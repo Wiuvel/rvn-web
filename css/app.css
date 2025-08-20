@@ -1,0 +1,67 @@
+.noise-bg {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(1200px 600px at 80% -10%, rgba(22,163,255,0.18), transparent 70%),
+    radial-gradient(800px 400px at -10% 50%, rgba(17,79,134,0.18), transparent 70%),
+    linear-gradient(180deg, rgba(17,17,20,0.2), transparent 30%);
+  filter: saturate(1.1);
+  pointer-events: none;
+}
+
+.glass {
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+@keyframes fade-shift {
+  0%   { opacity: 0; transform: translateY(6px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+.shift {
+  animation: fade-shift 0.4s ease;
+
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+.float {
+  animation: float 4s ease-in-out infinite;
+}
+
+.section-glow {
+  position: relative;
+  overflow: hidden;
+}
+.section-glow::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at top left, rgba(22,163,255,0.08), transparent 70%);
+  z-index: 0;
+}
+.section-glow > * {
+  position: relative;
+  z-index: 1;
+}
+
+.glow-text-white {
+  color: #fff;
+  text-shadow: 
+    0 0 10px rgba(255, 255, 255, 0.7),
+    0 0 20px rgba(255, 255, 255, 0.5),
+    0 0 40px rgba(255, 255, 255, 0.3),
+    0 0 80px rgba(255, 255, 255, 0.15);
+}
+
+html, body {
+  scrollbar-width: none;       /* Firefox */
+  -ms-overflow-style: none;    /* IE и старый Edge */
+}
+
+html::-webkit-scrollbar, 
+body::-webkit-scrollbar {
+  display: none;               /* Chrome, Safari, новый Edge */
+}
