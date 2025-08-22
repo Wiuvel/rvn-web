@@ -63,19 +63,19 @@
     .card-hover:hover { box-shadow: 0 0 20px rgba(22,163,255,0.5); transform: translateY(-4px); transition: all 0.3s ease; }
   </style>
   <style>
-  .fade-in {
-    opacity: 0;
-    transform: translateY(20px);
-    transition: all 0.8s ease-out;
-  }
-  .fade-in.show {
-    opacity: 1;
-    transform: translateY(0);
-  }
-  #particles-js {
-    pointer-events: none;
-    z-index: 0;
-  }
+    .fade-in {
+      opacity: 0;
+      transform: translateY(20px);
+      transition: all 0.8s ease-out;
+    }
+    .fade-in.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    #particles-js {
+      pointer-events: none;
+      z-index: 0;
+    }
   </style>
 </head>
 <body class="h-full bg-neutral-950 text-neutral-100 antialiased relative">
@@ -198,8 +198,7 @@
             <path d="M98 160l-5 12h7l4-10-6-2z" fill="#0c0f14"/>
             <path d="M116 162l-4 10h6l5-9-7-1z" fill="#0c0f14"/>
             <defs>
-              <radialGradient id="shadowGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse"
-                              gradientTransform="translate(110 200) rotate(90) scale(12 50)">
+              <radialGradient id="shadowGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(110 200) rotate(90) scale(12 50)">
                 <stop stop-color="#16a3ff" stop-opacity="0.4"/>
                 <stop offset="1" stop-color="#16a3ff" stop-opacity="0"/>
               </radialGradient>
@@ -623,25 +622,25 @@
   </script>
   <script src="https://cdn.jsdelivr.net/npm/particles.js"></script>
   <script>
-  particlesJS("particles-js", {
-    particles: {
-      number: { value: 20 },
-      color: { value: "#16a3ff" }, 
-      shape: { type: "circle" },
-      opacity: { value: 0.4 },
-      size: { value: 2, random: true },
-      line_linked: { enable: false },
-      move: { enable: true, speed: 0.6, direction: "none", random: true, straight: false, out_mode: "out" }
-    },
-    interactivity: {
-      detect_on: "canvas",
-      events: {
-        onhover: { enable: false },
-        onclick: { enable: false }
-      }
-    },
-    retina_detect: true
-  });
+    particlesJS("particles-js", {
+      particles: {
+        number: { value: 20 },
+        color: { value: "#16a3ff" }, 
+        shape: { type: "circle" },
+        opacity: { value: 0.4 },
+        size: { value: 2, random: true },
+        line_linked: { enable: false },
+        move: { enable: true, speed: 0.6, direction: "none", random: true, straight: false, out_mode: "out" }
+      },
+      interactivity: {
+        detect_on: "canvas",
+        events: {
+          onhover: { enable: false },
+          onclick: { enable: false }
+        }
+      },
+      retina_detect: true
+    });
   </script>  
 </body>
 </html>

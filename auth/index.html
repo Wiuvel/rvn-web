@@ -35,11 +35,22 @@
       border-color: rgba(22,163,255,0.5);
       box-shadow: 0 0 16px rgba(22,163,255,0.35);
     }
+    #particles-js {
+      pointer-events: none; 
+      z-index: 0;
+    }
+    #quote {
+      text-shadow: 0 0 8px rgba(22,163,255,0.6), 0 0 16px rgba(22,163,255,0.4);
+    }
+
+    .fade-in-up {
+      opacity: 1 !important;
+      transform: translate(-50%, 0) !important;
+    }
   </style>
+  <link rel="stylesheet" href="/css/app.css">
 </head>
 <body class="min-h-screen flex flex-col">
-
-  <!-- Header -->
   <header class="sticky top-0 z-50 border-b border-neutral-800/70 bg-neutral-950/70 backdrop-blur-xl">
     <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
       <div class="flex h-16 items-center">
@@ -50,16 +61,12 @@
       </div>
     </div>
   </header>
-
   <section class="flex-grow flex items-center justify-center px-4 sm:px-6 lg:px-8 py-12">
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-12 items-center w-full max-w-5xl">
-
-      <!-- authForm -->
+    <div id="particles-js" class="absolute inset-0"></div>
+    <div class="z-10 grid grid-cols-1 md:grid-cols-2 gap-12 items-center w-full max-w-5xl">
       <div x-data="authForms()" class="w-full max-w-md mx-auto">
         <div class="bg-neutral-900/80 backdrop-blur-xl p-8 rounded-2xl border border-neutral-800 shadow-lg animate-fadeIn">
           <h2 class="text-2xl font-semibold mb-6 text-center" x-text="tab==='register' ? 'Регистрация' : 'Вход'"></h2>
-
-          <!-- Reg -->
           <form x-show="tab==='register'" @submit.prevent="handleRegister" class="space-y-4">
             <input type="text" x-model="username" placeholder="Логин" required class="w-full px-4 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-white"/>
             <p class="text-red-500 text-sm mt-1" x-show="usernameError" x-text="usernameError"></p>
@@ -88,15 +95,12 @@
               <input type="checkbox" required class="mt-0.5 rounded border-neutral-700 bg-neutral-800"/>
               <span>Я согласен с <a href="/terms/" target="_blank" rel="noopener noreferrer" class="text-primary-400 hover:underline">Пользовательским соглашением</a> и <a href="/privacy/" target="_blank" rel="noopener noreferrer" class="text-primary-400 hover:underline">Политикой конфиденциальности</a>.</span>
             </div>
-
-            <!-- hCaptcha -->
             <div class="flex justify-center mt-4">
               <div class="h-captcha" 
                   data-sitekey="11ec60ae-6f54-4fe0-9dda-707293c02de6" 
                   data-callback="onCaptchaVerify">
               </div>
             </div>
-
             <input type="hidden" name="h-captcha-response" x-model="captchaResponse">
             <p x-show="globalError" class="text-red-400 text-sm text-center mt-2" x-text="globalError"></p>
             <div class="flex justify-center">
@@ -104,8 +108,6 @@
             </div>
             <p class="text-center text-sm text-neutral-400">Уже есть аккаунт? <a href="#" @click.prevent="tab='login'; resetForm()" class="text-primary-400 hover:underline">Войти</a></p>
           </form>
-
-          <!-- Authorization -->
           <form x-show="tab==='login'" @submit.prevent="handleLogin" class="space-y-4">
             <input type="text" x-model="username" placeholder="Логин" required class="w-full px-4 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-white"/>
             <p class="text-red-500 text-sm mt-1" x-show="usernameError" x-text="usernameError"></p>
@@ -120,34 +122,43 @@
           </form>
         </div>
       </div>
+    </div>
+    <div id="quote" class="fixed bottom-4 left-1/2 transform -translate-x-1/2 text-neutral-400 text-sm animate-fadeIn z-10">
+      [ID: ––––––]
+    </div>
+    <script>
+      async function setUserID() {
+        try {
+          const res = await fetch("https://api.ipify.org?format=json");
+          const data = await res.json();
+          const ip = data.ip;
 
-      <!-- Mascot -->
-      <div class="hidden md:flex justify-center animate-float">
-        <svg width="220" height="220" viewBox="0 0 220 220" fill="none" xmlns="http://www.w3.org/2000/svg"
-             class="h-56 w-auto drop-shadow-[0_0_18px_rgba(22,163,255,0.35)]">
-          <ellipse cx="110" cy="200" rx="60" ry="14" fill="url(#shadowGlow)" opacity="0.6"/>
-          <path d="M70 120c0-35 30-60 65-50 25 7 40 30 35 55-6 28-33 42-65 40-28-2-35-15-35-45z"
-                fill="#0c0f14" stroke="#16a3ff" stroke-width="2" stroke-opacity="0.4"/>
-          <path d="M75 115c-15 15-25 35-20 50 4 12 15 20 25 15 10-6 10-25 15-35 5-12 10-20 20-25-15-5-25-5-40-5z"
-                fill="#111827" stroke="#16a3ff" stroke-opacity="0.25"/>
-          <circle cx="145" cy="90" r="22" fill="#0c0f14" stroke="#16a3ff" stroke-opacity="0.5"/>
-          <circle cx="152" cy="88" r="5" fill="white"/>
-          <circle cx="153" cy="88" r="2" fill="#0c0f14"/>
-          <path d="M166 90l25 8-25 8c2-4 3-10 0-16z" fill="#f5a524"/>
-          <path d="M95 170l-6 14h8l5-12-7-2z" fill="#0c0f14"/>
-          <path d="M115 172l-5 12h7l5-10-7-2z" fill="#0c0f14"/>
-          <defs>
-            <radialGradient id="shadowGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse"
-                            gradientTransform="translate(110 200) rotate(90) scale(14 60)">
-              <stop stop-color="#16a3ff" stop-opacity="0.45"/>
-              <stop offset="1" stop-color="#16a3ff" stop-opacity="0"/>
-            </radialGradient>
-          </defs>
-        </svg>
-      </div>
+          const hash = ip.split("")
+            .map(c => c.charCodeAt(0))
+            .reduce((a, b) => a + b, 0);
+
+          const id = (hash % 1000000).toString().padStart(6, "0");
+
+          const el = document.getElementById("quote");
+          el.textContent = `[ID: ${id}]`;
+
+          setTimeout(() => {
+            el.classList.add("fade-in-up");
+          }, 200);
+        } catch (err) {
+          const el = document.getElementById("quote");
+          el.textContent = "[ID: offline]";
+          setTimeout(() => {
+            el.classList.add("fade-in-up");
+          }, 200);
+        }
+      }
+      setUserID();
+    </script>
+    <div class="hidden md:flex fixed bottom-0 right-50 pointer-events-none z-0">
+      <img src="/static/splash.png" class="max-h-screen drop-shadow-[0_0_30px_rgba(22,163,255,0.35)]" loading="lazy" decoding="async"/>
     </div>
   </section>
-
   <script>
     function authForms() {
       return {
@@ -263,6 +274,28 @@
     function onCaptchaVerify(token) {
       window.captchaToken = token;
     }
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/particles.js"></script>
+  <script>
+    particlesJS("particles-js", {
+      particles: {
+        number: { value: 30 },
+        color: { value: "#16a3ff" },
+        shape: { type: "circle" },
+        opacity: { value: 0.4 },
+        size: { value: 2, random: true },
+        line_linked: { enable: false },
+        move: { enable: true, speed: 0.6, direction: "none", random: true, straight: false, out_mode: "out" }
+      },
+      interactivity: {
+        detect_on: "canvas",
+        events: {
+          onhover: { enable: false },
+          onclick: { enable: false }
+        }
+      },
+      retina_detect: true
+    });
   </script>
 </body>
 </html>
