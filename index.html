@@ -51,30 +51,20 @@
       }
     }
   </script>
-  <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <script defer src="https://unpkg.com/alpinejs@3.14.9/dist/cdn.min.js" integrity="sha384-9Ax3MmS9AClxJyd5/zafcXXjxmwFhZCdsT6HJoJjarvCaAkJlk5QDzjLJm+Wdx5F" crossorigin="anonymous" nonce="{{nonce}}"></script>
   <link rel="stylesheet" href="css/app.css" />
   <style>
-    .tilt:hover {
-      transform: perspective(600px) rotateX(4deg) rotateY(-4deg) scale(1.03);
-      transition: transform 0.3s ease;
-    }
+    .tilt:hover { transform: perspective(600px) rotateX(4deg) rotateY(-4deg) scale(1.03); transition: transform 0.3s ease; }
+    .card-hover:hover { box-shadow: 0 0 20px rgba(22,163,255,0.5); transform: translateY(-4px); transition: all 0.3s ease; }
     .fade-section { opacity: 0; transform: translateY(20px); transition: all 0.7s ease-out; }
     .fade-section.visible { opacity: 1; transform: translateY(0); }
-    .card-hover:hover { box-shadow: 0 0 20px rgba(22,163,255,0.5); transform: translateY(-4px); transition: all 0.3s ease; }
-  </style>
-  <style>
-    .fade-in {
-      opacity: 0;
-      transform: translateY(20px);
-      transition: all 0.8s ease-out;
-    }
-    .fade-in.show {
-      opacity: 1;
-      transform: translateY(0);
-    }
-    #particles-js {
-      pointer-events: none;
-      z-index: 0;
+    .fade-in { opacity: 0; transform: translateY(20px); transition: all 0.8s ease-out; }
+    .fade-in.show { opacity: 1; transform: translateY(0); }
+    #particles-js { pointer-events: none; z-index: 0; }
+    .wing-animation { animation: flap 2s ease-in-out infinite; transform-origin: center; }
+    @keyframes flap {
+      0%, 100% { transform: rotate(0deg); }
+      50% { transform: rotate(3deg); }
     }
   </style>
 </head>
@@ -83,9 +73,7 @@
   <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
     <div class="flex h-16 items-center justify-between">
       <a href="#home" class="flex items-center gap-2">
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" class="text-primary-400">
-          <path d="M12 2l8 4v6c0 5-4 9-8 10-4-1-8-5-8-10V6l8-4Z" stroke="currentColor" stroke-width="1.4"/>
-        </svg>
+        <img src="/static/logo.png" alt="RVNPrivate" class="h-8 w-8">
         <span class="font-semibold tracking-tight">RVNPrivate</span>
       </a>
       <nav class="hidden md:flex items-center gap-8 text-sm text-neutral-300">
@@ -102,7 +90,7 @@
       <div class="flex items-center gap-4 md:hidden">
         <a href="/auth/" class="flex items-center gap-1 text-neutral-300 hover:text-white transition"
            aria-label="Авторизация">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <svg xmlns="https://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <path d="M3 21h18"/>
             <path d="M14 21V5.5a2 2 0 0 0-1.106-1.789l-4-2A2 2 0 0 0 6 3.5V21"/>
             <path d="M10 12h.01"/>
@@ -110,10 +98,10 @@
           <span class="text-sm">Авторизация</span>
         </a>
         <button @click="open = !open" class="text-neutral-300 hover:text-white focus:outline-none" aria-label="Открыть меню">
-          <svg x-show="!open" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg x-show="!open" xmlns="https://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
           </svg>
-          <svg x-show="open" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg x-show="open" xmlns="https://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
           </svg>
         </button>
@@ -184,7 +172,7 @@
           </div>
         </div>
         <div class="hidden md:flex justify-center animate-float">
-          <svg width="220" height="220" viewBox="0 0 220 220" fill="none" xmlns="http://www.w3.org/2000/svg"
+          <svg width="220" height="220" viewBox="0 0 220 220" fill="none" xmlns="https://www.w3.org/2000/svg"
               class="h-48 w-auto drop-shadow-[0_0_14px_rgba(22,163,255,0.35)]">
             <ellipse cx="110" cy="200" rx="50" ry="12" fill="url(#shadowGlow)" opacity="0.6"/>
             <path d="M75 120c0-30 28-52 58-43 22 6 36 26 32 48-5 24-29 36-58 34-24-2-32-13-32-39z"
@@ -205,20 +193,6 @@
             </defs>
           </svg>
         </div>
-        <style>
-          .wing-animation {
-            animation: flap 2s ease-in-out infinite;
-            transform-origin: center;
-          }
-          @keyframes flap {
-            0%, 100% {
-              transform: rotate(0deg);
-            }
-            50% {
-              transform: rotate(3deg);
-            }
-          }
-        </style>
       </div>
     </div>
   </div>
@@ -321,7 +295,7 @@
   }
 </style>
 <section id="pricing" class="relative border-t border-neutral-800/70 bg-neutral-950 overflow-hidden fade-in">
-  <svg class="absolute inset-0 w-full h-full opacity-20" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
+  <svg class="absolute inset-0 w-full h-full opacity-20" xmlns="https://www.w3.org/2000/svg" preserveAspectRatio="none">
     <defs>
       <radialGradient id="grad" cx="50%" cy="50%" r="75%" fx="50%" fy="50%">
         <stop offset="0%" stop-color="#16a3ff" stop-opacity="0.25"/>
@@ -344,7 +318,7 @@
     <div class="mt-12 grid grid-cols-1 md:grid-cols-3 gap-8">
       <div class="relative group rounded-3xl border border-neutral-800 bg-neutral-900 p-6 flex flex-col text-center hover:border-primary-500/60 hover:scale-[1.03] transition">
         <div class="flex justify-center mb-4 text-primary-400">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-14 w-14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+          <svg xmlns="https://www.w3.org/2000/svg" class="h-14 w-14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
             <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V7a4.5 4.5 0 10-9 0v3.5M6.75 10.5h10.5a1.5 1.5 0 011.5 1.5v7.5a1.5 1.5 0 01-1.5 1.5H6.75a1.5 1.5 0 01-1.5-1.5V12a1.5 1.5 0 011.5-1.5z"/>
           </svg>
         </div>
@@ -362,7 +336,7 @@
       <div class="relative group rounded-3xl border border-primary-500/30 bg-neutral-900 p-6 shadow-soft flex flex-col text-center hover:border-primary-500 hover:scale-[1.05] transition">
         <span class="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-primary-500 px-3 py-1 text-xs font-medium text-neutral-900">Популярно</span>
         <div class="flex justify-center mb-4 text-primary-400">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-14 w-14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+          <svg xmlns="https://www.w3.org/2000/svg" class="h-14 w-14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
             <path stroke-linecap="round" stroke-linejoin="round" d="M12 15c1.38 0 2.5-1.12 2.5-2.5S13.38 10 12 10s-2.5 1.12-2.5 2.5S10.62 15 12 15z"/>
             <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 20h15a2 2 0 002-2v-7.586a2 2 0 00-.586-1.414L14 2.586a2 2 0 00-2.828 0L3.086 9a2 2 0 00-.586 1.414V18a2 2 0 002 2z"/>
           </svg>
@@ -380,7 +354,7 @@
       </div>
       <div class="relative group rounded-3xl border border-neutral-800 bg-neutral-900 p-6 flex flex-col text-center hover:border-primary-400/40 hover:scale-[1.03] transition">
         <div class="flex justify-center mb-4 text-primary-400">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-14 w-14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+          <svg xmlns="https://www.w3.org/2000/svg" class="h-14 w-14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
             <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m2 0a8 8 0 11-16 0 8 8 0 0116 0z"/>
           </svg>
         </div>
@@ -408,7 +382,7 @@
           <div class="mt-6 flex flex-wrap gap-3 text-sm">
             <a href="#" onclick="openHiddify(); return false;" class="rounded-xl border border-neutral-800 px-4 py-2 hover:bg-neutral-900 hover:scale-105">Hiddify (Android/iOS)</a>
             <a href="#" onclick="openV2rayTun(); return false;" class="rounded-xl border border-neutral-800 px-4 py-2 hover:bg-neutral-900 hover:scale-105">v2RayTun (Android/iOS)</a>
-            <a href="https://storage.v2raytun.com/v2RayTun_Setup.exe" class="rounded-xl border border-neutral-800 px-4 py-2 hover:bg-neutral-900 hover:scale-105" target="_blank">Windows</a>
+            <a href="https://storage.v2raytun.com/v2RayTun_Setup.exe" class="rounded-xl border border-neutral-800 px-4 py-2 hover:bg-neutral-900 hover:scale-105" target="_blank" rel="noopener noreferrer">Windows</a>
           </div>
         </div>
         <div class="relative">
@@ -620,7 +594,7 @@
       elements.forEach(el => observer.observe(el));
     });
   </script>
-  <script src="https://cdn.jsdelivr.net/npm/particles.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.js" integrity="sha384-AWFROZ10DoeXcNjhoQe0agryexFsipZEA17Cde6/tknpOUacvUGk27vXQ2a6ljSt" crossorigin="anonymous" nonce="{{nonce}}"></script>
   <script>
     particlesJS("particles-js", {
       particles: {

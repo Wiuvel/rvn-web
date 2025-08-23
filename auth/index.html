@@ -6,8 +6,8 @@
   <title>Авторизация | RVNPrivate</title>
   <link rel="icon" href="/static/favicon.ico" />
   <script src="https://cdn.tailwindcss.com"></script>
-  <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
-  <script src="https://js.hcaptcha.com/1/api.js" async defer></script>
+  <script defer src="https://unpkg.com/alpinejs@3.14.9/dist/cdn.min.js" integrity="sha384-9Ax3MmS9AClxJyd5/zafcXXjxmwFhZCdsT6HJoJjarvCaAkJlk5QDzjLJm+Wdx5F" crossorigin="anonymous" nonce="{{nonce}}"></script>
+  <script src="https://js.hcaptcha.com/1/api.js" async defer nonce="{{nonce}}"></script>
   <style>
     body {
       background: radial-gradient(circle at top, #0f172a, #020617);
@@ -42,10 +42,20 @@
     #quote {
       text-shadow: 0 0 8px rgba(22,163,255,0.6), 0 0 16px rgba(22,163,255,0.4);
     }
-
     .fade-in-up {
       opacity: 1 !important;
       transform: translate(-50%, 0) !important;
+    }
+    .tree-glow {
+      animation: glow 5s ease-in-out infinite;
+    }
+    @keyframes glow {
+      0%, 100% {
+        filter: drop-shadow(0 0 20px rgba(22,163,255,0.3));
+      }
+      50% {
+        filter: drop-shadow(0 0 30px rgba(22,163,255,0.6));
+      }
     }
   </style>
   <link rel="stylesheet" href="/css/app.css">
@@ -156,7 +166,7 @@
       setUserID();
     </script>
     <div class="hidden md:flex fixed bottom-0 right-50 pointer-events-none z-0">
-      <img src="/static/splash.png" class="max-h-screen drop-shadow-[0_0_30px_rgba(22,163,255,0.35)]" loading="lazy" decoding="async"/>
+      <img src="/static/splash.png" class="tree-glow max-h-screen drop-shadow-[0_0_5px_rgba(22,163,255,0.35)]" loading="lazy" decoding="async"/>
     </div>
   </section>
   <script>
@@ -269,13 +279,12 @@
         }
       }
     }
-
     window.captchaToken = '';
     function onCaptchaVerify(token) {
       window.captchaToken = token;
     }
   </script>
-  <script src="https://cdn.jsdelivr.net/npm/particles.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.js" integrity="sha384-AWFROZ10DoeXcNjhoQe0agryexFsipZEA17Cde6/tknpOUacvUGk27vXQ2a6ljSt" crossorigin="anonymous" nonce="{{nonce}}"></script>
   <script>
     particlesJS("particles-js", {
       particles: {
