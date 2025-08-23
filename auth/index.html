@@ -6,8 +6,8 @@
   <title>Авторизация | RVNPrivate</title>
   <link rel="icon" href="/static/favicon.ico" />
   <script src="https://cdn.tailwindcss.com"></script>
-  <script defer src="https://unpkg.com/alpinejs@3.14.9/dist/cdn.min.js" integrity="sha384-9Ax3MmS9AClxJyd5/zafcXXjxmwFhZCdsT6HJoJjarvCaAkJlk5QDzjLJm+Wdx5F" crossorigin="anonymous" nonce="{{nonce}}"></script>
-  <script src="https://js.hcaptcha.com/1/api.js" async defer nonce="{{nonce}}"></script>
+  <script defer src="https://unpkg.com/alpinejs@3.14.9/dist/cdn.min.js" integrity="sha384-9Ax3MmS9AClxJyd5/zafcXXjxmwFhZCdsT6HJoJjarvCaAkJlk5QDzjLJm+Wdx5F" crossorigin="anonymous"></script>
+  <script src="https://js.hcaptcha.com/1/api.js" async defer></script>
   <style>
     body {
       background: radial-gradient(circle at top, #0f172a, #020617);
@@ -166,7 +166,7 @@
       setUserID();
     </script>
     <div class="hidden md:flex fixed bottom-0 right-50 pointer-events-none z-0">
-      <img src="/static/splash.png" class="tree-glow max-h-screen drop-shadow-[0_0_5px_rgba(22,163,255,0.35)]" loading="lazy" decoding="async"/>
+      <img src="/static/splash-night.png" class="tree-glow max-h-screen drop-shadow-[0_0_5px_rgba(22,163,255,0.35)]" loading="lazy" decoding="async"/>
     </div>
   </section>
   <script>
@@ -284,7 +284,7 @@
       window.captchaToken = token;
     }
   </script>
-  <script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.js" integrity="sha384-AWFROZ10DoeXcNjhoQe0agryexFsipZEA17Cde6/tknpOUacvUGk27vXQ2a6ljSt" crossorigin="anonymous" nonce="{{nonce}}"></script>
+  <script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.js" integrity="sha384-AWFROZ10DoeXcNjhoQe0agryexFsipZEA17Cde6/tknpOUacvUGk27vXQ2a6ljSt" crossorigin="anonymous"></script>
   <script>
     particlesJS("particles-js", {
       particles: {
