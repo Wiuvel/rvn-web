@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="ru" class="h-full bg-neutral-950 text-neutral-100 antialiased">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ошибка 404 — Страница не найдена</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="flex items-center justify-center h-screen bg-neutral-950 text-center px-6">
+  <div>
+    <h1 class="text-6xl font-bold text-primary-500 mb-6">404</h1>
+    <p class="text-xl text-neutral-300 mb-8">К сожалению, страница не найдена.</p>
+    <a href="/" class="rounded-2xl bg-primary-500 hover:bg-primary-400 text-white px-6 py-3 font-medium shadow-lg transition">
+      Вернуться на главную
+    </a>
+  </div>
+</body>
+</html>
