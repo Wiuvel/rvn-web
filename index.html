@@ -380,8 +380,8 @@
           <h2 class="text-3xl font-semibold">Поддерживаемые приложения</h2>
           <p class="mt-2 text-neutral-400">Работает с Hiddify, v2RayTun и другими клиентами. Просто импортируйте профиль или отсканируйте QR-код.</p>
           <div class="mt-6 flex flex-wrap gap-3 text-sm">
-            <a href="#" onclick="openHiddify(); return false;" class="rounded-xl border border-neutral-800 px-4 py-2 hover:bg-neutral-900 hover:scale-105">Hiddify (Android/iOS)</a>
-            <a href="#" onclick="openV2rayTun(); return false;" class="rounded-xl border border-neutral-800 px-4 py-2 hover:bg-neutral-900 hover:scale-105">v2RayTun (Android/iOS)</a>
+            <a href="#" id="btn-hiddify"class="rounded-xl border border-neutral-800 px-4 py-2 hover:bg-neutral-900 hover:scale-105">Hiddify (Android/iOS)</a>
+            <a href="#" id="btn-v2raytun" class="rounded-xl border border-neutral-800 px-4 py-2 hover:bg-neutral-900 hover:scale-105">v2RayTun (Android/iOS)</a>
             <a href="https://storage.v2raytun.com/v2RayTun_Setup.exe" class="rounded-xl border border-neutral-800 px-4 py-2 hover:bg-neutral-900 hover:scale-105" target="_blank" rel="noopener noreferrer">Windows</a>
           </div>
         </div>
@@ -415,7 +415,6 @@
         alert("Откройте страницу с телефона, чтобы скачать приложение.");
       }
     }
-
     function openV2rayTun() {
       const ua = navigator.userAgent || navigator.vendor || window.opera;
       if (/iPad|iPhone|iPod/.test(ua) && !window.MSStream) {
@@ -426,6 +425,17 @@
         alert("Откройте страницу с телефона, чтобы скачать приложение.");
       }
     }
+    document.addEventListener("DOMContentLoaded", () => {
+      document.getElementById("btn-hiddify").addEventListener("click", (e) => {
+        e.preventDefault();
+        openHiddify();
+      });
+
+      document.getElementById("btn-v2raytun").addEventListener("click", (e) => {
+        e.preventDefault();
+        openV2rayTun();
+      });
+    });
   </script>
 <section id="faq" class="border-t border-neutral-800/70 fade-in">
   <div class="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8 py-20" x-data="{open:null}">
@@ -532,23 +542,39 @@
       <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
         <div>
           <div class="flex items-center gap-2 text-neutral-200">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" class="text-primary-400"><path d="M12 2l8 4v6c0 5-4 9-8 10-4-1-8-5-8-10V6l8-4Z" stroke="currentColor" stroke-width="1.4"/></svg>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" class="text-primary-400">
+              <path d="M12 2l8 4v6c0 5-4 9-8 10-4-1-8-5-8-10V6l8-4Z" stroke="currentColor" stroke-width="1.4"/>
+            </svg>
             RVNPrivate
           </div>
-          <p class="mt-3">Сайт в разработке</p>
+          <p class="mt-3">Приватность без компромиссов</p>
+          <div class="mt-4 flex items-center gap-4">
+            <a href="/contacts" class="flex items-center gap-2 hover:text-neutral-200">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3 8l9 6 9-6M4 6h16a1 1 0 011 1v10a1 1 0 01-1 1H4a1 1 0 01-1-1V7a1 1 0 011-1z"/>
+              </svg>
+              Контакты
+            </a>
+            <a href="https://t.me/" target="_blank" rel="noopener noreferrer" class="flex items-center gap-2 hover:text-neutral-200">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-neutral-400" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M9.999 15.17l-.394 5.556c.562 0 .805-.241 1.099-.529l2.635-2.516 5.461 4.043c1.001.551 1.716.264 1.96-.924l3.555-16.725c.314-1.46-.527-2.03-1.49-1.675L1.51 9.043c-1.438.56-1.416 1.364-.245 1.733l5.688 1.769L18.631 5.59c.6-.394 1.149-.176.698.217"/>
+              </svg>
+              Telegram
+            </a>
+          </div>
         </div>
         <div>
-          <div class="text-neutral-300 font-medium">Команда</div>
+          <div class="text-neutral-300 font-medium">Информация</div>
           <ul class="mt-3 space-y-2">
-            <li><a href="#" class="hover:text-neutral-200">О нас</a></li>
-            <li><a href="#" class="hover:text-neutral-200">Roadmap</a></li>
+            <li><a href="#" class="hover:text-neutral-200">О проекте</a></li>
+            <li><a href="#" class="hover:text-neutral-200">Полезные статьи</a></li>
           </ul>
         </div>
         <div>
           <div class="text-neutral-300 font-medium">Поддержка</div>
           <ul class="mt-3 space-y-2">
-            <li><a href="#faq" class="hover:text-neutral-200">Центр помощи</a></li>
-            <li><a href="mailto:privacy@rvn.guru" class="hover:text-neutral-200">support@rvn.guru</a></li>
+            <li><a href="#" class="hover:text-neutral-200">Центр помощи</a></li>
+            <li><a href="#" class="hover:text-neutral-200">Информация о сайте</a></li>            
           </ul>
         </div>
         <div>
@@ -556,15 +582,21 @@
           <ul class="mt-3 space-y-2">
             <li><a href="/privacy/" class="hover:text-neutral-200">Политика конфиденциальности</a></li>
             <li><a href="/terms/" class="hover:text-neutral-200">Пользовательское соглашение</a></li>
+            <li>
+              <a href="/offer/" class="hover:text-neutral-200">Публичная оферта</a>
+              &nbsp;&amp;&nbsp;
+              <a href="/refunds/" class="hover:text-neutral-200">Политика возвратов</a>
+            </li>
           </ul>
         </div>
       </div>
-      <div class="mt-10 flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div class="mt-10 flex flex-col sm:flex-row items-center justify-between gap-6">
         <div>© <span id="year"></span> RVNPrivate. Все права защищены.</div>
-        <div class="flex items-center gap-4">
-          <a href="#" class="hover:text-neutral-200">Контакты</a>
-          <a href="#" class="hover:text-neutral-200">Telegram</a>
-          <a href="#" class="hover:text-neutral-200">GitHub</a>
+        <div class="hidden sm:flex items-center gap-3 flex-wrap justify-center mr-5">
+          <img src="static/payments/spb.svg" alt="СПБ" class="h-8">
+          <img src="static/payments/mir.svg" alt="МИР" class="h-5">
+          <img src="static/payments/visa.svg" alt="VISA" class="h-10">
+          <img src="static/payments/mastercard.svg" alt="Mastercard" class="h-10">
         </div>
       </div>
     </div>
