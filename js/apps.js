@@ -8,7 +8,6 @@ function openHiddify() {
     alert("Откройте страницу с телефона, чтобы скачать приложение.");
   }
 }
-
 function openV2rayTun() {
   const ua = navigator.userAgent || navigator.vendor || window.opera;
   if (/iPad|iPhone|iPod/.test(ua) && !window.MSStream) {
@@ -19,6 +18,14 @@ function openV2rayTun() {
     alert("Откройте страницу с телефона, чтобы скачать приложение.");
   }
 }
+document.addEventListener("DOMContentLoaded", () => {
+  document.getElementById("btn-hiddify").addEventListener("click", (e) => {
+    e.preventDefault();
+    openHiddify();
+  });
 
-window.openHiddify = openHiddify;
-window.openV2rayTun = openV2rayTun;
+  document.getElementById("btn-v2raytun").addEventListener("click", (e) => {
+    e.preventDefault();
+    openV2rayTun();
+  });
+});
