@@ -82,20 +82,9 @@
             <p class="text-red-500 text-sm mt-1" x-show="usernameError" x-text="usernameError"></p>
             <div class="relative">
               <input :type="showPassword ? 'text' : 'password'" x-model="password" placeholder="Пароль" required class="w-full px-4 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-white pr-10" @input="checkPassword(); checkConfirmPassword()"/>
-              <button type="button" 
-                      @click="showPassword = !showPassword"
-                      class="absolute right-3 top-4 text-gray-500 hover:text-gray-700">
-                <svg xmlns="http://www.w3.org/2000/svg" 
-                    :class="{'hidden': showPassword}" 
-                    class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path d="M10 3C5 3 1.73 7.11 1 10c.73 2.89 4 7 9 7s8.27-4.11 9-7c-.73-2.89-4-7-9-7zm0 12c-2.76 0-5-2.24-5-5 s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/>
-                  <path d="M10 8a2 2 0 100 4 2 2 0 000-4z"/>
-                </svg>
-                <svg xmlns="http://www.w3.org/2000/svg" 
-                    :class="{'hidden': !showPassword}" 
-                    class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path d="M4.707 3.293a1 1 0 00-1.414 1.414l12.999 13a1 1 0 001.414-1.415l-2.32-2.319C16.924 12.15 18 10.172 18 10c-.73-2.89-4-7-9-7-1.276 0-2.464.3-3.536.835L4.707 3.293zM9.88 7.465A3 3 0 0113 10c0 .437-.095.852-.265 1.224l-2.856-2.856zM7.1 8.685l2.856 2.856A3 3 0 017 10c0-.437.095-.852.265-1.224L7.1 8.685z"/>
-                </svg>
+              <button type="button" @click="showPassword = !showPassword" class="absolute right-3 top-3.5 text-gray-500 hover:text-gray-700">
+                <img src="/static/icons/pass-hideoff.svg" :class="{'hidden': showPassword}" class="h-6 transition hover:brightness-75">
+                <img src="/static/icons/pass-hide.svg" :class="{'hidden': !showPassword}" class="h-6 transition hover:brightness-75">
               </button>
             </div>
             <p class="text-red-400 text-xs mt-1" x-show="passwordError" x-text="passwordError"></p>
@@ -133,40 +122,8 @@
         </div>
       </div>
     </div>
-    <div id="quote" class="fixed bottom-6 left-1/2 transform -translate-x-1/2 text-neutral-400 text-sm opacity-0 transition duration-700 ease-out z-10">
-      [ID: ––––––]
-    </div>
-    <script>
-      async function setUserID() {
-        try {
-          const res = await fetch("https://api.ipify.org?format=json");
-          const data = await res.json();
-          const ip = data.ip;
-
-          const hash = ip.split("")
-            .map(c => c.charCodeAt(0))
-            .reduce((a, b) => a + b, 0);
-
-          const id = (hash % 1000000).toString().padStart(6, "0");
-
-          const el = document.getElementById("quote");
-          el.textContent = `[ID: ${id}]`;
-
-          setTimeout(() => {
-            el.classList.add("fade-in-up");
-          }, 200);
-        } catch (err) {
-          const el = document.getElementById("quote");
-          el.textContent = "[ID: offline]";
-          setTimeout(() => {
-            el.classList.add("fade-in-up");
-          }, 200);
-        }
-      }
-      setUserID();
-    </script>
     <div class="hidden md:flex fixed bottom-0 right-50 pointer-events-none z-0">
-      <img src="/static/splash-night.png" class="tree-glow max-h-screen drop-shadow-[0_0_5px_rgba(22,163,255,0.35)]" loading="lazy" decoding="async"/>
+      <img src="/static/templates/login-bg-tree.png" class="tree-glow max-h-screen drop-shadow-[0_0_5px_rgba(22,163,255,0.35)]" loading="lazy" decoding="async"/>
     </div>
   </section>
   <script>
@@ -276,6 +233,11 @@
           this.passwordError = '';
           this.confirmPasswordError = '';
           this.passwordValid = false;
+          if (window.hcaptcha) {
+            hcaptcha.reset();
+          }
+          window.captchaToken = '';
+          this.captchaResponse = '';
         }
       }
     }

@@ -8,10 +8,10 @@ document.addEventListener("DOMContentLoaded", () => {
   const flagEl = document.getElementById("server-flag");
 
   const servers = [
-    { country: "Германия", code: "DE-1", flag: "https://flagcdn.com/w20/de.png" },
-    { country: "Германия", code: "DE-2", flag: "https://flagcdn.com/w20/de.png" },
-    { country: "Швеция", code: "SWE-1", flag: "https://flagcdn.com/w20/se.png" },
-    { country: "Швеция", code: "SWE-2", flag: "https://flagcdn.com/w20/se.png" }
+    { country: "Германия", code: "DE-1", flag: "https://rvn.guru/static/flags/de.svg" },
+    { country: "Германия", code: "DE-2", flag: "https://rvn.guru/static/flags/de.svg" },
+    { country: "Швеция", code: "SWE-1", flag: "https://rvn.guru/static/flags/swe.svg" },
+    { country: "Швеция", code: "SWE-2", flag: "https://rvn.guru/static/flags/swe.svg" }
   ];
 
   let ping = 50, connected = false;
