@@ -52,7 +52,7 @@
     }
   </script>
   <script defer src="https://unpkg.com/alpinejs@3.14.9/dist/cdn.min.js" integrity="sha384-9Ax3MmS9AClxJyd5/zafcXXjxmwFhZCdsT6HJoJjarvCaAkJlk5QDzjLJm+Wdx5F" crossorigin="anonymous"></script>
-  <link rel="stylesheet" href="css/app.css" />
+  <link rel="stylesheet" href="css/main/app.css" />
   <style>
     .tilt:hover { transform: perspective(600px) rotateX(4deg) rotateY(-4deg) scale(1.03); transition: transform 0.3s ease; }
     .card-hover:hover { box-shadow: 0 0 20px rgba(22,163,255,0.5); transform: translateY(-4px); transition: all 0.3s ease; }
@@ -72,7 +72,7 @@
 <header x-data="{ open: false }" class="sticky top-0 z-50 border-b border-neutral-800/70 bg-neutral-950/70 backdrop-blur-xl animate-fadeIn">
   <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
     <div class="flex h-16 items-center justify-between">
-      <a href="#home" class="flex items-center gap-2">
+      <a href="/" class="flex items-center gap-2">
         <img src="/static/logo.svg" alt="RVNPrivate" class="h-8 w-8">
         <span class="font-semibold tracking-tight">RVNPrivate</span>
       </a>
@@ -132,7 +132,7 @@
           <div>Поддержка 24/7</div>
         </div>
       </div>
-      <div class="relative animate-fadeIn flex items-end">
+      <div class="hidden sm:flex relative animate-fadeIn flex items-end">
         <div class="relative rounded-3xl border border-neutral-800 bg-neutral-900 p-2 shadow-soft flex-shrink-0 w-full sm:w-auto">
           <div class="absolute -inset-8 rounded-3xl bg-gradient-to-br from-primary-500/20 to-transparent blur-2xl"></div>
           <div class="relative rounded-2xl border border-neutral-800 bg-black p-6 animate-fadeIn">
@@ -552,10 +552,10 @@
       <div class="mt-10 flex flex-col sm:flex-row items-center justify-between gap-6">
         <div>© <span id="year"></span> RVNPrivate. Все права защищены.</div>
         <div class="hidden sm:flex items-center gap-4 flex-wrap justify-center mr-2 select-none pointer-events-none drop-shadow-[0_0_50px_rgba(22,163,255,0.8)]">
-          <img src="/static/payments/merchant_spb.svg" alt="spb" class="h-8">
-          <img src="/static/payments/merchant_mir.svg" alt="mir" class="h-5">
-          <img src="/static/payments/merchant_visa.svg" alt="visa" class="h-10">
-          <img src="/static/payments/merchant_mcard.svg" alt="mastercard" class="h-10">
+          <img src="/static/payments/merchant-spb.svg" alt="spb" class="h-8">
+          <img src="/static/payments/merchant-mir.svg" alt="mir" class="h-5">
+          <img src="/static/payments/merchant-visa.svg" alt="visa" class="h-10">
+          <img src="/static/payments/merchant-mcard.svg" alt="mastercard" class="h-10">
         </div>
       </div>
     </div>
@@ -566,8 +566,8 @@
       <button class="font-bold no-underline text-[#25B3FF] ml-2" @click="show=false">OK!</button>
     </div>
   </div>
-  <script src="js/hero.js"></script>
-  <script src="js/apps.js"></script>
+  <script src="js/main/connection.js"></script>
+  <script src="js/main/apps.js"></script>
   <script>
     document.getElementById('year').textContent = new Date().getFullYear();
     document.addEventListener("DOMContentLoaded", () => {

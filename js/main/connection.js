@@ -14,7 +14,8 @@ document.addEventListener("DOMContentLoaded", () => {
     { country: "Швеция", code: "SWE-2", flag: "https://rvn.guru/static/flags/swe.svg" }
   ];
 
-  let ping = 50, connected = false;
+  let ping = 45 + Math.random() * 5;
+  let connected = false;
 
   function updatePing() {
     if (!connected) return;
@@ -43,7 +44,12 @@ document.addEventListener("DOMContentLoaded", () => {
     sessionEl.textContent = "Сеанс защищён";
     sessionEl.classList.add("shift");
 
-    statusEl.innerHTML = '<span class="inline-block h-2 w-2 rounded-full bg-green-400 animate-pulse"></span> Подключено';
+    statusEl.textContent = "";
+    const dot = document.createElement("span");
+    dot.classList.add("inline-block", "h-2", "w-2", "rounded-full", "bg-green-400", "animate-pulse");
+    statusEl.appendChild(dot);
+    statusEl.appendChild(document.createTextNode(" Подключено"));
+
     statusEl.classList.remove("text-yellow-400");
     statusEl.classList.add("text-green-400", "shift");
 
@@ -58,9 +64,12 @@ document.addEventListener("DOMContentLoaded", () => {
   function chooseServer() {
     loaderEl.classList.add("hidden");
     serverEl.classList.remove("hidden");
+
     const chosen = servers[Math.floor(Math.random() * servers.length)];
     nameEl.textContent = `${chosen.country} · ${chosen.code}`;
     flagEl.src = chosen.flag;
+    flagEl.alt = chosen.country;
+
     serverEl.classList.add("shift");
   }
 
