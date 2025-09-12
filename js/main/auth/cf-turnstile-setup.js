@@ -62,11 +62,20 @@
 
     window.resetAllTurnstiles = function () {
         if (window.turnstile) {
-            document.querySelectorAll('.cf-turnstile[data-rendered="true"]').forEach(el => {
-                try {
-                    window.turnstile.reset(el);
-                } catch (e) {
-                    console.warn("Skip reset: not rendered", el);
+            document.querySelectorAll('.cf-turnstile-manual').forEach((el) => {
+                if (el.offsetParent === null) return;
+                if (!el.dataset.rendered) {
+                    el.dataset.rendered = 'true';
+                    turnstile.render(el, {
+                        sitekey: getSiteKey(),
+                        callback: token => {
+                            window.captchaToken = token;
+                            const alpineScope = document.querySelector('[x-data="authForms()"]');
+                            if (alpineScope && alpineScope.__x) {
+                                alpineScope.__x.$data.captchaResponse = token;
+                            }
+                        }
+                    });
                 }
             });
         }

@@ -7,7 +7,6 @@
   <link rel="icon" href="/static/favicon.ico" />
   <script src="https://cdn.tailwindcss.com"></script>
   <script defer src="https://unpkg.com/alpinejs@3.14.9/dist/cdn.min.js" integrity="sha384-9Ax3MmS9AClxJyd5/zafcXXjxmwFhZCdsT6HJoJjarvCaAkJlk5QDzjLJm+Wdx5F" crossorigin="anonymous"></script>
-  <script src="/js/main/auth/cf-turnstile-setup.js" defer></script>
   <style>
     body {
       background: radial-gradient(circle at top, #0f172a, #020617);
@@ -95,7 +94,7 @@
               <span>Я согласен с <a href="/terms/" target="_blank" rel="noopener noreferrer" class="text-primary-400 hover:underline">Пользовательским соглашением</a> и <a href="/privacy/" target="_blank" rel="noopener noreferrer" class="text-primary-400 hover:underline">Политикой конфиденциальности</a>.</span>
             </div>
             <div class="flex justify-center mt-4">
-              <div id="cf-turnstile-register" class="cf-turnstile"></div>
+              <div class="cf-turnstile" data-sitekey="0x4AAAAAAB0s4O-sxm9ZnAQk" data-theme="dark"></div>
             </div>
             <input type="hidden" name="cf-turnstile-response" x-model="captchaResponse">
             <p x-show="globalError" class="text-red-400 text-sm text-center mt-2" x-text="globalError"></p>
@@ -112,7 +111,7 @@
             <p class="text-red-500 text-xs mt-1" x-show="passwordError" x-text="passwordError"></p>
 
             <div class="flex justify-center mt-4">
-              <div id="cf-turnstile-login" class="cf-turnstile"></div>
+              <div class="cf-turnstile" data-sitekey="0x4AAAAAAB0s4O-sxm9ZnAQk" data-theme="dark"></div>
             </div>
             <input type="hidden" name="cf-turnstile-response" x-model="captchaResponse">
 
@@ -270,5 +269,6 @@
       retina_detect: true
     });
   </script>
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 </body>
 </html>
