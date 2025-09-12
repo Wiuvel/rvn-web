@@ -94,9 +94,9 @@
               <span>Я согласен с <a href="/terms/" target="_blank" rel="noopener noreferrer" class="text-primary-400 hover:underline">Пользовательским соглашением</a> и <a href="/privacy/" target="_blank" rel="noopener noreferrer" class="text-primary-400 hover:underline">Политикой конфиденциальности</a>.</span>
             </div>
             <div class="flex justify-center mt-4">
-              <div class="cf-turnstile" data-sitekey="0x4AAAAAAB0s4O-sxm9ZnAQk" data-theme="dark"></div>
+              <div id="register-captcha"></div>
             </div>
-            <input type="hidden" name="cf-turnstile-response" x-model="captchaResponse">
+            <input type="hidden" name="cf-turnstile-response" x-model="captchaResponseRegister">
             <p x-show="globalError" class="text-red-400 text-sm text-center mt-2" x-text="globalError"></p>
             <div class="flex justify-center">
               <button type="submit" class="glass-btn">Зарегистрироваться</button>
@@ -111,9 +111,9 @@
             <p class="text-red-500 text-xs mt-1" x-show="passwordError" x-text="passwordError"></p>
 
             <div class="flex justify-center mt-4">
-              <div class="cf-turnstile" data-sitekey="0x4AAAAAAB0s4O-sxm9ZnAQk" data-theme="dark"></div>
+              <div id="login-captcha"></div>
             </div>
-            <input type="hidden" name="cf-turnstile-response" x-model="captchaResponse">
+            <input type="hidden" name="cf-turnstile-response" x-model="captchaResponseLogin">
 
             <div class="flex justify-center">
               <button type="submit" class="glass-btn">Войти</button>
@@ -139,7 +139,8 @@
         passwordValid: false, 
         confirmPassword: '',
         confirmPasswordError: '',
-        captchaResponse: '',
+        captchaResponseRegister: '',
+        captchaResponseLogin: '',
         globalError: '',
 
         validateUsername() {
@@ -198,7 +199,7 @@
         },
 
         handleRegister() {
-          this.captchaResponse = window.captchaToken || '';
+          this.captchaResponseRegister = window.captchaRegisterToken || '';
 
           const validUser = this.validateUsername();
           const validPass = this.checkPassword();
@@ -206,23 +207,42 @@
 
           if (!validUser || !validPass || !validConfirm) return;
 
-          if (!this.captchaResponse) {
+          if (!this.captchaResponseRegister) {
             this.globalError = 'Подтвердите, что вы не робот';
             return;
           }
 
           this.globalError = '';
           alert('Регистрация отправлена (AJAX → сервер)');
+
+          if (window.registerWidgetId != null && typeof turnstile !== 'undefined') {
+            try { turnstile.reset(window.registerWidgetId); } catch (e) { console.error(e); }
+          }
+          window.captchaRegisterToken = '';
+          this.captchaResponseRegister = '';
         },
 
         handleLogin() {
+          this.captchaResponseLogin = window.captchaLoginToken || '';
+
           const validUser = this.validateUsername();
           const validPass = this.checkPassword();
 
           if (!validUser || !validPass) return;
 
+          if (!this.captchaResponseLogin) {
+            this.globalError = 'Подтвердите, что вы не робот';
+            return;
+          }
+
           this.globalError = '';
           alert('Вход отправлен (AJAX → сервер)');
+
+          if (window.loginWidgetId != null && typeof turnstile !== 'undefined') {
+            try { turnstile.reset(window.loginWidgetId); } catch (e) { console.error(e); }
+          }
+          window.captchaLoginToken = '';
+          this.captchaResponseLogin = '';
         },
 
         resetForm() {
@@ -234,17 +254,18 @@
           this.passwordError = '';
           this.confirmPasswordError = '';
           this.passwordValid = false;
-          window.captchaToken = '';
-          this.captchaResponse = '';
-          if (typeof window.resetAllTurnstiles === 'function') {
-            window.resetAllTurnstiles();
+          this.captchaResponseRegister = '';
+          this.captchaResponseLogin = '';
+          if (window.registerWidgetId != null && typeof turnstile !== 'undefined') {
+            try { turnstile.reset(window.registerWidgetId); } catch (e) { console.error(e); }
           }
+          if (window.loginWidgetId != null && typeof turnstile !== 'undefined') {
+            try { turnstile.reset(window.loginWidgetId); } catch (e) { console.error(e); }
+          }
+          window.captchaRegisterToken = '';
+          window.captchaLoginToken = '';
         }
       }
-    }
-    window.captchaToken = '';
-    function onCaptchaVerify(token) {
-      window.captchaToken = token;
     }
   </script>
   <script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.js" integrity="sha384-AWFROZ10DoeXcNjhoQe0agryexFsipZEA17Cde6/tknpOUacvUGk27vXQ2a6ljSt" crossorigin="anonymous"></script>
@@ -269,6 +290,43 @@
       retina_detect: true
     });
   </script>
-  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+  <script>
+    window.captchaRegisterToken = '';
+    window.captchaLoginToken = '';
+    window.registerWidgetId = null;
+    window.loginWidgetId = null;
+    function onRegisterCaptcha(token) {
+      window.captchaRegisterToken = token;
+    }
+    function onLoginCaptcha(token) {
+      window.captchaLoginToken = token;
+    }
+
+    function onloadTurnstileCallback() {
+      try {
+        if (typeof turnstile !== 'undefined') {
+          var regEl = document.getElementById('register-captcha');
+          if (regEl) {
+            window.registerWidgetId = turnstile.render(regEl, {
+              sitekey: '0x4AAAAAAB0s4O-sxm9ZnAQk',
+              theme: 'dark',
+              callback: onRegisterCaptcha
+            });
+          }
+          var logEl = document.getElementById('login-captcha');
+          if (logEl) {
+            window.loginWidgetId = turnstile.render(logEl, {
+              sitekey: '0x4AAAAAAB0s4O-sxm9ZnAQk',
+              theme: 'dark',
+              callback: onLoginCaptcha
+            });
+          }
+        }
+      } catch (e) {
+        console.error('Turnstile init error', e);
+      }
+    }
+  </script>
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onloadTurnstileCallback" async defer></script>
 </body>
 </html>
