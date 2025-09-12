@@ -24,15 +24,18 @@
 
     function renderTurnstiles() {
         const siteKey = getSiteKey();
-        document.querySelectorAll('.cf-turnstile').forEach((el, i) => {
-            if (el.offsetParent === null) return; 
-            if (!el.id) el.id = `turnstile-${i}`;
+        document.querySelectorAll('.cf-turnstile').forEach((el) => {
+            if (el.offsetParent === null) return; // не рендерим скрытые
             if (!el.dataset.rendered) {
                 el.dataset.rendered = 'true';
-                turnstile.render(`#${el.id}`, {
+                turnstile.render(el, {
                     sitekey: siteKey,
                     callback: token => {
                         window.captchaToken = token;
+                        const alpineScope = document.querySelector('[x-data="authForms()"]');
+                        if (alpineScope && alpineScope.__x) {
+                            alpineScope.__x.$data.captchaResponse = token;
+                        }
                     }
                 });
             }
@@ -50,6 +53,7 @@
         }
 
         window.onTurnstileReady = renderTurnstiles;
+
         const observer = new MutationObserver(() => {
             if (window.turnstile) renderTurnstiles();
         });
@@ -58,13 +62,17 @@
 
     window.resetAllTurnstiles = function () {
         if (window.turnstile) {
-            document.querySelectorAll('.cf-turnstile').forEach(el => {
-                window.turnstile.reset(el);
+            document.querySelectorAll('.cf-turnstile[data-rendered="true"]').forEach(el => {
+                try {
+                    window.turnstile.reset(el);
+                } catch (e) {
+                    console.warn("Skip reset: not rendered", el);
+                }
             });
         }
         window.captchaToken = '';
     };
 
-    window.initTurnstile = initTurnstile; 
+    window.initTurnstile = initTurnstile;
     document.addEventListener('DOMContentLoaded', initTurnstile);
 })();
