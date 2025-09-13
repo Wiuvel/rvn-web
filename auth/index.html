@@ -64,9 +64,65 @@
       .bg-neutral-900\/80 { padding: 1.25rem !important; }
       .glass-btn { min-width: 120px !important; padding: 0.5rem 1rem !important; }
     }
+
+    @keyframes preload-bounce {
+      0% { transform: translateY(0);}
+      100% { transform: translateY(-12px);}
+    }
   </style>
 </head>
 <body class="min-h-screen flex flex-col">
+  <div id="preloader" style="
+    position:fixed;
+    z-index:99999;
+    inset:0;
+    background:rgba(10,16,32,0.92);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    transition:opacity 0.5s;
+  ">
+    <div style="text-align:center;display:flex;flex-direction:column;align-items:center;">
+      <div style="font-size:1.2rem;color:#b0e5ff;font-weight:500;letter-spacing:0.05em;margin-bottom:6px;position:relative;display:inline-block;overflow:hidden;width:max-content;">
+        <span id="preloader-text-base" style="color:#b0e5ff;opacity:0.25;">Проверяем&nbsp;доступность</span>
+        <span id="preloader-text-fill" style="
+          position:absolute;
+          left:0;top:0;
+          white-space:nowrap;
+          color:#16a3ff;
+          width:0;
+          overflow:hidden;
+          transition:width 0.5s;
+          pointer-events:none;
+        ">Проверяем&nbsp;доступность</span>
+      </div>
+    </div>
+  </div>
+  <style>
+    @keyframes preload-bounce {
+      0% { transform: translateY(0);}
+      100% { transform: translateY(-12px);}
+    }
+  </style>
+  <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      const fill = document.getElementById('preloader-text-fill');
+      const base = document.getElementById('preloader-text-base');
+      setTimeout(() => {
+        fill.style.width = base.offsetWidth + 'px';
+      }, 80);
+
+      setTimeout(() => {
+        document.getElementById('preloader').style.opacity = '0';
+        setTimeout(() => {
+          document.getElementById('preloader').style.display = 'none';
+          console.log('PRELOAD HIDDEN');
+        }, 400);
+      }, 1200);
+    });
+  </script>
   <header class="sticky top-0 z-50 border-b border-neutral-800/70 bg-neutral-950/70 backdrop-blur-xl">
     <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
       <div class="flex h-16 items-center">
@@ -98,8 +154,8 @@
                 @click="showPassword = !showPassword"
                 class="absolute right-3 top-3.5 text-gray-500 hover:text-gray-700 pass-toggle"
                 :aria-label="showPassword ? 'Скрыть пароль' : 'Показать пароль'">
-                <img src="/static/icons/pass-hideoff.svg" :class="{'hidden': showPassword}" class="h-6 transition hover:brightness-75" alt="Показать пароль">
-                <img src="/static/icons/pass-hide.svg" :class="{'hidden': !showPassword}" class="h-6 transition hover:brightness-75" alt="Скрыть пароль">
+                <img src="/static/icons/login/pass-hideoff.svg" :class="{'hidden': showPassword}" class="h-6 transition hover:brightness-75" alt="Показать пароль">
+                <img src="/static/icons/login/pass-hide.svg" :class="{'hidden': !showPassword}" class="h-6 transition hover:brightness-75" alt="Скрыть пароль">
               </button>
             </div>
             <p class="text-red-400 text-xs mt-1" x-show="passwordError" x-text="passwordError" role="alert" aria-live="polite"></p>
@@ -140,8 +196,8 @@
                 @click="showPassword = !showPassword"
                 class="absolute right-3 top-3.5 text-gray-500 hover:text-gray-700 pass-toggle"
                 :aria-label="showPassword ? 'Скрыть пароль' : 'Показать пароль'">
-                <img src="/static/icons/pass-hideoff.svg" :class="{'hidden': showPassword}" class="h-6 transition hover:brightness-75" alt="Показать пароль">
-                <img src="/static/icons/pass-hide.svg" :class="{'hidden': !showPassword}" class="h-6 transition hover:brightness-75" alt="Скрыть пароль">
+                <img src="/static/icons/login/pass-hideoff.svg" :class="{'hidden': showPassword}" class="h-6 transition hover:brightness-75" alt="Показать пароль">
+                <img src="/static/icons/login/pass-hide.svg" :class="{'hidden': !showPassword}" class="h-6 transition hover:brightness-75" alt="Скрыть пароль">
               </button>
             </div>
             <p class="text-red-500 text-xs mt-1" x-show="passwordError" x-text="passwordError" role="alert" aria-live="polite"></p>
@@ -178,7 +234,7 @@
       </div>
     </div>
     <div class="hidden md:flex pointer-events-none z-0 absolute inset-0 items-end justify-center">
-      <img src="/static/templates/login-bg-tree.png" class="tree-glow" style="height: 90vh; min-height: 480px; max-height: 1200px; width: 72vw; min-width: 720px; max-width: 1320px; position: relative; left: 3%; object-fit: contain;" loading="lazy" decoding="async" alt="Декоративное дерево"/>
+      <img src="/static/templates/overlay-login.png" class="tree-glow" style="height: 90vh; min-height: 480px; max-height: 1200px; width: 72vw; min-width: 720px; max-width: 1320px; position: relative; left: 3%; object-fit: contain;" loading="lazy" decoding="async" alt="Декоративное дерево"/>
     </div>
   </section>
   <script>
