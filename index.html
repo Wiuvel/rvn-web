@@ -3,13 +3,20 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large" />
+  <title>Raven Private — безопасный доступ в сеть через VLESS и PROXY</title>
+  <meta name="description" content="RVN.GURU — современный сервис приватного доступа в сеть. Высокая скорость и полная анонимность. Стабильные сервера с минимальном пингом." />
+  <meta name="keywords" content="Raven Private, RVN.GURU, VLESS" />
   <meta name="theme-color" content="#0f7fdb" />
-  <title>Raven Private — приватный и быстрый доступ в сеть</title>
-  <meta name="description" content="Raven Private — современный сервис с протоколом VLESS. Быстрая скорость, мощное шифрование и полная приватность в сети." />
-  <meta property="og:title" content="Raven Private — свободный и безопасный" />
-  <meta property="og:description" content="Приватность и безопасность в один клик. Высокая скорость и защита с протоколом VLESS." />
+  <meta property="og:site_name" content="Raven Private" />
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://rvn.guru/" />
+  <meta property="og:title" content="Raven Private — безопасный доступ в сеть" />
+  <meta property="og:description" content="Современный сервис приватного доступа в сеть. Высокая скорость, полная анонимность и стабильные сервера с минимальным пингом." />
+  <meta property="og:locale" content="ru_RU" />
+  <meta name="twitter:title" content="Raven Private — безопасный доступ в сеть" />
+  <meta name="twitter:description" content="Современный сервис приватного доступа в сеть. Высокая скорость и полная анонимность." />
+  <link rel="canonical" href="https://rvn.guru/" />
   <link rel="icon" href="/static/favicon.ico" />
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -141,7 +148,7 @@
   <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
     <div class="flex h-16 items-center justify-between">
       <a href="/" class="flex items-center gap-2">
-        <img src="/static/logo.svg" alt="RVNPrivate" class="h-8 w-8">
+        <img src="/static/logo.svg" class="h-8 w-8">
         <span class="font-semibold tracking-tight">RVNPrivate</span>
       </a>
       <nav class="hidden md:flex items-center gap-8 text-sm text-neutral-300">
@@ -486,21 +493,13 @@
       <h2 class="text-3xl font-semibold text-center">Частые вопросы</h2>
       <div class="mt-8 divide-y divide-neutral-800/70">
         <div class="py-4">
-          <button class="w-full flex justify-between items-center text-left faq-question" 
-                  @click="open===1?open=null:open=1"
-                  :aria-expanded="open===1"
-                  aria-controls="faq1"
-                  :class="{'faq-open':open===1}"
-                  tabindex="0">
+          <button class="w-full flex justify-between items-center text-left faq-question" @click="open===1?open=null:open=1" :aria-expanded="open===1" aria-controls="faq1" :class="{'faq-open':open===1}" tabindex="0">
             <span class="font-medium">Как оформить покупку?</span>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" 
-                :class="{'faq-icon':true,'faq-open':open===1}" 
-                class="faq-icon transition-transform duration-300">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" :class="{'faq-icon':true,'faq-open':open===1}" class="faq-icon transition-transform duration-300">
               <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="1.6"/>
             </svg>
           </button>
-          <div x-show="open===1" 
-              id="faq1"
+          <div x-show="open===1" id="faq1"
               x-transition:enter="transition ease-out duration-300"
               x-transition:enter-start="opacity-0 -translate-y-2"
               x-transition:enter-end="opacity-100 translate-y-0"
@@ -512,16 +511,9 @@
           </div>
         </div>
         <div class="py-4">
-          <button class="w-full flex justify-between items-center text-left faq-question" 
-                  @click="open===2?open=null:open=2"
-                  :aria-expanded="open===2"
-                  aria-controls="faq2"
-                  :class="{'faq-open':open===2}"
-                  tabindex="0">
+          <button class="w-full flex justify-between items-center text-left faq-question" @click="open===2?open=null:open=2" :aria-expanded="open===2" aria-controls="faq2" :class="{'faq-open':open===2}" tabindex="0">
             <span class="font-medium">Почему именно VLESS?</span>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" 
-                :class="{'faq-icon':true,'faq-open':open===2}" 
-                class="faq-icon transition-transform duration-300">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" :class="{'faq-icon':true,'faq-open':open===2}" class="faq-icon transition-transform duration-300">
               <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="1.6"/>
             </svg>
           </button>
@@ -538,16 +530,9 @@
           </div>
         </div>
         <div class="py-4">
-          <button class="w-full flex justify-between items-center text-left faq-question" 
-                  @click="open===3?open=null:open=3"
-                  :aria-expanded="open===3"
-                  aria-controls="faq3"
-                  :class="{'faq-open':open===3}"
-                  tabindex="0">
+          <button class="w-full flex justify-between items-center text-left faq-question" @click="open===3?open=null:open=3" :aria-expanded="open===3" aria-controls="faq3" :class="{'faq-open':open===3}" tabindex="0">
             <span class="font-medium">Какие есть способы оплаты?</span>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" 
-                :class="{'faq-icon':true,'faq-open':open===3}" 
-                class="faq-icon transition-transform duration-300">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" :class="{'faq-icon':true,'faq-open':open===3}" class="faq-icon transition-transform duration-300">
               <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="1.6"/>
             </svg>
           </button>
@@ -564,21 +549,13 @@
           </div>
         </div>
         <div class="py-4">
-          <button class="w-full flex justify-between items-center text-left faq-question" 
-                  @click="open===4?open=null:open=4"
-                  :aria-expanded="open===4"
-                  aria-controls="faq4"
-                  :class="{'faq-open':open===4}"
-                  tabindex="0">
+          <button class="w-full flex justify-between items-center text-left faq-question" @click="open===4?open=null:open=4" :aria-expanded="open===4" aria-controls="faq4" :class="{'faq-open':open===4}" tabindex="0">
             <span class="font-medium">Существует ли гарантия?</span>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" 
-                :class="{'faq-icon':true,'faq-open':open===4}" 
-                class="faq-icon transition-transform duration-300">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" :class="{'faq-icon':true,'faq-open':open===4}" class="faq-icon transition-transform duration-300">
               <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="1.6"/>
             </svg>
           </button>
-          <div x-show="open===4" 
-              id="faq4"
+          <div x-show="open===4" id="faq4"
               x-transition:enter="transition ease-out duration-300"
               x-transition:enter-start="opacity-0 -translateY(10px)"
               x-transition:enter-end="opacity-100 translateY(0)"

@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Авторизация | RVNPrivate</title>
-  <meta name="robots" content="noindex, nofollow" />
+  <title>Авторизация — RVN.GURU</title>
+  <meta name="description" content="Страница входа и регистрации. Личный кабинет. Raven Private.">
   <link rel="icon" href="/static/favicon.ico" />
   <script src="https://cdn.tailwindcss.com"></script>
   <script defer src="https://unpkg.com/alpinejs@3.14.9/dist/cdn.min.js" integrity="sha384-9Ax3MmS9AClxJyd5/zafcXXjxmwFhZCdsT6HJoJjarvCaAkJlk5QDzjLJm+Wdx5F" crossorigin="anonymous"></script>
@@ -17,12 +17,10 @@
       outline-offset: 2px;
       box-shadow: 0 0 0 3px rgba(22,163,255,0.2);
     }
-
     .pass-toggle:focus {
       outline: none !important;
       box-shadow: none !important;
     }
-
     @media (max-width: 768px) {
       .tree-glow { display: none !important; }
     }
@@ -39,12 +37,10 @@
       filter: drop-shadow(0 0 24px #16a3ff55);
       transition: width 0.3s;
     }
-
     input, .glass-btn {
       max-width: 100%;
       box-sizing: border-box;
     }
-
     .spinner {
       border: 2px solid #16a3ff;
       border-top: 2px solid transparent;
@@ -59,12 +55,10 @@
     @keyframes spin {
       100% { transform: rotate(360deg);}
     }
-
     @media (max-width: 400px) {
       .bg-neutral-900\/80 { padding: 1.25rem !important; }
       .glass-btn { min-width: 120px !important; padding: 0.5rem 1rem !important; }
     }
-
     @keyframes preload-bounce {
       0% { transform: translateY(0);}
       100% { transform: translateY(-12px);}
@@ -72,39 +66,16 @@
   </style>
 </head>
 <body class="min-h-screen flex flex-col">
-  <div id="preloader" style="
-    position:fixed;
-    z-index:99999;
-    inset:0;
-    background:rgba(10,16,32,0.92);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    transition:opacity 0.5s;
-  ">
+  <div id="preloader" style="position:fixed; z-index:99999; inset:0; background:rgba(10,16,32,0.92); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); display:flex; align-items:center; justify-content:center; transition:opacity 0.5s;">
     <div style="text-align:center;display:flex;flex-direction:column;align-items:center;">
-      <div style="font-size:1.2rem;color:#b0e5ff;font-weight:500;letter-spacing:0.05em;margin-bottom:6px;position:relative;display:inline-block;overflow:hidden;width:max-content;">
+      <div style="font-size:1.2rem; color:#b0e5ff; font-weight:500; letter-spacing:0.05em; margin-bottom:6px; position:relative; display:inline-block; overflow:hidden; width:max-content;">
         <span id="preloader-text-base" style="color:#b0e5ff;opacity:0.25;">Проверяем&nbsp;доступность</span>
-        <span id="preloader-text-fill" style="
-          position:absolute;
-          left:0;top:0;
-          white-space:nowrap;
-          color:#16a3ff;
-          width:0;
-          overflow:hidden;
-          transition:width 0.5s;
-          pointer-events:none;
-        ">Проверяем&nbsp;доступность</span>
+        <span id="preloader-text-fill" style="position:absolute; left:0;top:0; white-space:nowrap; color:#16a3ff; width:0; overflow:hidden; transition:width 0.5s; pointer-events:none;">Проверяем&nbsp;доступность</span>
       </div>
     </div>
   </div>
   <style>
-    @keyframes preload-bounce {
-      0% { transform: translateY(0);}
-      100% { transform: translateY(-12px);}
-    }
+    @keyframes preload-bounce { 0% { transform: translateY(0);} 100% { transform: translateY(-12px);}}
   </style>
   <script>
     window.addEventListener('DOMContentLoaded', () => {
