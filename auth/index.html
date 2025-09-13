@@ -4,12 +4,67 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Авторизация | RVNPrivate</title>
+  <meta name="robots" content="noindex, nofollow" />
   <link rel="icon" href="/static/favicon.ico" />
   <script src="https://cdn.tailwindcss.com"></script>
   <script defer src="https://unpkg.com/alpinejs@3.14.9/dist/cdn.min.js" integrity="sha384-9Ax3MmS9AClxJyd5/zafcXXjxmwFhZCdsT6HJoJjarvCaAkJlk5QDzjLJm+Wdx5F" crossorigin="anonymous"></script>
   <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
   <link rel="stylesheet" href="/css/main/app.css">
   <link rel="stylesheet" href="/css/auth/glassmorphism-auth.css">
+  <style>
+    input:focus, button:focus {
+      outline: 2px solid #16a3ff;
+      outline-offset: 2px;
+      box-shadow: 0 0 0 3px rgba(22,163,255,0.2);
+    }
+
+    .pass-toggle:focus {
+      outline: none !important;
+      box-shadow: none !important;
+    }
+
+    @media (max-width: 768px) {
+      .tree-glow { display: none !important; }
+    }
+    .tree-glow {
+      position: fixed;
+      bottom: 0;
+      right: 0;
+      min-width: 320px;
+      width: 32vw;
+      max-width: 520px;
+      opacity: 0.85;
+      z-index: 0;
+      pointer-events: none;
+      filter: drop-shadow(0 0 24px #16a3ff55);
+      transition: width 0.3s;
+    }
+
+    input, .glass-btn {
+      max-width: 100%;
+      box-sizing: border-box;
+    }
+
+    .spinner {
+      border: 2px solid #16a3ff;
+      border-top: 2px solid transparent;
+      border-radius: 50%;
+      width: 18px;
+      height: 18px;
+      animation: spin 0.7s linear infinite;
+      display: inline-block;
+      vertical-align: middle;
+      margin-right: 8px;
+    }
+    @keyframes spin {
+      100% { transform: rotate(360deg);}
+    }
+
+    @media (max-width: 400px) {
+      .bg-neutral-900\/80 { padding: 1.25rem !important; }
+      .glass-btn { min-width: 120px !important; padding: 0.5rem 1rem !important; }
+    }
+  </style>
 </head>
 <body class="min-h-screen flex flex-col">
   <header class="sticky top-0 z-50 border-b border-neutral-800/70 bg-neutral-950/70 backdrop-blur-xl">
@@ -26,65 +81,95 @@
     <div id="particles-js" class="absolute inset-0"></div>
     <div class="z-10 grid grid-cols-1 md:grid-cols-2 gap-12 items-center w-full max-w-5xl">
       <div x-data="authForms()" class="w-full max-w-md mx-auto">
-        <div class="bg-neutral-900/80 backdrop-blur-xl p-8 rounded-2xl border border-neutral-800 shadow-lg animate-fadeIn">
+        <div class="bg-neutral-900/80 backdrop-blur-xl p-8 rounded-2xl border border-neutral-800 shadow-lg animate-fadeIn" style="overflow: hidden;" x-ref="formContainer">
           <h2 class="text-2xl font-semibold mb-6 text-center" x-text="tab==='register' ? 'Регистрация' : 'Вход'"></h2>
           <form x-show="tab==='register'" @submit.prevent="handleRegister" class="space-y-4">
-            <input type="text" x-model="username" placeholder="Логин" required class="w-full px-4 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-white"/>
-            <p class="text-red-500 text-sm mt-1" x-show="usernameError" x-text="usernameError"></p>
+            <label class="block">
+              <span class="sr-only">Логин</span>
+              <input id="register-username" type="text" x-model="username" placeholder="Логин" required autocomplete="username" class="w-full px-4 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-white"/>
+            </label>
+            <p class="text-red-500 text-sm mt-1" x-show="usernameError" x-text="usernameError" role="alert" aria-live="polite"></p>
             <div class="relative">
-              <input :type="showPassword ? 'text' : 'password'" x-model="password" placeholder="Пароль" required class="w-full px-4 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-white pr-10" @input="checkPassword(); checkConfirmPassword()"/>
-              <button type="button" @click="showPassword = !showPassword" class="absolute right-3 top-3.5 text-gray-500 hover:text-gray-700">
-                <img src="/static/icons/pass-hideoff.svg" :class="{'hidden': showPassword}" class="h-6 transition hover:brightness-75">
-                <img src="/static/icons/pass-hide.svg" :class="{'hidden': !showPassword}" class="h-6 transition hover:brightness-75">
+              <label class="block">
+                <span class="sr-only">Пароль</span>
+                <input :type="showPassword ? 'text' : 'password'" x-model="password" placeholder="Пароль" required autocomplete="new-password" class="w-full px-4 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-white pr-10" @input="checkPassword(); checkConfirmPassword()"/>
+              </label>
+              <button type="button"
+                @click="showPassword = !showPassword"
+                class="absolute right-3 top-3.5 text-gray-500 hover:text-gray-700 pass-toggle"
+                :aria-label="showPassword ? 'Скрыть пароль' : 'Показать пароль'">
+                <img src="/static/icons/pass-hideoff.svg" :class="{'hidden': showPassword}" class="h-6 transition hover:brightness-75" alt="Показать пароль">
+                <img src="/static/icons/pass-hide.svg" :class="{'hidden': !showPassword}" class="h-6 transition hover:brightness-75" alt="Скрыть пароль">
               </button>
             </div>
-            <p class="text-red-400 text-xs mt-1" x-show="passwordError" x-text="passwordError"></p>
-            <input type="password" x-model="confirmPassword" placeholder="Подтверждение пароля" required class="w-full px-4 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-white" :disabled="!passwordValid" :class="passwordValid ? 'border-neutral-700 opacity-100' : 'border-neutral-700 opacity-50'" @input="checkConfirmPassword()"/>
-            <p class="text-red-400 text-xs mt-1" x-show="confirmPasswordError" x-text="confirmPasswordError"></p>
+            <p class="text-red-400 text-xs mt-1" x-show="passwordError" x-text="passwordError" role="alert" aria-live="polite"></p>
+            <label class="block">
+              <span class="sr-only">Подтверждение пароля</span>
+              <input id="register-confirm" type="password" x-model="confirmPassword" placeholder="Подтверждение пароля" required autocomplete="new-password" class="w-full px-4 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-white" :disabled="!passwordValid" :class="passwordValid ? 'border-neutral-700 opacity-100' : 'border-neutral-700 opacity-50'" @input="checkConfirmPassword()"/>
+            </label>
+            <p class="text-red-400 text-xs mt-1" x-show="confirmPasswordError" x-text="confirmPasswordError" role="alert" aria-live="polite"></p>
             <div class="flex items-start gap-2 text-xs text-neutral-400">
-              <input type="checkbox" required class="mt-0.5 rounded border-neutral-700 bg-neutral-800"/>
+              <input type="checkbox" required class="mt-0.5 rounded border-neutral-700 bg-neutral-800" id="register-agree"/>
               <span>Я согласен с <a href="/terms/" target="_blank" rel="noopener noreferrer" class="text-primary-400 hover:underline">Пользовательским соглашением</a> и <a href="/privacy/" target="_blank" rel="noopener noreferrer" class="text-primary-400 hover:underline">Политикой конфиденциальности</a>.</span>
             </div>
             <div class="flex justify-center mt-4">
               <div id="register-captcha-container"></div>
             </div>
             <input type="hidden" name="cf-turnstile-response" x-model="captchaResponse">
-            <p x-show="globalError" class="text-red-400 text-sm text-center mt-2" x-text="globalError"></p>
+            <p x-show="globalError" class="text-red-400 text-sm text-center mt-2" x-text="globalError" role="alert" aria-live="polite"></p>
             <div class="flex justify-center">
-              <button type="submit" class="glass-btn">Зарегистрироваться</button>
+              <button type="submit" class="glass-btn" :disabled="loading">
+                <span x-show="loading" class="spinner"></span>
+                Зарегистрироваться
+              </button>
             </div>
             <p class="text-center text-sm text-neutral-400">Уже есть аккаунт? <a href="#" @click.prevent="switchToLogin()" class="text-primary-400 hover:underline">Войти</a></p>
           </form>
           <form x-show="tab==='login'" @submit.prevent="handleLogin" class="space-y-4">
-            <input type="text" x-model="username" placeholder="Логин" required class="w-full px-4 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-white"/>
-            <p class="text-red-500 text-sm mt-1" x-show="usernameError" x-text="usernameError"></p>
-
-            <input type="password" x-model="password" placeholder="Пароль" required class="w-full px-4 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-white" @input="checkPassword()"/>
-            <p class="text-red-500 text-xs mt-1" x-show="passwordError" x-text="passwordError"></p>
-
+            <label class="block">
+              <span class="sr-only">Логин</span>
+              <input id="login-username" type="text" x-model="username" placeholder="Логин" required autocomplete="username" class="w-full px-4 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-white"/>
+            </label>
+            <p class="text-red-500 text-sm mt-1" x-show="usernameError" x-text="usernameError" role="alert" aria-live="polite"></p>
+            <div class="relative">
+              <label class="block">
+                <span class="sr-only">Пароль</span>
+                <input id="login-password" type="password" x-model="password" placeholder="Пароль" required autocomplete="current-password" class="w-full px-4 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-white pr-10" @input="checkPassword()"/>
+              </label>
+              <button type="button"
+                @click="showPassword = !showPassword"
+                class="absolute right-3 top-3.5 text-gray-500 hover:text-gray-700 pass-toggle"
+                :aria-label="showPassword ? 'Скрыть пароль' : 'Показать пароль'">
+                <img src="/static/icons/pass-hideoff.svg" :class="{'hidden': showPassword}" class="h-6 transition hover:brightness-75" alt="Показать пароль">
+                <img src="/static/icons/pass-hide.svg" :class="{'hidden': !showPassword}" class="h-6 transition hover:brightness-75" alt="Скрыть пароль">
+              </button>
+            </div>
+            <p class="text-red-500 text-xs mt-1" x-show="passwordError" x-text="passwordError" role="alert" aria-live="polite"></p>
             <div class="flex justify-center mt-4">
               <div id="login-captcha-container"></div>
             </div>
             <input type="hidden" name="cf-turnstile-response" x-model="captchaResponse">
-
             <div class="flex justify-center">
-              <button type="submit" class="glass-btn">Войти</button>
+              <button type="submit" class="glass-btn" :disabled="loading">
+                <span x-show="loading" class="spinner"></span>
+                Войти
+              </button>
             </div>
             <div class="divider">
               <span>или войти через</span>
             </div>
             <div class="oauth-grid">
-              <button type="button" class="oauth-btn" @click="oauthLogin('google')" title="Войти через Google">
+              <button type="button" class="oauth-btn" @click="oauthLogin('google')" title="Войти через Google" aria-label="Войти через Google">
                 <img src="/static/icons/oauth/google.svg" alt="Google" class="h-6">
               </button>
-              <button type="button" class="oauth-btn" @click="oauthLogin('twitch')" title="Войти через Twitch">
+              <button type="button" class="oauth-btn" @click="oauthLogin('twitch')" title="Войти через Twitch" aria-label="Войти через Twitch">
                 <img src="/static/icons/oauth/twitch.svg" alt="Twitch" class="h-6">
               </button>
-              <button type="button" class="oauth-btn" @click="oauthLogin('yandex')" title="Войти через Discord">
+              <button type="button" class="oauth-btn" @click="oauthLogin('yandex')" title="Войти через Yandex" aria-label="Войти через Yandex">
                 <img src="/static/icons/oauth/yandex.svg" alt="Yandex" class="w-6">
               </button>
-              <button type="button" class="oauth-btn" @click="oauthLogin('github')" title="Войти через GitHub">
-                <img src="/static/icons/oauth/github.svg" alt="Twitch" class="h-8">
+              <button type="button" class="oauth-btn" @click="oauthLogin('github')" title="Войти через GitHub" aria-label="Войти через GitHub">
+                <img src="/static/icons/oauth/github.svg" alt="GitHub" class="h-8">
               </button>
             </div>
             <p class="text-center text-sm text-neutral-400">Нет аккаунта? <a href="#" @click.prevent="switchToRegister()" class="text-primary-400 hover:underline">Зарегистрироваться</a></p>
@@ -92,8 +177,8 @@
         </div>
       </div>
     </div>
-    <div class="hidden md:flex fixed bottom-0 right-50 pointer-events-none z-0">
-      <img src="/static/templates/login-bg-tree.png" class="tree-glow max-h-screen drop-shadow-[0_0_5px_rgba(22,163,255,0.35)]" loading="lazy" decoding="async"/>
+    <div class="hidden md:flex pointer-events-none z-0 absolute inset-0 items-end justify-center">
+      <img src="/static/templates/login-bg-tree.png" class="tree-glow" style="height: 90vh; min-height: 480px; max-height: 1200px; width: 72vw; min-width: 720px; max-width: 1320px; position: relative; left: 3%; object-fit: contain;" loading="lazy" decoding="async" alt="Декоративное дерево"/>
     </div>
   </section>
   <script>
@@ -111,6 +196,7 @@
         captchaResponse: '',
         globalError: '',
         currentWidgetId: null,
+        loading: false,
 
         init() {
           this.$nextTick(() => {
@@ -131,7 +217,7 @@
 
           if (typeof turnstile !== 'undefined') {
             this.currentWidgetId = turnstile.render('#' + containerId, {
-              sitekey: '0x4AAAAAAB0s4O-sxm9ZnAQk',
+              sitekey: '3x00000000000000000000FF',
               theme: 'dark',
               callback: (token) => {
                 this.captchaResponse = token;
@@ -218,7 +304,7 @@
           return true;
         },
 
-        handleRegister() {
+        async handleRegister() {
           const validUser = this.validateUsername();
           const validPass = this.checkPassword();
           const validConfirm = this.checkConfirmPassword();
@@ -231,10 +317,13 @@
           }
 
           this.globalError = '';
+          this.loading = true;
+          await new Promise(r => setTimeout(r, 1200));
+          this.loading = false;
           alert('Регистрация отправлена (AJAX → сервер)');
         },
 
-        handleLogin() {
+        async handleLogin() {
           const validUser = this.validateUsername();
           const validPass = this.checkPassword();
 
@@ -246,6 +335,9 @@
           }
 
           this.globalError = '';
+          this.loading = true;
+          await new Promise(r => setTimeout(r, 900));
+          this.loading = false;
           alert('Вход отправлен (AJAX → сервер)');
         },
 
@@ -269,25 +361,27 @@
   </script>
   <script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.js" integrity="sha384-AWFROZ10DoeXcNjhoQe0agryexFsipZEA17Cde6/tknpOUacvUGk27vXQ2a6ljSt" crossorigin="anonymous"></script>
   <script>
-    particlesJS("particles-js", {
-      particles: {
-        number: { value: 30 },
-        color: { value: "#16a3ff" },
-        shape: { type: "circle" },
-        opacity: { value: 0.4 },
-        size: { value: 2, random: true },
-        line_linked: { enable: false },
-        move: { enable: true, speed: 0.6, direction: "none", random: true, straight: false, out_mode: "out" }
-      },
-      interactivity: {
-        detect_on: "canvas",
-        events: {
-          onhover: { enable: false },
-          onclick: { enable: false }
-        }
-      },
-      retina_detect: true
-    });
+    if (window.innerWidth >= 1024) {
+      particlesJS("particles-js", {
+        particles: {
+          number: { value: 30 },
+          color: { value: "#16a3ff" },
+          shape: { type: "circle" },
+          opacity: { value: 0.4 },
+          size: { value: 2, random: true },
+          line_linked: { enable: false },
+          move: { enable: true, speed: 0.6, direction: "none", random: true, straight: false, out_mode: "out" }
+        },
+        interactivity: {
+          detect_on: "canvas",
+          events: {
+            onhover: { enable: false },
+            onclick: { enable: false }
+          }
+        },
+        retina_detect: true
+      });
+    }
   </script>
 </body>
 </html>

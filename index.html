@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#0f7fdb" />
   <title>Raven Private — приватный и быстрый доступ в сеть</title>
   <meta name="description" content="Raven Private — современный сервис с протоколом VLESS. Быстрая скорость, мощное шифрование и полная приватность в сети." />
   <meta property="og:title" content="Raven Private — свободный и безопасный" />
@@ -24,26 +25,26 @@
             soft: '0 10px 30px rgba(0,0,0,0.08)',
             glow: '0 0 20px rgba(22,163,255,0.6)'
           },
-					animation: {
-  					fadeIn: 'fadeIn 0.5s ease-in forwards',
-  					float: 'float 3s ease-in-out infinite',
-  					pulseFloat: 'pulseFloat 3s ease-in-out infinite'
-					},
-					keyframes: {
-  					fadeIn: {
-    					'0%': { opacity: 0, transform: 'translateY(15px)' },
-    					'100%': { opacity: 1, transform: 'translateY(0)' }
-  					},
-  					float: {
-    					'0%, 100%': { transform: 'translateY(0)' },
-    					'50%': { transform: 'translateY(-6px)' }
-  					},
-  					pulseFloat: {
-    					'0%': { transform: 'translateY(0) scale(1)' },
-    					'25%': { transform: 'translateY(-4px) scale(1.02)' },
-    					'50%': { transform: 'translateY(0) scale(1)' },
-    					'75%': { transform: 'translateY(4px) scale(0.98)' },
-    					'100%': { transform: 'translateY(0) scale(1)' }
+          animation: {
+            fadeIn: 'fadeIn 0.5s ease-in forwards',
+            float: 'float 3s ease-in-out infinite',
+            pulseFloat: 'pulseFloat 3s ease-in-out infinite'
+          },
+          keyframes: {
+            fadeIn: {
+              '0%': { opacity: 0, transform: 'translateY(15px)' },
+              '100%': { opacity: 1, transform: 'translateY(0)' }
+            },
+            float: {
+              '0%, 100%': { transform: 'translateY(0)' },
+              '50%': { transform: 'translateY(-6px)' }
+            },
+            pulseFloat: {
+              '0%': { transform: 'translateY(0) scale(1)' },
+              '25%': { transform: 'translateY(-4px) scale(1.02)' },
+              '50%': { transform: 'translateY(0) scale(1)' },
+              '75%': { transform: 'translateY(4px) scale(0.98)' },
+              '100%': { transform: 'translateY(0) scale(1)' }
             }
           }
         }
@@ -53,6 +54,15 @@
   <script defer src="https://unpkg.com/alpinejs@3.14.9/dist/cdn.min.js" integrity="sha384-9Ax3MmS9AClxJyd5/zafcXXjxmwFhZCdsT6HJoJjarvCaAkJlk5QDzjLJm+Wdx5F" crossorigin="anonymous"></script>
   <link rel="stylesheet" href="css/main/app.css" />
   <style>
+    html, body { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+    img { max-width: 100%; height: auto; display: block; }
+    button, a { touch-action: manipulation; }
+    :root { --card-gap: 1.25rem; }
+    @media (prefers-reduced-motion: reduce) {
+      .animate-marquee { animation: none !important; }
+    }
+  </style>
+  <style>
     .tilt:hover { transform: perspective(600px) rotateX(4deg) rotateY(-4deg) scale(1.03); transition: transform 0.3s ease; }
     .card-hover:hover { box-shadow: 0 0 20px rgba(22,163,255,0.5); transform: translateY(-4px); transition: all 0.3s ease; }
     .fade-section { opacity: 0; transform: translateY(20px); transition: all 0.7s ease-out; }
@@ -61,13 +71,72 @@
     .fade-in.show { opacity: 1; transform: translateY(0); }
     #particles-js { pointer-events: none; z-index: 0; }
     .wing-animation { animation: flap 2s ease-in-out infinite; transform-origin: center; }
-    @keyframes flap {
-      0%, 100% { transform: rotate(0deg); }
-      50% { transform: rotate(3deg); }
+    @keyframes flap { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(3deg); } }
+  </style>
+  <style>
+    #page-progress {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, #16a3ff 0%, #0f7fdb 100%);
+      z-index: 9999;
+      width: 0;
+      transition: width 0.3s cubic-bezier(.4,0,.2,1);
+    }
+    .user-is-tabbing a:focus, .user-is-tabbing button:focus {
+      outline: 2px solid #16a3ff;
+      outline-offset: 2px;
+      box-shadow: 0 0 0 3px rgba(22,163,255,0.2);
+    }
+    @media (max-width: 640px) {
+      .mobile-nav {
+        position: fixed;
+        bottom: 0; left: 0; right: 0;
+        background: rgba(10,10,10,0.98);
+        border-top: 1px solid #222;
+        display: flex;
+        justify-content: space-around;
+        align-items: center;
+        z-index: 1000;
+        height: 56px;
+        box-shadow: 0 -2px 16px rgba(0,0,0,0.15);
+      }
+      .mobile-nav a {
+        flex: 1 1 0;
+        text-align: center;
+        padding: 8px 0 0 0;
+        color: #b0e5ff;
+        font-size: 13px;
+        transition: color 0.2s;
+      }
+      .mobile-nav a.active, .mobile-nav a:focus {
+        color: #16a3ff;
+      }
+      body { padding-bottom: 56px; }
+    }
+    .card:active, .card:focus-within { box-shadow: 0 0 0 2px #16a3ff; }
+    .card:hover { transform: translateY(-2px) scale(1.02); box-shadow: 0 4px 24px rgba(22,163,255,0.12); }
+    .faq-icon {
+      transition: transform 0.3s cubic-bezier(.4,0,.2,1);
+    }
+    .faq-open .faq-icon {
+      transform: rotate(180deg) scale(1.2);
+      color: #16a3ff;
+    }
+    .faq-question:hover, .faq-question:focus {
+      background: #111c;
+      border-radius: 0.75rem;
+    }
+    .feature-illustration {
+      width: 44px; height: 44px;
+      margin-bottom: 8px;
+      filter: drop-shadow(0 0 12px #16a3ff44);
+      animation: float 3s ease-in-out infinite;
     }
   </style>
 </head>
 <body class="h-full bg-neutral-950 text-neutral-100 antialiased relative">
+  <div id="page-progress"></div>
 <header x-data="{ open: false }" class="sticky top-0 z-50 border-b border-neutral-800/70 bg-neutral-950/70 backdrop-blur-xl animate-fadeIn">
   <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
     <div class="flex h-16 items-center justify-between">
@@ -87,7 +156,7 @@
       </div>
       <div class="flex items-center gap-4 md:hidden">
         <a href="/auth/" class="flex items-center gap-1 text-neutral-300 hover:text-white transition" aria-label="Авторизация">
-          <img src="/static/icons/log-in.svg">
+          <img src="/static/icons/log-in.svg" alt="login" class="h-5" loading="lazy">
           <span class="text-sm">Авторизация</span>
         </a>
         <button @click="open = !open" class="text-neutral-300 hover:text-white focus:outline-none" aria-label="Открыть меню">
@@ -109,82 +178,68 @@
 </header>
 <section id="home" class="relative overflow-hidden animate-fadeIn">
   <div id="particles-js" class="absolute inset-0"></div>
-  <div class="absolute -top-32 -left-32 w-96 h-96 bg-primary-500/20 blur-[120px] rounded-full z-0 section-glow"></div>
-  <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-24 pb-28">
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-      <div class="animate-fadeIn">
-        <h1 class="text-4xl sm:text-6xl font-semibold tracking-tight leading-tight">
-          Свобода и безопасность в один клик
+  <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-20 pb-16 md:pt-24 md:pb-28 relative">
+    <div class="absolute top-0 left-0 -translate-x-1/4 -translate-y-1/4 w-96 h-96 bg-primary-500/20 blur-[120px] rounded-full z-0 section-glow"></div>
+    <div class="flex flex-col lg:grid lg:grid-cols-2 gap-8 md:gap-12 items-center">
+      <div class="animate-fadeIn order-2 lg:order-1 text-center lg:text-left">
+        <h1 class="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-semibold tracking-tight leading-tight">
+          Свобода и безопасность в <br class="hidden sm:block">один <u>клик</u>
         </h1>
-        <p class="mt-4 text-neutral-300 text-lg">
-          Быстрое и надежное решение с нулевыми логами, шифрованием и серверами в 5+ странах.
+        <p class="mt-3 md:mt-4 text-neutral-300 text-base md:text-lg max-w-xl mx-auto lg:mx-0">
+          Быстрое и надежное решение с нулевыми логами, шифрованием и серверами в 5+ странах
         </p>
-        <div class="mt-8 flex flex-wrap gap-3">
-          <a href="#pricing" class="rounded-2xl bg-primary-500 hover:bg-primary-400 text-white px-6 py-3 font-medium shadow-glow transition shadow-lg transform duration-300 hover:scale-105 hover:shadow-blue-500/50">Выбрать тариф</a>
-          <a href="#apps" class="rounded-2xl border border-neutral-700 px-6 py-3 font-medium hover:bg-neutral-900 transition">Подробнее</a>
+        <div class="mt-6 md:mt-8 flex flex-col sm:flex-row gap-3 justify-center lg:justify-start">
+          <a href="#pricing" class="rounded-2xl bg-primary-500 hover:bg-primary-400 text-white px-5 py-3 md:px-6 md:py-3 font-medium shadow-glow transition shadow-lg transform duration-300 hover:scale-105 hover:shadow-blue-500/50 text-sm md:text-base">
+            Выбрать тариф
+          </a>
+          <a href="#apps" class="rounded-2xl border border-neutral-700 px-5 py-3 md:px-6 md:py-3 font-medium hover:bg-neutral-900 transition text-sm md:text-base">
+            Подробнее
+          </a>
         </div>
-        <div class="mt-6 flex items-center gap-4 text-xs text-neutral-400 animate-fadeIn">
+        <div class="mt-4 md:mt-6 flex flex-wrap justify-center lg:justify-start gap-3 md:gap-4 text-xs text-neutral-400 animate-fadeIn">
           <div class="flex items-center gap-2">
-            <span class="inline-block h-2 w-2 rounded-full bg-green-400 animate-pulse"></span>99.4% аптайм
+            <span class="inline-block h-2 w-2 rounded-full bg-green-400 animate-pulse"></span>
+            <span>99.4% аптайм</span>
           </div>
-          <div>7-дн. гарантия возврата</div>
+          <div>7-дн. гарантия</div>
           <div>Поддержка 24/7</div>
         </div>
       </div>
-      <div class="hidden sm:flex relative animate-fadeIn flex items-end">
-        <div class="relative rounded-3xl border border-neutral-800 bg-neutral-900 p-2 shadow-soft flex-shrink-0 w-full sm:w-auto">
-          <div class="absolute -inset-8 rounded-3xl bg-gradient-to-br from-primary-500/20 to-transparent blur-2xl"></div>
-          <div class="relative rounded-2xl border border-neutral-800 bg-black p-6 animate-fadeIn">
+      <div class="hidden sm:flex animate-fadeIn order-1 lg:order-2 w-full max-w-md mx-auto lg:mx-0 lg:ml-auto flex justify-center lg:justify-end">
+        <div class="relative rounded-3xl border border-neutral-800 bg-neutral-900 p-2 shadow-soft w-full">
+          <div class="absolute -inset-4 md:-inset-8 rounded-3xl bg-gradient-to-br from-primary-500/20 to-transparent blur-xl md:blur-2xl"></div>
+          <div class="relative rounded-2xl border border-neutral-800 bg-black p-4 md:p-6 animate-fadeIn">
             <div class="flex items-center justify-between text-xs">
               <span id="session-status" class="text-white">Подключение…</span>
               <span id="connection-status" class="flex items-center gap-1 text-yellow-400">
-                <span class="h-2 w-2 rounded-full bg-yellow-400 animate-ping"></span> Проверка
+                <span class="h-2 w-2 rounded-full bg-yellow-400 animate-ping"></span> 
+                Проверка
               </span>
             </div>
-            <div class="mt-4 grid grid-cols-2 gap-4">
-              <div class="rounded-xl border border-neutral-800 p-4">
-                <div class="text-neutral-400 text-xs">Максимальная скорость</div>
-                <div class="mt-1 text-2xl font-semibold">1 Гбит/с</div>
+            <div class="mt-4 grid grid-cols-2 gap-3 md:gap-4">
+              <div class="rounded-xl border border-neutral-800 p-3 md:p-4">
+                <div class="text-neutral-400 text-xs">Макс. скорость</div>
+                <div class="mt-1 text-xl md:text-2xl font-semibold">1 Гбит/с</div>
               </div>
-              <div class="rounded-xl border border-neutral-800 p-4">
+              <div class="rounded-xl border border-neutral-800 p-3 md:p-4">
                 <div class="text-neutral-400 text-xs">Пинг</div>
-                <div id="ping-value" class="mt-1 text-2xl font-semibold">– ms</div>
+                <div id="ping-value" class="mt-1 text-xl md:text-2xl font-semibold">– ms</div>
               </div>
-              <div class="rounded-xl border border-neutral-800 p-4 col-span-2">
+              <div class="rounded-xl border border-neutral-800 p-3 md:p-4 col-span-2">
                 <div class="text-neutral-400 text-xs">Текущий сервер</div>
                 <div id="server-loader" class="mt-1 flex items-center gap-2 text-neutral-500 animate-pulse">
                   <span>Выбор сервера…</span>
                 </div>
                 <div id="server-info" class="mt-1 flex items-center gap-2 hidden">
-                  <img id="server-flag" src="" alt="server" class="h-4 w-6 rounded-sm border border-neutral-700" />
-                  <span id="server-name" class="font-medium"></span>
+                  <img id="server-flag" src="" alt="server" class="h-4 w-6 rounded-sm border border-neutral-700" loading="lazy" />
+                  <span id="server-name" class="font-medium text-sm md:text-base"></span>
                 </div>
               </div>
             </div>
-            <button class="mt-6 w-full rounded-xl bg-white text-neutral-900 font-medium py-3 hover:shadow-glow transition" disabled>Отключить</button>
+            <button class="mt-4 md:mt-6 w-full rounded-xl bg-white text-neutral-900 font-medium py-2 md:py-3 hover:shadow-glow transition text-sm md:text-base" disabled>
+              Отключить
+            </button>
           </div>
-        </div>
-        <div class="hidden md:flex justify-center animate-float">
-          <svg width="220" height="220" viewBox="0 0 220 220" fill="none" xmlns="https://www.w3.org/2000/svg"
-              class="h-48 w-auto drop-shadow-[0_0_14px_rgba(22,163,255,0.35)]">
-            <ellipse cx="110" cy="200" rx="50" ry="12" fill="url(#shadowGlow)" opacity="0.6"/>
-            <path d="M75 120c0-30 28-52 58-43 22 6 36 26 32 48-5 24-29 36-58 34-24-2-32-13-32-39z"
-                  fill="#0c0f14" stroke="#16a3ff" stroke-width="2" stroke-opacity="0.35"/>
-            <path class="wing-animation" d="M78 118c-12 12-22 30-18 44 3 10 12 17 20 12 9-5 9-22 13-30 4-10 8-18 18-22-12-4-20-4-33-4z"
-                  fill="#111827" stroke="#16a3ff" stroke-opacity="0.25"/>
-            <circle cx="145" cy="90" r="20" fill="#0c0f14" stroke="#16a3ff" stroke-opacity="0.4"/>
-            <circle cx="151" cy="88" r="5" fill="white"/>
-            <circle cx="152" cy="88" r="2" fill="#0c0f14"/>
-            <path d="M163 90l20 7-20 7c2-4 3-9 0-14z" fill="#f5a524"/>
-            <path d="M98 160l-5 12h7l4-10-6-2z" fill="#0c0f14"/>
-            <path d="M116 162l-4 10h6l5-9-7-1z" fill="#0c0f14"/>
-            <defs>
-              <radialGradient id="shadowGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(110 200) rotate(90) scale(12 50)">
-                <stop stop-color="#16a3ff" stop-opacity="0.4"/>
-                <stop offset="1" stop-color="#16a3ff" stop-opacity="0"/>
-              </radialGradient>
-            </defs>
-          </svg>
         </div>
       </div>
     </div>
@@ -197,54 +252,34 @@
         <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24"
             class="shrink-0 text-primary-400 drop-shadow-[0_0_12px_rgba(22,163,255,0.8)]"
             fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="10"/>
-          <path d="M2 12h20M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20"/>
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          <path d="m9 12 2 2 4-4"/>
         </svg>
-        <span class="text-2xl">Возможности</span>
+        <span class="text-2xl">Преимущества</span>
       </span>
     </h2>
-    <div class="relative">
+    <div class="relative" aria-label="Возможности сервиса" role="region">
       <div class="fade-mask">
-        <div class="flex gap-6 animate-marquee">
-          <div class="card">
+        <div class="flex gap-6 animate-marquee items-stretch" role="list" aria-live="polite">
+          <div class="card" role="listitem" tabindex="0">
             <h3 class="text-xl font-semibold">Молниеносная скорость</h3>
-            <p class="mt-2 text-neutral-400">Протоколы VLESS® и Shadowsocks, оптимизированные маршруты и 25-Гбит сети.</p>
+            <p class="mt-2 text-neutral-400">Протоколы VLESS® и Shadowsocks, оптимизированные маршруты и 25-Гбит сети</p>
           </div>
-          <div class="card">
+          <div class="card" role="listitem" tabindex="0">
             <h3 class="text-xl font-semibold">Нулевая политика логов</h3>
-            <p class="mt-2 text-neutral-400">Мы не собираем и не храним журналы активности. Независимый аудит.</p>
+            <p class="mt-2 text-neutral-400">Мы не собираем и не храним журналы активности. Независимый аудит</p>
           </div>
-          <div class="card">
+          <div class="card" role="listitem" tabindex="0">
             <h3 class="text-xl font-semibold">Доступ к контенту</h3>
-            <p class="mt-2 text-neutral-400">Разблокируйте любимые сервисы и сайты дома и в поездках.</p>
+            <p class="mt-2 text-neutral-400">Разблокируйте любимые сервисы и сайты дома и в поездках</p>
           </div>
-          <div class="card">
+          <div class="hidden sm:flex card" role="listitem" tabindex="0">
             <h3 class="text-xl font-semibold">Протечки исключены</h3>
-            <p class="mt-2 text-neutral-400">Kill-Switch, DNS-over-HTTPS, защита от утечек IPv6 и WebRTC.</p>
+            <p class="mt-2 text-neutral-400">Kill-Switch, DNS-over-HTTPS, защита от утечек IPv6 и WebRTC</p>
           </div>
-          <div class="card">
+          <div class="hidden sm:flex card" role="listitem" tabindex="0">
             <h3 class="text-xl font-semibold">Безопасная оплата</h3>
-            <p class="mt-2 text-neutral-400">Проверенные временем платежные системы.</p>
-          </div>
-          <div class="card">
-            <h3 class="text-xl font-semibold">Молниеносная скорость</h3>
-            <p class="mt-2 text-neutral-400">Протоколы VLESS® и Shadowsocks, оптимизированные маршруты и 25-Гбит сети.</p>
-          </div>
-          <div class="card">
-            <h3 class="text-xl font-semibold">Нулевая политика логов</h3>
-            <p class="mt-2 text-neutral-400">Мы не собираем и не храним журналы активности. Независимый аудит.</p>
-          </div>
-          <div class="card">
-            <h3 class="text-xl font-semibold">Доступ к контенту</h3>
-            <p class="mt-2 text-neutral-400">Разблокируйте любимые сервисы и сайты дома и в поездках.</p>
-          </div>
-          <div class="card">
-            <h3 class="text-xl font-semibold">Протечки исключены</h3>
-            <p class="mt-2 text-neutral-400">Kill-Switch, DNS-over-HTTPS, защита от утечек IPv6 и WebRTC.</p>
-          </div>
-          <div class="card">
-            <h3 class="text-xl font-semibold">Безопасная оплата</h3>
-            <p class="mt-2 text-neutral-400">Проверенные временем платежные системы.</p>
+            <p class="hidden sm:flex mt-2 text-neutral-400">Проверенные временем платежные системы</p>
           </div>
         </div>
       </div>
@@ -252,10 +287,7 @@
   </div>
 </section>
 <style>
-  @keyframes marquee {
-    0%   { transform: translateX(0%); }
-    100% { transform: translateX(-50%); }
-  }
+  @keyframes marquee { 0% { transform: translateX(0%);} 100% { transform: translateX(-50%);} }
   .animate-marquee {
     display: flex;
     width: max-content;
@@ -279,8 +311,34 @@
     mask-size: 100% 100%;
     overflow: hidden;
   }
-  #features, #features * {
-    user-select: none;
+  #features, #features * { user-select: none; }
+
+  @media (max-width: 1024px) {
+    .animate-marquee {
+      animation: none !important;
+      display: flex;
+      gap: var(--card-gap);
+      overflow-x: auto;
+      padding-bottom: 0.5rem;
+      scrollbar-width: thin;
+      -webkit-overflow-scrolling: touch;
+      width: 100%;
+    }
+    .fade-mask { -webkit-mask-image: none; mask-image: none; overflow: visible; }
+    .card { min-width: 320px; flex: 0 0 auto; scroll-snap-align: start; }
+    .animate-marquee { scroll-snap-type: x mandatory; }
+    .drop-shadow-\[0_0_14px_rgba\(22\,163\,255\,0\.35\)\] { filter: drop-shadow(0 0 6px rgba(22,163,255,0.25)); }
+  }
+
+  @media (max-width: 640px) {
+    .animate-marquee { flex-direction: column; overflow-x: visible; gap: 1rem; }
+    .card { min-width: auto; width: 100%; }
+    .card h3 { font-size: 1.05rem; }
+    .card p { font-size: 0.95rem; }
+  }
+
+  @media (max-width: 1366px) and (min-width: 1025px) {
+    .card { min-width: 360px; }
   }
 </style>
 <section id="pricing" class="relative border-t border-neutral-800/70 bg-neutral-950 overflow-hidden fade-in">
@@ -361,38 +419,45 @@
           <li>Безлимитный трафик</li>
           <li>Цепочка из двух серверов (Multi-Hop)</li>
         </ul>
-        <a href="#" class="mt-6 rounded-xl bg-gray-300 text-neutral-500 text-center py-3 font-medium select-none pointer-events-none" onclick="return false;">Скоро</a>
+        <a href="#" class="mt-6 rounded-xl bg-gray-300 text-neutral-500 text-center py-3 font-medium select-none pointer-events-none" onclick="return false;" aria-disabled="true" tabindex="-1">Скоро</a>
         <div class="absolute -inset-2 rounded-3xl bg-gradient-to-tr from-primary-400/10 to-transparent blur-2xl opacity-50 group-hover:opacity-100 -z-10 transition"></div>
       </div>
     </div>
     <p class="mt-10 text-center text-xs text-neutral-500">* Цены указаны с НДС (если применимо). Возврат средств осуществляется в соответствии с политикой возвратов.</p>
   </div>
-</section>
   <section id="apps" class="border-t border-neutral-800/70 fade-in">
-    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-20">
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
+    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12 md:py-20">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-10 items-center">
         <div>
-          <h2 class="text-3xl font-semibold">Поддерживаемые приложения</h2>
-          <p class="mt-2 text-neutral-400">Работает с Hiddify, v2RayTun и другими клиентами. Просто импортируйте профиль или отсканируйте QR-код после покупки.</p>
-          <div class="mt-6 flex flex-wrap gap-3 text-sm">
-            <a href="#" id="btn-hiddify"class="rounded-xl border border-neutral-800 px-4 py-2 hover:bg-neutral-900 hover:scale-110">Hiddify (Android/iOS)</a>
-            <a href="#" id="btn-v2raytun" class="rounded-xl border border-neutral-800 px-4 py-2 hover:bg-neutral-900 hover:scale-110">v2RayTun (Android/iOS)</a>
-            <a href="https://storage.v2raytun.com/v2RayTun_Setup.exe" class="rounded-xl border border-neutral-800 px-4 py-2 hover:bg-neutral-900 hover:scale-110" target="_blank" rel="noopener noreferrer">Windows</a>
+          <h2 class="text-2xl md:text-3xl font-semibold text-center lg:text-left">Поддерживаемые приложения</h2>
+          <p class="mt-2 md:mt-3 text-neutral-400 text-sm md:text-base text-center lg:text-left">
+            Работает с Hiddify, v2RayTun и другими клиентами. Просто импортируйте профиль или отсканируйте QR-код после покупки.
+          </p>
+          <div class="mt-4 md:mt-6 flex flex-wrap gap-2 md:gap-3 justify-center lg:justify-start">
+            <a href="#" id="btn-hiddify" class="rounded-xl border border-neutral-800 px-3 py-1.5 md:px-4 md:py-2 hover:bg-neutral-900 hover:scale-105 text-xs md:text-sm transition-transform">
+              Hiddify (Android/iOS)
+            </a>
+            <a href="#" id="btn-v2raytun" class="rounded-xl border border-neutral-800 px-3 py-1.5 md:px-4 md:py-2 hover:bg-neutral-900 hover:scale-105 text-xs md:text-sm transition-transform">
+              v2RayTun (Android/iOS)
+            </a>
+            <a href="https://storage.v2raytun.com/v2RayTun_Setup.exe" class="rounded-xl border border-neutral-800 px-3 py-1.5 md:px-4 md:py-2 hover:bg-neutral-900 hover:scale-105 text-xs md:text-sm transition-transform" target="_blank" rel="noopener noreferrer">
+              Windows
+            </a>
           </div>
         </div>
         <div class="relative">
-          <div class="absolute -inset-6 rounded-3xl bg-gradient-to-br from-primary-500/10 to-transparent blur-2xl"></div>
-          <div class="relative grid grid-cols-2 gap-4">
-            <div class="rounded-2xl border border-neutral-800 bg-neutral-900 p-5 text-center">
-              <div class="text-2xl font-semibold">VLESS</div>
+          <div class="absolute -inset-4 md:-inset-6 rounded-3xl bg-gradient-to-br from-primary-500/10 to-transparent blur-xl md:blur-2xl z-0"></div>
+          <div class="relative grid grid-cols-2 gap-3 md:gap-4 z-10">
+            <div class="rounded-2xl border border-neutral-800 bg-neutral-900 p-3 md:p-5 text-center">
+              <div class="text-lg md:text-xl lg:text-2xl font-semibold">VLESS</div>
               <div class="text-xs text-neutral-400 mt-1">Протокол</div>
             </div>
-            <div class="rounded-2xl border border-neutral-800 bg-neutral-900 p-5 text-center">
-              <div class="text-2xl font-semibold">AES-256 (TLS)</div>
+            <div class="rounded-2xl border border-neutral-800 bg-neutral-900 p-3 md:p-5 text-center">
+              <div class="text-sm md:text-lg lg:text-2xl font-semibold">AES-256 (TLS)</div>
               <div class="text-xs text-neutral-400 mt-1">Шифрование</div>
             </div>
-            <div class="col-span-2 rounded-2xl border border-neutral-800 bg-neutral-900 p-5 text-center">
-              <div class="text-lg">Сервера: Франкфурт, Стокгольм, Париж и др.</div>
+            <div class="col-span-2 rounded-2xl border border-neutral-800 bg-neutral-900 p-3 md:p-5 text-center">
+              <div class="text-sm md:text-base lg:text-2xl">Сервера: Франкфурт, Стокголм, Париж и др.</div>
             </div>
           </div>
         </div>
@@ -404,16 +469,21 @@
       <h2 class="text-3xl font-semibold text-center">Частые вопросы</h2>
       <div class="mt-8 divide-y divide-neutral-800/70">
         <div class="py-4">
-          <button class="w-full flex justify-between items-center text-left" 
-                  @click="open===1?open=null:open=1">
+          <button class="w-full flex justify-between items-center text-left faq-question" 
+                  @click="open===1?open=null:open=1"
+                  :aria-expanded="open===1"
+                  aria-controls="faq1"
+                  :class="{'faq-open':open===1}"
+                  tabindex="0">
             <span class="font-medium">Как оформить покупку?</span>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" 
-                :class="{'rotate-180':open===1}" 
-                class="transition-transform duration-300">
+                :class="{'faq-icon':true,'faq-open':open===1}" 
+                class="faq-icon transition-transform duration-300">
               <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="1.6"/>
             </svg>
           </button>
           <div x-show="open===1" 
+              id="faq1"
               x-transition:enter="transition ease-out duration-300"
               x-transition:enter-start="opacity-0 -translate-y-2"
               x-transition:enter-end="opacity-100 translate-y-0"
@@ -425,64 +495,79 @@
           </div>
         </div>
         <div class="py-4">
-          <button class="w-full flex justify-between items-center text-left" 
-                  @click="open===2?open=null:open=2">
+          <button class="w-full flex justify-between items-center text-left faq-question" 
+                  @click="open===2?open=null:open=2"
+                  :aria-expanded="open===2"
+                  aria-controls="faq2"
+                  :class="{'faq-open':open===2}"
+                  tabindex="0">
             <span class="font-medium">Почему именно VLESS?</span>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" 
-                :class="{'rotate-180':open===2}" 
-                class="transition-transform duration-300">
+                :class="{'faq-icon':true,'faq-open':open===2}" 
+                class="faq-icon transition-transform duration-300">
               <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="1.6"/>
             </svg>
           </button>
           <div x-show="open===2" 
+              id="faq2"
               x-transition:enter="transition ease-out duration-300"
-              x-transition:enter-start="opacity-0 -translate-y-2"
-              x-transition:enter-end="opacity-100 translate-y-0"
+              x-transition:enter-start="opacity-0 -translateY(10px)"
+              x-transition:enter-end="opacity-100 translateY(0)"
               x-transition:leave="transition ease-in duration-200"
-              x-transition:leave-start="opacity-100 translate-y-0"
-              x-transition:leave-end="opacity-0 -translate-y-2"
+              x-transition:leave-start="opacity-100 translateY(0)"
+              x-transition:leave-end="opacity-0 -translateY(10px)"
               class="mt-2 text-neutral-400">
             В последнее время в РФ значительно усилились ограничения сети и контроль над легко отслеживаемыми подключениями. VLESS — современный и гибкий протокол, который умело маскируется под обычный интернет-трафик и не зависит от стандартных сигнатур, обеспечивая стабильный и защищённый доступ.
           </div>
         </div>
         <div class="py-4">
-          <button class="w-full flex justify-between items-center text-left" 
-                  @click="open===3?open=null:open=3">
+          <button class="w-full flex justify-between items-center text-left faq-question" 
+                  @click="open===3?open=null:open=3"
+                  :aria-expanded="open===3"
+                  aria-controls="faq3"
+                  :class="{'faq-open':open===3}"
+                  tabindex="0">
             <span class="font-medium">Какие есть способы оплаты?</span>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" 
-                :class="{'rotate-180':open===3}" 
-                class="transition-transform duration-300">
+                :class="{'faq-icon':true,'faq-open':open===3}" 
+                class="faq-icon transition-transform duration-300">
               <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="1.6"/>
             </svg>
           </button>
           <div x-show="open===3" 
+              id="faq3"
               x-transition:enter="transition ease-out duration-300"
-              x-transition:enter-start="opacity-0 -translate-y-2"
-              x-transition:enter-end="opacity-100 translate-y-0"
+              x-transition:enter-start="opacity-0 -translateY(10px)"
+              x-transition:enter-end="opacity-100 translateY(0)"
               x-transition:leave="transition ease-in duration-200"
-              x-transition:leave-start="opacity-100 translate-y-0"
-              x-transition:leave-end="opacity-0 -translate-y-2"
+              x-transition:leave-start="opacity-100 translateY(0)"
+              x-transition:leave-end="opacity-0 -translateY(10px)"
               class="mt-2 text-neutral-400">
             Сайт в разработке.
           </div>
         </div>
         <div class="py-4">
-          <button class="w-full flex justify-between items-center text-left" 
-                  @click="open===4?open=null:open=4">
+          <button class="w-full flex justify-between items-center text-left faq-question" 
+                  @click="open===4?open=null:open=4"
+                  :aria-expanded="open===4"
+                  aria-controls="faq4"
+                  :class="{'faq-open':open===4}"
+                  tabindex="0">
             <span class="font-medium">Существует ли гарантия?</span>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" 
-                :class="{'rotate-180':open===3}" 
-                class="transition-transform duration-300">
+                :class="{'faq-icon':true,'faq-open':open===4}" 
+                class="faq-icon transition-transform duration-300">
               <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="1.6"/>
             </svg>
           </button>
           <div x-show="open===4" 
+              id="faq4"
               x-transition:enter="transition ease-out duration-300"
-              x-transition:enter-start="opacity-0 -translate-y-2"
-              x-transition:enter-end="opacity-100 translate-y-0"
+              x-transition:enter-start="opacity-0 -translateY(10px)"
+              x-transition:enter-end="opacity-100 translateY(0)"
               x-transition:leave="transition ease-in duration-200"
-              x-transition:leave-start="opacity-100 translate-y-0"
-              x-transition:leave-end="opacity-0 -translate-y-2"
+              x-transition:leave-start="opacity-100 translateY(0)"
+              x-transition:leave-end="opacity-0 -translateY(10px)"
               class="mt-2 text-neutral-400">
             Да. У нас действует 7-дневная гарантия возврата средств в случае, если сервис вам не подошел.
           </div>
@@ -504,7 +589,7 @@
       <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
         <div>
           <div class="flex items-center gap-1 text-neutral-200 drop-shadow-[0_0_8px_rgba(22,163,255,0.8)]">
-            <img src="/static/icons/footer-logo.svg">
+            <img src="/static/icons/footer-logo.svg" alt="footer logo" loading="lazy">
             Raven Private
           </div>
           <p class="mt-3">Приватность без компромиссов</p>
@@ -551,20 +636,14 @@
       <div class="mt-10 flex flex-col sm:flex-row items-center justify-between gap-6">
         <div>© <span id="year"></span> RVNPrivate. Все права защищены.</div>
         <div class="hidden sm:flex items-center gap-4 flex-wrap justify-center mr-2 select-none pointer-events-none drop-shadow-[0_0_50px_rgba(22,163,255,0.8)]">
-          <img src="/static/payments/merchant-spb.svg" alt="spb" class="h-8">
-          <img src="/static/payments/merchant-mir.svg" alt="mir" class="h-5">
-          <img src="/static/payments/merchant-visa.svg" alt="visa" class="h-10">
-          <img src="/static/payments/merchant-mcard.svg" alt="mastercard" class="h-10">
+          <img src="/static/payments/merchant-spb.svg" alt="spb" class="h-8" loading="lazy" aria-label="Платежная система СПБ">
+          <img src="/static/payments/merchant-mir.svg" alt="mir" class="h-5" loading="lazy" aria-label="Платежная система МИР">
+          <img src="/static/payments/merchant-visa.svg" alt="visa" class="h-10" loading="lazy" aria-label="Visa">
+          <img src="/static/payments/merchant-mcard.svg" alt="mastercard" class="h-10" loading="lazy" aria-label="Mastercard">
         </div>
       </div>
     </div>
   </footer>
-  <div x-data="{show:true}" x-show="show" x-transition class="fixed bottom-4 left-1/2 -translate-x-1/2 z-50">
-    <div class="glass rounded-xl border border-neutral-800 bg-neutral-900/70 px-3 py-2 shadow-soft text-sm text-neutral-200 whitespace-nowrap">
-      Мы используем «куки» для улучшения работы сайта
-      <button class="font-bold no-underline text-[#25B3FF] ml-2" @click="show=false">OK!</button>
-    </div>
-  </div>
   <script src="js/main/connection.js"></script>
   <script src="js/main/apps.js"></script>
   <script>
@@ -580,31 +659,104 @@
           }
         });
       }, { threshold: 0.2 });
-
       elements.forEach(el => observer.observe(el));
+      if (window.matchMedia('(min-width: 1025px)').matches) {
+        if (typeof particlesJS === 'function') {
+          try {
+            particlesJS("particles-js", {
+              particles: {
+                number: { value: 20 },
+                color: { value: "#16a3ff" },
+                shape: { type: "circle" },
+                opacity: { value: 0.4 },
+                size: { value: 2, random: true },
+                line_linked: { enable: false },
+                move: { enable: true, speed: 0.6, direction: "none", random: true, straight: false, out_mode: "out" }
+              },
+              interactivity: {
+                detect_on: "canvas",
+                events: { onhover: { enable: false }, onclick: { enable: false } }
+              },
+              retina_detect: true
+            });
+          } catch(e) {
+            console.warn('Particles Init Failed', e);
+          }
+        }
+      } else {
+        const p = document.getElementById('particles-js'); if (p) p.style.display = 'none';
+      }
     });
   </script>
   <script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.js" integrity="sha384-AWFROZ10DoeXcNjhoQe0agryexFsipZEA17Cde6/tknpOUacvUGk27vXQ2a6ljSt" crossorigin="anonymous"></script>
   <script>
-    particlesJS("particles-js", {
-      particles: {
-        number: { value: 20 },
-        color: { value: "#16a3ff" }, 
-        shape: { type: "circle" },
-        opacity: { value: 0.4 },
-        size: { value: 2, random: true },
-        line_linked: { enable: false },
-        move: { enable: true, speed: 0.6, direction: "none", random: true, straight: false, out_mode: "out" }
-      },
-      interactivity: {
-        detect_on: "canvas",
-        events: {
-          onhover: { enable: false },
-          onclick: { enable: false }
+    (function(){
+      function handleFirstTab(e) {
+        if (e.key === 'Tab') {
+          document.documentElement.classList.add('user-is-tabbing');
+          window.removeEventListener('keydown', handleFirstTab);
         }
-      },
-      retina_detect: true
-    });
-  </script>  
+      }
+      window.addEventListener('keydown', handleFirstTab);
+      document.addEventListener('click', function(ev){
+      });
+    })();
+  </script>
+  <script>
+    (() => {
+      let progress = document.getElementById('page-progress');
+      let timer;
+      function startProgress() {
+        if (!progress) return;
+        progress.style.width = '0';
+        progress.style.opacity = '1';
+        setTimeout(() => { progress.style.width = '60%'; }, 10);
+        timer = setTimeout(() => { progress.style.width = '100%'; }, 600);
+      }
+      function endProgress() {
+        if (!progress) return;
+        progress.style.width = '100%';
+        setTimeout(() => { progress.style.opacity = '0'; progress.style.width = '0'; }, 400);
+        clearTimeout(timer);
+      }
+      document.querySelectorAll('a[href^="#"]').forEach(link => {
+        link.addEventListener('click', function(e) {
+          const id = this.getAttribute('href').slice(1);
+          if (!id) return;
+          const el = document.getElementById(id);
+          if (el) {
+            e.preventDefault();
+            startProgress();
+            setTimeout(() => {
+              el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              endProgress();
+            }, 250);
+          }
+        });
+      });
+      function setActiveNav() {
+        const sections = ['home','features','pricing','apps','faq'];
+        let found = false;
+        for (let id of sections) {
+          const el = document.getElementById(id);
+          if (el) {
+            const rect = el.getBoundingClientRect();
+            if (rect.top <= 80 && rect.bottom > 80) {
+              document.querySelectorAll('.mobile-nav a').forEach(a => a.classList.remove('active'));
+              let nav = document.getElementById('nav-' + id);
+              if (nav) nav.classList.add('active');
+              found = true;
+              break;
+            }
+          }
+        }
+        if (!found) document.querySelectorAll('.mobile-nav a').forEach(a => a.classList.remove('active'));
+      }
+      window.addEventListener('scroll', setActiveNav, { passive: true });
+      window.addEventListener('DOMContentLoaded', setActiveNav);
+    })();
+  </script>
+  <script>
+  </script>
 </body>
 </html>

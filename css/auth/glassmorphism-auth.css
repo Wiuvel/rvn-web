@@ -63,15 +63,24 @@ body {
     transform: translate(-50%, 0) !important;
 }
 .tree-glow {
-    animation: glow 5s ease-in-out infinite;
+  display: block;
+  pointer-events: none;
+  filter:
+    drop-shadow(0 0 8px #16a3ff44)
+    drop-shadow(0 0 16px #16a3ff22);
+  animation: glow 6s ease-in-out infinite;
 }
 @keyframes glow {
-    0%, 100% {
-    filter: drop-shadow(0 0 20px rgba(22,163,255,0.3));
-    }
-    50% {
-    filter: drop-shadow(0 0 30px rgba(22,163,255,0.6));
-    }
+  0%, 100% {
+    filter:
+      drop-shadow(0 0 8px #16a3ff44)
+      drop-shadow(0 0 16px #16a3ff22);
+  }
+  50% {
+    filter:
+      drop-shadow(0 0 16px #16a3ff66)
+      drop-shadow(0 0 24px #16a3ff33);
+  }
 }
 .divider {
     display: flex;
