@@ -8,57 +8,8 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script defer src="https://unpkg.com/alpinejs@3.14.9/dist/cdn.min.js" integrity="sha384-9Ax3MmS9AClxJyd5/zafcXXjxmwFhZCdsT6HJoJjarvCaAkJlk5QDzjLJm+Wdx5F" crossorigin="anonymous"></script>
   <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
-  <style>
-    body {
-      background: radial-gradient(circle at top, #0f172a, #020617);
-      color: white;
-    }
-    .animate-fadeIn { animation: fadeIn 1s ease-in-out; }
-    @keyframes fadeIn { from {opacity:0; transform:translateY(10px);} to {opacity:1; transform:translateY(0);} }
-    .animate-float { animation: float 6s ease-in-out infinite; }
-    @keyframes float { 0%,100%{transform:translateY(0);} 50%{transform:translateY(-12px);} }
-    .glass-btn {
-      display: inline-block;
-      min-width: 180px;
-      padding: 0.75rem 1.5rem;
-      border-radius: 0.75rem;
-      font-weight: 500;
-      text-align: center;
-      color: #fff;
-      border: 1px solid rgba(255, 255, 255, 0.25);
-      background: rgba(255, 255, 255, 0.08);
-      backdrop-filter: blur(12px);
-      transition: all 0.3s ease;
-    }
-    .glass-btn:hover {
-      background: rgba(22, 163, 255, 0.15);
-      border-color: rgba(22,163,255,0.5);
-      box-shadow: 0 0 16px rgba(22,163,255,0.35);
-    }
-    #particles-js {
-      pointer-events: none; 
-      z-index: 0;
-    }
-    #quote {
-      text-shadow: 0 0 8px rgba(22,163,255,0.6), 0 0 16px rgba(22,163,255,0.4);
-    }
-    .fade-in-up {
-      opacity: 1 !important;
-      transform: translate(-50%, 0) !important;
-    }
-    .tree-glow {
-      animation: glow 5s ease-in-out infinite;
-    }
-    @keyframes glow {
-      0%, 100% {
-        filter: drop-shadow(0 0 20px rgba(22,163,255,0.3));
-      }
-      50% {
-        filter: drop-shadow(0 0 30px rgba(22,163,255,0.6));
-      }
-    }
-  </style>
   <link rel="stylesheet" href="/css/main/app.css">
+  <link rel="stylesheet" href="/css/auth/glassmorphism-auth.css">
 </head>
 <body class="min-h-screen flex flex-col">
   <header class="sticky top-0 z-50 border-b border-neutral-800/70 bg-neutral-950/70 backdrop-blur-xl">
@@ -118,6 +69,23 @@
 
             <div class="flex justify-center">
               <button type="submit" class="glass-btn">Войти</button>
+            </div>
+            <div class="divider">
+              <span>или войти через</span>
+            </div>
+            <div class="oauth-grid">
+              <button type="button" class="oauth-btn" @click="oauthLogin('google')" title="Войти через Google">
+                <img src="/static/icons/oauth/google.svg" alt="Google" class="h-6">
+              </button>
+              <button type="button" class="oauth-btn" @click="oauthLogin('twitch')" title="Войти через Twitch">
+                <img src="/static/icons/oauth/twitch.svg" alt="Twitch" class="h-6">
+              </button>
+              <button type="button" class="oauth-btn" @click="oauthLogin('yandex')" title="Войти через Discord">
+                <img src="/static/icons/oauth/yandex.svg" alt="Yandex" class="w-6">
+              </button>
+              <button type="button" class="oauth-btn" @click="oauthLogin('github')" title="Войти через GitHub">
+                <img src="/static/icons/oauth/github.svg" alt="Twitch" class="h-8">
+              </button>
             </div>
             <p class="text-center text-sm text-neutral-400">Нет аккаунта? <a href="#" @click.prevent="switchToRegister()" class="text-primary-400 hover:underline">Зарегистрироваться</a></p>
           </form>
@@ -279,6 +247,10 @@
 
           this.globalError = '';
           alert('Вход отправлен (AJAX → сервер)');
+        },
+
+        oauthLogin(provider) {
+          alert(`Перенаправление на ${provider} OAuth`);
         },
 
         resetForm() {
