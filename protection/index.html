@@ -103,7 +103,6 @@
       }, 1000);
     }
     function onErrorCallback() {
-      // document.getElementById('error').style.display = 'block';
       const footer = document.getElementById('footer');
       if (footer) {
         footer.style.color = '#ff6b6b';
@@ -112,8 +111,6 @@
     }
     setTimeout(() => {
       if (!window.turnstile) {
-        // document.getElementById('error').style.display = 'block';
-        // document.getElementById('error').textContent = 'Не удалось загрузить проверку безопасности. Проверьте подключение к интернету.';
         const footer = document.getElementById('footer');
         if (footer) {
           footer.style.color = '#ff6b6b';
@@ -121,13 +118,23 @@
         }
       }
     }, 10000);
-
-    function onReadyCallback() {
+    (function observeTurnstile() {
       const desc = document.getElementById('site-desc');
-      if (desc) {
+      const container = document.querySelector('.cf-turnstile');
+      if (!desc || !container) return;
+
+      if (container.querySelector('iframe')) {
         desc.textContent = 'Подтвердите, что вы человек, выполнив указанное действие.';
+        return;
       }
-    }
+      const observer = new MutationObserver(() => {
+        if (container.querySelector('iframe')) {
+          desc.textContent = 'Подтвердите, что вы человек, выполнив указанное действие.';
+          observer.disconnect();
+        }
+      });
+      observer.observe(container, { childList: true, subtree: true });
+    })();
   </script>
 </body>
 </html>
