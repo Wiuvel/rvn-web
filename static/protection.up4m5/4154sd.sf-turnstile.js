@@ -24,7 +24,7 @@ function getSimpleTimeouts() {
     console.log('[PROTECT] Desktop device detected. Using standard timeouts.');
     return {
         observeDelay: 100, 
-        iframeCheck: 2000, 
+        iframeCheck: 3000, 
         mainTimeout: 15000 
     };
 }
@@ -156,7 +156,8 @@ function isSearchEngineBot() {
     const botPatterns = [
         /googlebot/i, /bingbot/i, /yandex/i, /duckduckbot/i,
         /baiduspider/i, /slurp/i, /facebookexternalhit/i,
-        /twitterbot/i, /linkedinbot/i, /whatsapp/i, /telegrambot/i
+        /twitterbot/i, /whatsapp/i, /telegrambot/i,
+        /Google-PageSpeed-Insights/i, /Google Page Speed Insights/i, /PSI bot/i
     ];
     
     return botPatterns.some(pattern => pattern.test(navigator.userAgent));
@@ -245,7 +246,7 @@ window.addEventListener('resize', syncTitleFill);
 
 (function checkExistingCookie() {
     if (isSearchEngineBot()) {
-        console.log('[PROTECT] Search engine bot detected. Skipping protection.');
+        console.log('[PROTECT] Helpful bot detected. Skipping protection.');
         return;
     }
 
