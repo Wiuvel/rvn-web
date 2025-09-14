@@ -9,32 +9,218 @@
   <link rel="preload" href="/static/templates/overlay-login.png" as="image" media="(min-width: 768px)">
   <link rel="preconnect" href="https://challenges.cloudflare.com">
   <link rel="dns-prefetch" href="https://challenges.cloudflare.com">
-  <link rel="stylesheet" href="/css/auth/glassmorphism-auth.css">
-  <script src="https://cdn.tailwindcss.com/3.4.17?plugins=forms@0.5.10" async></script>
-  <script defer src="https://unpkg.com/alpinejs@3.14.9/dist/cdn.min.js" integrity="sha384-9Ax3MmS9AClxJyd5/zafcXXjxmwFhZCdsT6HJoJjarvCaAkJlk5QDzjLJm+Wdx5F" crossorigin="anonymous"></script>
-  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
-  <script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.js" integrity="sha384-AWFROZ10DoeXcNjhoQe0agryexFsipZEA17Cde6/tknpOUacvUGk27vXQ2a6ljSt" crossorigin="anonymous" defer></script>
-  
   <style>
-    input:focus, button:focus {
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      background: #0a1020;
+      color: white;
+      font-family: system-ui, -apple-system, sans-serif;
+    }
+    
+    .min-h-screen {
+      min-height: 100vh;
+    }
+    
+    .flex {
+      display: flex;
+    }
+    
+    .flex-col {
+      flex-direction: column;
+    }
+    
+    .flex-grow {
+      flex-grow: 1;
+    }
+    
+    .items-center {
+      align-items: center;
+    }
+    
+    .justify-center {
+      justify-content: center;
+    }
+    
+    .px-4 {
+      padding-left: 1rem;
+      padding-right: 1rem;
+    }
+    
+    .py-12 {
+      padding-top: 3rem;
+      padding-bottom: 3rem;
+    }
+    
+    .absolute {
+      position: absolute;
+    }
+    
+    .inset-0 {
+      top: 0;
+      right: 0;
+      bottom: 0;
+      left: 0;
+    }
+    
+    .z-10 {
+      z-index: 10;
+    }
+    
+    .bg-neutral-900\/80 {
+      background-color: rgba(23, 23, 23, 0.8);
+    }
+    
+    .backdrop-blur-xl {
+      backdrop-filter: blur(20px);
+    }
+    
+    .p-8 {
+      padding: 2rem;
+    }
+    
+    .rounded-2xl {
+      border-radius: 1rem;
+    }
+    
+    .border {
+      border-width: 1px;
+    }
+    
+    .border-neutral-800 {
+      border-color: rgba(38, 38, 38, 0.8);
+    }
+    
+    .shadow-lg {
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+    }
+    
+    .w-full {
+      width: 100%;
+    }
+    
+    .max-w-md {
+      max-width: 28rem;
+    }
+    
+    .mx-auto {
+      margin-left: auto;
+      margin-right: auto;
+    }
+    
+    #preloader {
+      position: fixed;
+      z-index: 99999;
+      inset: 0;
+      background: rgba(10, 16, 32, 0.92);
+      backdrop-filter: blur(12px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: opacity 0.5s;
+    }
+    
+    .sticky {
+      position: sticky;
+    }
+    
+    .top-0 {
+      top: 0;
+    }
+    
+    .z-50 {
+      z-index: 50;
+    }
+    
+    .border-b {
+      border-bottom-width: 1px;
+    }
+    
+    .border-neutral-800\/70 {
+      border-color: rgba(38, 38, 38, 0.7);
+    }
+    
+    .bg-neutral-950\/70 {
+      background-color: rgba(10, 10, 10, 0.7);
+    }
+    
+    input {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      border-radius: 0.75rem;
+      background: rgba(38, 38, 38, 0.8);
+      border: 1px solid rgba(55, 55, 55, 0.8);
+      color: white;
+      box-sizing: border-box;
+    }
+    
+    input:focus {
       outline: 2px solid #16a3ff;
       outline-offset: 2px;
-      box-shadow: 0 0 0 3px rgba(22,163,255,0.2);
     }
-    .pass-toggle:focus {
-      outline: none !important;
-      box-shadow: none !important;
+    
+    .glass-btn {
+      background: linear-gradient(135deg, rgba(22, 163, 255, 0.2), rgba(22, 163, 255, 0.1));
+      border: 1px solid rgba(22, 163, 255, 0.3);
+      color: white;
+      padding: 0.75rem 2rem;
+      border-radius: 0.75rem;
+      transition: all 0.2s;
+    }
+    
+    .glass-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    
+    .spinner {
+      border: 2px solid #16a3ff;
+      border-top: 2px solid transparent;
+      border-radius: 50%;
+      width: 18px;
+      height: 18px;
+      animation: spin 0.7s linear infinite;
+      display: inline-block;
+      margin-right: 8px;
+    }
+    
+    @keyframes spin {
+      100% { transform: rotate(360deg); }
+    }
+    
+    .text-red-500 {
+      color: #ef4444;
+    }
+    
+    .text-sm {
+      font-size: 0.875rem;
+    }
+    
+    .mt-1 {
+      margin-top: 0.25rem;
     }
     
     @media (max-width: 768px) {
-      .tree-glow { display: none !important; }
-      .glass-btn, .oauth-btn {
-        min-height: 44px !important;
-        min-width: 44px !important;
+      .tree-glow { 
+        display: none !important; 
       }
-      input {
-        font-size: 16px !important;
+      
+      .p-8 {
+        padding: 1.25rem;
       }
+    }
+  </style>
+  <script src="https://cdn.tailwindcss.com?plugins=forms" async></script>
+  <script defer src="https://unpkg.com/alpinejs@3.14.9/dist/cdn.min.js" integrity="sha384-9Ax3MmS9AClxJyd5/zafcXXjxmwFhZCdsT6HJoJjarvCaAkJlk5QDzjLJm+Wdx5F" crossorigin="anonymous"></script>
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.js" integrity="sha384-AWFROZ10DoeXcNjhoQe0agryexFsipZEA17Cde6/tknpOUacvUGk27vXQ2a6ljSt" crossorigin="anonymous" defer></script>
+  <link rel="stylesheet" href="/css/auth/glassmorphism-auth.css" media="print" onload="this.media='all'">
+  <style>
+    .pass-toggle:focus {
+      outline: none !important;
+      box-shadow: none !important;
     }
     
     .tree-glow {
@@ -49,32 +235,6 @@
       pointer-events: none;
       filter: drop-shadow(0 0 24px #16a3ff55);
       transition: width 0.3s;
-    }
-    
-    input, .glass-btn {
-      max-width: 100%;
-      box-sizing: border-box;
-    }
-    
-    .spinner {
-      border: 2px solid #16a3ff;
-      border-top: 2px solid transparent;
-      border-radius: 50%;
-      width: 18px;
-      height: 18px;
-      animation: spin 0.7s linear infinite;
-      display: inline-block;
-      vertical-align: middle;
-      margin-right: 8px;
-    }
-    
-    @keyframes spin {
-      100% { transform: rotate(360deg);}
-    }
-    
-    @media (max-width: 400px) {
-      .bg-neutral-900\/80 { padding: 1.25rem !important; }
-      .glass-btn { min-width: 120px !important; padding: 0.5rem 1rem !important; }
     }
     
     @keyframes preload-bounce {
@@ -92,6 +252,53 @@
       background-color: #374151;
       border-radius: 1px;
       transition: all 0.3s ease;
+    }
+    
+    .oauth-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.5rem;
+      margin-top: 1rem;
+    }
+    
+    .oauth-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.5rem;
+      border-radius: 0.5rem;
+      background: rgba(38, 38, 38, 0.6);
+      border: 1px solid rgba(55, 55, 55, 0.4);
+      transition: all 0.2s;
+    }
+    
+    .oauth-btn:hover:not(:disabled) {
+      background: rgba(38, 38, 38, 0.8);
+      border-color: rgba(22, 163, 255, 0.4);
+    }
+    
+    .divider {
+      display: flex;
+      align-items: center;
+      text-align: center;
+      margin: 1.5rem 0;
+      color: #9ca3af;
+      font-size: 0.875rem;
+    }
+    
+    .divider::before,
+    .divider::after {
+      content: '';
+      flex: 1;
+      border-bottom: 1px solid rgba(55, 55, 55, 0.4);
+    }
+    
+    .divider::before {
+      margin-right: 0.5rem;
+    }
+    
+    .divider::after {
+      margin-left: 0.5rem;
     }
   </style>
 </head>
