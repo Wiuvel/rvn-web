@@ -72,6 +72,9 @@
       data-sitekey="0x4AAAAAAB0s4O-sxm9ZnAQk"
       data-callback="onSuccessCallback"
       data-error-callback="onErrorCallback"
+      data-before-interactive-callback="onBeforeInteractiveCallback"
+      data-after-interactive-callback="onAfterInteractiveCallback"
+      data-unsupported-callback="onUnsupportedCallback"
       data-theme="dark"
       data-size="normal"></div>
     <div id="error" class="footer" style="display:none; color:#ff6b6b;">
@@ -83,78 +86,141 @@
   </div>
 
   <script>
+    const captchaStates = {
+      LOADING: 'loading',
+      INTERACTIVE: 'interactive',
+      VERIFYING: 'verifying',
+      SUCCESS: 'success',
+      ERROR: 'error'
+    };
+    
+    let currentState = captchaStates.LOADING;
+
+    function updateStatusText() {
+      const desc = document.getElementById('site-desc');
+      const footer = document.getElementById('footer');
+      
+      if (!desc) return;
+      
+      switch(currentState) {
+        case captchaStates.LOADING:
+          desc.textContent = 'Загрузка проверки безопасности...';
+          if (footer) footer.textContent = 'Пожалуйста, подождите.';
+          break;
+        case captchaStates.INTERACTIVE:
+          desc.textContent = 'Подтвердите, что вы человек, выполнив указанное действие ниже.';
+          if (footer) footer.textContent = 'Выполните проверку безопасности.';
+          break;
+        case captchaStates.VERIFYING:
+          desc.textContent = 'Проверка выполняется...';
+          if (footer) footer.textContent = 'Пожалуйста, подождите.';
+          break;
+        case captchaStates.SUCCESS:
+          desc.textContent = 'Проверка пройдена успешно!';
+          if (footer) footer.textContent = 'Перенаправляем на сайт...';
+          break;
+        case captchaStates.ERROR:
+          desc.textContent = 'Ошибка проверки безопасности';
+          if (footer) {
+            footer.style.color = '#ff6b6b';
+            footer.textContent = 'Обновите страницу или попробуйте позже.';
+          }
+          break;
+      }
+    }
+
+    function onBeforeInteractiveCallback() {
+      console.log('Капча переходит в интерактивный режим');
+      currentState = captchaStates.INTERACTIVE;
+      updateStatusText();
+    }
+
+    function onAfterInteractiveCallback() {
+      console.log('Капча завершила интерактивный режим');
+      currentState = captchaStates.VERIFYING;
+      updateStatusText();
+    }
+
+    function onUnsupportedCallback() {
+      console.log('Браузер не поддерживается');
+      currentState = captchaStates.ERROR;
+      updateStatusText();
+    }
+
     function onSuccessCallback(token) {
-      // const expiration = new Date();
-      // expiration.setTime(expiration.getTime() + (2 * 60 * 60 * 1000));
-      // document.cookie = `access_granted=true; expires=${expiration.toUTCString()}; path=/; domain=.rvn.guru; Secure; SameSite=Lax`;
+      console.log('✅ Капча пройдена! Токен:', token);
+      currentState = captchaStates.SUCCESS;
+      updateStatusText();
       const urlParams = new URLSearchParams(window.location.search);
       let redirectUrl = urlParams.get('redirect') || '/';
-      if (
-        typeof redirectUrl !== 'string' ||
-        !redirectUrl.startsWith('/') ||
-        redirectUrl.startsWith('//') ||
-        redirectUrl.includes('://')
-      ) {
+      if (typeof redirectUrl !== 'string' ||
+          !redirectUrl.startsWith('/') ||
+          redirectUrl.startsWith('//') ||
+          redirectUrl.includes('://')) {
         redirectUrl = '/';
       }
+      
       setTimeout(() => {
         window.location.href = redirectUrl;
       }, 1000);
     }
 
     function onErrorCallback() {
-      const footer = document.getElementById('footer');
-      if (footer) {
-        footer.style.color = '#ff6b6b';
-        footer.textContent = 'Ошибка проверки. Обновите страницу или попробуйте позже.';
+      console.error('❌ Ошибка капчи');
+      currentState = captchaStates.ERROR;
+      updateStatusText();
+      
+      const errorDiv = document.getElementById('error');
+      if (errorDiv) {
+        errorDiv.style.display = 'block';
       }
     }
 
-    // Если не загрузился turnstile вообще
-    setTimeout(() => {
-      if (!window.turnstile) {
-        const footer = document.getElementById('footer');
-        if (footer) {
-          footer.style.color = '#ff6b6b';
-          footer.textContent = 'Не удалось загрузить проверку безопасности. Проверьте подключение к интернету.';
-        }
-      }
-    }, 10000);
-
-    // --- Новый рабочий код отслеживания появления iframe ---
-    function setHumanText() {
-      const desc = document.getElementById('site-desc');
-      if (desc) {
-        desc.textContent = 'Подтвердите, что вы человек, выполнив указанное действие.';
-      }
-    }
-
-    function observeIframe(container) {
-      const iframe = container.querySelector('iframe');
-      if (iframe) {
-        setHumanText();
+    function observeCaptchaContainer() {
+      const container = document.querySelector('.cf-turnstile');
+      if (!container) {
+        setTimeout(observeCaptchaContainer, 100);
         return;
       }
-      const observer = new MutationObserver(() => {
-        const iframeNow = container.querySelector('iframe');
-        if (iframeNow) {
-          setHumanText();
-          observer.disconnect();
-        }
+
+      const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+          if (mutation.type === 'childList') {
+            const iframe = container.querySelector('iframe');
+            if (iframe && currentState === captchaStates.LOADING) {
+              console.log('Iframe капчи загружен');
+              currentState = captchaStates.INTERACTIVE;
+              updateStatusText();
+            }
+          }
+        });
       });
-      observer.observe(container, { childList: true, subtree: true });
+
+      observer.observe(container, {
+        childList: true,
+        subtree: true
+      });
+
+      setTimeout(() => {
+        const iframe = container.querySelector('iframe');
+        if (iframe && currentState === captchaStates.LOADING) {
+          console.log('Iframe обнаружен (фолбэк)');
+          currentState = captchaStates.INTERACTIVE;
+          updateStatusText();
+        }
+      }, 2000);
     }
 
-    function waitForTurnstile() {
-      const container = document.querySelector('.cf-turnstile');
-      if (container) {
-        observeIframe(container);
-      } else {
-        requestAnimationFrame(waitForTurnstile);
-      }
-    }
-
-    waitForTurnstile();
+    document.addEventListener('DOMContentLoaded', () => {
+      observeCaptchaContainer();
+      setTimeout(() => {
+        if (!window.turnstile && currentState === captchaStates.LOADING) {
+          console.error('Turnstile не загрузился');
+          currentState = captchaStates.ERROR;
+          updateStatusText();
+        }
+      }, 10000);
+    });
   </script>
 </body>
 </html>
