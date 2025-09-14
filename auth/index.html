@@ -6,11 +6,15 @@
   <title>Авторизация — RVN.GURU</title>
   <meta name="description" content="Страница входа и регистрации. Личный кабинет. Raven Private.">
   <link rel="icon" href="/static/favicon.ico" />
-  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preload" href="/static/templates/overlay-login.png" as="image" media="(min-width: 768px)">
+  <link rel="preconnect" href="https://challenges.cloudflare.com">
+  <link rel="dns-prefetch" href="https://challenges.cloudflare.com">
+  <link rel="stylesheet" href="/css/auth/glassmorphism-auth.css">
+  <script src="https://cdn.tailwindcss.com/3.4.17?plugins=forms@0.5.10" async></script>
   <script defer src="https://unpkg.com/alpinejs@3.14.9/dist/cdn.min.js" integrity="sha384-9Ax3MmS9AClxJyd5/zafcXXjxmwFhZCdsT6HJoJjarvCaAkJlk5QDzjLJm+Wdx5F" crossorigin="anonymous"></script>
   <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
-  <link rel="stylesheet" href="/css/main/app.css">
-  <link rel="stylesheet" href="/css/auth/glassmorphism-auth.css">
+  <script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.js" integrity="sha384-AWFROZ10DoeXcNjhoQe0agryexFsipZEA17Cde6/tknpOUacvUGk27vXQ2a6ljSt" crossorigin="anonymous" defer></script>
+  
   <style>
     input:focus, button:focus {
       outline: 2px solid #16a3ff;
@@ -21,9 +25,18 @@
       outline: none !important;
       box-shadow: none !important;
     }
+    
     @media (max-width: 768px) {
       .tree-glow { display: none !important; }
+      .glass-btn, .oauth-btn {
+        min-height: 44px !important;
+        min-width: 44px !important;
+      }
+      input {
+        font-size: 16px !important;
+      }
     }
+    
     .tree-glow {
       position: fixed;
       bottom: 0;
@@ -37,10 +50,12 @@
       filter: drop-shadow(0 0 24px #16a3ff55);
       transition: width 0.3s;
     }
+    
     input, .glass-btn {
       max-width: 100%;
       box-sizing: border-box;
     }
+    
     .spinner {
       border: 2px solid #16a3ff;
       border-top: 2px solid transparent;
@@ -52,16 +67,31 @@
       vertical-align: middle;
       margin-right: 8px;
     }
+    
     @keyframes spin {
       100% { transform: rotate(360deg);}
     }
+    
     @media (max-width: 400px) {
       .bg-neutral-900\/80 { padding: 1.25rem !important; }
       .glass-btn { min-width: 120px !important; padding: 0.5rem 1rem !important; }
     }
+    
     @keyframes preload-bounce {
       0% { transform: translateY(0);}
       100% { transform: translateY(-12px);}
+    }
+    
+    .password-strength {
+      margin-top: 0.25rem;
+      transition: opacity 0.3s ease;
+    }
+    
+    .password-strength-bar {
+      height: 2px;
+      background-color: #374151;
+      border-radius: 1px;
+      transition: all 0.3s ease;
     }
   </style>
 </head>
@@ -74,9 +104,6 @@
       </div>
     </div>
   </div>
-  <style>
-    @keyframes preload-bounce { 0% { transform: translateY(0);} 100% { transform: translateY(-12px);}}
-  </style>
   <script>
     window.addEventListener('DOMContentLoaded', () => {
       const fill = document.getElementById('preloader-text-fill');
@@ -89,7 +116,6 @@
         document.getElementById('preloader').style.opacity = '0';
         setTimeout(() => {
           document.getElementById('preloader').style.display = 'none';
-          console.log('PRELOAD HIDDEN');
         }, 400);
       }, 1200);
     });
@@ -107,34 +133,36 @@
   <section class="flex-grow flex items-center justify-center px-4 sm:px-6 lg:px-8 py-12">
     <div id="particles-js" class="absolute inset-0"></div>
     <div class="z-10 grid grid-cols-1 md:grid-cols-2 gap-12 items-center w-full max-w-5xl">
-      <div x-data="authForms()" class="w-full max-w-md mx-auto">
-        <div class="bg-neutral-900/80 backdrop-blur-xl p-8 rounded-2xl border border-neutral-800 shadow-lg animate-fadeIn" style="overflow: hidden;" x-ref="formContainer">
-          <h2 class="text-2xl font-semibold mb-6 text-center" x-text="tab==='register' ? 'Регистрация' : 'Вход'"></h2>
-          <form x-show="tab==='register'" @submit.prevent="handleRegister" class="space-y-4">
+      <div x-data="authForms()" x-init="init()" class="w-full max-w-md mx-auto">
+        <div class="bg-neutral-900/80 backdrop-blur-xl p-8 rounded-2xl border border-neutral-800 shadow-lg animate-fadeIn" style="overflow: hidden;">
+          <h2 class="text-2xl font-semibold mb-6 text-center" x-text="currentTab === 'register' ? 'Регистрация' : 'Вход'"></h2>
+          <form x-show="currentTab === 'register'" @submit.prevent="handleRegister" class="space-y-4">
             <label class="block">
               <span class="sr-only">Логин</span>
-              <input id="register-username" type="text" x-model="username" placeholder="Логин" required autocomplete="username" class="w-full px-4 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-white"/>
+              <input type="text" x-model="registerData.username" placeholder="Логин" required autocomplete="username" class="w-full px-4 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-white" @input="validateUsername(registerData.username, 'register')"/>
             </label>
-            <p class="text-red-500 text-sm mt-1" x-show="usernameError" x-text="usernameError" role="alert" aria-live="polite"></p>
+            <p class="text-red-500 text-sm mt-1" x-show="errors.register.username" x-text="errors.register.username" role="alert"></p>
             <div class="relative">
               <label class="block">
                 <span class="sr-only">Пароль</span>
-                <input :type="showPassword ? 'text' : 'password'" x-model="password" placeholder="Пароль" required autocomplete="new-password" class="w-full px-4 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-white pr-10" @input="checkPassword(); checkConfirmPassword()"/>
+                <input :type="showPassword.register ? 'text' : 'password'" x-model="registerData.password" placeholder="Пароль" required autocomplete="new-password" class="w-full px-4 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-white pr-10" @input="validatePassword(registerData.password, 'register')"/>
               </label>
-              <button type="button"
-                @click="showPassword = !showPassword"
-                class="absolute right-3 top-3.5 text-gray-500 hover:text-gray-700 pass-toggle"
-                :aria-label="showPassword ? 'Скрыть пароль' : 'Показать пароль'">
-                <img src="/static/icons/login/pass-hideoff.svg" :class="{'hidden': showPassword}" class="h-6 transition hover:brightness-75" alt="Показать пароль">
-                <img src="/static/icons/login/pass-hide.svg" :class="{'hidden': !showPassword}" class="h-6 transition hover:brightness-75" alt="Скрыть пароль">
+              <button type="button" @click="showPassword.register = !showPassword.register" class="absolute right-3 top-3.5 text-gray-500 hover:text-gray-700 pass-toggle" :aria-label="showPassword.register ? 'Скрыть пароль' : 'Показать пароль'">
+                <img src="/static/icons/login/pass-hideoff.svg" :class="{'hidden': showPassword.register}" class="h-6 transition hover:brightness-75" alt="Показать пароль">
+                <img src="/static/icons/login/pass-hide.svg" :class="{'hidden': !showPassword.register}" class="h-6 transition hover:brightness-75" alt="Скрыть пароль">
               </button>
             </div>
-            <p class="text-red-400 text-xs mt-1" x-show="passwordError" x-text="passwordError" role="alert" aria-live="polite"></p>
+            <div class="password-strength" x-show="showPasswordStrength.register && registerData.password.length > 0 && !registerData.confirmPassword">
+              <div class="password-strength-bar">
+                <div class="h-1 rounded transition-all" :class="{'bg-red-500 w-1/4': registerData.password.length > 0 && registerData.password.length < 7, 'bg-yellow-500 w-2/4': registerData.password.length >= 7 && registerData.password.length < 9, 'bg-green-500 w-full': registerData.password.length >= 9 }"></div>
+              </div>
+            </div>
+            <p class="text-red-400 text-xs mt-1" x-show="errors.register.password" x-text="errors.register.password" role="alert"></p>
             <label class="block">
               <span class="sr-only">Подтверждение пароля</span>
-              <input id="register-confirm" type="password" x-model="confirmPassword" placeholder="Подтверждение пароля" required autocomplete="new-password" class="w-full px-4 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-white" :disabled="!passwordValid" :class="passwordValid ? 'border-neutral-700 opacity-100' : 'border-neutral-700 opacity-50'" @input="checkConfirmPassword()"/>
+              <input type="password" x-model="registerData.confirmPassword" placeholder="Подтверждение пароля" required autocomplete="new-password" class="w-full px-4 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-white" :disabled="!isPasswordValid.register" :class="isPasswordValid.register ? 'border-neutral-700 opacity-100' : 'border-neutral-700 opacity-50'" @input="validateConfirmPassword()"/>
             </label>
-            <p class="text-red-400 text-xs mt-1" x-show="confirmPasswordError" x-text="confirmPasswordError" role="alert" aria-live="polite"></p>
+            <p class="text-red-400 text-xs mt-1" x-show="errors.register.confirmPassword" x-text="errors.register.confirmPassword" role="alert"></p>
             <div class="flex items-start gap-2 text-xs text-neutral-400">
               <input type="checkbox" required class="mt-0.5 rounded border-neutral-700 bg-neutral-800" id="register-agree"/>
               <span>Я согласен с <a href="/terms/" target="_blank" rel="noopener noreferrer" class="text-primary-400 hover:underline">Пользовательским соглашением</a> и <a href="/privacy/" target="_blank" rel="noopener noreferrer" class="text-primary-400 hover:underline">Политикой конфиденциальности</a>.</span>
@@ -142,64 +170,61 @@
             <div class="flex justify-center mt-4">
               <div id="register-captcha-container"></div>
             </div>
-            <input type="hidden" name="cf-turnstile-response" x-model="captchaResponse">
-            <p x-show="globalError" class="text-red-400 text-sm text-center mt-2" x-text="globalError" role="alert" aria-live="polite"></p>
+            <input type="hidden" name="cf-turnstile-response" x-model="captchaResponse.register">
+            <p x-show="errors.global" class="text-red-400 text-sm text-center mt-2" x-text="errors.global" role="alert"></p>
             <div class="flex justify-center">
-              <button type="submit" class="glass-btn" :disabled="loading">
-                <span x-show="loading" class="spinner"></span>
-                Зарегистрироваться
+              <button type="submit" class="glass-btn" :disabled="isLoading">
+                <span x-show="isLoading" class="spinner"></span>
+                <span x-text="isLoading ? 'Отправка...' : 'Зарегистрироваться'"></span>
               </button>
             </div>
-            <p class="text-center text-sm text-neutral-400">Уже есть аккаунт? <a href="#" @click.prevent="switchToLogin()" class="text-primary-400 hover:underline">Войти</a></p>
+            <p class="text-center text-sm text-neutral-400">Уже есть аккаунт? <a href="#" @click.prevent="switchTab('login')" class="text-primary-400 hover:underline">Войти</a></p>
           </form>
-          <form x-show="tab==='login'" @submit.prevent="handleLogin" class="space-y-4">
+          <form x-show="currentTab === 'login'" @submit.prevent="handleLogin" class="space-y-4">
             <label class="block">
               <span class="sr-only">Логин</span>
-              <input id="login-username" type="text" x-model="username" placeholder="Логин" required autocomplete="username" class="w-full px-4 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-white"/>
+              <input type="text" x-model="loginData.username" placeholder="Логин" required autocomplete="username" class="w-full px-4 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-white" @input="validateUsername(loginData.username, 'login')"/>
             </label>
-            <p class="text-red-500 text-sm mt-1" x-show="usernameError" x-text="usernameError" role="alert" aria-live="polite"></p>
+            <p class="text-red-500 text-sm mt-1" x-show="errors.login.username" x-text="errors.login.username" role="alert"></p>
             <div class="relative">
               <label class="block">
                 <span class="sr-only">Пароль</span>
-                <input id="login-password" type="password" x-model="password" placeholder="Пароль" required autocomplete="current-password" class="w-full px-4 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-white pr-10" @input="checkPassword()"/>
+                <input :type="showPassword.login ? 'text' : 'password'" x-model="loginData.password" placeholder="Пароль" required autocomplete="current-password" class="w-full px-4 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-white pr-10" @input="validatePassword(loginData.password, 'login')"/>
               </label>
-              <button type="button"
-                @click="showPassword = !showPassword"
-                class="absolute right-3 top-3.5 text-gray-500 hover:text-gray-700 pass-toggle"
-                :aria-label="showPassword ? 'Скрыть пароль' : 'Показать пароль'">
-                <img src="/static/icons/login/pass-hideoff.svg" :class="{'hidden': showPassword}" class="h-6 transition hover:brightness-75" alt="Показать пароль">
-                <img src="/static/icons/login/pass-hide.svg" :class="{'hidden': !showPassword}" class="h-6 transition hover:brightness-75" alt="Скрыть пароль">
+              <button type="button" @click="showPassword.login = !showPassword.login" class="absolute right-3 top-3.5 text-gray-500 hover:text-gray-700 pass-toggle" :aria-label="showPassword.login ? 'Скрыть пароль' : 'Показать пароль'">
+                <img src="/static/icons/login/pass-hideoff.svg" :class="{'hidden': showPassword.login}" class="h-6 transition hover:brightness-75" alt="Показать пароль">
+                <img src="/static/icons/login/pass-hide.svg" :class="{'hidden': !showPassword.login}" class="h-6 transition hover:brightness-75" alt="Скрыть пароль">
               </button>
             </div>
-            <p class="text-red-500 text-xs mt-1" x-show="passwordError" x-text="passwordError" role="alert" aria-live="polite"></p>
+            <p class="text-red-500 text-xs mt-1" x-show="errors.login.password" x-text="errors.login.password" role="alert"></p>
             <div class="flex justify-center mt-4">
               <div id="login-captcha-container"></div>
             </div>
-            <input type="hidden" name="cf-turnstile-response" x-model="captchaResponse">
+            <input type="hidden" name="cf-turnstile-response" x-model="captchaResponse.login">
             <div class="flex justify-center">
-              <button type="submit" class="glass-btn" :disabled="loading">
-                <span x-show="loading" class="spinner"></span>
-                Войти
+              <button type="submit" class="glass-btn" :disabled="isLoading">
+                <span x-show="isLoading" class="spinner"></span>
+                <span x-text="isLoading ? 'Вход...' : 'Войти'"></span>
               </button>
             </div>
             <div class="divider">
               <span>или войти через</span>
             </div>
             <div class="oauth-grid">
-              <button type="button" class="oauth-btn" @click="oauthLogin('google')" title="Войти через Google" aria-label="Войти через Google">
+              <button type="button" class="oauth-btn" @click="oauthLogin('google')" :disabled="isLoading" title="Войти через Google" aria-label="Войти через Google">
                 <img src="/static/icons/oauth/google.svg" alt="Google" class="h-6">
               </button>
-              <button type="button" class="oauth-btn" @click="oauthLogin('twitch')" title="Войти через Twitch" aria-label="Войти через Twitch">
+              <button type="button" class="oauth-btn" @click="oauthLogin('twitch')" :disabled="isLoading" title="Войти через Twitch" aria-label="Войти через Twitch">
                 <img src="/static/icons/oauth/twitch.svg" alt="Twitch" class="h-6">
               </button>
-              <button type="button" class="oauth-btn" @click="oauthLogin('yandex')" title="Войти через Yandex" aria-label="Войти через Yandex">
+              <button type="button" class="oauth-btn" @click="oauthLogin('yandex')" :disabled="isLoading" title="Войти через Yandex" aria-label="Войти через Yandex">
                 <img src="/static/icons/oauth/yandex.svg" alt="Yandex" class="w-6">
               </button>
-              <button type="button" class="oauth-btn" @click="oauthLogin('github')" title="Войти через GitHub" aria-label="Войти через GitHub">
+              <button type="button" class="oauth-btn" @click="oauthLogin('github')" :disabled="isLoading" title="Войти через GitHub" aria-label="Войти через GitHub">
                 <img src="/static/icons/oauth/github.svg" alt="GitHub" class="h-8">
               </button>
             </div>
-            <p class="text-center text-sm text-neutral-400">Нет аккаунта? <a href="#" @click.prevent="switchToRegister()" class="text-primary-400 hover:underline">Зарегистрироваться</a></p>
+            <p class="text-center text-sm text-neutral-400">Нет аккаунта? <a href="#" @click.prevent="switchTab('register')" class="text-primary-400 hover:underline">Зарегистрироваться</a></p>
           </form>
         </div>
       </div>
@@ -211,203 +236,311 @@
   <script>
     function authForms() {
       return {
-        tab: 'register',
-        username: '',
-        usernameError: '',
-        password: '',
-        passwordError: '',
-        showPassword: false,
-        passwordValid: false, 
-        confirmPassword: '',
-        confirmPasswordError: '',
-        captchaResponse: '',
-        globalError: '',
-        currentWidgetId: null,
-        loading: false,
-
-        init() {
-          this.$nextTick(() => {
-            this.loadCaptcha('register');
-          });
+        currentTab: 'register',
+        isLoading: false,
+        registerData: {
+          username: '',
+          password: '',
+          confirmPassword: ''
         },
-
+        loginData: {
+          username: '',
+          password: ''
+        },
+        isPasswordValid: {
+          register: false,
+          login: false
+        },
+        showPasswordStrength: {
+          register: false,
+          login: false
+        },
+        showPassword: {
+          register: false,
+          login: false
+        },
+        errors: {
+          global: '',
+          register: {
+            username: '',
+            password: '',
+            confirmPassword: ''
+          },
+          login: {
+            username: '',
+            password: ''
+          }
+        },
+        captchaResponse: {
+          register: '',
+          login: ''
+        },
+        currentWidgetId: null,
+        init() {
+          this.loadCaptcha(this.currentTab);
+        },
+        switchTab(tab) {
+          this.currentTab = tab;
+          this.resetForm();
+          setTimeout(() => {
+            this.loadCaptcha(tab);
+          }, 50);
+        },
         loadCaptcha(formType) {
           if (this.currentWidgetId && typeof turnstile !== 'undefined') {
             turnstile.remove(this.currentWidgetId);
           }
-
-          const containerId = formType === 'register' ? 'register-captcha-container' : 'login-captcha-container';
+        
+          const containerId = `${formType}-captcha-container`;
           const container = document.getElementById(containerId);
+          
           if (container) {
             container.innerHTML = '';
           }
-
+          
           if (typeof turnstile !== 'undefined') {
             this.currentWidgetId = turnstile.render('#' + containerId, {
               sitekey: '0x4AAAAAAB0s4O-sxm9ZnAQk',
               theme: 'dark',
               callback: (token) => {
-                this.captchaResponse = token;
-                this.globalError = '';
+                this.captchaResponse[formType] = token;
+                this.errors.global = '';
               },
               'error-callback': () => {
-                this.captchaResponse = '';
-                this.globalError = 'Ошибка загрузки капчи';
+                this.captchaResponse[formType] = '';
+                this.errors.global = 'Ошибка загрузки капчи';
               }
             });
           } else {
             setTimeout(() => this.loadCaptcha(formType), 100);
           }
         },
-
-        switchToLogin() {
-          this.tab = 'login';
-          this.resetForm();
-          this.$nextTick(() => {
-            this.loadCaptcha('login');
-          });
-        },
-
-        switchToRegister() {
-          this.tab = 'register';
-          this.resetForm();
-          this.$nextTick(() => {
-            this.loadCaptcha('register');
-          });
-        },
-
-        validateUsername() {
+        
+        validateUsername(username, formType) {
           const usernameRegex = /^[a-zA-Z0-9_]+$/;
-          if (!usernameRegex.test(this.username)) {
-            this.usernameError = "Логин может содержать только латиницу и цифры";
+          
+          if (!usernameRegex.test(username)) {
+            this.errors[formType].username = "Логин может содержать только латиницу и цифры";
             return false;
           }
-          if (this.username.length < 3) {
-            this.usernameError = "Логин должен быть не короче 3 символов";
+          
+          if (username.length < 3) {
+            this.errors[formType].username = "Логин должен быть не короче 3 символов";
             return false;
           }
-          this.usernameError = '';
+          
+          this.errors[formType].username = '';
           return true;
         },
-
-        checkPassword() {
+        
+        validatePassword(password, formType) {
           const passwordRegex = /^[a-zA-Z0-9!@#$%^&*()_+]+$/;
-          if (this.password.length === 0) {
-            this.passwordError = '';
-            this.passwordValid = false;
-            this.confirmPassword = '';
+          
+          if (password.length === 0) {
+            this.errors[formType].password = '';
+            this.isPasswordValid[formType] = false;
+            this.showPasswordStrength[formType] = false;
+            
+            if (formType === 'register') {
+              this.registerData.confirmPassword = '';
+              this.errors.register.confirmPassword = '';
+            }
             return false;
           }
-         
-          if (!passwordRegex.test(this.password)) {
-            this.passwordError = 'Пароль может содержать только латиницу, цифры и спецсимволы';
-            this.passwordValid = false;
-            this.confirmPassword = '';
+          
+          if (!passwordRegex.test(password)) {
+            this.errors[formType].password = 'Пароль может содержать только латиницу, цифры и спецсимволы';
+            this.isPasswordValid[formType] = false;
+            this.showPasswordStrength[formType] = false;
+            
+            if (formType === 'register') {
+              this.registerData.confirmPassword = '';
+              this.errors.register.confirmPassword = '';
+            }
             return false;
           }
-          if (this.password.length < 6) {
-            this.passwordError = 'Пароль должен быть не менее 6 символов';
-            this.passwordValid = false;
-            this.confirmPassword = ''; 
+          
+          if (password.length < 6) {
+            this.errors[formType].password = 'Пароль должен быть не менее 6 символов';
+            this.isPasswordValid[formType] = false;
+            this.showPasswordStrength[formType] = false;
+            
+            if (formType === 'register') {
+              this.registerData.confirmPassword = '';
+              this.errors.register.confirmPassword = '';
+            }
             return false;
           }
-          this.passwordError = '';
-          this.passwordValid = true;   
+          
+          this.errors[formType].password = '';
+          this.isPasswordValid[formType] = true;
+          this.showPasswordStrength[formType] = true;
           return true;
         },
-
-        checkConfirmPassword() {
-          if (!this.confirmPassword) {
-            this.confirmPasswordError = '';
+        
+        validateConfirmPassword() {
+          if (!this.registerData.confirmPassword) {
+            this.errors.register.confirmPassword = '';
+            this.showPasswordStrength.register = true;
             return true;
           }
-
-          if (this.confirmPassword !== this.password) {
-            this.confirmPasswordError = 'Пароли не совпадают';
+          
+          this.showPasswordStrength.register = false;
+          
+          if (this.registerData.confirmPassword !== this.registerData.password) {
+            this.errors.register.confirmPassword = 'Пароли не совпадают';
             return false;
           }
-
-          this.confirmPasswordError = '';
+          
+          this.errors.register.confirmPassword = '';
           return true;
         },
-
+        
         async handleRegister() {
-          const validUser = this.validateUsername();
-          const validPass = this.checkPassword();
-          const validConfirm = this.checkConfirmPassword();
-
-          if (!validUser || !validPass || !validConfirm) return;
-
-          if (!this.captchaResponse) {
-            this.globalError = 'Подтвердите, что вы не робот';
-            return;
+          if (!this.validateForm('register')) return;
+          
+          this.isLoading = true;
+          this.errors.global = '';
+          
+          try {
+            const response = await fetch('/api/register', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                username: this.escapeHtml(this.registerData.username),
+                password: this.registerData.password,
+                'cf-turnstile-response': this.captchaResponse.register
+              })
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok) {
+              window.location.href = '/dashboard';
+            } else {
+              this.errors.global = this.escapeHtml(data.message || 'Ошибка регистрации');
+            }
+          } catch (error) {
+            this.errors.global = 'API ERROR: 405';
+          } finally {
+            this.isLoading = false;
           }
-
-          this.globalError = '';
-          this.loading = true;
-          await new Promise(r => setTimeout(r, 1200));
-          this.loading = false;
-          alert('Регистрация отправлена (AJAX → сервер)');
         },
-
+        
         async handleLogin() {
-          const validUser = this.validateUsername();
-          const validPass = this.checkPassword();
-
-          if (!validUser || !validPass) return;
-
-          if (!this.captchaResponse) {
-            this.globalError = 'Подтвердите, что вы не робот';
-            return;
+          if (!this.validateForm('login')) return;
+          
+          this.isLoading = true;
+          this.errors.global = '';
+          
+          try {
+            const response = await fetch('/api/login', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                username: this.escapeHtml(this.loginData.username),
+                password: this.loginData.password,
+                'cf-turnstile-response': this.captchaResponse.login
+              })
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok) {
+              window.location.href = '/dashboard';
+            } else {
+              this.errors.global = this.escapeHtml(data.message || 'Ошибка входа');
+            }
+          } catch (error) {
+            this.errors.global = 'Ошибка сети. Попробуйте позже.';
+          } finally {
+            this.isLoading = false;
           }
-
-          this.globalError = '';
-          this.loading = true;
-          await new Promise(r => setTimeout(r, 900));
-          this.loading = false;
-          alert('Вход отправлен (AJAX → сервер)');
         },
-
-        oauthLogin(provider) {
-          alert(`Перенаправление на ${provider} OAuth`);
+        
+        validateForm(formType) {
+          const isValidUsername = this.validateUsername(this[formType + 'Data'].username, formType);
+          const isValidPassword = this.validatePassword(this[formType + 'Data'].password, formType);
+          
+          let isValidConfirm = true;
+          if (formType === 'register') {
+            isValidConfirm = this.validateConfirmPassword();
+          }
+          
+          const hasCaptcha = !!this.captchaResponse[formType];
+          
+          if (!hasCaptcha) {
+            this.errors.global = 'Подтвердите, что вы не робот';
+            return false;
+          }
+          
+          return isValidUsername && isValidPassword && isValidConfirm;
         },
-
+        
+        async oauthLogin(provider) {
+          this.isLoading = true;
+          
+          try {
+            window.location.href = `/auth/${provider}`;
+          } catch (error) {
+            this.errors.global = 'Ошибка подключения к провайдеру';
+            this.isLoading = false;
+          }
+        },
+        
+        escapeHtml(unsafe) {
+          if (!unsafe) return '';
+          return unsafe
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+        },
+        
         resetForm() {
-          this.username = '';
-          this.password = '';
-          this.confirmPassword = '';
-          this.globalError = '';
-          this.usernameError = '';
-          this.passwordError = '';
-          this.confirmPasswordError = '';
-          this.passwordValid = false;
-          this.captchaResponse = '';
+          this.registerData = { username: '', password: '', confirmPassword: '' };
+          this.loginData = { username: '', password: '' };
+          this.errors = { 
+            global: '', 
+            register: { username: '', password: '', confirmPassword: '' }, 
+            login: { username: '', password: '' } 
+          };
+          this.isPasswordValid = { register: false, login: false };
+          this.showPasswordStrength = { register: false, login: false };
+          this.captchaResponse = { register: '', login: '' };
         }
       }
     }
-  </script>
-  <script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.js" integrity="sha384-AWFROZ10DoeXcNjhoQe0agryexFsipZEA17Cde6/tknpOUacvUGk27vXQ2a6ljSt" crossorigin="anonymous"></script>
-  <script>
-    if (window.innerWidth >= 1024) {
-      particlesJS("particles-js", {
-        particles: {
-          number: { value: 30 },
-          color: { value: "#16a3ff" },
-          shape: { type: "circle" },
-          opacity: { value: 0.4 },
-          size: { value: 2, random: true },
-          line_linked: { enable: false },
-          move: { enable: true, speed: 0.6, direction: "none", random: true, straight: false, out_mode: "out" }
-        },
-        interactivity: {
-          detect_on: "canvas",
-          events: {
-            onhover: { enable: false },
-            onclick: { enable: false }
-          }
-        },
-        retina_detect: true
-      });
+
+    function initParticles() {
+      if (window.innerWidth >= 1024 && typeof particlesJS !== 'undefined') {
+        particlesJS("particles-js", {
+          particles: {
+            number: { value: 30 },
+            color: { value: "#16a3ff" },
+            shape: { type: "circle" },
+            opacity: { value: 0.4 },
+            size: { value: 2, random: true },
+            line_linked: { enable: false },
+            move: { enable: true, speed: 0.6, direction: "none", random: true, straight: false, out_mode: "out" }
+          },
+          interactivity: {
+            detect_on: "canvas",
+            events: {
+              onhover: { enable: false },
+              onclick: { enable: false }
+            }
+          },
+          retina_detect: true
+        });
+      }
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initParticles);
+    } else {
+      initParticles();
     }
   </script>
 </body>

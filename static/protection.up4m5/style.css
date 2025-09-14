@@ -8,7 +8,6 @@
   --gradient-from: #4f8cff; 
   --gradient-to: #8c66ff;
 }
-
 * {
   box-sizing: border-box;
   margin: 0;
@@ -21,7 +20,6 @@ html, body {
   padding: 0;
   scroll-behavior: smooth;
 }
-
 body {
   background: 
     radial-gradient(circle at 20% 30%, rgba(99, 102, 241, 0.08) 0%, transparent 50%),
@@ -38,21 +36,6 @@ body {
   padding: 1rem;
   position: relative;
 }
-
-body::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: 
-    radial-gradient(circle at 10% 20%, rgba(99, 102, 241, 0.03) 0%, transparent 40%),
-    radial-gradient(circle at 90% 80%, rgba(236, 72, 153, 0.02) 0%, transparent 40%);
-  pointer-events: none;
-  z-index: -1;
-}
-
 .center-container {
   width: 100%;
   max-width: 440px;
@@ -60,7 +43,6 @@ body::before {
   text-align: center;
   padding: 2rem 1.5rem;
 }
-
 .site-title {
   position: relative;
   font-size: 2.5rem;
@@ -78,7 +60,6 @@ body::before {
   -webkit-text-fill-color: transparent;
   text-fill-color: transparent;
 }
-
 .site-title-base {
   color: var(--text-tertiary);
   opacity: 0.3;
@@ -92,7 +73,6 @@ body::before {
   letter-spacing: inherit;
   line-height: inherit;
 }
-
 .site-title-fill {
   position: absolute;
   left: 0; 
@@ -109,7 +89,6 @@ body::before {
   pointer-events: none;
   filter: drop-shadow(0 0 8px rgba(99, 102, 241, 0.3));
 }
-
 .site-desc, .footer {
   transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
   opacity: 1;
@@ -119,7 +98,6 @@ body::before {
   align-items: center;
   justify-content: center;
 }
-
 .site-desc {
   margin-bottom: 2.5rem;
   font-weight: 400;
@@ -129,7 +107,6 @@ body::before {
   height: 2.2em;
   line-height: 1.5;
 }
-
 .cf-turnstile {
   display: flex;
   justify-content: center;
@@ -139,7 +116,6 @@ body::before {
   border-radius: 12px;
   transition: all 0.3s ease;
 }
-
 .footer {
   margin-top: 2.5rem;
   color: var(--text-tertiary);
@@ -149,51 +125,42 @@ body::before {
   min-height: 1.5em;
   height: 1.5em;
 }
-
 .fade-text {
   opacity: 0;
   transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1);
   transform: translateY(10px);
 }
-
 .fade-text.visible {
   opacity: 1;
   transform: translateY(0);
 }
-
 @media (hover: hover) {
   .site-title:hover .site-title-fill {
     width: 100%;
   }
 }
-
 @media (max-width: 480px) {
   .center-container { 
     padding: 1.5rem 1rem;
   }
-  
   .site-title { 
     font-size: 2rem;
     min-height: 2.4em;
   }
-  
   .site-desc { 
     font-size: 1rem; 
     height: 2em; 
     min-height: 2em;
     margin-bottom: 2rem;
   }
-  
   .cf-turnstile { 
     min-height: 65px;
   }
-  
   .footer {
     margin-top: 2rem;
     font-size: 0.9rem;
   }
 }
-
 @media (prefers-reduced-motion: reduce) {
   * {
     transition-duration: 0.01ms !important;
@@ -201,7 +168,6 @@ body::before {
     animation-iteration-count: 1 !important;
   }
 }
-
 @keyframes fadeInUp {
   from {
     opacity: 0;
@@ -212,7 +178,6 @@ body::before {
     transform: translateY(0);
   }
 }
-
 .center-container {
   animation: fadeInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
