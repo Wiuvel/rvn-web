@@ -28,6 +28,25 @@ function getTimeouts() {
 
 const timeouts = getTimeouts();
 
+async function generateSecureHash() {
+    try {
+        const data = navigator.userAgent + navigator.language + screen.width + 'x' + screen.height + 
+                    (navigator.hardwareConcurrency || '') + (navigator.deviceMemory || '');
+        
+        const encoder = new TextEncoder();
+        const dataBuffer = encoder.encode(data);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', dataBuffer);
+        
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        
+        return hashHex;
+    } catch (error) {
+        console.error('[HASH] Error generating secure hash:', error);
+        return 'fallback_' + btoa(navigator.userAgent + Date.now()).substring(0, 64).replace(/[^a-f0-9]/g, '0');
+    }
+}
+
 function safeRedirect(url) {
     try {
         if (url && url.startsWith('/') && !url.startsWith('//') && !url.includes('://')) {
@@ -53,14 +72,25 @@ function checkExistingCookie() {
     }
     
     const cookies = document.cookie.split(';');
+    let hasAccess = false;
+    let hasHash = false;
+    
     for (const cookie of cookies) {
         const [name, value] = cookie.trim().split('=');
         if (name === 'access_granted' && value === 'true') {
-            const urlParams = new URLSearchParams(window.location.search);
-            let redirectUrl = (urlParams.get('redirect') || '/').trim();
-            return safeRedirect(redirectUrl);
+            hasAccess = true;
+        }
+        if (name === 'access_hash' && value && value.length === 64 && /^[a-f0-9]{64}$/.test(value)) {
+            hasHash = true;
         }
     }
+    
+    if (hasAccess && hasHash) {
+        const urlParams = new URLSearchParams(window.location.search);
+        let redirectUrl = (urlParams.get('redirect') || '/').trim();
+        return safeRedirect(redirectUrl);
+    }
+    
     return false;
 }
 
@@ -195,35 +225,18 @@ function isValidBrowser() {
     return true;
 }
 
-function generateBrowserFingerprint() {
-    try {
-        const components = [
-            navigator.userAgent,
-            navigator.languages ? navigator.languages.join(',') : '',
-            screen.width + 'x' + screen.height,
-            navigator.hardwareConcurrency || 'unknown',
-            navigator.deviceMemory || 'unknown',
-            new Date().getTimezoneOffset()
-        ];
-        
-        return btoa(encodeURIComponent(components.join('|'))).substring(0, 32);
-    } catch (error) {
-        console.error('[FINGERPRINT] Error generating fingerprint:', error);
-        return 'error_' + Date.now();
-    }
-}
-
-function setSecureCookie(token) {
+async function setSecureCookie(token) {
     try {
         const expiration = new Date();
         expiration.setTime(expiration.getTime() + (2 * 60 * 60 * 1000));
-        const browserFingerprint = generateBrowserFingerprint();
+        const secureHash = await generateSecureHash();
         document.cookie = `access_granted=true; expires=${expiration.toUTCString()}; path=/; domain=.rvn.guru; Secure; SameSite=Strict`;
-        document.cookie = `fingerprint=${encodeURIComponent(browserFingerprint)}; expires=${expiration.toUTCString()}; path=/; domain=.rvn.guru; Secure; SameSite=Strict`;
-        
+        document.cookie = `access_hash=${secureHash}; expires=${expiration.toUTCString()}; path=/; domain=.rvn.guru; Secure; SameSite=Strict`;
+        document.cookie = `access_time=${Date.now()}; expires=${expiration.toUTCString()}; path=/; domain=.rvn.guru; Secure; SameSite=Strict`;
+        console.log('[COOKIE] Secure cookies set successfully');
         return true;
     } catch (error) {
-        console.error('[COOKIE] Error setting cookie:', error);
+        console.error('[COOKIE] Error setting secure cookies:', error);
         return false;
     }
 }
@@ -247,7 +260,7 @@ function onUnsupportedCallback() {
     updateStatusText();
 }
 
-function onSuccessCallback(token) {
+async function onSuccessCallback(token) {
     if (!isValidBrowser()) {
         console.log('[PROTECT] Browser validation failed. Not setting cookie.');
         currentState = captchaStates.ERROR;
@@ -255,7 +268,7 @@ function onSuccessCallback(token) {
         return;
     }
     
-    if (!setSecureCookie(token)) {
+    if (!await setSecureCookie(token)) {
         currentState = captchaStates.ERROR;
         updateStatusText();
         return;
