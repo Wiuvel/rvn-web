@@ -5,61 +5,99 @@ const captchaStates = {
     SUCCESS: 'success',
     ERROR: 'error'
 };
+
 let currentState = captchaStates.LOADING;
+let observationTimeout = null;
+let mainTimeoutId = null;
 
 function isMobileDevice() {
     return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 }
 
-function getSimpleTimeouts() {
-    if (isMobileDevice()) {
-        console.log('[PROTECT] Mobile device detected. Using extended timeouts.');
-        return {
-            observeDelay: 500, 
-            iframeCheck: 8000, 
-            mainTimeout: 20000 
-        };
-    }
-    
-    console.log('[PROTECT] Desktop device detected. Using standard timeouts.');
-    return {
-        observeDelay: 100, 
-        iframeCheck: 3000, 
-        mainTimeout: 15000 
+function getTimeouts() {
+    return isMobileDevice() ? {
+        observeDelay: 500,
+        iframeCheck: 8000,
+        mainTimeout: 25000
+    } : {
+        observeDelay: 100,
+        iframeCheck: 2000,
+        mainTimeout: 15000
     };
 }
 
-const timeouts = getSimpleTimeouts();
+const timeouts = getTimeouts();
+
+function safeRedirect(url) {
+    try {
+        if (url && url.startsWith('/') && !url.startsWith('//') && !url.includes('://')) {
+            if (!url.includes('<') && !url.includes('>') && !url.includes('javascript:')) {
+                window.location.replace(url);
+                return true;
+            }
+        }
+
+        window.location.replace('/');
+        return true;
+    } catch (error) {
+        console.error('[REDIRECT] Error during redirect:', error);
+        window.location.replace('/');
+        return true;
+    }
+}
+
+function checkExistingCookie() {
+    if (!isValidBrowser()) {
+        console.log('[PROTECT] Invalid browser detected. Requiring verification.');
+        return false;
+    }
+    
+    const cookies = document.cookie.split(';');
+    for (const cookie of cookies) {
+        const [name, value] = cookie.trim().split('=');
+        if (name === 'access_granted' && value === 'true') {
+            const urlParams = new URLSearchParams(window.location.search);
+            let redirectUrl = (urlParams.get('redirect') || '/').trim();
+            return safeRedirect(redirectUrl);
+        }
+    }
+    return false;
+}
 
 function observeCaptchaContainer() {
+    if (observationTimeout) {
+        clearTimeout(observationTimeout);
+    }
+    
     const container = document.querySelector('.cf-turnstile');
     if (!container) {
-        setTimeout(observeCaptchaContainer, timeouts.observeDelay);
+        observationTimeout = setTimeout(observeCaptchaContainer, timeouts.observeDelay);
         return;
     }
     
     const observer = new MutationObserver((mutations) => {
-        mutations.forEach((mutation) => {
-            if (mutation.type === 'childList') {
-                const iframe = container.querySelector('iframe');
-                if (iframe && currentState === captchaStates.LOADING) {
-                    currentState = captchaStates.INTERACTIVE;
-                    updateStatusText();
-                }
+        for (const mutation of mutations) {
+            if (mutation.type === 'childList' && container.querySelector('iframe') && currentState === captchaStates.LOADING) {
+                currentState = captchaStates.INTERACTIVE;
+                updateStatusText();
+                observer.disconnect();
             }
-        });
+        }
     });
     
-    observer.observe(container, {
-        childList: true,
-        subtree: true
-    });
+    try {
+        observer.observe(container, { childList: true, subtree: true });
+    } catch (error) {
+        console.error('[OBSERVER] Error observing container:', error);
+        observationTimeout = setTimeout(observeCaptchaContainer, timeouts.observeDelay);
+        return;
+    }
     
     setTimeout(() => {
-        const iframe = container.querySelector('iframe');
-        if (iframe && currentState === captchaStates.LOADING) {
+        if (container.querySelector('iframe') && currentState === captchaStates.LOADING) {
             currentState = captchaStates.INTERACTIVE;
             updateStatusText();
+            observer.disconnect();
         }
     }, timeouts.iframeCheck);
 }
@@ -149,30 +187,45 @@ function isValidBrowser() {
         return false;
     }
     
+    if (!window.JSON || !window.Promise) {
+        console.log('[PROTECT] Browser lacks modern features.');
+        return false;
+    }
+    
     return true;
 }
 
-function isSearchEngineBot() {
-    const botPatterns = [
-        /googlebot/i, /bingbot/i, /yandex/i, /duckduckbot/i,
-        /twitterbot/i, /whatsapp/i, /telegrambot/i,
-        /Google-PageSpeed-Insights/i, /Google Page Speed Insights/i, 
-        /PSI bot/i, /Chrome-Lighthouse/i
-    ];
-    
-    return botPatterns.some(pattern => pattern.test(navigator.userAgent));
+function generateBrowserFingerprint() {
+    try {
+        const components = [
+            navigator.userAgent,
+            navigator.languages ? navigator.languages.join(',') : '',
+            screen.width + 'x' + screen.height,
+            navigator.hardwareConcurrency || 'unknown',
+            navigator.deviceMemory || 'unknown',
+            new Date().getTimezoneOffset()
+        ];
+        
+        return btoa(encodeURIComponent(components.join('|'))).substring(0, 32);
+    } catch (error) {
+        console.error('[FINGERPRINT] Error generating fingerprint:', error);
+        return 'error_' + Date.now();
+    }
 }
 
-function generateBrowserFingerprint() {
-    const components = [
-        navigator.userAgent,
-        navigator.languages ? navigator.languages.join(',') : '',
-        screen.width + 'x' + screen.height,
-        navigator.hardwareConcurrency || 'unknown',
-        navigator.deviceMemory || 'unknown'
-    ];
-    
-    return btoa(components.join('|')).substring(0, 32);
+function setSecureCookie(token) {
+    try {
+        const expiration = new Date();
+        expiration.setTime(expiration.getTime() + (2 * 60 * 60 * 1000));
+        const browserFingerprint = generateBrowserFingerprint();
+        document.cookie = `access_granted=true; expires=${expiration.toUTCString()}; path=/; domain=.rvn.guru; Secure; SameSite=Strict`;
+        document.cookie = `fingerprint=${encodeURIComponent(browserFingerprint)}; expires=${expiration.toUTCString()}; path=/; domain=.rvn.guru; Secure; SameSite=Strict`;
+        
+        return true;
+    } catch (error) {
+        console.error('[COOKIE] Error setting cookie:', error);
+        return false;
+    }
 }
 
 function onBeforeInteractiveCallback() {
@@ -202,39 +255,46 @@ function onSuccessCallback(token) {
         return;
     }
     
+    if (!setSecureCookie(token)) {
+        currentState = captchaStates.ERROR;
+        updateStatusText();
+        return;
+    }
+    
     currentState = captchaStates.SUCCESS;
     updateStatusText();
-    const expiration = new Date();
-    expiration.setTime(expiration.getTime() + (2 * 60 * 60 * 1000));
-    const browserFingerprint = generateBrowserFingerprint();
-    document.cookie = `access_granted=true; fingerprint=${browserFingerprint}; expires=${expiration.toUTCString()}; path=/; domain=.rvn.guru; Secure; SameSite=Strict`;
     const urlParams = new URLSearchParams(window.location.search);
     let redirectUrl = (urlParams.get('redirect') || '/').trim();
-    if (!redirectUrl.startsWith('/') || redirectUrl.startsWith('//') || redirectUrl.includes('://')) {
-        redirectUrl = '/';
-    }
-
     setTimeout(() => {
-        window.location.replace(redirectUrl);
+        safeRedirect(redirectUrl);
     }, 1000);
 }
 
 function onErrorCallback() {
     currentState = captchaStates.ERROR;
     updateStatusText();
-    
     const errorDiv = document.getElementById('error');
     if (errorDiv) {
         errorDiv.style.display = 'block';
     }
 }
 
+let resizeTimeout;
+function debounceResize() {
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(syncTitleFill, 100);
+}
+
 document.addEventListener('DOMContentLoaded', () => {
+    if (checkExistingCookie()) {
+        return;
+    }
+    
     resetTitleFill();
     updateStatusText();
     observeCaptchaContainer();
     
-    setTimeout(() => {
+    mainTimeoutId = setTimeout(() => {
         if (!window.turnstile && currentState === captchaStates.LOADING) {
             currentState = captchaStates.ERROR;
             updateStatusText();
@@ -242,25 +302,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }, timeouts.mainTimeout);
 });
 
-window.addEventListener('resize', syncTitleFill);
-
-(function checkExistingCookie() {
-    if (isSearchEngineBot()) {
-        console.log('[PROTECT] Helpful bot detected. Skipping protection.');
-        const urlParams = new URLSearchParams(window.location.search);
-        let redirectUrl = (urlParams.get('redirect') || '/').trim();
-        if (redirectUrl.startsWith('/') && !redirectUrl.startsWith('//') && !redirectUrl.includes('://')) {
-            window.location.replace(redirectUrl);
-        } else {
-            window.location.replace('/');
-        }
-        return;
-    }
-
-    if (!isValidBrowser()) {
-        console.log('[PROTECT] Invalid browser detected. Requiring verification.');
-        return;
-    }
-
-    console.log('Page ready. Showing captcha.');
-})();
+window.addEventListener('resize', debounceResize);
+window.addEventListener('beforeunload', () => {
+    if (observationTimeout) clearTimeout(observationTimeout);
+    if (mainTimeoutId) clearTimeout(mainTimeoutId);
+    if (resizeTimeout) clearTimeout(resizeTimeout);
+});
