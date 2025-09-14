@@ -53,26 +53,26 @@ function updateStatusText() {
     switch(currentState) {
     case captchaStates.LOADING:
         animateTextChange(desc, 'Проверяем, человек ли вы. Это может занять несколько секунд.', '#b0b0b0');
-        if (footer) animateTextChange(footer, 'Сначала rvn.guru необходимо проверить безопасность вашего подключения', '#888');
+        if (footer) animateTextChange(footer, '', '#888');
         resetTitleFill();
         break;
     case captchaStates.INTERACTIVE:
-        animateTextChange(desc, 'Подтвердите, что вы человек, выполнив указанное действие ниже.', '#b0b0b0');
+        animateTextChange(desc, 'Подтвердите, что вы человек, выполнив указанное действие ниже:', '#b0b0b0');
         if (footer) animateTextChange(footer, 'Выполните проверку безопасности', '#888');
         setTitleFill();
         break;
     case captchaStates.VERIFYING:
-        animateTextChange(desc, 'Проверка выполняется', '#b0b0b0');
+        animateTextChange(desc, 'Проверка выполняется..', '#b0b0b0');
         if (footer) animateTextChange(footer, '', '#888');
         break;
     case captchaStates.SUCCESS:
-        animateTextChange(desc, 'Проверка пройдена успешно! Генерация уникального токена.', '#b0b0b0');
-        if (footer) animateTextChange(footer, 'Выполняется перенаправление на сайт...', '#888');
+        animateTextChange(desc, 'Проверка пройдена успешно.', '#b0b0b0');
+        if (footer) animateTextChange(footer, 'Выполняется перенаправление на сайт..', '#888');
         setTitleFill();
         break;
     case captchaStates.ERROR:
-        animateTextChange(desc, 'Ошибка проверки безопасности.', '#b0b0b0');
-        if (footer) animateTextChange(footer, 'Обновите страницу или попробуйте позже', '#ff6b6b');
+        animateTextChange(desc, 'Ошибка проверки безопасности. Обновите страницу или попробуйте позже.', '#ff6b6b');
+        if (footer) animateTextChange(footer, '', '#888');
         resetTitleFill();
         break;
     }
