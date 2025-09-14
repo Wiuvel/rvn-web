@@ -7,42 +7,7 @@ const captchaStates = {
 };
 let currentState = captchaStates.LOADING;
 
-function isValidBrowser() {
-    const tests = {
-        hasUserAgent: navigator.userAgent.length > 0,
-        hasLanguages: navigator.languages && navigator.languages.length > 0,
-        hasPlugins: navigator.plugins && navigator.plugins.length > 0,
-        hasCookies: navigator.cookieEnabled,
-        hasStorage: typeof Storage !== 'undefined',
-        hasPerformance: typeof performance !== 'undefined',
-        hardwareConcurrency: navigator.hardwareConcurrency > 1,
-        deviceMemory: navigator.deviceMemory > 0.5
-    };
-
-    return Object.values(tests).every(test => test === true);
-}
-
-function isSearchEngineBot() {
-    const botPatterns = [
-        /googlebot/i, /bingbot/i, /yandex/i, /duckduckbot/i,
-        /baiduspider/i, /slurp/i, /facebookexternalhit/i,
-        /twitterbot/i, /linkedinbot/i, /whatsapp/i, /telegrambot/i
-    ];
-    
-    return botPatterns.some(pattern => pattern.test(navigator.userAgent));
-}
-
 (function checkExistingCookie() {
-    if (isSearchEngineBot()) {
-        console.log('Search engine bot detected. Skipping protection.');
-        return;
-    }
-
-    if (!isValidBrowser()) {
-        console.log('Invalid browser detected Requiring verification.');
-        return;
-    }
-    
     if (document.cookie.includes('access_granted=true')) {
         const urlParams = new URLSearchParams(window.location.search);
         let redirectUrl = (urlParams.get('redirect') || '/').trim();
@@ -53,48 +18,83 @@ function isSearchEngineBot() {
     }
 })();
 
-function onSuccessCallback(token) {
-    if (!isValidBrowser()) {
-        console.log('Browser validation failed. Not setting cookie.');
-        currentState = captchaStates.ERROR;
-        updateStatusText();
-        return;
+function syncTitleFill() {
+    const fill = document.getElementById('site-title-fill');
+    const base = document.getElementById('site-title-base');
+    if (!fill || !base) return;
+    if (parseFloat(fill.style.width) > 0 || fill.style.width === 'auto') {
+        fill.style.width = base.offsetWidth + 'px';
     }
-    
-    currentState = captchaStates.SUCCESS;
-    updateStatusText();
-    const expiration = new Date();
-    expiration.setTime(expiration.getTime() + (2 * 60 * 60 * 1000));
-    const browserFingerprint = generateBrowserFingerprint();
-    document.cookie = `access_granted=true; fingerprint=${browserFingerprint}; expires=${expiration.toUTCString()}; path=/; domain=.rvn.guru; Secure; SameSite=Strict`;
-    const urlParams = new URLSearchParams(window.location.search);
-    let redirectUrl = (urlParams.get('redirect') || '/').trim();
-    
-    if (!redirectUrl.startsWith('/') || redirectUrl.startsWith('//') || redirectUrl.includes('://')) {
-        redirectUrl = '/';
-    }
-
-    setTimeout(() => {
-        window.location.replace(redirectUrl);
-    }, 1000);
 }
 
-function generateBrowserFingerprint() {
-    const components = [
-        navigator.userAgent,
-        navigator.languages ? navigator.languages.join(',') : '',
-        screen.width + 'x' + screen.height,
-        navigator.hardwareConcurrency || 'unknown'
-    ];
+window.addEventListener('resize', syncTitleFill);
+
+function setTitleFill(animate = true) {
+    const fill = document.getElementById('site-title-fill');
+    const base = document.getElementById('site-title-base');
+    if (!fill || !base) return;
     
-    return btoa(components.join('|')).substring(0, 32);
+    if (animate) {
+        fill.style.transition = 'width 1.1s cubic-bezier(.4,0,.2,1)';
+        fill.style.width = base.offsetWidth + 'px';
+    } else {
+        fill.style.transition = 'none';
+        fill.style.width = base.offsetWidth + 'px';
+        setTimeout(() => { fill.style.transition = ''; }, 10);
+    }
+}
+
+function resetTitleFill() {
+    const fill = document.getElementById('site-title-fill');
+    if (fill) fill.style.width = '0';
+}
+
+function animateTextChange(element, newText, color) {
+    if (!element) return;
+    element.classList.add('fade-text');
+    setTimeout(() => {
+        if (typeof color !== 'undefined') element.style.color = color;
+        element.textContent = newText;
+        setTimeout(() => {
+            element.classList.remove('fade-text');
+        }, 20);
+    }, 250);
+}
+
+function updateStatusText() {
+    const desc = document.getElementById('site-desc');
+    const footer = document.getElementById('footer');
+    if (!desc) return;
+    
+    switch(currentState) {
+        case captchaStates.LOADING:
+            animateTextChange(desc, 'Проверяем, человек ли вы. Это может занять несколько секунд.', '#b0b0b0');
+            if (footer) animateTextChange(footer, '', '#888');
+            resetTitleFill();
+            break;
+        case captchaStates.INTERACTIVE:
+            animateTextChange(desc, 'Подтвердите, что вы человек, выполнив указанное действие ниже:', '#b0b0b0');
+            if (footer) animateTextChange(footer, 'Выполните проверку безопасности', '#888');
+            setTitleFill();
+            break;
+        case captchaStates.VERIFYING:
+            animateTextChange(desc, 'Проверка выполняется..', '#b0b0b0');
+            if (footer) animateTextChange(footer, '', '#888');
+            break;
+        case captchaStates.SUCCESS:
+            animateTextChange(desc, 'Проверка пройдена успешно.', '#b0b0b0');
+            if (footer) animateTextChange(footer, 'Выполняется перенаправление на сайт..', '#888');
+            setTitleFill();
+            break;
+        case captchaStates.ERROR:
+            animateTextChange(desc, 'Ошибка проверки безопасности. Обновите страницу или попробуйте позже.', '#ff6b6b');
+            if (footer) animateTextChange(footer, '', '#888');
+            resetTitleFill();
+            break;
+    }
 }
 
 function onBeforeInteractiveCallback() {
-    if (!isValidBrowser()) {
-        onUnsupportedCallback();
-        return;
-    }
     currentState = captchaStates.INTERACTIVE;
     updateStatusText();
 }
@@ -113,11 +113,10 @@ function onSuccessCallback(token) {
     currentState = captchaStates.SUCCESS;
     updateStatusText();
     const expiration = new Date();
-    expiration.setTime(expiration.getTime() + (2 * 60 * 60 * 1000));
+    expiration.setTime(expiration.getTime() + (2 * 60 * 60 * 1000)); // 2 часа
     document.cookie = `access_granted=true; expires=${expiration.toUTCString()}; path=/; domain=.rvn.guru; Secure; SameSite=Lax`;
     const urlParams = new URLSearchParams(window.location.search);
     let redirectUrl = (urlParams.get('redirect') || '/').trim();
-    
     if (!redirectUrl.startsWith('/') || redirectUrl.startsWith('//') || redirectUrl.includes('://')) {
         redirectUrl = '/';
     }
@@ -130,6 +129,7 @@ function onSuccessCallback(token) {
 function onErrorCallback() {
     currentState = captchaStates.ERROR;
     updateStatusText();
+    
     const errorDiv = document.getElementById('error');
     if (errorDiv) {
         errorDiv.style.display = 'block';
