@@ -7,6 +7,91 @@ const captchaStates = {
 };
 let currentState = captchaStates.LOADING;
 
+function getDeviceType() {
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const isTablet = /iPad|Android|Tablet|Silk/i.test(navigator.userAgent);
+    
+    if (isMobile) return 'mobile';
+    if (isTablet) return 'tablet';
+    return 'desktop';
+}
+
+function getSmartTimeouts() {
+    const deviceType = getDeviceType();
+    const connection = navigator.connection;
+    let observeDelay = 100;
+    let iframeCheck = 2000;
+    let mainTimeout = 10000;
+    if (deviceType === 'mobile' || deviceType === 'tablet') {
+        observeDelay = 500;
+        iframeCheck = 8000;
+        mainTimeout = 20000;
+    }
+    if (connection) {
+        if (connection.saveData) {
+            observeDelay = 1000;
+            iframeCheck = 15000;
+            mainTimeout = 45000;
+        } else if (connection.effectiveType) {
+            switch(connection.effectiveType) {
+                case 'slow-2g':
+                    observeDelay = 800;
+                    iframeCheck = 12000;
+                    mainTimeout = 40000;
+                    break;
+                case '2g':
+                    observeDelay = 600;
+                    iframeCheck = 10000;
+                    mainTimeout = 35000;
+                    break;
+                case '3g':
+                    observeDelay = 400;
+                    iframeCheck = 7000;
+                    mainTimeout = 30000;
+                    break;
+                case '4g':
+                    break;
+            }
+        }
+    }
+    return { observeDelay, iframeCheck, mainTimeout };
+}
+
+const timeouts = getSmartTimeouts();
+console.log(`[PROTECT] Device: ${getDeviceType()}, Timeouts:`, timeouts);
+function observeCaptchaContainer() {
+    const container = document.querySelector('.cf-turnstile');
+    if (!container) {
+        setTimeout(observeCaptchaContainer, timeouts.observeDelay);
+        return;
+    }
+    
+    const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+            if (mutation.type === 'childList') {
+                const iframe = container.querySelector('iframe');
+                if (iframe && currentState === captchaStates.LOADING) {
+                    currentState = captchaStates.INTERACTIVE;
+                    updateStatusText();
+                }
+            }
+        });
+    });
+    
+    observer.observe(container, {
+        childList: true,
+        subtree: true
+    });
+    
+    setTimeout(() => {
+        const iframe = container.querySelector('iframe');
+        if (iframe && currentState === captchaStates.LOADING) {
+            currentState = captchaStates.INTERACTIVE;
+            updateStatusText();
+        }
+    }, timeouts.iframeCheck);
+}
+
 function syncTitleFill() {
     const fill = document.getElementById('site-title-fill');
     const base = document.getElementById('site-title-base');
@@ -82,29 +167,27 @@ function updateStatusText() {
 }
 
 function isValidBrowser() {
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    const tests = {
-        hasUserAgent: navigator.userAgent.length > 0,
-        hasLanguages: navigator.languages && navigator.languages.length > 0,
-        hasCookies: navigator.cookieEnabled,
-        hasStorage: typeof Storage !== 'undefined',
-        hasPerformance: typeof performance !== 'undefined',
-    };
-
-    if (isMobile) {
-        console.log('[PROTECT] Mobile device detected. Using relaxed validation.');
-        return Object.values(tests).every(test => test === true);
+    if (!navigator.userAgent || navigator.userAgent.length === 0) {
+        console.log('[PROTECT] No User-Agent Detected');
+        return false;
     }
+    
+    if (!navigator.cookieEnabled) {
+        console.log('[PROTECT] Cookies Are Disabled');
+        return false;
+    }
+    
+    return true;
+}
 
-    const desktopTests = {
-        ...tests,
-        hasPlugins: navigator.plugins && navigator.plugins.length > 0,
-        hardwareConcurrency: navigator.hardwareConcurrency > 0,
-        deviceMemory: navigator.deviceMemory > 0.25
-    };
-
-    console.log('[PROTECT] Desktop device. Using strict validation.');
-    return Object.values(desktopTests).every(test => test === true);
+function isSearchEngineBot() {
+    const botPatterns = [
+        /googlebot/i, /bingbot/i, /yandex/i, /duckduckbot/i,
+        /baiduspider/i, /slurp/i, /facebookexternalhit/i,
+        /twitterbot/i, /linkedinbot/i, /whatsapp/i, /telegrambot/i
+    ];
+    
+    return botPatterns.some(pattern => pattern.test(navigator.userAgent));
 }
 
 function generateBrowserFingerprint() {
@@ -112,7 +195,8 @@ function generateBrowserFingerprint() {
         navigator.userAgent,
         navigator.languages ? navigator.languages.join(',') : '',
         screen.width + 'x' + screen.height,
-        navigator.hardwareConcurrency || 'unknown'
+        navigator.hardwareConcurrency || 'unknown',
+        navigator.deviceMemory || 'unknown'
     ];
     
     return btoa(components.join('|')).substring(0, 32);
@@ -205,6 +289,21 @@ function observeCaptchaContainer() {
     }, 2000);
 }
 
+document.addEventListener('DOMContentLoaded', () => {
+    resetTitleFill();
+    updateStatusText();
+    observeCaptchaContainer();
+    
+    setTimeout(() => {
+        if (!window.turnstile && currentState === captchaStates.LOADING) {
+            currentState = captchaStates.ERROR;
+            updateStatusText();
+        }
+    }, timeouts.mainTimeout);
+});
+
+window.addEventListener('resize', syncTitleFill);
+
 (function checkExistingCookie() {
     if (isSearchEngineBot()) {
         console.log('[PROTECT] Search engine bot detected. Skipping protection.');
@@ -225,17 +324,3 @@ function observeCaptchaContainer() {
         }
     }
 })();
-
-document.addEventListener('DOMContentLoaded', () => {
-    resetTitleFill();
-    updateStatusText();
-    observeCaptchaContainer();
-    setTimeout(() => {
-        if (!window.turnstile && currentState === captchaStates.LOADING) {
-            currentState = captchaStates.ERROR;
-            updateStatusText();
-        }
-    }, 10000);
-});
-
-window.addEventListener('resize', syncTitleFill);
