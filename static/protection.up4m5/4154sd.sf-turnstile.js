@@ -7,17 +7,6 @@ const captchaStates = {
 };
 let currentState = captchaStates.LOADING;
 
-(function checkExistingCookie() {
-    if (document.cookie.includes('access_granted=true')) {
-        const urlParams = new URLSearchParams(window.location.search);
-        let redirectUrl = (urlParams.get('redirect') || '/').trim();
-        if (redirectUrl.startsWith('/') && !redirectUrl.startsWith('//') && !redirectUrl.includes('://')) {
-            window.location.replace(redirectUrl);
-            return;
-        }
-    }
-})();
-
 function syncTitleFill() {
     const fill = document.getElementById('site-title-fill');
     const base = document.getElementById('site-title-base');
@@ -26,8 +15,6 @@ function syncTitleFill() {
         fill.style.width = base.offsetWidth + 'px';
     }
 }
-
-window.addEventListener('resize', syncTitleFill);
 
 function setTitleFill(animate = true) {
     const fill = document.getElementById('site-title-fill');
@@ -94,7 +81,47 @@ function updateStatusText() {
     }
 }
 
+function isValidBrowser() {
+    const tests = {
+        hasUserAgent: navigator.userAgent.length > 0,
+        hasLanguages: navigator.languages && navigator.languages.length > 0,
+        hasPlugins: navigator.plugins && navigator.plugins.length > 0,
+        hasCookies: navigator.cookieEnabled,
+        hasStorage: typeof Storage !== 'undefined',
+        hasPerformance: typeof performance !== 'undefined',
+        hardwareConcurrency: navigator.hardwareConcurrency > 1,
+        deviceMemory: navigator.deviceMemory > 0.5
+    };
+
+    return Object.values(tests).every(test => test === true);
+}
+
+function isSearchEngineBot() {
+    const botPatterns = [
+        /googlebot/i, /bingbot/i, /yandex/i, /duckduckbot/i,
+        /baiduspider/i, /slurp/i, /facebookexternalhit/i,
+        /twitterbot/i, /linkedinbot/i, /whatsapp/i, /telegrambot/i
+    ];
+    
+    return botPatterns.some(pattern => pattern.test(navigator.userAgent));
+}
+
+function generateBrowserFingerprint() {
+    const components = [
+        navigator.userAgent,
+        navigator.languages ? navigator.languages.join(',') : '',
+        screen.width + 'x' + screen.height,
+        navigator.hardwareConcurrency || 'unknown'
+    ];
+    
+    return btoa(components.join('|')).substring(0, 32);
+}
+
 function onBeforeInteractiveCallback() {
+    if (!isValidBrowser()) {
+        onUnsupportedCallback();
+        return;
+    }
     currentState = captchaStates.INTERACTIVE;
     updateStatusText();
 }
@@ -110,11 +137,19 @@ function onUnsupportedCallback() {
 }
 
 function onSuccessCallback(token) {
+    if (!isValidBrowser()) {
+        console.log('Browser validation failed, not setting cookie');
+        currentState = captchaStates.ERROR;
+        updateStatusText();
+        return;
+    }
+    
     currentState = captchaStates.SUCCESS;
     updateStatusText();
     const expiration = new Date();
-    expiration.setTime(expiration.getTime() + (2 * 60 * 60 * 1000)); // 2 часа
-    document.cookie = `access_granted=true; expires=${expiration.toUTCString()}; path=/; domain=.rvn.guru; Secure; SameSite=Lax`;
+    expiration.setTime(expiration.getTime() + (2 * 60 * 60 * 1000));
+    const browserFingerprint = generateBrowserFingerprint();
+    document.cookie = `access_granted=true; fingerprint=${browserFingerprint}; expires=${expiration.toUTCString()}; path=/; domain=.rvn.guru; Secure; SameSite=Strict`;
     const urlParams = new URLSearchParams(window.location.search);
     let redirectUrl = (urlParams.get('redirect') || '/').trim();
     if (!redirectUrl.startsWith('/') || redirectUrl.startsWith('//') || redirectUrl.includes('://')) {
@@ -169,6 +204,27 @@ function observeCaptchaContainer() {
     }, 2000);
 }
 
+(function checkExistingCookie() {
+    if (isSearchEngineBot()) {
+        console.log('Search engine bot detected, skipping protection');
+        return;
+    }
+
+    if (!isValidBrowser()) {
+        console.log('Invalid browser detected, requiring verification');
+        return;
+    }
+    
+    if (document.cookie.includes('access_granted=true')) {
+        const urlParams = new URLSearchParams(window.location.search);
+        let redirectUrl = (urlParams.get('redirect') || '/').trim();
+        if (redirectUrl.startsWith('/') && !redirectUrl.startsWith('//') && !redirectUrl.includes('://')) {
+            window.location.replace(redirectUrl);
+            return;
+        }
+    }
+})();
+
 document.addEventListener('DOMContentLoaded', () => {
     resetTitleFill();
     updateStatusText();
@@ -180,3 +236,5 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }, 10000);
 });
+
+window.addEventListener('resize', syncTitleFill);
