@@ -82,28 +82,29 @@ function updateStatusText() {
 }
 
 function isValidBrowser() {
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     const tests = {
         hasUserAgent: navigator.userAgent.length > 0,
         hasLanguages: navigator.languages && navigator.languages.length > 0,
-        hasPlugins: navigator.plugins && navigator.plugins.length > 0,
         hasCookies: navigator.cookieEnabled,
         hasStorage: typeof Storage !== 'undefined',
         hasPerformance: typeof performance !== 'undefined',
-        hardwareConcurrency: navigator.hardwareConcurrency > 1,
-        deviceMemory: navigator.deviceMemory > 0.5
     };
 
-    return Object.values(tests).every(test => test === true);
-}
+    if (isMobile) {
+        console.log('[PROTECT] Mobile device detected. Using relaxed validation.');
+        return Object.values(tests).every(test => test === true);
+    }
 
-function isSearchEngineBot() {
-    const botPatterns = [
-        /googlebot/i, /bingbot/i, /yandex/i, /duckduckbot/i,
-        /baiduspider/i, /slurp/i, /facebookexternalhit/i,
-        /twitterbot/i, /linkedinbot/i, /whatsapp/i, /telegrambot/i
-    ];
-    
-    return botPatterns.some(pattern => pattern.test(navigator.userAgent));
+    const desktopTests = {
+        ...tests,
+        hasPlugins: navigator.plugins && navigator.plugins.length > 0,
+        hardwareConcurrency: navigator.hardwareConcurrency > 0,
+        deviceMemory: navigator.deviceMemory > 0.25
+    };
+
+    console.log('[PROTECT] Desktop device. Using strict validation.');
+    return Object.values(desktopTests).every(test => test === true);
 }
 
 function generateBrowserFingerprint() {
@@ -234,7 +235,7 @@ document.addEventListener('DOMContentLoaded', () => {
             currentState = captchaStates.ERROR;
             updateStatusText();
         }
-    }, 20000);
+    }, 10000);
 });
 
 window.addEventListener('resize', syncTitleFill);
