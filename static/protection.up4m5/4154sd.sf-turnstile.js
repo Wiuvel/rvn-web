@@ -138,7 +138,7 @@ function onUnsupportedCallback() {
 
 function onSuccessCallback(token) {
     if (!isValidBrowser()) {
-        console.log('Browser validation failed, not setting cookie');
+        console.log('[PROTECT] Browser validation failed. Not setting cookie.');
         currentState = captchaStates.ERROR;
         updateStatusText();
         return;
@@ -206,12 +206,12 @@ function observeCaptchaContainer() {
 
 (function checkExistingCookie() {
     if (isSearchEngineBot()) {
-        console.log('Search engine bot detected, skipping protection');
+        console.log('[PROTECT] Search engine bot detected. Skipping protection.');
         return;
     }
 
     if (!isValidBrowser()) {
-        console.log('Invalid browser detected, requiring verification');
+        console.log('[PROTECT] Invalid browser detected. Requiring verification.');
         return;
     }
     
@@ -234,7 +234,7 @@ document.addEventListener('DOMContentLoaded', () => {
             currentState = captchaStates.ERROR;
             updateStatusText();
         }
-    }, 10000);
+    }, 20000);
 });
 
 window.addEventListener('resize', syncTitleFill);

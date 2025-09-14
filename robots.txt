@@ -5,6 +5,7 @@ Allow: /legal/terms/
 Allow: /legal/privacy/
 Allow: /legal/offer/
 Allow: /legal/refunds/
+Allow: /legal/cookies/
 
 Disallow: /protection/
 Disallow: /api/
