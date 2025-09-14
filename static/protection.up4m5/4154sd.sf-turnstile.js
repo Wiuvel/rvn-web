@@ -157,7 +157,9 @@ function isSearchEngineBot() {
         /googlebot/i, /bingbot/i, /yandex/i, /duckduckbot/i,
         /baiduspider/i, /slurp/i, /facebookexternalhit/i,
         /twitterbot/i, /whatsapp/i, /telegrambot/i,
-        /Google-PageSpeed-Insights/i, /Google Page Speed Insights/i, /PSI bot/i
+        /Google-PageSpeed-Insights/i, /Google Page Speed Insights/i, /PSI bot/i,
+        /redditbot/i, /ahrefsbot/i, /mj12bot/i, /dotbot/i,
+        /applebot/i, /discordbot/i, /slackbot/i, /linkedinbot/i
     ];
     
     return botPatterns.some(pattern => pattern.test(navigator.userAgent));
@@ -247,6 +249,12 @@ window.addEventListener('resize', syncTitleFill);
 (function checkExistingCookie() {
     if (isSearchEngineBot()) {
         console.log('[PROTECT] Helpful bot detected. Skipping protection.');
+        const urlParams = new URLSearchParams(window.location.search);
+        let redirectUrl = (urlParams.get('redirect') || '/').trim();
+        if (!redirectUrl.startsWith('/') || redirectUrl.startsWith('//') || redirectUrl.includes('://')) {
+            redirectUrl = '/';
+        }
+        window.location.replace(redirectUrl);
         return;
     }
 
