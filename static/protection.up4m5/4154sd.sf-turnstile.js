@@ -7,58 +7,30 @@ const captchaStates = {
 };
 let currentState = captchaStates.LOADING;
 
-function getDeviceType() {
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    const isTablet = /iPad|Android|Tablet|Silk/i.test(navigator.userAgent);
+function isMobileDevice() {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+}
+
+function getSimpleTimeouts() {
+    if (isMobileDevice()) {
+        console.log('[PROTECT] Mobile device detected. Using extended timeouts.');
+        return {
+            observeDelay: 500, 
+            iframeCheck: 8000, 
+            mainTimeout: 20000 
+        };
+    }
     
-    if (isMobile) return 'mobile';
-    if (isTablet) return 'tablet';
-    return 'desktop';
+    console.log('[PROTECT] Desktop device detected. Using standard timeouts.');
+    return {
+        observeDelay: 100, 
+        iframeCheck: 2000, 
+        mainTimeout: 15000 
+    };
 }
 
-function getSmartTimeouts() {
-    const deviceType = getDeviceType();
-    const connection = navigator.connection;
-    let observeDelay = 100;
-    let iframeCheck = 2000;
-    let mainTimeout = 10000;
-    if (deviceType === 'mobile' || deviceType === 'tablet') {
-        observeDelay = 500;
-        iframeCheck = 8000;
-        mainTimeout = 20000;
-    }
-    if (connection) {
-        if (connection.saveData) {
-            observeDelay = 1000;
-            iframeCheck = 15000;
-            mainTimeout = 45000;
-        } else if (connection.effectiveType) {
-            switch(connection.effectiveType) {
-                case 'slow-2g':
-                    observeDelay = 800;
-                    iframeCheck = 12000;
-                    mainTimeout = 40000;
-                    break;
-                case '2g':
-                    observeDelay = 600;
-                    iframeCheck = 10000;
-                    mainTimeout = 35000;
-                    break;
-                case '3g':
-                    observeDelay = 400;
-                    iframeCheck = 7000;
-                    mainTimeout = 30000;
-                    break;
-                case '4g':
-                    break;
-            }
-        }
-    }
-    return { observeDelay, iframeCheck, mainTimeout };
-}
+const timeouts = getSimpleTimeouts();
 
-const timeouts = getSmartTimeouts();
-console.log(`[PROTECT] Device: ${getDeviceType()}, Timeouts:`, timeouts);
 function observeCaptchaContainer() {
     const container = document.querySelector('.cf-turnstile');
     if (!container) {
@@ -168,12 +140,12 @@ function updateStatusText() {
 
 function isValidBrowser() {
     if (!navigator.userAgent || navigator.userAgent.length === 0) {
-        console.log('[PROTECT] No User-Agent Detected');
+        console.log('[PROTECT] No User-Agent Detected.');
         return false;
     }
     
     if (!navigator.cookieEnabled) {
-        console.log('[PROTECT] Cookies Are Disabled');
+        console.log('[PROTECT] Cookies Are Disabled.');
         return false;
     }
     
@@ -254,39 +226,6 @@ function onErrorCallback() {
     if (errorDiv) {
         errorDiv.style.display = 'block';
     }
-}
-
-function observeCaptchaContainer() {
-    const container = document.querySelector('.cf-turnstile');
-    if (!container) {
-        setTimeout(observeCaptchaContainer, 100);
-        return;
-    }
-    
-    const observer = new MutationObserver((mutations) => {
-        mutations.forEach((mutation) => {
-            if (mutation.type === 'childList') {
-                const iframe = container.querySelector('iframe');
-                if (iframe && currentState === captchaStates.LOADING) {
-                    currentState = captchaStates.INTERACTIVE;
-                    updateStatusText();
-                }
-            }
-        });
-    });
-    
-    observer.observe(container, {
-        childList: true,
-        subtree: true
-    });
-    
-    setTimeout(() => {
-        const iframe = container.querySelector('iframe');
-        if (iframe && currentState === captchaStates.LOADING) {
-            currentState = captchaStates.INTERACTIVE;
-            updateStatusText();
-        }
-    }, 2000);
 }
 
 document.addEventListener('DOMContentLoaded', () => {
