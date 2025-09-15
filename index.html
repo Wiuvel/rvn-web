@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large" />
   <title>Raven Private — безопасный доступ в сеть через VLESS и PROXY</title>
-  <meta name="description" content="RVN.GURU — современный сервис приватного доступа в сеть. Высокая скорость и полная анонимность. Стабильные сервера с минимальном пингом." />
+  <meta name="description" content="RVN.GURU — современный сервис приватного доступа в сеть. Высокая скорость и полная анонимность. Стабильные сервера с минимальным пингом." />
   <meta name="keywords" content="Raven Private, RVN.GURU, VLESS" />
   <meta name="theme-color" content="#0f7fdb" />
   <meta property="og:site_name" content="Raven Private" />
@@ -59,7 +59,6 @@
     }
   </script>
   <script defer src="https://unpkg.com/alpinejs@3.14.9/dist/cdn.min.js" integrity="sha384-9Ax3MmS9AClxJyd5/zafcXXjxmwFhZCdsT6HJoJjarvCaAkJlk5QDzjLJm+Wdx5F" crossorigin="anonymous"></script>
-  <link rel="stylesheet" href="/css/main/app.css" />
   <style>
     html, body { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
     img { max-width: 100%; height: auto; display: block; }
@@ -140,7 +139,17 @@
       filter: drop-shadow(0 0 12px #16a3ff44);
       animation: float 3s ease-in-out infinite;
     }
+    html, body {
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+
+    html::-webkit-scrollbar, 
+    body::-webkit-scrollbar {
+      display: none;
+    }
   </style>
+  <style>[x-cloak] { display: none !important; }</style>
 </head>
 <body class="h-full bg-neutral-950 text-neutral-100 antialiased relative">
   <div id="page-progress"></div>
@@ -177,7 +186,7 @@
       </div>
     </div>
   </div>
-  <div x-show="open" x-transition class="md:hidden bg-neutral-950 border-t border-neutral-800/70 px-4 py-4 space-y-3 text-sm text-neutral-300">
+  <div x-show="open" x-cloak x-transition class="md:hidden bg-neutral-950 border-t border-neutral-800/70 px-4 py-4 space-y-3 text-sm text-neutral-300">
     <a href="#pricing" class="block hover:text-white transition">Тарифы</a>
     <a href="#apps" class="block hover:text-white transition">Приложения</a>
     <a href="#faq" class="block hover:text-white transition">FAQ</a>
@@ -643,8 +652,8 @@
       </div>
     </div>
   </footer>
-  <script type="text/javascript" src="js/main/connection.js" integrity="sha384-eRPjh6whKuQDJLzGwuNNP68Q7CbyTyg0TNiH3tWu6dIrM4fKDqkLSXiR/lSV5TbC" crossorigin="anonymous"></script>
-  <script type="text/javascript" src="js/main/apps.js" integrity="sha384-CTW+gW0KyHpIlju4bRgcF6gsimbfpDa9P74pjroBHTI9a/4TvuBC/Q2PgCfl/JaW" crossorigin="anonymous"></script>
+  <script type="text/javascript" src="js/main/connection.js" integrity="sha384-eRPjh6whKuQDJLzGwuNNP68Q7CbyTyg0TNiH3tWu6dIrM4fKDqkLSXiR/lSV5TbC"></script>
+  <script type="text/javascript" src="js/main/apps.js" integrity="sha384-CTW+gW0KyHpIlju4bRgcF6gsimbfpDa9P74pjroBHTI9a/4TvuBC/Q2PgCfl/JaW"></script>
   <script>
     document.getElementById('year').textContent = new Date().getFullYear();
     document.addEventListener("DOMContentLoaded", () => {
