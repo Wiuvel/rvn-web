@@ -1,1 +1,834 @@
-const a0_0x2d93d9=a0_0x228e;(function(_0x3361f2,_0x2ea0e0){const _0x4819a0=a0_0x228e,_0x3ed485=_0x3361f2();while(!![]){try{const _0x46071a=parseInt(_0x4819a0(0x1fe))/0x1+parseInt(_0x4819a0(0x200))/0x2+-parseInt(_0x4819a0(0x1ca))/0x3+parseInt(_0x4819a0(0x1cc))/0x4*(-parseInt(_0x4819a0(0x20a))/0x5)+-parseInt(_0x4819a0(0x1ba))/0x6+parseInt(_0x4819a0(0x1f7))/0x7*(parseInt(_0x4819a0(0x1d6))/0x8)+parseInt(_0x4819a0(0x1ed))/0x9;if(_0x46071a===_0x2ea0e0)break;else _0x3ed485['push'](_0x3ed485['shift']());}catch(_0x5654bf){_0x3ed485['push'](_0x3ed485['shift']());}}}(a0_0x37ae,0x22556));const captchaStates={'LOADING':a0_0x2d93d9(0x1c1),'INTERACTIVE':'interactive','VERIFYING':a0_0x2d93d9(0x1b2),'SUCCESS':a0_0x2d93d9(0x1fc),'ERROR':a0_0x2d93d9(0x1f1)};let currentState=captchaStates[a0_0x2d93d9(0x1c7)],observationTimeout=null,mainTimeoutId=null;function isMobileDevice(){const _0x208b90=a0_0x2d93d9;return/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i[_0x208b90(0x1b9)](navigator['userAgent']);}function getTimeouts(){return isMobileDevice()?{'observeDelay':0x1f4,'iframeCheck':0x1f40,'mainTimeout':0x61a8}:{'observeDelay':0x64,'iframeCheck':0x7d0,'mainTimeout':0x3a98};}const timeouts=getTimeouts();async function generateSecureHash(){const _0x3e4b54=a0_0x2d93d9;try{const _0x53855c=navigator[_0x3e4b54(0x1a5)]+navigator[_0x3e4b54(0x1f5)]+screen[_0x3e4b54(0x1ea)]+'x'+screen[_0x3e4b54(0x1e3)]+(navigator[_0x3e4b54(0x1e0)]||'')+(navigator[_0x3e4b54(0x1f8)]||''),_0x41ded2=new TextEncoder(),_0x489214=_0x41ded2[_0x3e4b54(0x1f0)](_0x53855c),_0x2b6513=await crypto['subtle'][_0x3e4b54(0x1a7)](_0x3e4b54(0x1ee),_0x489214),_0x16a008=Array['from'](new Uint8Array(_0x2b6513)),_0x277cd6=_0x16a008[_0x3e4b54(0x208)](_0x410812=>_0x410812['toString'](0x10)[_0x3e4b54(0x1e8)](0x2,'0'))['join']('');return _0x277cd6;}catch(_0x16dbcc){return console[_0x3e4b54(0x1f1)]('[HASH]\x20Error\x20generating\x20secure\x20hash:',_0x16dbcc),_0x3e4b54(0x1c5)+btoa(navigator[_0x3e4b54(0x1a5)]+Date['now']())[_0x3e4b54(0x1ef)](0x0,0x40)[_0x3e4b54(0x1a8)](/[^a-f0-9]/g,'0');}}function safeRedirect(_0x8e14e4){const _0x9aca18=a0_0x2d93d9;try{if(_0x8e14e4&&_0x8e14e4[_0x9aca18(0x1b1)]('/')&&!_0x8e14e4[_0x9aca18(0x1b1)]('//')&&!_0x8e14e4[_0x9aca18(0x1b6)]('://')){if(!_0x8e14e4[_0x9aca18(0x1b6)]('<')&&!_0x8e14e4[_0x9aca18(0x1b6)]('>')&&!_0x8e14e4[_0x9aca18(0x1b6)](_0x9aca18(0x1ec)))return window[_0x9aca18(0x1eb)][_0x9aca18(0x1a8)](_0x8e14e4),!![];}return window[_0x9aca18(0x1eb)][_0x9aca18(0x1a8)]('/'),!![];}catch(_0x5bb223){return console['error']('[REDIRECT]\x20Error\x20during\x20redirect:',_0x5bb223),window[_0x9aca18(0x1eb)][_0x9aca18(0x1a8)]('/'),!![];}}function checkExistingCookie(){const _0x465769=a0_0x2d93d9;if(!isValidBrowser())return console['log'](_0x465769(0x1dc)),![];const _0x1853b9=document['cookie']['split'](';');let _0x319dd4=![],_0x1b693f=![];for(const _0x4bdcb5 of _0x1853b9){const [_0x43a9fd,_0x42f9e0]=_0x4bdcb5[_0x465769(0x1c4)]()[_0x465769(0x1f9)]('=');_0x43a9fd===_0x465769(0x20c)&&_0x42f9e0===_0x465769(0x20d)&&(_0x319dd4=!![]),_0x43a9fd===_0x465769(0x1c3)&&_0x42f9e0&&_0x42f9e0[_0x465769(0x1d0)]===0x40&&/^[a-f0-9]{64}$/[_0x465769(0x1b9)](_0x42f9e0)&&(_0x1b693f=!![]);}if(_0x319dd4&&_0x1b693f){const _0x65ed5=new URLSearchParams(window[_0x465769(0x1eb)][_0x465769(0x1d2)]);let _0x1b29b3=(_0x65ed5[_0x465769(0x1be)](_0x465769(0x1d4))||'/')[_0x465769(0x1c4)]();return safeRedirect(_0x1b29b3);}return![];}function observeCaptchaContainer(){const _0x55d11e=a0_0x2d93d9;observationTimeout&&clearTimeout(observationTimeout);const _0x5e1b56=document[_0x55d11e(0x1af)](_0x55d11e(0x1da));if(!_0x5e1b56){observationTimeout=setTimeout(observeCaptchaContainer,timeouts['observeDelay']);return;}const _0xe6986a=new MutationObserver(_0x1d247b=>{const _0x2280fe=_0x55d11e;for(const _0x51019b of _0x1d247b){_0x51019b[_0x2280fe(0x1cb)]===_0x2280fe(0x1fd)&&_0x5e1b56[_0x2280fe(0x1af)]('iframe')&&currentState===captchaStates[_0x2280fe(0x1c7)]&&(currentState=captchaStates[_0x2280fe(0x206)],updateStatusText(),_0xe6986a[_0x2280fe(0x209)]());}});try{_0xe6986a[_0x55d11e(0x1b3)](_0x5e1b56,{'childList':!![],'subtree':!![]});}catch(_0x256e62){console[_0x55d11e(0x1f1)](_0x55d11e(0x1d7),_0x256e62),observationTimeout=setTimeout(observeCaptchaContainer,timeouts[_0x55d11e(0x1c0)]);return;}setTimeout(()=>{const _0x4a7f87=_0x55d11e;_0x5e1b56[_0x4a7f87(0x1af)](_0x4a7f87(0x1ab))&&currentState===captchaStates['LOADING']&&(currentState=captchaStates[_0x4a7f87(0x206)],updateStatusText(),_0xe6986a[_0x4a7f87(0x209)]());},timeouts[_0x55d11e(0x1b0)]);}function syncTitleFill(){const _0x58e412=a0_0x2d93d9,_0x11ffe7=document[_0x58e412(0x1b4)](_0x58e412(0x204)),_0x35546=document[_0x58e412(0x1b4)](_0x58e412(0x20b));if(!_0x11ffe7||!_0x35546)return;(parseFloat(_0x11ffe7['style'][_0x58e412(0x1ea)])>0x0||_0x11ffe7[_0x58e412(0x1aa)][_0x58e412(0x1ea)]===_0x58e412(0x1f2))&&(_0x11ffe7[_0x58e412(0x1aa)][_0x58e412(0x1ea)]=_0x35546[_0x58e412(0x1f3)]+'px');}function setTitleFill(_0x21bf0f=!![]){const _0x145d92=a0_0x2d93d9,_0x3b02d7=document[_0x145d92(0x1b4)](_0x145d92(0x204)),_0x88ab83=document[_0x145d92(0x1b4)](_0x145d92(0x20b));if(!_0x3b02d7||!_0x88ab83)return;_0x21bf0f?(_0x3b02d7[_0x145d92(0x1aa)][_0x145d92(0x1f4)]='width\x201.1s\x20cubic-bezier(.4,0,.2,1)',_0x3b02d7[_0x145d92(0x1aa)][_0x145d92(0x1ea)]=_0x88ab83[_0x145d92(0x1f3)]+'px'):(_0x3b02d7[_0x145d92(0x1aa)][_0x145d92(0x1f4)]=_0x145d92(0x1bf),_0x3b02d7[_0x145d92(0x1aa)]['width']=_0x88ab83[_0x145d92(0x1f3)]+'px',setTimeout(()=>{const _0x41a345=_0x145d92;_0x3b02d7[_0x41a345(0x1aa)][_0x41a345(0x1f4)]='';},0xa));}function resetTitleFill(){const _0x18f78c=a0_0x2d93d9,_0x29452=document['getElementById'](_0x18f78c(0x204));if(_0x29452)_0x29452[_0x18f78c(0x1aa)][_0x18f78c(0x1ea)]='0';}function animateTextChange(_0x51d099,_0x54d602,_0x298aa4){const _0x5534a3=a0_0x2d93d9;if(!_0x51d099)return;_0x51d099['classList'][_0x5534a3(0x1ff)](_0x5534a3(0x1c9)),setTimeout(()=>{const _0x34c3d8=_0x5534a3;if(typeof _0x298aa4!==_0x34c3d8(0x1d9))_0x51d099[_0x34c3d8(0x1aa)]['color']=_0x298aa4;_0x51d099[_0x34c3d8(0x1d1)]=_0x54d602,setTimeout(()=>{const _0x3d29b5=_0x34c3d8;_0x51d099[_0x3d29b5(0x1e2)][_0x3d29b5(0x1e4)](_0x3d29b5(0x1c9));},0x14);},0xfa);}function updateStatusText(){const _0x2ffd5c=a0_0x2d93d9,_0x4d96fb=document[_0x2ffd5c(0x1b4)]('site-desc'),_0x554faa=document[_0x2ffd5c(0x1b4)]('footer');if(!_0x4d96fb)return;switch(currentState){case captchaStates['LOADING']:animateTextChange(_0x4d96fb,'Проверяем,\x20человек\x20ли\x20вы.\x20Это\x20может\x20занять\x20несколько\x20секунд.',_0x2ffd5c(0x1d3));if(_0x554faa)animateTextChange(_0x554faa,'',_0x2ffd5c(0x1b8));resetTitleFill();break;case captchaStates[_0x2ffd5c(0x206)]:animateTextChange(_0x4d96fb,_0x2ffd5c(0x1c6),_0x2ffd5c(0x1d3));if(_0x554faa)animateTextChange(_0x554faa,_0x2ffd5c(0x205),'#888');setTitleFill();break;case captchaStates[_0x2ffd5c(0x1fb)]:animateTextChange(_0x4d96fb,_0x2ffd5c(0x1fa),_0x2ffd5c(0x1d3));if(_0x554faa)animateTextChange(_0x554faa,'','#888');break;case captchaStates[_0x2ffd5c(0x1e7)]:animateTextChange(_0x4d96fb,'Проверка\x20пройдена\x20успешно.',_0x2ffd5c(0x1d3));if(_0x554faa)animateTextChange(_0x554faa,_0x2ffd5c(0x1bb),'#888');setTitleFill();break;case captchaStates['ERROR']:animateTextChange(_0x4d96fb,'Ошибка\x20проверки\x20безопасности.\x20Обновите\x20страницу\x20или\x20попробуйте\x20позже.',_0x2ffd5c(0x1dd));if(_0x554faa)animateTextChange(_0x554faa,'','#888');resetTitleFill();break;}}function a0_0x228e(_0x224109,_0x5def5c){const _0x37aef2=a0_0x37ae();return a0_0x228e=function(_0x228ed2,_0x1693ae){_0x228ed2=_0x228ed2-0x1a5;let _0xd80cf=_0x37aef2[_0x228ed2];return _0xd80cf;},a0_0x228e(_0x224109,_0x5def5c);}function isValidBrowser(){const _0x1889cd=a0_0x2d93d9;if(!navigator[_0x1889cd(0x1a5)]||navigator[_0x1889cd(0x1a5)][_0x1889cd(0x1d0)]===0x0)return console[_0x1889cd(0x1a9)](_0x1889cd(0x1df)),![];if(!navigator['cookieEnabled'])return console[_0x1889cd(0x1a9)](_0x1889cd(0x1db)),![];if(!window[_0x1889cd(0x1de)]||!window[_0x1889cd(0x201)])return console[_0x1889cd(0x1a9)]('[PROTECT]\x20Browser\x20lacks\x20modern\x20features.'),![];return!![];}async function setSecureCookie(_0x4c27b0){const _0xecde9f=a0_0x2d93d9;try{const _0x3cfbc5=new Date();_0x3cfbc5['setTime'](_0x3cfbc5[_0xecde9f(0x1e9)]()+0x2*0x3c*0x3c*0x3e8);const _0xdc15ab=await generateSecureHash();return document['cookie']='access_granted=true;\x20expires='+_0x3cfbc5[_0xecde9f(0x1c8)]()+_0xecde9f(0x1e6),document[_0xecde9f(0x1e5)]=_0xecde9f(0x1b5)+_0xdc15ab+_0xecde9f(0x1bc)+_0x3cfbc5['toUTCString']()+';\x20path=/;\x20domain=.rvn.guru;\x20Secure;\x20SameSite=Strict',document[_0xecde9f(0x1e5)]=_0xecde9f(0x207)+Date[_0xecde9f(0x1f6)]()+_0xecde9f(0x1bc)+_0x3cfbc5['toUTCString']()+_0xecde9f(0x1e6),console[_0xecde9f(0x1a9)](_0xecde9f(0x1c2)),!![];}catch(_0x47d4d1){return console[_0xecde9f(0x1f1)]('[COOKIE]\x20Error\x20setting\x20secure\x20cookies:',_0x47d4d1),![];}}function onBeforeInteractiveCallback(){const _0x126bee=a0_0x2d93d9;if(!isValidBrowser()){onUnsupportedCallback();return;}currentState=captchaStates[_0x126bee(0x206)],updateStatusText();}function onAfterInteractiveCallback(){const _0x1bdc61=a0_0x2d93d9;currentState=captchaStates[_0x1bdc61(0x1fb)],updateStatusText();}function onUnsupportedCallback(){currentState=captchaStates['ERROR'],updateStatusText();}async function onSuccessCallback(_0x109d1d){const _0x30fdc1=a0_0x2d93d9;if(!isValidBrowser()){console[_0x30fdc1(0x1a9)]('[PROTECT]\x20Browser\x20validation\x20failed.\x20Not\x20setting\x20cookie.'),currentState=captchaStates[_0x30fdc1(0x1ce)],updateStatusText();return;}if(!await setSecureCookie(_0x109d1d)){currentState=captchaStates[_0x30fdc1(0x1ce)],updateStatusText();return;}currentState=captchaStates['SUCCESS'],updateStatusText();const _0x21e678=new URLSearchParams(window[_0x30fdc1(0x1eb)]['search']);let _0x1aa61f=(_0x21e678['get'](_0x30fdc1(0x1d4))||'/')[_0x30fdc1(0x1c4)]();setTimeout(()=>{safeRedirect(_0x1aa61f);},0x3e8);}function onErrorCallback(){const _0xb404e1=a0_0x2d93d9;currentState=captchaStates[_0xb404e1(0x1ce)],updateStatusText();const _0x411cff=document[_0xb404e1(0x1b4)](_0xb404e1(0x1f1));_0x411cff&&(_0x411cff[_0xb404e1(0x1aa)]['display']=_0xb404e1(0x1cd));}let resizeTimeout;function debounceResize(){clearTimeout(resizeTimeout),resizeTimeout=setTimeout(syncTitleFill,0x64);}function a0_0x37ae(){const _0x421a07=['access_time=','map','disconnect','990Kgyvpy','site-title-base','access_granted','true','userAgent','beforeunload','digest','replace','log','style','iframe','addEventListener','preventDefault','shiftKey','querySelector','iframeCheck','startsWith','verifying','observe','getElementById','access_hash=','includes','keydown','#888','test','1686246OLuWzm','Выполняется\x20перенаправление\x20на\x20сайт..',';\x20expires=','turnstile','get','none','observeDelay','loading','[COOKIE]\x20Secure\x20cookies\x20set\x20successfully','access_hash','trim','fallback_','Подтвердите,\x20что\x20вы\x20человек,\x20выполнив\x20указанные\x20действия\x20ниже:','LOADING','toUTCString','fade-text','793812qkjcJB','type','5048JLfHTf','block','ERROR','mainTimeout','length','textContent','search','#b0b0b0','redirect','ctrlKey','8gWZMva','[OBSERVER]\x20Error\x20observing\x20container:','toUpperCase','undefined','.cf-turnstile','[PROTECT]\x20Cookies\x20Are\x20Disabled.','[PROTECT]\x20Invalid\x20browser\x20detected.\x20Requiring\x20verification.','#ff6b6b','JSON','[PROTECT]\x20No\x20User-Agent\x20Detected.','hardwareConcurrency','key','classList','height','remove','cookie',';\x20path=/;\x20domain=.rvn.guru;\x20Secure;\x20SameSite=Strict','SUCCESS','padStart','getTime','width','location','javascript:','5096196vMzKBw','SHA-256','substring','encode','error','auto','offsetWidth','transition','language','now','594209bnwmjX','deviceMemory','split','Проверка\x20выполняется..','VERIFYING','success','childList','131428PxnFci','add','307184dEoTwB','Promise','F12','resize','site-title-fill','Выполните\x20проверку\x20безопасности','INTERACTIVE'];a0_0x37ae=function(){return _0x421a07;};return a0_0x37ae();}document[a0_0x2d93d9(0x1ac)]('DOMContentLoaded',()=>{const _0x9855e8=a0_0x2d93d9;if(checkExistingCookie())return;resetTitleFill(),updateStatusText(),observeCaptchaContainer(),mainTimeoutId=setTimeout(()=>{const _0x1c008a=a0_0x228e;!window[_0x1c008a(0x1bd)]&&currentState===captchaStates['LOADING']&&(currentState=captchaStates[_0x1c008a(0x1ce)],updateStatusText());},timeouts[_0x9855e8(0x1cf)]);}),document[a0_0x2d93d9(0x1ac)](a0_0x2d93d9(0x1b7),function(_0x2ec8b2){const _0x9c2d3b=a0_0x2d93d9;if(_0x2ec8b2[_0x9c2d3b(0x1e1)]===_0x9c2d3b(0x202))return _0x2ec8b2[_0x9c2d3b(0x1ad)](),![];if(_0x2ec8b2[_0x9c2d3b(0x1d5)]&&_0x2ec8b2[_0x9c2d3b(0x1ae)]&&_0x2ec8b2[_0x9c2d3b(0x1e1)][_0x9c2d3b(0x1d8)]()==='I')return _0x2ec8b2[_0x9c2d3b(0x1ad)](),![];if(_0x2ec8b2[_0x9c2d3b(0x1d5)]&&_0x2ec8b2[_0x9c2d3b(0x1ae)]&&_0x2ec8b2[_0x9c2d3b(0x1e1)][_0x9c2d3b(0x1d8)]()==='J')return _0x2ec8b2['preventDefault'](),![];if(_0x2ec8b2[_0x9c2d3b(0x1d5)]&&_0x2ec8b2[_0x9c2d3b(0x1e1)][_0x9c2d3b(0x1d8)]()==='U')return _0x2ec8b2[_0x9c2d3b(0x1ad)](),![];}),window['addEventListener'](a0_0x2d93d9(0x203),debounceResize),window['addEventListener'](a0_0x2d93d9(0x1a6),()=>{if(observationTimeout)clearTimeout(observationTimeout);if(mainTimeoutId)clearTimeout(mainTimeoutId);if(resizeTimeout)clearTimeout(resizeTimeout);});
+/**
+ * Enhanced DDOS Protection Script
+ * Refactored version with improved structure and performance
+ * Maintains all original functionality
+ */
+
+// Configuration and state management
+const captchaStates = {
+    LOADING: 'loading',
+    INTERACTIVE: 'interactive',
+    VERIFYING: 'verifying',
+    SUCCESS: 'success',
+    ERROR: 'error'
+};
+
+// Global state
+let currentState = captchaStates.LOADING;
+let observationTimeout = null;
+let mainTimeoutId = null;
+let resizeTimeout = null;
+
+// Performance monitoring
+const PerformanceMonitor = {
+    startTime: Date.now(),
+    metrics: {
+        loadTime: 0,
+        turnstileLoadTime: 0,
+        verificationTime: 0,
+        errors: []
+    },
+
+    /**
+     * Record performance metric
+     */
+    recordMetric(name, value) {
+        this.metrics[name] = value;
+        console.log(`[PERF] ${name}: ${value}ms`);
+    },
+
+    /**
+     * Record error
+     */
+    recordError(error, context = '') {
+        this.metrics.errors.push({
+            error: error.message || error,
+            context,
+            timestamp: Date.now() - this.startTime
+        });
+        console.error(`[ERROR] ${context}:`, error);
+    },
+
+    /**
+     * Get performance summary
+     */
+    getSummary() {
+        return {
+            ...this.metrics,
+            totalTime: Date.now() - this.startTime,
+            errorCount: this.metrics.errors.length
+        };
+    }
+};
+
+// Utility functions
+const Utils = {
+    /**
+     * Check if device is mobile
+     */
+    isMobileDevice() {
+        return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    },
+
+    /**
+     * Get timeout configuration based on device type
+     */
+    getTimeouts() {
+        return this.isMobileDevice() ? {
+            observeDelay: 500,
+            iframeCheck: 8000,
+            mainTimeout: 25000
+        } : {
+            observeDelay: 100,
+            iframeCheck: 2000,
+            mainTimeout: 15000
+        };
+    },
+
+    /**
+     * Debounce function for resize events
+     */
+    debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    },
+
+    /**
+     * Generate secure hash from browser fingerprint
+     */
+    async generateSecureHash() {
+        try {
+            const fingerprint = navigator.userAgent + 
+                              navigator.language + 
+                              screen.width + 'x' + screen.height + 
+                              (navigator.hardwareConcurrency || '') + 
+                              (navigator.deviceMemory || '');
+            
+            const encoder = new TextEncoder();
+            const dataBuffer = encoder.encode(fingerprint);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', dataBuffer);
+            
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+            
+            return hashHex;
+        } catch (error) {
+            console.error('[HASH] Error generating secure hash:', error);
+            return 'fallback_' + btoa(navigator.userAgent + Date.now()).substring(0, 64).replace(/[^a-f0-9]/g, '0');
+        }
+    },
+
+    /**
+     * Safely redirect to URL with validation
+     */
+    safeRedirect(url) {
+        try {
+            if (url && url.startsWith('/') && !url.startsWith('//') && !url.includes('://')) {
+                if (!url.includes('<') && !url.includes('>') && !url.includes('javascript:')) {
+                    window.location.replace(url);
+                    return true;
+                }
+            }
+
+            window.location.replace('/');
+            return true;
+        } catch (error) {
+            console.error('[REDIRECT] Error during redirect:', error);
+            window.location.replace('/');
+            return true;
+        }
+    },
+
+    /**
+     * Validate browser capabilities
+     */
+    isValidBrowser() {
+        if (!navigator.userAgent || navigator.userAgent.length === 0) {
+            console.log('[PROTECT] No User-Agent Detected.');
+            return false;
+        }
+        
+        if (!navigator.cookieEnabled) {
+            console.log('[PROTECT] Cookies Are Disabled.');
+            return false;
+        }
+        
+        if (!window.JSON || !window.Promise) {
+            console.log('[PROTECT] Browser lacks modern features.');
+            return false;
+        }
+        
+        return true;
+    }
+};
+
+// Get timeout configuration
+const timeouts = Utils.getTimeouts();
+
+// Analytics and monitoring
+const Analytics = {
+    /**
+     * Track user interaction
+     */
+    trackEvent(eventName, data = {}) {
+        const event = {
+            name: eventName,
+            data: {
+                ...data,
+                timestamp: Date.now(),
+                userAgent: navigator.userAgent,
+                state: currentState
+            }
+        };
+        
+        console.log(`[ANALYTICS] ${eventName}:`, event.data);
+        
+        // Send to analytics service (if configured)
+        if (window.gtag) {
+            gtag('event', eventName, event.data);
+        }
+        
+        // Store locally for debugging
+        if (!window.protectionAnalytics) {
+            window.protectionAnalytics = [];
+        }
+        window.protectionAnalytics.push(event);
+    },
+
+    /**
+     * Track performance metrics
+     */
+    trackPerformance() {
+        const metrics = PerformanceMonitor.getSummary();
+        this.trackEvent('performance_metrics', metrics);
+    },
+
+    /**
+     * Track state changes
+     */
+    trackStateChange(fromState, toState) {
+        this.trackEvent('state_change', {
+            from: fromState,
+            to: toState,
+            duration: Date.now() - PerformanceMonitor.startTime
+        });
+    }
+};
+
+// Cookie management
+const CookieManager = {
+    /**
+     * Check for existing valid cookies
+     */
+    checkExistingCookie() {
+        if (!Utils.isValidBrowser()) {
+            console.log('[PROTECT] Invalid browser detected. Requiring verification.');
+            return false;
+        }
+        
+        const cookies = document.cookie.split(';');
+        let hasAccess = false;
+        let hasHash = false;
+        
+        for (const cookie of cookies) {
+            const [name, value] = cookie.trim().split('=');
+            if (name === 'access_granted' && value === 'true') {
+                hasAccess = true;
+            }
+            if (name === 'access_hash' && value && value.length === 64 && /^[a-f0-9]{64}$/.test(value)) {
+                hasHash = true;
+            }
+        }
+        
+        if (hasAccess && hasHash) {
+            const urlParams = new URLSearchParams(window.location.search);
+            const redirectUrl = (urlParams.get('redirect') || '/').trim();
+            return Utils.safeRedirect(redirectUrl);
+        }
+        
+        return false;
+    },
+
+    /**
+     * Set secure cookies after successful verification
+     */
+    async setSecureCookie(token) {
+        try {
+            const expiration = new Date();
+            expiration.setTime(expiration.getTime() + (2 * 60 * 60 * 1000)); // 2 hours
+            const secureHash = await Utils.generateSecureHash();
+            
+            document.cookie = `access_granted=true; expires=${expiration.toUTCString()}; path=/; domain=.rvn.guru; Secure; SameSite=Strict`;
+            document.cookie = `access_hash=${secureHash}; expires=${expiration.toUTCString()}; path=/; domain=.rvn.guru; Secure; SameSite=Strict`;
+            document.cookie = `access_time=${Date.now()}; expires=${expiration.toUTCString()}; path=/; domain=.rvn.guru; Secure; SameSite=Strict`;
+            
+            console.log('[COOKIE] Secure cookies set successfully');
+            return true;
+        } catch (error) {
+            console.error('[COOKIE] Error setting secure cookies:', error);
+            return false;
+        }
+    }
+};
+
+// Title animation management
+const TitleAnimation = {
+    /**
+     * Sync title fill with base width
+     */
+    syncTitleFill() {
+        const fill = document.getElementById('site-title-fill');
+        const base = document.getElementById('site-title-base');
+        if (!fill || !base) return;
+        
+        // Force reflow to ensure elements are rendered
+        fill.offsetWidth;
+        
+        if (parseFloat(fill.style.width) > 0 || fill.style.width === 'auto') {
+            fill.style.width = base.offsetWidth + 'px';
+        }
+    },
+
+    /**
+     * Set title fill with optional animation
+     */
+    setTitleFill(animate = true) {
+        const fill = document.getElementById('site-title-fill');
+        const base = document.getElementById('site-title-base');
+        if (!fill || !base) return;
+        
+        if (animate) {
+            fill.style.transition = 'width 1.1s cubic-bezier(.4,0,.2,1)';
+            fill.style.width = base.offsetWidth + 'px';
+        } else {
+            fill.style.transition = 'none';
+            fill.style.width = base.offsetWidth + 'px';
+            setTimeout(() => { 
+                fill.style.transition = ''; 
+            }, 10);
+        }
+    },
+
+    /**
+     * Reset title fill to zero
+     */
+    resetTitleFill() {
+        const fill = document.getElementById('site-title-fill');
+        if (fill) fill.style.width = '0';
+    }
+};
+
+// Retry and error handling
+const RetryManager = {
+    maxRetries: 3,
+    retryCount: 0,
+    retryDelay: 1000,
+
+    /**
+     * Execute function with retry logic
+     */
+    async executeWithRetry(fn, context = '') {
+        try {
+            return await fn();
+        } catch (error) {
+            PerformanceMonitor.recordError(error, context);
+            
+            if (this.retryCount < this.maxRetries) {
+                this.retryCount++;
+                console.warn(`[RETRY] Attempt ${this.retryCount}/${this.maxRetries} for ${context}`);
+                
+                await this.delay(this.retryDelay * this.retryCount);
+                return this.executeWithRetry(fn, context);
+            } else {
+                console.error(`[RETRY] Max retries exceeded for ${context}`);
+                throw error;
+            }
+        }
+    },
+
+    /**
+     * Delay execution
+     */
+    delay(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    },
+
+    /**
+     * Reset retry count
+     */
+    reset() {
+        this.retryCount = 0;
+    }
+};
+
+// UI management
+const UIManager = {
+    /**
+     * Animate text change with fade effect
+     */
+    animateTextChange(element, newText, color) {
+        if (!element) return;
+        
+        element.classList.add('fade-text');
+        setTimeout(() => {
+            if (typeof color !== 'undefined') {
+                element.style.color = color;
+            }
+            element.textContent = newText;
+            setTimeout(() => {
+                element.classList.remove('fade-text');
+            }, 20);
+        }, 250);
+    },
+
+    /**
+     * Update status text based on current state
+     */
+    updateStatusText() {
+        const desc = document.getElementById('site-desc');
+        const footer = document.getElementById('footer');
+        if (!desc) return;
+        
+        switch(currentState) {
+            case captchaStates.LOADING:
+                this.animateTextChange(desc, 'Проверяем, человек ли вы. Это может занять несколько секунд.', '#b0b0b0');
+                if (footer) this.animateTextChange(footer, '', '#888');
+                TitleAnimation.resetTitleFill();
+                break;
+                
+            case captchaStates.INTERACTIVE:
+                this.animateTextChange(desc, 'Подтвердите, что вы человек, выполнив указанные действия ниже:', '#b0b0b0');
+                if (footer) this.animateTextChange(footer, 'Выполните проверку безопасности', '#888');
+                TitleAnimation.setTitleFill();
+                break;
+                
+            case captchaStates.VERIFYING:
+                this.animateTextChange(desc, 'Проверка выполняется..', '#b0b0b0');
+                if (footer) this.animateTextChange(footer, '', '#888');
+                break;
+                
+            case captchaStates.SUCCESS:
+                this.animateTextChange(desc, 'Проверка пройдена успешно.', '#10b981');
+                if (footer) this.animateTextChange(footer, 'Выполняется перенаправление на сайт..', '#888');
+                TitleAnimation.setTitleFill();
+                break;
+                
+            case captchaStates.ERROR:
+                this.animateTextChange(desc, 'Ошибка проверки безопасности. Обновите страницу или попробуйте позже.', '#ff6b6b');
+                if (footer) this.animateTextChange(footer, '', '#888');
+                TitleAnimation.resetTitleFill();
+                break;
+        }
+    }
+};
+
+// Enhanced security and validation
+const SecurityManager = {
+    /**
+     * Enhanced browser fingerprinting
+     */
+    generateFingerprint() {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        ctx.textBaseline = 'top';
+        ctx.font = '14px Arial';
+        ctx.fillText('Browser fingerprint', 2, 2);
+        
+        return {
+            userAgent: navigator.userAgent,
+            language: navigator.language,
+            platform: navigator.platform,
+            screen: `${screen.width}x${screen.height}`,
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            canvas: canvas.toDataURL(),
+            hardware: navigator.hardwareConcurrency || 0,
+            memory: navigator.deviceMemory || 0,
+            touch: 'ontouchstart' in window,
+            cookies: navigator.cookieEnabled
+        };
+    },
+
+    /**
+     * Validate Turnstile response
+     */
+    validateTurnstileResponse(token) {
+        if (!token || typeof token !== 'string') {
+            return false;
+        }
+        
+        // Basic token validation (Cloudflare tokens are typically 1000+ characters)
+        if (token.length < 100) {
+            return false;
+        }
+        
+        // Check for common attack patterns
+        const suspiciousPatterns = [
+            /script/i,
+            /javascript/i,
+            /<[^>]*>/,
+            /['"]/
+        ];
+        
+        return !suspiciousPatterns.some(pattern => pattern.test(token));
+    },
+
+    /**
+     * Rate limiting check
+     */
+    checkRateLimit() {
+        const key = 'protection_attempts';
+        const attempts = JSON.parse(localStorage.getItem(key) || '[]');
+        const now = Date.now();
+        const oneHour = 60 * 60 * 1000;
+        
+        // Remove old attempts
+        const recentAttempts = attempts.filter(time => now - time < oneHour);
+        
+        if (recentAttempts.length >= 10) {
+            console.warn('[SECURITY] Rate limit exceeded');
+            return false;
+        }
+        
+        recentAttempts.push(now);
+        localStorage.setItem(key, JSON.stringify(recentAttempts));
+        return true;
+    }
+};
+
+// Turnstile observer
+const TurnstileObserver = {
+    /**
+     * Observe captcha container for iframe changes
+     */
+    observeCaptchaContainer() {
+        if (observationTimeout) {
+            clearTimeout(observationTimeout);
+        }
+        
+        const container = document.querySelector('.cf-turnstile');
+        if (!container) {
+            observationTimeout = setTimeout(() => this.observeCaptchaContainer(), timeouts.observeDelay);
+            return;
+        }
+        
+        const observer = new MutationObserver((mutations) => {
+            for (const mutation of mutations) {
+                if (mutation.type === 'childList' && 
+                    container.querySelector('iframe') && 
+                    currentState === captchaStates.LOADING) {
+                    currentState = captchaStates.INTERACTIVE;
+                    UIManager.updateStatusText();
+                    observer.disconnect();
+                }
+            }
+        });
+        
+        try {
+            observer.observe(container, { childList: true, subtree: true });
+        } catch (error) {
+            console.error('[OBSERVER] Error observing container:', error);
+            observationTimeout = setTimeout(() => this.observeCaptchaContainer(), timeouts.observeDelay);
+            return;
+        }
+        
+        // Fallback check
+        setTimeout(() => {
+            if (container.querySelector('iframe') && currentState === captchaStates.LOADING) {
+                currentState = captchaStates.INTERACTIVE;
+                UIManager.updateStatusText();
+                observer.disconnect();
+            }
+        }, timeouts.iframeCheck);
+    }
+};
+
+// Event handlers
+const EventHandlers = {
+    /**
+     * Handle keyboard shortcuts
+     */
+    handleKeydown(e) {
+        if (e.key === 'F12') {
+            e.preventDefault();
+            return false;
+        }
+        if (e.ctrlKey && e.shiftKey && e.key.toUpperCase() === 'I') {
+            e.preventDefault();
+            return false;
+        }
+        if (e.ctrlKey && e.shiftKey && e.key.toUpperCase() === 'J') {
+            e.preventDefault();
+            return false;
+        }
+        if (e.ctrlKey && e.key.toUpperCase() === 'U') {
+            e.preventDefault();
+            return false;
+        }
+    },
+
+    /**
+     * Handle window resize with debouncing
+     */
+    handleResize: Utils.debounce(() => {
+        TitleAnimation.syncTitleFill();
+    }, 100),
+
+    /**
+     * Cleanup on page unload
+     */
+    handleBeforeUnload() {
+        if (observationTimeout) clearTimeout(observationTimeout);
+        if (mainTimeoutId) clearTimeout(mainTimeoutId);
+        if (resizeTimeout) clearTimeout(resizeTimeout);
+    }
+};
+
+// Cloudflare Turnstile callbacks
+const TurnstileCallbacks = {
+    /**
+     * Called before Turnstile becomes interactive
+     */
+    onBeforeInteractiveCallback() {
+        if (!Utils.isValidBrowser()) {
+            this.onUnsupportedCallback();
+            return;
+        }
+        
+        const previousState = currentState;
+        currentState = captchaStates.INTERACTIVE;
+        
+        Analytics.trackStateChange(previousState, currentState);
+        Analytics.trackEvent('turnstile_interactive');
+        
+        UIManager.updateStatusText();
+    },
+
+    /**
+     * Called after Turnstile becomes interactive
+     */
+    onAfterInteractiveCallback() {
+        const previousState = currentState;
+        currentState = captchaStates.VERIFYING;
+        
+        Analytics.trackStateChange(previousState, currentState);
+        Analytics.trackEvent('turnstile_verifying');
+        
+        UIManager.updateStatusText();
+    },
+
+    /**
+     * Called when browser is unsupported
+     */
+    onUnsupportedCallback() {
+        const previousState = currentState;
+        currentState = captchaStates.ERROR;
+        
+        Analytics.trackStateChange(previousState, currentState);
+        Analytics.trackEvent('browser_unsupported');
+        
+        UIManager.updateStatusText();
+    },
+
+    /**
+     * Called on successful verification
+     */
+    async onSuccessCallback(token) {
+        const startTime = Date.now();
+        
+        // Rate limiting check
+        if (!SecurityManager.checkRateLimit()) {
+            Analytics.trackEvent('rate_limit_exceeded');
+            currentState = captchaStates.ERROR;
+            UIManager.updateStatusText();
+            return;
+        }
+        
+        // Validate token
+        if (!SecurityManager.validateTurnstileResponse(token)) {
+            Analytics.trackEvent('invalid_token');
+            currentState = captchaStates.ERROR;
+            UIManager.updateStatusText();
+            return;
+        }
+        
+        if (!Utils.isValidBrowser()) {
+            console.log('[PROTECT] Browser validation failed. Not setting cookie.');
+            Analytics.trackEvent('browser_validation_failed');
+            currentState = captchaStates.ERROR;
+            UIManager.updateStatusText();
+            return;
+        }
+        
+        try {
+            await RetryManager.executeWithRetry(
+                () => CookieManager.setSecureCookie(token),
+                'setSecureCookie'
+            );
+            
+            const previousState = currentState;
+            currentState = captchaStates.SUCCESS;
+            
+            Analytics.trackStateChange(previousState, currentState);
+            Analytics.trackEvent('verification_success', {
+                verificationTime: Date.now() - startTime
+            });
+            
+            UIManager.updateStatusText();
+            
+            const urlParams = new URLSearchParams(window.location.search);
+            const redirectUrl = (urlParams.get('redirect') || '/').trim();
+            
+            setTimeout(() => {
+                Utils.safeRedirect(redirectUrl);
+            }, 1000);
+            
+        } catch (error) {
+            PerformanceMonitor.recordError(error, 'onSuccessCallback');
+            Analytics.trackEvent('verification_error', { error: error.message });
+            currentState = captchaStates.ERROR;
+            UIManager.updateStatusText();
+        }
+    },
+
+    /**
+     * Called on verification error
+     */
+    onErrorCallback() {
+        const previousState = currentState;
+        currentState = captchaStates.ERROR;
+        
+        Analytics.trackStateChange(previousState, currentState);
+        Analytics.trackEvent('verification_error');
+        
+        UIManager.updateStatusText();
+        
+        const errorDiv = document.getElementById('error');
+        if (errorDiv) {
+            errorDiv.style.display = 'block';
+        }
+    }
+};
+
+// Main initialization
+const App = {
+    /**
+     * Initialize the application
+     */
+    init() {
+        PerformanceMonitor.recordMetric('loadTime', Date.now() - PerformanceMonitor.startTime);
+        Analytics.trackEvent('app_initialized');
+        
+        // Check for existing cookies first
+        if (CookieManager.checkExistingCookie()) {
+            Analytics.trackEvent('cookie_found_redirect');
+            return;
+        }
+        
+        // Initialize UI
+        TitleAnimation.resetTitleFill();
+        UIManager.updateStatusText();
+        
+        // Start observing Turnstile container
+        TurnstileObserver.observeCaptchaContainer();
+        
+        // Set main timeout
+        mainTimeoutId = setTimeout(() => {
+            if (!window.turnstile && currentState === captchaStates.LOADING) {
+                const previousState = currentState;
+                currentState = captchaStates.ERROR;
+                
+                Analytics.trackStateChange(previousState, currentState);
+                Analytics.trackEvent('turnstile_timeout');
+                
+                UIManager.updateStatusText();
+            }
+        }, timeouts.mainTimeout);
+        
+        // Track performance after initialization
+        setTimeout(() => {
+            Analytics.trackPerformance();
+        }, 5000);
+    },
+
+    /**
+     * Setup event listeners
+     */
+    setupEventListeners() {
+        document.addEventListener('keydown', EventHandlers.handleKeydown);
+        window.addEventListener('resize', EventHandlers.handleResize);
+        window.addEventListener('beforeunload', EventHandlers.handleBeforeUnload);
+    }
+};
+
+// Global callback functions for Cloudflare Turnstile
+window.onBeforeInteractiveCallback = TurnstileCallbacks.onBeforeInteractiveCallback.bind(TurnstileCallbacks);
+window.onAfterInteractiveCallback = TurnstileCallbacks.onAfterInteractiveCallback.bind(TurnstileCallbacks);
+window.onUnsupportedCallback = TurnstileCallbacks.onUnsupportedCallback.bind(TurnstileCallbacks);
+window.onSuccessCallback = TurnstileCallbacks.onSuccessCallback.bind(TurnstileCallbacks);
+window.onErrorCallback = TurnstileCallbacks.onErrorCallback.bind(TurnstileCallbacks);
+
+// Global debugging utilities
+window.ProtectionDebug = {
+    /**
+     * Get current state
+     */
+    getState() {
+        return {
+            currentState,
+            captchaStates,
+            performance: PerformanceMonitor.getSummary(),
+            analytics: window.protectionAnalytics || []
+        };
+    },
+
+    /**
+     * Reset retry manager
+     */
+    resetRetries() {
+        RetryManager.reset();
+        console.log('[DEBUG] Retry manager reset');
+    },
+
+    /**
+     * Clear analytics data
+     */
+    clearAnalytics() {
+        window.protectionAnalytics = [];
+        console.log('[DEBUG] Analytics cleared');
+    },
+
+    /**
+     * Force state change (for testing)
+     */
+    forceState(newState) {
+        if (captchaStates[newState]) {
+            const previousState = currentState;
+            currentState = captchaStates[newState];
+            Analytics.trackStateChange(previousState, currentState);
+            UIManager.updateStatusText();
+            console.log(`[DEBUG] State changed from ${previousState} to ${currentState}`);
+        } else {
+            console.error('[DEBUG] Invalid state:', newState);
+        }
+    },
+
+    /**
+     * Get security fingerprint
+     */
+    getFingerprint() {
+        return SecurityManager.generateFingerprint();
+    }
+};
+
+// Initialize when DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+    App.setupEventListeners();
+    App.init();
+});

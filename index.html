@@ -148,6 +148,14 @@
     body::-webkit-scrollbar {
       display: none;
     }
+    #ping-value.shift {
+      animation: pingPulse 0.5s cubic-bezier(.4,0,.2,1);
+    }
+    @keyframes pingPulse {
+      0%   { transform: scale(1); }
+      50%  { transform: scale(1.01); }
+      100% { transform: scale(1); }
+    }
   </style>
   <style>[x-cloak] { display: none !important; }</style>
 </head>
@@ -652,119 +660,7 @@
       </div>
     </div>
   </footer>
-  <script type="text/javascript" src="js/main/connection.js" integrity="sha384-eRPjh6whKuQDJLzGwuNNP68Q7CbyTyg0TNiH3tWu6dIrM4fKDqkLSXiR/lSV5TbC"></script>
-  <script type="text/javascript" src="js/main/apps.js" integrity="sha384-CTW+gW0KyHpIlju4bRgcF6gsimbfpDa9P74pjroBHTI9a/4TvuBC/Q2PgCfl/JaW"></script>
-  <script>
-    document.getElementById('year').textContent = new Date().getFullYear();
-    document.addEventListener("DOMContentLoaded", () => {
-      const elements = document.querySelectorAll(".fade-in");
-
-      const observer = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add("show");
-            observer.unobserve(entry.target);
-          }
-        });
-      }, { threshold: 0.2 });
-      elements.forEach(el => observer.observe(el));
-      if (window.matchMedia('(min-width: 1025px)').matches) {
-        if (typeof particlesJS === 'function') {
-          try {
-            particlesJS("particles-js", {
-              particles: {
-                number: { value: 20 },
-                color: { value: "#16a3ff" },
-                shape: { type: "circle" },
-                opacity: { value: 0.4 },
-                size: { value: 2, random: true },
-                line_linked: { enable: false },
-                move: { enable: true, speed: 0.6, direction: "none", random: true, straight: false, out_mode: "out" }
-              },
-              interactivity: {
-                detect_on: "canvas",
-                events: { onhover: { enable: false }, onclick: { enable: false } }
-              },
-              retina_detect: true
-            });
-          } catch(e) {
-            console.warn('Particles Init Failed', e);
-          }
-        }
-      } else {
-        const p = document.getElementById('particles-js'); if (p) p.style.display = 'none';
-      }
-    });
-  </script>
+  <script type="text/javascript" src="js/main/d415.main.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.js" integrity="sha384-AWFROZ10DoeXcNjhoQe0agryexFsipZEA17Cde6/tknpOUacvUGk27vXQ2a6ljSt" crossorigin="anonymous"></script>
-  <script>
-    (function(){
-      function handleFirstTab(e) {
-        if (e.key === 'Tab') {
-          document.documentElement.classList.add('user-is-tabbing');
-          window.removeEventListener('keydown', handleFirstTab);
-        }
-      }
-      window.addEventListener('keydown', handleFirstTab);
-      document.addEventListener('click', function(ev){
-      });
-    })();
-  </script>
-  <script>
-    (() => {
-      let progress = document.getElementById('page-progress');
-      let timer;
-      function startProgress() {
-        if (!progress) return;
-        progress.style.width = '0';
-        progress.style.opacity = '1';
-        setTimeout(() => { progress.style.width = '60%'; }, 10);
-        timer = setTimeout(() => { progress.style.width = '100%'; }, 600);
-      }
-      function endProgress() {
-        if (!progress) return;
-        progress.style.width = '100%';
-        setTimeout(() => { progress.style.opacity = '0'; progress.style.width = '0'; }, 400);
-        clearTimeout(timer);
-      }
-      document.querySelectorAll('a[href^="#"]').forEach(link => {
-        link.addEventListener('click', function(e) {
-          const id = this.getAttribute('href').slice(1);
-          if (!id) return;
-          const el = document.getElementById(id);
-          if (el) {
-            e.preventDefault();
-            startProgress();
-            setTimeout(() => {
-              el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-              endProgress();
-            }, 250);
-          }
-        });
-      });
-      function setActiveNav() {
-        const sections = ['home','features','pricing','apps','faq'];
-        let found = false;
-        for (let id of sections) {
-          const el = document.getElementById(id);
-          if (el) {
-            const rect = el.getBoundingClientRect();
-            if (rect.top <= 80 && rect.bottom > 80) {
-              document.querySelectorAll('.mobile-nav a').forEach(a => a.classList.remove('active'));
-              let nav = document.getElementById('nav-' + id);
-              if (nav) nav.classList.add('active');
-              found = true;
-              break;
-            }
-          }
-        }
-        if (!found) document.querySelectorAll('.mobile-nav a').forEach(a => a.classList.remove('active'));
-      }
-      window.addEventListener('scroll', setActiveNav, { passive: true });
-      window.addEventListener('DOMContentLoaded', setActiveNav);
-    })();
-  </script>
-  <script>
-  </script>
 </body>
 </html>
