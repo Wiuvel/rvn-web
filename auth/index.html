@@ -9,321 +9,11 @@
   <link rel="preload" href="/static/templates/overlay-login.png" as="image" media="(min-width: 768px)">
   <link rel="preconnect" href="https://challenges.cloudflare.com">
   <link rel="dns-prefetch" href="https://challenges.cloudflare.com">
-  <style>
-    body {
-      margin: 0;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      background: #0a1020;
-      color: white;
-      font-family: system-ui, -apple-system, sans-serif;
-    }
-    
-    .min-h-screen {
-      min-height: 100vh;
-    }
-    
-    .flex {
-      display: flex;
-    }
-    
-    .flex-col {
-      flex-direction: column;
-    }
-    
-    .flex-grow {
-      flex-grow: 1;
-    }
-    
-    .items-center {
-      align-items: center;
-    }
-    
-    .justify-center {
-      justify-content: center;
-    }
-    
-    .px-4 {
-      padding-left: 1rem;
-      padding-right: 1rem;
-    }
-    
-    .py-12 {
-      padding-top: 3rem;
-      padding-bottom: 3rem;
-    }
-    
-    .absolute {
-      position: absolute;
-    }
-    
-    .inset-0 {
-      top: 0;
-      right: 0;
-      bottom: 0;
-      left: 0;
-    }
-    
-    .z-10 {
-      z-index: 10;
-    }
-    
-    .bg-neutral-900\/80 {
-      background-color: rgba(23, 23, 23, 0.8);
-    }
-    
-    .backdrop-blur-xl {
-      backdrop-filter: blur(20px);
-    }
-    
-    .p-8 {
-      padding: 2rem;
-    }
-    
-    .rounded-2xl {
-      border-radius: 1rem;
-    }
-    
-    .border {
-      border-width: 1px;
-    }
-    
-    .border-neutral-800 {
-      border-color: rgba(38, 38, 38, 0.8);
-    }
-    
-    .shadow-lg {
-      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
-    }
-    
-    .w-full {
-      width: 100%;
-    }
-    
-    .max-w-md {
-      max-width: 28rem;
-    }
-    
-    .mx-auto {
-      margin-left: auto;
-      margin-right: auto;
-    }
-    
-    #preloader {
-      position: fixed;
-      z-index: 99999;
-      inset: 0;
-      background: rgba(10, 16, 32, 0.92);
-      backdrop-filter: blur(12px);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: opacity 0.5s;
-    }
-    
-    .sticky {
-      position: sticky;
-    }
-    
-    .top-0 {
-      top: 0;
-    }
-    
-    .z-50 {
-      z-index: 50;
-    }
-    
-    .border-b {
-      border-bottom-width: 1px;
-    }
-    
-    .border-neutral-800\/70 {
-      border-color: rgba(38, 38, 38, 0.7);
-    }
-    
-    .bg-neutral-950\/70 {
-      background-color: rgba(10, 10, 10, 0.7);
-    }
-    
-    input {
-      width: 100%;
-      padding: 0.75rem 1rem;
-      border-radius: 0.75rem;
-      background: rgba(38, 38, 38, 0.8);
-      border: 1px solid rgba(55, 55, 55, 0.8);
-      color: white;
-      box-sizing: border-box;
-    }
-    
-    input:focus {
-      outline: 2px solid #16a3ff;
-      outline-offset: 2px;
-    }
-    
-    .glass-btn {
-      background: linear-gradient(135deg, rgba(22, 163, 255, 0.2), rgba(22, 163, 255, 0.1));
-      border: 1px solid rgba(22, 163, 255, 0.3);
-      color: white;
-      padding: 0.75rem 2rem;
-      border-radius: 0.75rem;
-      transition: all 0.2s;
-    }
-    
-    .glass-btn:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-    }
-    
-    .spinner {
-      border: 2px solid #16a3ff;
-      border-top: 2px solid transparent;
-      border-radius: 50%;
-      width: 18px;
-      height: 18px;
-      animation: spin 0.7s linear infinite;
-      display: inline-block;
-      margin-right: 8px;
-    }
-    
-    @keyframes spin {
-      100% { transform: rotate(360deg); }
-    }
-    
-    .text-red-500 {
-      color: #ef4444;
-    }
-    
-    .text-sm {
-      font-size: 0.875rem;
-    }
-    
-    .mt-1 {
-      margin-top: 0.25rem;
-    }
-    
-    @media (max-width: 768px) {
-      .tree-glow { 
-        display: none !important; 
-      }
-      
-      .p-8 {
-        padding: 1.25rem;
-      }
-    }
-
-    html, body {
-      scrollbar-width: none;
-      -ms-overflow-style: none;
-    }
-
-    html::-webkit-scrollbar, 
-    body::-webkit-scrollbar {
-      display: none;
-    }
-
-    input[type="checkbox"] {
-      width: 1em;
-      height: 1em;
-      min-width: 1em;
-      max-width: 1em;
-      min-height: 1em;
-      max-height: 1em;
-      padding: 0;
-      box-sizing: border-box;
-      display: inline-block;
-      vertical-align: middle;
-    }
-  </style>
   <script src="/js/main/tailwindcss.js"></script>
   <script src="https://unpkg.com/alpinejs@3.14.9/dist/cdn.min.js" integrity="sha384-9Ax3MmS9AClxJyd5/zafcXXjxmwFhZCdsT6HJoJjarvCaAkJlk5QDzjLJm+Wdx5F" crossorigin="anonymous" defer></script>
   <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
   <script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.js" integrity="sha384-AWFROZ10DoeXcNjhoQe0agryexFsipZEA17Cde6/tknpOUacvUGk27vXQ2a6ljSt" crossorigin="anonymous" defer></script>
-  <link rel="stylesheet" href="/css/auth/glassmorphism-auth.css" media="print" onload="this.media='all'">
-  <style>
-    .pass-toggle:focus {
-      outline: none !important;
-      box-shadow: none !important;
-    }
-    
-    .tree-glow {
-      position: fixed;
-      bottom: 0;
-      right: 0;
-      min-width: 320px;
-      width: 32vw;
-      max-width: 520px;
-      opacity: 0.85;
-      z-index: 0;
-      pointer-events: none;
-      filter: drop-shadow(0 0 24px #16a3ff55);
-      transition: width 0.3s;
-    }
-    
-    @keyframes preload-bounce {
-      0% { transform: translateY(0);}
-      100% { transform: translateY(-12px);}
-    }
-    
-    .password-strength {
-      margin-top: 0.25rem;
-      transition: opacity 0.3s ease;
-    }
-    
-    .password-strength-bar {
-      height: 2px;
-      background-color: #374151;
-      border-radius: 1px;
-      transition: all 0.3s ease;
-    }
-    
-    .oauth-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 0.5rem;
-      margin-top: 1rem;
-    }
-    
-    .oauth-btn {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 0.5rem;
-      border-radius: 0.5rem;
-      background: rgba(38, 38, 38, 0.6);
-      border: 1px solid rgba(55, 55, 55, 0.4);
-      transition: all 0.2s;
-    }
-    
-    .oauth-btn:hover:not(:disabled) {
-      background: rgba(38, 38, 38, 0.8);
-      border-color: rgba(22, 163, 255, 0.4);
-    }
-    
-    .divider {
-      display: flex;
-      align-items: center;
-      text-align: center;
-      margin: 1.5rem 0;
-      color: #9ca3af;
-      font-size: 0.875rem;
-    }
-    
-    .divider::before,
-    .divider::after {
-      content: '';
-      flex: 1;
-      border-bottom: 1px solid rgba(55, 55, 55, 0.4);
-    }
-    
-    .divider::before {
-      margin-right: 0.5rem;
-    }
-    
-    .divider::after {
-      margin-left: 0.5rem;
-    }
-  </style>
+  <link rel="stylesheet" href="/css/auth/styles.css" media="print" onload="this.media='all'">
 </head>
 <body class="min-h-screen flex flex-col">
   <div id="preloader" style="position:fixed; z-index:99999; inset:0; background:rgba(10,16,32,0.92); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); display:flex; align-items:center; justify-content:center; transition:opacity 0.5s;">
@@ -350,123 +40,129 @@
       }, 1200);
     });
   </script>
-  <header class="sticky top-0 z-50 border-b border-neutral-800/70 bg-neutral-950/70 backdrop-blur-xl">
-    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-      <div class="flex h-16 items-center">
-        <a href="/" class="flex items-center gap-2">
-          <img src="/static/logo.svg" alt="RVNPrivate" class="h-8 w-8">
-          <span class="font-semibold tracking-tight text-white">RVNPrivate</span>
+<header x-data="{ open: false }" class="sticky top-4 z-50">
+  <div class="mx-auto max-w-6xl px-4">
+    <div class="backdrop-blur-xl bg-neutral-900/40 border border-white/10 rounded-full px-6 py-3 flex items-center justify-between shadow-lg">
+      <a href="/" class="flex items-center gap-2">
+        <img src="/static/logo.svg" alt="RVNPrivate" class="w-6 h-6" loading="lazy">
+        <span class="font-semibold text-white">Raven Private</span>
+      </a>
+      <div class="hidden lg:flex">
+        <a href="/about/" class="rounded-xl bg-primary-500 hover:bg-primary-400 px-4 py-2 text-sm font-medium text-white shadow-glow transition">
+          О проекте
         </a>
       </div>
     </div>
-  </header>
-  <section class="flex-grow flex items-center justify-center px-4 sm:px-6 lg:px-8 py-12">
-    <div id="particles-js" class="absolute inset-0"></div>
-    <div class="z-10 grid grid-cols-1 md:grid-cols-2 gap-12 items-center w-full max-w-5xl">
-      <div x-data="authForms()" x-init="init()" class="w-full max-w-md mx-auto">
-        <div class="bg-neutral-900/80 backdrop-blur-xl p-8 rounded-2xl border border-neutral-800 shadow-lg animate-fadeIn" style="overflow: hidden;">
-          <h2 class="text-2xl font-semibold mb-6 text-center" x-text="currentTab === 'register' ? 'Регистрация' : 'Вход'"></h2>
-          <form x-show="currentTab === 'register'" @submit.prevent="handleRegister" class="space-y-4">
+  </div>
+</header>
+<section class="flex-grow flex items-center justify-center px-4 sm:px-6 lg:px-8 py-12">
+  <div id="particles-js" class="absolute inset-0"></div>
+  <div class="z-10 grid grid-cols-1 md:grid-cols-2 gap-12 items-center w-full max-w-5xl">
+    <div x-data="authForms()" x-init="init()" class="w-full max-w-md mx-auto">
+      <div class="bg-neutral-900/80 backdrop-blur-xl p-8 rounded-2xl border border-neutral-800 shadow-lg animate-fadeIn" style="overflow: hidden;">
+        <h2 class="text-2xl font-semibold mb-6 text-center" x-text="currentTab === 'register' ? 'Регистрация' : 'Вход'"></h2>
+        <form x-show="currentTab === 'register'" @submit.prevent="handleRegister" class="space-y-4">
+          <label class="block">
+            <span class="sr-only">Логин</span>
+            <input type="text" x-model="registerData.username" placeholder="Логин" required autocomplete="username" class="w-full px-4 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-white" @input="validateUsername(registerData.username, 'register')"/>
+          </label>
+          <p class="text-red-500 text-sm mt-1" x-show="errors.register.username" x-text="errors.register.username" role="alert"></p>
+          <div class="relative">
             <label class="block">
-              <span class="sr-only">Логин</span>
-              <input type="text" x-model="registerData.username" placeholder="Логин" required autocomplete="username" class="w-full px-4 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-white" @input="validateUsername(registerData.username, 'register')"/>
+              <span class="sr-only">Пароль</span>
+              <input :type="showPassword.register ? 'text' : 'password'" x-model="registerData.password" placeholder="Пароль" required autocomplete="new-password" class="w-full px-4 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-white pr-10" @input="validatePassword(registerData.password, 'register')"/>
             </label>
-            <p class="text-red-500 text-sm mt-1" x-show="errors.register.username" x-text="errors.register.username" role="alert"></p>
-            <div class="relative">
-              <label class="block">
-                <span class="sr-only">Пароль</span>
-                <input :type="showPassword.register ? 'text' : 'password'" x-model="registerData.password" placeholder="Пароль" required autocomplete="new-password" class="w-full px-4 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-white pr-10" @input="validatePassword(registerData.password, 'register')"/>
-              </label>
-              <button type="button" @click="showPassword.register = !showPassword.register" class="absolute right-3 top-3.5 text-gray-500 hover:text-gray-700 pass-toggle" :aria-label="showPassword.register ? 'Скрыть пароль' : 'Показать пароль'">
-                <img src="/static/icons/login/pass-hideoff.svg" :class="{'hidden': showPassword.register}" class="h-6 transition hover:brightness-75" alt="Показать пароль">
-                <img src="/static/icons/login/pass-hide.svg" :class="{'hidden': !showPassword.register}" class="h-6 transition hover:brightness-75" alt="Скрыть пароль">
-              </button>
+            <button type="button" @click="showPassword.register = !showPassword.register" class="absolute right-3 top-3.5 text-gray-500 hover:text-gray-700 pass-toggle" :aria-label="showPassword.register ? 'Скрыть пароль' : 'Показать пароль'">
+              <img src="/static/icons/login/pass-hideoff.svg" :class="{'hidden': showPassword.register}" class="h-6 transition hover:brightness-75" alt="Показать пароль">
+              <img src="/static/icons/login/pass-hide.svg" :class="{'hidden': !showPassword.register}" class="h-6 transition hover:brightness-75" alt="Скрыть пароль">
+            </button>
+          </div>
+          <div class="password-strength" x-show="showPasswordStrength.register && registerData.password.length > 0 && !registerData.confirmPassword">
+            <div class="password-strength-bar">
+              <div class="h-1 rounded transition-all" :class="{'bg-red-500 w-1/4': registerData.password.length > 0 && registerData.password.length < 7, 'bg-yellow-500 w-2/4': registerData.password.length >= 7 && registerData.password.length < 9, 'bg-green-500 w-full': registerData.password.length >= 9 }"></div>
             </div>
-            <div class="password-strength" x-show="showPasswordStrength.register && registerData.password.length > 0 && !registerData.confirmPassword">
-              <div class="password-strength-bar">
-                <div class="h-1 rounded transition-all" :class="{'bg-red-500 w-1/4': registerData.password.length > 0 && registerData.password.length < 7, 'bg-yellow-500 w-2/4': registerData.password.length >= 7 && registerData.password.length < 9, 'bg-green-500 w-full': registerData.password.length >= 9 }"></div>
-              </div>
-            </div>
-            <p class="text-red-400 text-xs mt-1" x-show="errors.register.password" x-text="errors.register.password" role="alert"></p>
+          </div>
+          <p class="text-red-400 text-xs mt-1" x-show="errors.register.password" x-text="errors.register.password" role="alert"></p>
+          <label class="block">
+            <span class="sr-only">Подтверждение пароля</span>
+            <input type="password" x-model="registerData.confirmPassword" placeholder="Подтверждение пароля" required autocomplete="new-password" class="w-full px-4 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-white" :disabled="!isPasswordValid.register" :class="isPasswordValid.register ? 'border-neutral-700 opacity-100' : 'border-neutral-700 opacity-50'" @input="validateConfirmPassword()"/>
+          </label>
+          <p class="text-red-400 text-xs mt-1" x-show="errors.register.confirmPassword" x-text="errors.register.confirmPassword" role="alert"></p>
+          <div class="flex justify-center select-none">
+            <label class="flex items-center gap-2 text-xs text-neutral-400 cursor-pointer">
+              <input type="checkbox" required class="h-4 w-4 rounded border-neutral-700 bg-neutral-800" id="register-agree"/>
+              <span>Я согласен с <a href="/legal/terms/" target="_blank" rel="noopener noreferrer" class="text-primary-400 hover:underline">Пользовательским соглашением</a>
+                и
+              <a href="/legal/privacy/" target="_blank" rel="noopener noreferrer" class="text-primary-400 hover:underline">Политикой конфиденциальности</a>.</span>
+            </label>
+          </div>
+          <div class="flex justify-center mt-4">
+            <div id="register-captcha-container"></div>
+          </div>
+          <input type="hidden" name="cf-turnstile-response" x-model="captchaResponse.register">
+          <p x-show="errors.global" class="text-red-400 text-sm text-center mt-2" x-text="errors.global" role="alert"></p>
+          <div class="flex justify-center">
+            <button type="submit" class="glass-btn" :disabled="isLoading">
+              <span x-show="isLoading" class="spinner"></span>
+              <span x-text="isLoading ? 'Отправка...' : 'Зарегистрироваться'"></span>
+            </button>
+          </div>
+          <p class="text-center text-sm text-neutral-400">Уже есть аккаунт? <a href="#" @click.prevent="switchTab('login')" class="text-primary-400 hover:underline">Войти</a></p>
+        </form>
+        <form x-show="currentTab === 'login'" @submit.prevent="handleLogin" class="space-y-4">
+          <label class="block">
+            <span class="sr-only">Логин</span>
+            <input type="text" x-model="loginData.username" placeholder="Логин" required autocomplete="username" class="w-full px-4 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-white" @input="validateUsername(loginData.username, 'login')"/>
+          </label>
+          <p class="text-red-500 text-sm mt-1" x-show="errors.login.username" x-text="errors.login.username" role="alert"></p>
+          <div class="relative">
             <label class="block">
-              <span class="sr-only">Подтверждение пароля</span>
-              <input type="password" x-model="registerData.confirmPassword" placeholder="Подтверждение пароля" required autocomplete="new-password" class="w-full px-4 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-white" :disabled="!isPasswordValid.register" :class="isPasswordValid.register ? 'border-neutral-700 opacity-100' : 'border-neutral-700 opacity-50'" @input="validateConfirmPassword()"/>
+              <span class="sr-only">Пароль</span>
+              <input :type="showPassword.login ? 'text' : 'password'" x-model="loginData.password" placeholder="Пароль" required autocomplete="current-password" class="w-full px-4 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-white pr-10" @input="validatePassword(loginData.password, 'login')"/>
             </label>
-            <p class="text-red-400 text-xs mt-1" x-show="errors.register.confirmPassword" x-text="errors.register.confirmPassword" role="alert"></p>
-            <div class="flex items-start gap-2 text-xs text-neutral-400">
-              <input type="checkbox" required class="mt-0.5 rounded border-neutral-700 bg-neutral-800" id="register-agree"/>
-              <span>Я согласен с <a href="/terms/" target="_blank" rel="noopener noreferrer" class="text-primary-400 hover:underline">Пользовательским соглашением</a> и <a href="/privacy/" target="_blank" rel="noopener noreferrer" class="text-primary-400 hover:underline">Политикой конфиденциальности</a>.</span>
-            </div>
-            <div class="flex justify-center mt-4">
-              <div id="register-captcha-container"></div>
-            </div>
-            <input type="hidden" name="cf-turnstile-response" x-model="captchaResponse.register">
-            <p x-show="errors.global" class="text-red-400 text-sm text-center mt-2" x-text="errors.global" role="alert"></p>
-            <div class="flex justify-center">
-              <button type="submit" class="glass-btn" :disabled="isLoading">
-                <span x-show="isLoading" class="spinner"></span>
-                <span x-text="isLoading ? 'Отправка...' : 'Зарегистрироваться'"></span>
-              </button>
-            </div>
-            <p class="text-center text-sm text-neutral-400">Уже есть аккаунт? <a href="#" @click.prevent="switchTab('login')" class="text-primary-400 hover:underline">Войти</a></p>
-          </form>
-          <form x-show="currentTab === 'login'" @submit.prevent="handleLogin" class="space-y-4">
-            <label class="block">
-              <span class="sr-only">Логин</span>
-              <input type="text" x-model="loginData.username" placeholder="Логин" required autocomplete="username" class="w-full px-4 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-white" @input="validateUsername(loginData.username, 'login')"/>
-            </label>
-            <p class="text-red-500 text-sm mt-1" x-show="errors.login.username" x-text="errors.login.username" role="alert"></p>
-            <div class="relative">
-              <label class="block">
-                <span class="sr-only">Пароль</span>
-                <input :type="showPassword.login ? 'text' : 'password'" x-model="loginData.password" placeholder="Пароль" required autocomplete="current-password" class="w-full px-4 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-white pr-10" @input="validatePassword(loginData.password, 'login')"/>
-              </label>
-              <button type="button" @click="showPassword.login = !showPassword.login" class="absolute right-3 top-3.5 text-gray-500 hover:text-gray-700 pass-toggle" :aria-label="showPassword.login ? 'Скрыть пароль' : 'Показать пароль'">
-                <img src="/static/icons/login/pass-hideoff.svg" :class="{'hidden': showPassword.login}" class="h-6 transition hover:brightness-75" alt="Показать пароль">
-                <img src="/static/icons/login/pass-hide.svg" :class="{'hidden': !showPassword.login}" class="h-6 transition hover:brightness-75" alt="Скрыть пароль">
-              </button>
-            </div>
-            <p class="text-red-500 text-xs mt-1" x-show="errors.login.password" x-text="errors.login.password" role="alert"></p>
-            <div class="flex justify-center mt-4">
-              <div id="login-captcha-container"></div>
-            </div>
-            <input type="hidden" name="cf-turnstile-response" x-model="captchaResponse.login">
-            <div class="flex justify-center">
-              <button type="submit" class="glass-btn" :disabled="isLoading">
-                <span x-show="isLoading" class="spinner"></span>
-                <span x-text="isLoading ? 'Вход...' : 'Войти'"></span>
-              </button>
-            </div>
-            <div class="divider">
-              <span>или войти через</span>
-            </div>
-            <div class="oauth-grid">
-              <button type="button" class="oauth-btn" @click="oauthLogin('google')" :disabled="isLoading" title="Войти через Google" aria-label="Войти через Google">
-                <img src="/static/icons/oauth/google.svg" alt="Google" class="h-6">
-              </button>
-              <button type="button" class="oauth-btn" @click="oauthLogin('twitch')" :disabled="isLoading" title="Войти через Twitch" aria-label="Войти через Twitch">
-                <img src="/static/icons/oauth/twitch.svg" alt="Twitch" class="h-6">
-              </button>
-              <button type="button" class="oauth-btn" @click="oauthLogin('yandex')" :disabled="isLoading" title="Войти через Yandex" aria-label="Войти через Yandex">
-                <img src="/static/icons/oauth/yandex.svg" alt="Yandex" class="w-6">
-              </button>
-              <button type="button" class="oauth-btn" @click="oauthLogin('github')" :disabled="isLoading" title="Войти через GitHub" aria-label="Войти через GitHub">
-                <img src="/static/icons/oauth/github.svg" alt="GitHub" class="h-8">
-              </button>
-            </div>
-            <p class="text-center text-sm text-neutral-400">Нет аккаунта? <a href="#" @click.prevent="switchTab('register')" class="text-primary-400 hover:underline">Зарегистрироваться</a></p>
-          </form>
-        </div>
+            <button type="button" @click="showPassword.login = !showPassword.login" class="absolute right-3 top-3.5 text-gray-500 hover:text-gray-700 pass-toggle" :aria-label="showPassword.login ? 'Скрыть пароль' : 'Показать пароль'">
+              <img src="/static/icons/login/pass-hideoff.svg" :class="{'hidden': showPassword.login}" class="h-6 transition hover:brightness-75" alt="Показать пароль">
+              <img src="/static/icons/login/pass-hide.svg" :class="{'hidden': !showPassword.login}" class="h-6 transition hover:brightness-75" alt="Скрыть пароль">
+            </button>
+          </div>
+          <p class="text-red-500 text-xs mt-1" x-show="errors.login.password" x-text="errors.login.password" role="alert"></p>
+          <div class="flex justify-center mt-4">
+            <div id="login-captcha-container"></div>
+          </div>
+          <input type="hidden" name="cf-turnstile-response" x-model="captchaResponse.login">
+          <div class="flex justify-center">
+            <button type="submit" class="glass-btn" :disabled="isLoading">
+              <span x-show="isLoading" class="spinner"></span>
+              <span x-text="isLoading ? 'Вход...' : 'Войти'"></span>
+            </button>
+          </div>
+          <div class="divider">
+            <span>или войти через</span>
+          </div>
+          <div class="oauth-grid">
+            <button type="button" class="oauth-btn" @click="oauthLogin('google')" :disabled="isLoading" title="Войти через Google" aria-label="Войти через Google">
+              <img src="/static/icons/oauth/google.svg" alt="Google">
+            </button>
+            <button type="button" class="oauth-btn" @click="oauthLogin('twitch')" :disabled="isLoading" title="Войти через Twitch" aria-label="Войти через Twitch">
+              <img src="/static/icons/oauth/twitch.svg" alt="Twitch">
+            </button>
+            <button type="button" class="oauth-btn" @click="oauthLogin('yandex')" :disabled="isLoading" title="Войти через Yandex" aria-label="Войти через Yandex">
+              <img src="/static/icons/oauth/yandex.svg" alt="Yandex">
+            </button>
+          </div>
+          <p class="text-center text-sm text-neutral-400">Нет аккаунта? <a href="#" @click.prevent="switchTab('register')" class="text-primary-400 hover:underline">Зарегистрироваться</a></p>
+        </form>
       </div>
     </div>
-    <div class="hidden md:flex pointer-events-none z-0 absolute inset-0 items-end justify-center">
-      <img src="/static/templates/overlay-login.png" class="tree-glow" style="height: 90vh; min-height: 480px; max-height: 1200px; width: 72vw; min-width: 720px; max-width: 1320px; position: relative; left: 3%; object-fit: contain;" loading="lazy" decoding="async" alt="Декоративное дерево"/>
-    </div>
-  </section>
+  </div>
+  <div class="hidden md:flex pointer-events-none z-0 absolute inset-0 items-end justify-center">
+    <img src="/static/templates/overlay-login.png" class="tree-glow" style="height: 90vh; min-height: 480px; max-height: 1200px; width: 72vw; min-width: 720px; max-width: 1320px; position: relative; left: 3%; object-fit: contain;" loading="lazy" decoding="async" alt="Декоративное дерево"/>
+  </div>
+</section>
   <script>
     function authForms() {
       return {
-        currentTab: 'register',
+        currentTab: 'login',
         isLoading: false,
         registerData: {
           username: '',

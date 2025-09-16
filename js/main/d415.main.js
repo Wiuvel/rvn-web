@@ -1,5 +1,42 @@
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        primary: {
+          50: '#eef9ff', 100: '#d7f1ff', 200: '#b0e5ff', 300: '#7cd4ff', 400: '#45beff', 500: '#16a3ff', 600: '#0f7fdb', 700: '#0f65ad', 800: '#114f86', 900: '#113f69'
+        }
+      },
+      boxShadow: {
+        soft: '0 10px 30px rgba(0,0,0,0.08)',
+        glow: '0 0 20px rgba(22,163,255,0.6)'
+      },
+      animation: {
+        fadeIn: 'fadeIn 0.5s ease-in forwards',
+        float: 'float 3s ease-in-out infinite',
+        pulseFloat: 'pulseFloat 3s ease-in-out infinite'
+      },
+      keyframes: {
+        fadeIn: {
+          '0%': { opacity: 0, transform: 'translateY(15px)' },
+          '100%': { opacity: 1, transform: 'translateY(0)' }
+        },
+        float: {
+          '0%, 100%': { transform: 'translateY(0)' },
+          '50%': { transform: 'translateY(-6px)' }
+        },
+        pulseFloat: {
+          '0%': { transform: 'translateY(0) scale(1)' },
+          '25%': { transform: 'translateY(-4px) scale(1.02)' },
+          '50%': { transform: 'translateY(0) scale(1)' },
+          '75%': { transform: 'translateY(4px) scale(0.98)' },
+          '100%': { transform: 'translateY(0) scale(1)' }
+        }
+      }
+    }
+  }
+}
+
 document.addEventListener("DOMContentLoaded", () => {
-  // --- PING ---
   const pingEl = document.getElementById("ping-value");
   const sessionEl = document.getElementById("session-status");
   const statusEl = document.getElementById("connection-status");
@@ -76,7 +113,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   setTimeout(connectSession, 1000);
 
-  // --- REDIRECT APPS ---
   function openHiddify() {
     const ua = navigator.userAgent || navigator.vendor || window.opera;
     if (/iPad|iPhone|iPod/.test(ua) && !window.MSStream) {
@@ -105,11 +141,8 @@ document.addEventListener("DOMContentLoaded", () => {
     e.preventDefault();
     openV2rayTun();
   });
-
-  // --- YEAR ---
   document.getElementById('year').textContent = new Date().getFullYear();
 
-  // --- ANIMATION ---
   const elements = document.querySelectorAll(".fade-in");
   const observer = new IntersectionObserver((entries) => {
     entries.forEach(entry => {
@@ -121,7 +154,6 @@ document.addEventListener("DOMContentLoaded", () => {
   }, { threshold: 0.1 });
   elements.forEach(el => observer.observe(el));
 
-  // --- particles.js ---
   if (window.matchMedia('(min-width: 1025px)').matches) {
     if (typeof particlesJS === 'function') {
       try {
@@ -149,7 +181,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const p = document.getElementById('particles-js'); if (p) p.style.display = 'none';
   }
 
-  // --- NAVIGATION PROGRESS-BAR ---
   let progress = document.getElementById('page-progress');
   let timer;
   function startProgress() {
@@ -180,14 +211,4 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
   });
-
-  // --- FOCUS TAB ---
-  function handleFirstTab(e) {
-    if (e.key === 'Tab') {
-      document.documentElement.classList.add('user-is-tabbing');
-      window.removeEventListener('keydown', handleFirstTab);
-    }
-  }
-  window.addEventListener('keydown', handleFirstTab);
-  document.addEventListener('click', function(ev){});
 });
