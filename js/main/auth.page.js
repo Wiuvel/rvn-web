@@ -53,7 +53,7 @@ window.authForms = function authForms() {
 
       if (typeof window.turnstile !== 'undefined') {
         this.currentWidgetId = window.turnstile.render('#' + containerId, {
-          sitekey: '3x00000000000000000000FF',
+          sitekey: '0x4AAAAAAB0s4O-sxm9ZnAQk',
           theme: 'dark',
           callback: (token) => {
             this.captchaResponse[formType] = token;

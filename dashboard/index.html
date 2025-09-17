@@ -15,7 +15,7 @@
   <div id="page-progress"></div>
 <header x-data="{ open: false }" class="fixed top-0 left-0 right-0 pt-4 z-[999]">
   <div class="mx-auto max-w-6xl px-4">
-    <div class="backdrop-blur-xl bg-neutral-900/40 border border-white/10 rounded-full px-6 py-3 flex items-center justify-between shadow-lg">
+    <div class="backdrop-blur-lg bg-neutral-900/40 border border-white/10 rounded-full px-6 py-3 flex items-center justify-between shadow-lg">
       <a href="/" class="flex items-center gap-2">
         <img src="/static/logo.svg" alt="RVNPrivate" class="w-6 h-6" loading="lazy">
         <span class="font-semibold text-white">Raven Private</span>
@@ -45,7 +45,7 @@
          x-transition:leave="transition ease-in duration-150"
          x-transition:leave-start="opacity-100 scale-100"
          x-transition:leave-end="opacity-0 scale-95"
-         class="lg:hidden mt-4 py-4 bg-black/50 backdrop-blur-xl rounded-2xl border border-white/10">
+         class="lg:hidden mt-4 py-4 bg-black/50 backdrop-blur-lg rounded-2xl border border-white/10">
       <div class="px-4 space-y-4">
         <a href="/" @click="open = false" class="block text-white/80 hover:text-white transition-colors duration-300 py-2">Главная</a>
         <a href="/auth/" @click="open = false" class="block text-white/80 hover:text-white transition-colors duration-300 py-2">Профиль</a>

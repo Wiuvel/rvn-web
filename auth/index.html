@@ -27,7 +27,7 @@
   </div>
 <header x-data="{ open: false }" class="sticky top-4 z-50">
   <div class="mx-auto max-w-6xl px-4">
-    <div class="backdrop-blur-xl bg-neutral-900/40 border border-white/10 rounded-full px-6 py-3 flex items-center justify-between shadow-lg">
+    <div class="backdrop-blur-lg bg-neutral-900/40 border border-white/10 rounded-full px-6 py-3 flex items-center justify-between shadow-lg">
       <a href="/" class="flex items-center gap-2">
         <img src="/static/logo.svg" alt="RVNPrivate" class="w-6 h-6" loading="lazy">
         <span class="font-semibold text-white">Raven Private</span>
@@ -44,7 +44,7 @@
   <div id="particles-js" class="absolute inset-0 hidden lg:block" aria-hidden="true"></div>
   <div class="z-10 grid grid-cols-1 md:grid-cols-2 gap-12 items-center w-full max-w-5xl">
     <div x-data="authForms()" x-init="init()" class="w-full max-w-md mx-auto">
-      <div class="bg-neutral-900/80 backdrop-blur-xl p-8 rounded-2xl border border-neutral-800 shadow-lg animate-fadeIn" style="overflow: hidden;">
+      <div class="bg-neutral-900/80 backdrop-blur-md p-8 rounded-2xl border border-neutral-800 shadow-lg animate-fadeIn" style="overflow: hidden;">
         <h2 class="text-2xl font-semibold mb-6 text-center" x-text="currentTab === 'register' ? 'Регистрация' : 'Вход'"></h2>
         <form x-show="currentTab === 'register'" @submit.prevent="handleRegister" class="space-y-4">
           <label class="block">
@@ -92,7 +92,7 @@
               <span x-text="isLoading ? 'Отправка...' : 'Зарегистрироваться'"></span>
             </button>
           </div>
-          <p class="text-center text-sm text-neutral-400">Уже есть аккаунт? <a href="#" @click.prevent="switchTab('login')" class="text-primary-400 hover:underline">Войти</a></p>
+          <p class="text-center text-sm">Уже есть аккаунт? <a href="#" @click.prevent="switchTab('login')" class="text-sky-300 hover:underline">Войти</a></p>
         </form>
         <form x-show="currentTab === 'login'" @submit.prevent="handleLogin" class="space-y-4">
           <label class="block">
@@ -122,7 +122,7 @@
             </button>
           </div>
           <div class="divider">
-            <span>или войти через</span>
+            <span>или авторизироваться через</span>
           </div>
           <div class="oauth-grid">
             <button type="button" class="oauth-btn" @click="oauthLogin('google')" :disabled="isLoading" title="Войти через Google" aria-label="Войти через Google">
@@ -131,11 +131,8 @@
             <button type="button" class="oauth-btn" @click="oauthLogin('twitch')" :disabled="isLoading" title="Войти через Twitch" aria-label="Войти через Twitch">
               <img src="/static/icons/oauth/twitch.svg" alt="Twitch">
             </button>
-            <button type="button" class="oauth-btn" @click="oauthLogin('yandex')" :disabled="isLoading" title="Войти через Yandex" aria-label="Войти через Yandex">
-              <img src="/static/icons/oauth/yandex.svg" alt="Yandex">
-            </button>
           </div>
-          <p class="text-center text-sm text-neutral-400">Нет аккаунта? <a href="#" @click.prevent="switchTab('register')" class="text-primary-400 hover:underline">Зарегистрироваться</a></p>
+          <p class="text-center text-sm">Нет аккаунта? <a href="#" @click.prevent="switchTab('register')" class="text-sky-300 hover:underline">Зарегистрироваться</a></p>
         </form>
       </div>
     </div>
