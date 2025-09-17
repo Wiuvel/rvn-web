@@ -213,29 +213,37 @@ body::before {
 
 .cloudflare-badge {
   position: fixed;
-  bottom: 20px;
-  left: 0;
-  right: 0;
-  text-align: center;
-  font-size: 0.95rem;
-  color: var(--text-tertiary);
-  opacity: 0.85;
-  user-select: none;
+  left: 50%;
+  right: auto;
+  bottom: 16px;
+  transform: translateX(-50%);
+  z-index: 9999;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  pointer-events: none;
+  color: #a3b0c2;
+  font-size: 12px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 6px 10px;
+  border-radius: 999px;
+  backdrop-filter: blur(6px);
 }
 
 .cloudflare-badge a {
-  color: inherit;
-  text-decoration: none;
-  pointer-events: auto;
+  color: #d3deea;
+  text-decoration: underline;
 }
 
-.cloudflare-badge a:hover {
-  text-decoration: underline;
+@media (max-width: 640px) {
+  .cloudflare-badge {
+    left: 50%;
+    bottom: 12px;
+    transform: translateX(-50%);
+    font-size: 11px;
+    padding: 5px 9px;
+  }
 }
 
 .cloudflare-badge .pulse {

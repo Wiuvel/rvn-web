@@ -235,6 +235,9 @@ body {
     backdrop-filter: blur(16px);
 }
 
+/* Prevent background/glow layers from overlapping across sections */
+.isolate { isolation: isolate; }
+
 /* Обновляем стили для плавного зацикливания */
 .animate-marquee {
     display: flex;
