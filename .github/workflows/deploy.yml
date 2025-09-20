@@ -1,4 +1,4 @@
-name: 🚀 Deploy GitHub to Ubuntu Server 
+name: 🚀 Deploy Next.js to Ubuntu Server
 
 on:
   push:
@@ -8,6 +8,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -19,4 +20,19 @@ jobs:
 
       - name: Deploy to server
         run: |
-          ssh -o StrictHostKeyChecking=no ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} "cd ${{ secrets.DEPLOY_PATH }} && git pull origin main && sudo systemctl restart nginx"
+          ssh -o StrictHostKeyChecking=no ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} << 'EOF'
+          set -e
+
+          cd ${{ secrets.DEPLOY_PATH }}
+
+          # Update Repository
+          git pull origin main
+
+          # Istall Requirements and Build
+          yarn install --frozen-lockfile
+          yarn build
+
+          # Restart pm2
+          pm2 restart nextapp || pm2 start yarn --name nextapp -- start
+          pm2 save
+          EOF
