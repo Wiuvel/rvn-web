@@ -16,13 +16,14 @@ export default function CTASection() {
         <div ref={containerRef} className="rounded-3xl border border-neutral-800 bg-gradient-to-br from-neutral-900 to-neutral-950 p-8 text-center">
           <h3 ref={titleRef} className="text-2xl font-semibold">Готовы начать?</h3>
           <p ref={descriptionRef} className="mt-2 text-neutral-400">Оформите подписку и получите мгновенный доступ ко всему интернету.</p>
-          <Link 
-            ref={buttonRef}
-            href="/auth" 
-            className="mt-6 inline-block rounded-2xl bg-primary-500 text-white px-6 py-3 font-medium hover:bg-primary-400 transition shadow-lg transform duration-300 hover:shadow-blue-500/50 hover:scale-105"
-          >
-            Купить сейчас
-          </Link>
+          <div ref={buttonRef}>
+            <Link 
+              href="/auth" 
+              className="mt-6 inline-block rounded-2xl bg-primary-500 text-white px-6 py-3 font-medium hover:bg-primary-400 transition shadow-lg transform duration-300 hover:shadow-blue-500/50 hover:scale-105"
+            >
+              Купить сейчас
+            </Link>
+          </div>
         </div>
       </div>
     </section>

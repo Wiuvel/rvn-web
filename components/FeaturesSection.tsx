@@ -1,6 +1,6 @@
 'use client';
 
-import { useFadeIn, useRotateIn, useStaggeredFadeIn } from '@/hooks/useGSAP';
+import { useRotateIn, useStaggeredFadeIn } from '@/hooks/useGSAP';
 
 export default function FeaturesSection() {
   const titleRef = useRotateIn(0.1);

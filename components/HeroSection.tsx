@@ -1,10 +1,9 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { gsap } from 'gsap';
-import { useFadeIn, useSlideInLeft, useSlideInRight } from '@/hooks/useGSAP';
+import { useFadeIn, useSlideInRight } from '@/hooks/useGSAP';
 import ParticlesBackground from './ParticlesBackground';
 
 export default function HeroSection() {
@@ -16,14 +15,14 @@ export default function HeroSection() {
   const buttonsRef = useFadeIn(0.3);
   const dashboardRef = useSlideInRight(0.5);
 
-  const servers = [
-    { country: "Германия", code: "DE-1", flag: "/static/icons/flags/de.svg" },
-    { country: "Германия", code: "DE-2", flag: "/static/icons/flags/de.svg" },
-    { country: "Швеция", code: "SWE-1", flag: "/static/icons/flags/swe.svg" },
-    { country: "Швеция", code: "SWE-2", flag: "/static/icons/flags/swe.svg" }
-  ];
-
   useEffect(() => {
+    const servers = [
+      { country: "Германия", code: "DE-1", flag: "/static/icons/flags/de.svg" },
+      { country: "Германия", code: "DE-2", flag: "/static/icons/flags/de.svg" },
+      { country: "Швеция", code: "SWE-1", flag: "/static/icons/flags/swe.svg" },
+      { country: "Швеция", code: "SWE-2", flag: "/static/icons/flags/swe.svg" }
+    ];
+
     const timer = setTimeout(() => {
       setConnected(true);
       const randomServer = servers[Math.floor(Math.random() * servers.length)];

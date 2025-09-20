@@ -57,7 +57,7 @@ export const useGSAP = () => {
 };
 
 export const useFadeIn = (delay: number = 0) => {
-  const elementRef = useRef<HTMLElement>(null);
+  const elementRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!elementRef.current) return;
@@ -89,7 +89,7 @@ export const useFadeIn = (delay: number = 0) => {
 };
 
 export const useSlideInLeft = (delay: number = 0) => {
-  const elementRef = useRef<HTMLElement>(null);
+  const elementRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!elementRef.current) return;
@@ -121,7 +121,7 @@ export const useSlideInLeft = (delay: number = 0) => {
 };
 
 export const useSlideInRight = (delay: number = 0) => {
-  const elementRef = useRef<HTMLElement>(null);
+  const elementRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!elementRef.current) return;
@@ -153,7 +153,7 @@ export const useSlideInRight = (delay: number = 0) => {
 };
 
 export const useScaleIn = (delay: number = 0) => {
-  const elementRef = useRef<HTMLElement>(null);
+  const elementRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!elementRef.current) return;
@@ -220,7 +220,7 @@ export const useStaggeredFadeIn = (delay: number = 0, stagger: number = 0.05) =>
 };
 
 export const useRotateIn = (delay: number = 0) => {
-  const elementRef = useRef<HTMLElement>(null);
+  const elementRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!elementRef.current) return;
@@ -254,7 +254,7 @@ export const useRotateIn = (delay: number = 0) => {
 };
 
 export const useSlideInUp = (delay: number = 0) => {
-  const elementRef = useRef<HTMLElement>(null);
+  const elementRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!elementRef.current) return;
@@ -286,7 +286,7 @@ export const useSlideInUp = (delay: number = 0) => {
 };
 
 export const useBounceIn = (delay: number = 0) => {
-  const elementRef = useRef<HTMLElement>(null);
+  const elementRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!elementRef.current) return;
@@ -320,7 +320,7 @@ export const useBounceIn = (delay: number = 0) => {
 };
 
 export const useElasticIn = (delay: number = 0) => {
-  const elementRef = useRef<HTMLElement>(null);
+  const elementRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!elementRef.current) return;

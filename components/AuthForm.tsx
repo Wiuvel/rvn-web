@@ -215,7 +215,7 @@ export default function AuthForm() {
       } else {
         setErrors(prev => ({ ...prev, global: escapeHtml(data.message || 'Ошибка входа') }));
       }
-    } catch (error) {
+    } catch {
       setErrors(prev => ({ ...prev, global: 'Ошибка сети. Попробуйте позже.' }));
     } finally {
       setIsLoading(false);
@@ -247,7 +247,7 @@ export default function AuthForm() {
     setIsLoading(true);
     try {
       window.location.href = `/auth/${provider}`;
-    } catch (error) {
+    } catch {
       setErrors(prev => ({ ...prev, global: 'Ошибка подключения к провайдеру' }));
       setIsLoading(false);
     }

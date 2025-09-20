@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import DashboardPreviewSection from './DashboardPreviewSection';
-import { useFadeIn, useBounceIn, useStaggeredFadeIn, useSlideInUp } from '@/hooks/useGSAP';
+import { useFadeIn, useStaggeredFadeIn, useSlideInUp } from '@/hooks/useGSAP';
 
 export default function PricingSection() {
   const titleRef = useFadeIn(0.1);
