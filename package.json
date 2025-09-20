@@ -1,5 +1,5 @@
 {
-  "name": "rvnprivate-web",
+  "name": "rvnprivate",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -9,11 +9,16 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "-": "^0.0.1",
+    "@headlessui/react": "^2.2.8",
+    "@tanstack/react-query": "^5.89.0",
+    "framer-motion": "^12.23.16",
     "gsap": "^3.13.0",
     "next": "15.5.3",
     "react": "19.1.0",
-    "react-dom": "19.1.0"
+    "react-dom": "19.1.0",
+    "react-hook-form": "^7.63.0",
+    "zod": "^4.1.9",
+    "zustand": "^5.0.8"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
