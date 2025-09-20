@@ -17,8 +17,6 @@ jobs:
         uses: webfactory/ssh-agent@v0.8.0
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-      - name: SAFE GIT
-        run: git config --global --add safe.directory ***   
 
       - name: Deploy to server
         run: |
