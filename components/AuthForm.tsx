@@ -187,7 +187,7 @@ export default function AuthForm() {
         setErrors(prev => ({ ...prev, global: escapeHtml(data.message || 'Ошибка регистрации') }));
       }
     } catch {
-      setErrors(prev => ({ ...prev, global: 'API ERROR: 405' }));
+      setErrors(prev => ({ ...prev, global: 'API ERROR: 405.' }));
     } finally {
       setIsLoading(false);
     }
