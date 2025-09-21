@@ -244,16 +244,33 @@ async function setSecureCookie(token) {
         const expiration = new Date();
         expiration.setTime(expiration.getTime() + (2 * 60 * 60 * 1000));
         const secureHash = await generateSecureHash();
-        const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-        const domain = isLocalhost ? '' : '.rvn.guru';
-        const secure = isLocalhost ? '' : 'Secure';
+        
+        // Определяем домен в зависимости от окружения
+        const hostname = window.location.hostname;
+        const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
+        const isVercel = hostname.includes('vercel.app');
+        
+        let domain = '';
+        let secure = '';
+        
+        if (isLocalhost) {
+            domain = '';
+            secure = '';
+        } else if (isVercel) {
+            domain = ''; // Vercel - не устанавливаем домен
+            secure = 'Secure';
+        } else {
+            domain = '.rvn.guru'; // production
+            secure = 'Secure';
+        }
+        
         const cookieOptions = `expires=${expiration.toUTCString()}; path=/; ${domain ? `domain=${domain}; ` : ''}${secure}; SameSite=Strict`;
         
         document.cookie = `access_granted=true; ${cookieOptions}`;
         document.cookie = `access_hash=${secureHash}; ${cookieOptions}`;
         document.cookie = `access_time=${Date.now()}; ${cookieOptions}`;
         
-        console.log('[COOKIE] Secure cookies set successfully for domain:', domain || 'localhost');
+        console.log('[COOKIE] Secure cookies set successfully for domain:', domain || hostname);
         return true;
     } catch (error) {
         console.error('[COOKIE] Error setting secure cookies:', error);

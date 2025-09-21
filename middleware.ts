@@ -24,7 +24,18 @@ export function middleware(request: NextRequest) {
   if (pathname.startsWith('/auth') || pathname.startsWith('/dashboard') || pathname.startsWith('/legal') || pathname === '/') {
     const targetPath = pathname + request.nextUrl.search;
     const response = NextResponse.redirect(new URL(`/protection?redirect=${encodeURIComponent(targetPath)}`, request.url));
-    const isLocalhost = request.nextUrl.hostname === 'localhost' || request.nextUrl.hostname === '127.0.0.1';
+    const hostname = request.nextUrl.hostname;
+    const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
+    const isVercel = hostname.includes('vercel.app');
+    
+    let domain: string | undefined;
+    if (isLocalhost) {
+      domain = undefined; // localhost
+    } else if (isVercel) {
+      domain = undefined; // Vercel - не устанавливаем домен
+    } else {
+      domain = '.rvn.guru'; // production
+    }
     
     response.cookies.set('target_patch', targetPath, {
       maxAge: 60 * 60 * 2,
@@ -32,7 +43,7 @@ export function middleware(request: NextRequest) {
       secure: process.env.NODE_ENV === 'production' && !isLocalhost,
       sameSite: 'strict',
       path: '/',
-      domain: isLocalhost ? undefined : '.rvn.guru'
+      domain
     });
     return response;
   }
@@ -42,6 +53,6 @@ export function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!api|_next/static|_next/image|favicon.ico|public|debug).*)',
+    '/((?!api|_next/static|_next/image|favicon.ico|public|debug|vercel-test).*)',
   ],
 };
