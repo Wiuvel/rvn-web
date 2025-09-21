@@ -71,9 +71,15 @@ function checkExistingCookie() {
         return false;
     }
     
+    if (window.location.pathname === '/protection') {
+        console.log('[PROTECT] On protection page, skipping cookie check to avoid redirects.');
+        return false;
+    }
+    
     const cookies = document.cookie.split(';');
     let hasAccess = false;
     let hasHash = false;
+    let targetPath = null;
     
     for (const cookie of cookies) {
         const [name, value] = cookie.trim().split('=');
@@ -83,11 +89,19 @@ function checkExistingCookie() {
         if (name === 'access_hash' && value && value.length === 64 && /^[a-f0-9]{64}$/.test(value)) {
             hasHash = true;
         }
+        if (name === 'target_patch' && value) {
+            targetPath = decodeURIComponent(value);
+        }
     }
     
     if (hasAccess && hasHash) {
-        const urlParams = new URLSearchParams(window.location.search);
-        let redirectUrl = (urlParams.get('redirect') || '/').trim();
+        let redirectUrl = '/';
+        if (targetPath) {
+            redirectUrl = targetPath;
+        } else {
+            const urlParams = new URLSearchParams(window.location.search);
+            redirectUrl = (urlParams.get('redirect') || '/').trim();
+        }
         return safeRedirect(redirectUrl);
     }
     
@@ -230,10 +244,16 @@ async function setSecureCookie(token) {
         const expiration = new Date();
         expiration.setTime(expiration.getTime() + (2 * 60 * 60 * 1000));
         const secureHash = await generateSecureHash();
-        document.cookie = `access_granted=true; expires=${expiration.toUTCString()}; path=/; domain=.rvn.guru; Secure; SameSite=Strict`;
-        document.cookie = `access_hash=${secureHash}; expires=${expiration.toUTCString()}; path=/; domain=.rvn.guru; Secure; SameSite=Strict`;
-        document.cookie = `access_time=${Date.now()}; expires=${expiration.toUTCString()}; path=/; domain=.rvn.guru; Secure; SameSite=Strict`;
-        console.log('[COOKIE] Secure cookies set successfully');
+        const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const domain = isLocalhost ? '' : '.rvn.guru';
+        const secure = isLocalhost ? '' : 'Secure';
+        const cookieOptions = `expires=${expiration.toUTCString()}; path=/; ${domain ? `domain=${domain}; ` : ''}${secure}; SameSite=Strict`;
+        
+        document.cookie = `access_granted=true; ${cookieOptions}`;
+        document.cookie = `access_hash=${secureHash}; ${cookieOptions}`;
+        document.cookie = `access_time=${Date.now()}; ${cookieOptions}`;
+        
+        console.log('[COOKIE] Secure cookies set successfully for domain:', domain || 'localhost');
         return true;
     } catch (error) {
         console.error('[COOKIE] Error setting secure cookies:', error);
@@ -276,9 +296,35 @@ async function onSuccessCallback(token) {
     
     currentState = captchaStates.SUCCESS;
     updateStatusText();
-    const urlParams = new URLSearchParams(window.location.search);
-    let redirectUrl = (urlParams.get('redirect') || '/').trim();
+    
+    const cookies = document.cookie.split(';');
+    let targetPath = null;
+    
+    console.log('[PROTECT] All cookies:', document.cookie);
+    
+    for (const cookie of cookies) {
+        const [name, value] = cookie.trim().split('=');
+        console.log('[PROTECT] Cookie:', name, '=', value);
+        if (name === 'target_patch' && value) {
+            targetPath = decodeURIComponent(value);
+            console.log('[PROTECT] Found target_patch:', targetPath);
+        }
+    }
+    
+    let redirectUrl = '/';
+    if (targetPath) {
+        redirectUrl = targetPath;
+        console.log('[PROTECT] Using target_patch for redirect:', redirectUrl);
+    } else {
+        const urlParams = new URLSearchParams(window.location.search);
+        redirectUrl = (urlParams.get('redirect') || '/').trim();
+        console.log('[PROTECT] Using redirect parameter:', redirectUrl);
+    }
+    
+    console.log('[PROTECT] Final redirect URL:', redirectUrl);
+    
     setTimeout(() => {
+        console.log('[PROTECT] Executing redirect to:', redirectUrl);
         safeRedirect(redirectUrl);
     }, 1000);
 }

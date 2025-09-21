@@ -29,7 +29,7 @@ export default function ProtectionPage() {
           if (container) {
             container.innerHTML = '';
             const widgetId = win.turnstile.render(container, {
-              sitekey: '0x4AAAAAAB0s4O-sxm9ZnAQk',
+              sitekey: '3x00000000000000000000FF',
               theme: 'dark',
               size: 'flexible',
               callback: (token: string) => {
@@ -68,11 +68,7 @@ export default function ProtectionPage() {
           }
         }
         
-        if (win.checkExistingCookie) {
-          console.log('Calling checkExistingCookie.');
-          const hasAccess = win.checkExistingCookie();
-          console.log('Has existing access:', hasAccess);
-        }
+        console.log('Skipping checkExistingCookie on protection page to avoid redirects.');
         
         if (win.resetTitleFill) {
           console.log('Calling resetTitleFill.');

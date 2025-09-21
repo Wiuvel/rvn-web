@@ -1,0 +1,47 @@
+import { NextRequest, NextResponse } from 'next/server';
+
+export function middleware(request: NextRequest) {
+  const { pathname, searchParams } = request.nextUrl;
+  const accessGranted = request.cookies.get('access_granted')?.value === 'true';
+  const accessHash = request.cookies.get('access_hash')?.value;
+  
+  if (accessGranted && accessHash) {
+    const targetPath = request.cookies.get('target_patch')?.value;
+    
+    if (targetPath) {
+      const response = NextResponse.redirect(new URL(targetPath, request.url));
+      response.cookies.delete('target_patch');
+      return response;
+    }
+    
+    if (pathname === '/protection') {
+      return NextResponse.redirect(new URL('/', request.url));
+    }
+    
+    return NextResponse.next();
+  }
+  
+  if (pathname.startsWith('/auth') || pathname.startsWith('/dashboard') || pathname.startsWith('/legal') || pathname === '/') {
+    const targetPath = pathname + request.nextUrl.search;
+    const response = NextResponse.redirect(new URL(`/protection?redirect=${encodeURIComponent(targetPath)}`, request.url));
+    const isLocalhost = request.nextUrl.hostname === 'localhost' || request.nextUrl.hostname === '127.0.0.1';
+    
+    response.cookies.set('target_patch', targetPath, {
+      maxAge: 60 * 60 * 2,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production' && !isLocalhost,
+      sameSite: 'strict',
+      path: '/',
+      domain: isLocalhost ? undefined : '.rvn.guru'
+    });
+    return response;
+  }
+  
+  return NextResponse.next();
+}
+
+export const config = {
+  matcher: [
+    '/((?!api|_next/static|_next/image|favicon.ico|public|debug).*)',
+  ],
+};

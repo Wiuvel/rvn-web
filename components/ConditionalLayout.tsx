@@ -10,12 +10,13 @@ interface ConditionalLayoutProps {
 
 export default function ConditionalLayout({ children }: ConditionalLayoutProps) {
   const pathname = usePathname();
-  const isAuthPage = pathname.startsWith('/auth');
-  const isProtectionPage = pathname.startsWith('/protection');
-  const isDashboardPage = pathname.startsWith('/dashboard');
-  const isLegalPage = pathname.startsWith('/legal');
+  const pagesWithHeaderFooter = [
+    '/',
+  ];
   
-  if (isAuthPage || isProtectionPage || isDashboardPage || isLegalPage) {
+  const shouldShowHeaderFooter = pagesWithHeaderFooter.includes(pathname);
+  
+  if (!shouldShowHeaderFooter) {
     return <>{children}</>;
   }
   
