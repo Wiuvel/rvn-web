@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 
 export default function DebugPage() {
   const [cookies, setCookies] = useState<Record<string, string>>({});
@@ -94,24 +95,24 @@ export default function DebugPage() {
         <div className="bg-white rounded-lg shadow-md p-6">
           <h2 className="text-xl font-semibold mb-4">Тестирование редиректов</h2>
           <div className="space-x-4">
-            <a
+            <Link
               href="/"
               className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded inline-block"
             >
               Тест главной страницы
-            </a>
-            <a
+            </Link>
+            <Link
               href="/auth"
               className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded inline-block"
             >
               Тест страницы авторизации
-            </a>
-            <a
+            </Link>
+            <Link
               href="/dashboard"
               className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded inline-block"
             >
               Тест дашборда
-            </a>
+            </Link>
           </div>
         </div>
 

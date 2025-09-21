@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 export function middleware(request: NextRequest) {
-  const { pathname, searchParams } = request.nextUrl;
+  const { pathname } = request.nextUrl;
   const accessGranted = request.cookies.get('access_granted')?.value === 'true';
   const accessHash = request.cookies.get('access_hash')?.value;
   
