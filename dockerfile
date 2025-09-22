@@ -22,7 +22,6 @@ ENV NEXT_TELEMETRY_DISABLED=1
 # Билдим проект с npm
 RUN npm run build
 
-# Production image
 FROM base AS runner
 WORKDIR /app
 
