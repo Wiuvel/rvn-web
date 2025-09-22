@@ -21,11 +21,7 @@ export function middleware(request: NextRequest) {
       response.cookies.delete('target_path');
       return response;
     }
-    
-    if (pathname === '/protection') {
-      return NextResponse.redirect(new URL('/', request.url));
-    }
-    
+
     return NextResponse.next();
   }
   
@@ -36,19 +32,10 @@ export function middleware(request: NextRequest) {
     
     const targetPath = pathname + request.nextUrl.search;
     const response = NextResponse.redirect(new URL(`/protection?redirect=${encodeURIComponent(targetPath)}`, request.url));
-    
     const hostname = request.nextUrl.hostname;
     const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
     const isVercel = hostname.includes('vercel.app');
-    
-    let domain: string | undefined;
-    if (isLocalhost) {
-      domain = undefined;
-    } else if (isVercel) {
-      domain = undefined;
-    } else {
-      domain = 'rvn.guru';
-    }
+    const domain: string | undefined = undefined;
     
     response.cookies.set('target_path', targetPath, {
       maxAge: 60 * 60 * 2,
