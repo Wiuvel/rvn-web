@@ -244,8 +244,6 @@ async function setSecureCookie(token) {
         const expiration = new Date();
         expiration.setTime(expiration.getTime() + (2 * 60 * 60 * 1000));
         const secureHash = await generateSecureHash();
-        
-        // Определяем домен в зависимости от окружения
         const hostname = window.location.hostname;
         const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
         const isVercel = hostname.includes('vercel.app');
@@ -257,7 +255,7 @@ async function setSecureCookie(token) {
             domain = '';
             secure = '';
         } else if (isVercel) {
-            domain = ''; // Vercel - не устанавливаем домен
+            domain = '';
             secure = 'Secure';
         } else {
             domain = '.rvn.guru'; // production

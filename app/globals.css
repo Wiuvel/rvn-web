@@ -154,18 +154,6 @@ button, a {
     50% { transform: rotate(3deg); } 
 }
 
-#page-progress {
-    position: fixed;
-    top: 0; 
-    left: 0; 
-    right: 0;
-    height: 3px;
-    background: linear-gradient(90deg, #16a3ff 0%, #0f7fdb 100%);
-    z-index: 9999;
-    width: 0;
-    transition: width 0.3s cubic-bezier(.4,0,.2,1);
-}
-
 .user-is-tabbing a:focus, 
 .user-is-tabbing button:focus {
     outline: 2px solid #16a3ff;

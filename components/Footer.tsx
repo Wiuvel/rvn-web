@@ -42,9 +42,9 @@ export default function Footer() {
               <Image 
                 src="/static/icons/main/footer-logo.svg" 
                 alt="Raven Private" 
-                width={32} 
-                height={32} 
-                className="w-6 h-6 md:w-8 md:h-8" 
+                width={20} 
+                height={20} 
+                className="w-7 h-7"
               />
               <span className="text-base md:text-lg font-medium">Raven Private</span>
             </div>

@@ -30,11 +30,11 @@ export function middleware(request: NextRequest) {
     
     let domain: string | undefined;
     if (isLocalhost) {
-      domain = undefined; // localhost
+      domain = undefined;
     } else if (isVercel) {
-      domain = undefined; // Vercel - не устанавливаем домен
+      domain = undefined;
     } else {
-      domain = '.rvn.guru'; // production
+      domain = '.rvn.guru';
     }
     
     response.cookies.set('target_patch', targetPath, {
@@ -53,6 +53,6 @@ export function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!api|_next/static|_next/image|favicon.ico|public|debug|vercel-test).*)',
+    '/((?!api|_next/static|_next/image|favicon.ico|public|debug).*)',
   ],
 };

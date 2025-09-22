@@ -14,14 +14,8 @@ export default function DashboardPage() {
   const serversRef = useFadeIn(0.4) as React.RefObject<HTMLDivElement>;
   const eventsRef = useFadeIn(0.5) as React.RefObject<HTMLDivElement>;
   
-  useEffect(() => {
-    const progress = document.getElementById('page-progress');
-    if (progress) progress.style.display = 'none';
-  }, []);
-  
   return (
     <div className="dashboard-page">
-      <div id="page-progress"></div>
       {/* Header */}
       <header className="fixed top-0 left-0 right-0 pt-4 z-[999]">
         <div className="mx-auto max-w-6xl px-4">
@@ -88,8 +82,8 @@ export default function DashboardPage() {
         <div className="pointer-events-none absolute -bottom-24 -left-24 w-72 h-72 bg-white/5 blur-[100px] rounded-full -z-10"></div>
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div ref={titleRef}>
-            <h1 className="text-2xl md:text-3xl font-semibold">Личный кабинет</h1>
-            <p className="mt-2 text-neutral-400">Добро пожаловать! Здесь будут ваши подписки, ключи и настройки.</p>
+            <h1 className="text-2xl md:text-3xl font-semibold">Панель управления</h1>
+            <p className="mt-2 text-neutral-400">Добро пожаловать. Здесь будут ваши подписки, ключи и настройки.</p>
           </div>
           {/* Profile section */}
           <section ref={profileRef} className="mt-6 rounded-2xl border border-neutral-800 bg-neutral-900 p-5">
@@ -173,19 +167,14 @@ export default function DashboardPage() {
         </div>
       </main>
       {/* Footer */}
-      <footer className="mt-16 mb-5">
-        <div className="mx-auto max-w-6xl px-4">
-          <div className="border-t border-neutral-800 pt-8">
-            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-neutral-400">© {currentYear} Raven Private. Все права защищены.</span>
-              </div>
-              <div className="flex items-center gap-6 text-sm text-neutral-500">
-                <Link href="/legal/terms/" className="hover:text-neutral-300 transition">Пользовательское соглашение</Link>
-                <Link href="/legal/privacy/" className="hover:text-neutral-300 transition">Конфиденциальность</Link>
-                <Link href="/legal/offer/" className="hover:text-neutral-300 transition">Договор оферты</Link>
-                <Link href="/legal/refunds/" className="hover:text-neutral-300 transition">Политика возвратов</Link>
-              </div>
+      <footer className="mt-20 border-t border-neutral-800/50">
+        <div className="mx-auto max-w-6xl px-4 py-8">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+            <p className="text-sm text-neutral-500">
+              © {currentYear} RVNPrivate. Все права защищены.
+            </p>
+            <div className="flex items-center gap-6 text-xs text-neutral-500">
+              <span>v1.0.0</span>
             </div>
           </div>
         </div>

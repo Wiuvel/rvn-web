@@ -13,7 +13,6 @@ export default function Home() {
 
   return (
     <div ref={containerRef}>
-      <div id="page-progress"></div>
       <HeroSection />
       <FeaturesSection />
       <PricingSection />

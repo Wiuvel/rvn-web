@@ -29,7 +29,7 @@ export default function ProtectionPage() {
           if (container) {
             container.innerHTML = '';
             const widgetId = win.turnstile.render(container, {
-              sitekey: '3x00000000000000000000FF',
+              sitekey: '0x4AAAAAAB0s4O-sxm9ZnAQk',
               theme: 'dark',
               size: 'flexible',
               callback: (token: string) => {
@@ -98,7 +98,7 @@ export default function ProtectionPage() {
       console.error('Failed to load protection script:', error);
     };
     
-    const existingScript = document.querySelector('script[src="/static/protection.up4m5/4154sd.sf-turnstile.js"]');
+    const existingScript = document.querySelector('script[src="/static/protection.up4m5/sf-turnstile.js"]');
     if (!existingScript) {
       document.head.appendChild(script);
     }
@@ -141,9 +141,7 @@ export default function ProtectionPage() {
               suppressHydrationWarning
             />
           ) : (
-            <div className="cf-turnstile" suppressHydrationWarning>
-              <div style={{ color: '#a1a1aa', fontSize: '14px' }}>—</div>
-            </div>
+            <div className="cf-turnstile" suppressHydrationWarning></div>
           )}
           {/* Footer */}
           <div className="footer" id="footer" suppressHydrationWarning></div>
