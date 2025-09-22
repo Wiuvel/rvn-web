@@ -2,6 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const userAgent = request.headers.get('user-agent') || '';
+  const isBot = /googlebot|bingbot|yandex|duckduckbot|twitterbot|whatsapp|telegrambot|discordbot|applebot|redditbot/i.test(userAgent);
+  const isSpecialFile = pathname === '/robots.txt' || pathname === '/sitemap.xml' || pathname === '/favicon.ico' || pathname.startsWith('/api/');
+  
+  if (isBot || isSpecialFile) {
+    return NextResponse.next();
+  }
+  
   const accessGranted = request.cookies.get('access_granted')?.value === 'true';
   const accessHash = request.cookies.get('access_hash')?.value;
   
@@ -58,6 +66,6 @@ export function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!api|_next/static|_next/image|favicon.ico|public|static|debug).*)',
+    '/((?!api|_next/static|_next/image|favicon.ico|public|static|debug|robots.txt|sitemap.xml).*)',
   ],
 };
