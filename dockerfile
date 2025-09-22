@@ -19,7 +19,6 @@ COPY . .
 
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Билдим проект с npm
 RUN npm run build
 
 FROM base AS runner
