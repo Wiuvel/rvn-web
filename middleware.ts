@@ -14,18 +14,11 @@ export function middleware(request: NextRequest) {
   const accessHash = request.cookies.get('access_hash')?.value;
   
   if (accessGranted && accessHash) {
-    const targetPath = request.cookies.get('target_path')?.value;
-    
-    if (targetPath && targetPath !== pathname) {
-      const response = NextResponse.redirect(new URL(targetPath, request.url));
-      response.cookies.delete('target_path');
-      return response;
-    }
-
+    console.log('Access granted, allowing:', pathname);
     return NextResponse.next();
   }
   
-  if (pathname.startsWith('/auth') || pathname.startsWith('/dashboard') || pathname === '/') {
+  if (pathname.startsWith('/auth') || pathname.startsWith('/dashboard') || pathname.startsWith('/legal') || pathname === '/') {
     if (pathname === '/protection') {
       return NextResponse.next();
     }
