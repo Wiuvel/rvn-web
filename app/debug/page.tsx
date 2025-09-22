@@ -33,7 +33,6 @@ export default function DebugPage() {
   };
 
   const setTestCookies = () => {
-    // Устанавливаем тестовые куки для localhost
     const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
     const domain = isLocalhost ? '' : '.rvn.guru';
     const secure = isLocalhost ? '' : 'Secure';
