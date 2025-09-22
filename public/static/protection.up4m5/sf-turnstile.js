@@ -89,7 +89,7 @@ function checkExistingCookie() {
         if (name === 'access_hash' && value && value.length === 64 && /^[a-f0-9]{64}$/.test(value)) {
             hasHash = true;
         }
-        if (name === 'target_patch' && value) {
+        if (name === 'target_path' && value) {
             targetPath = decodeURIComponent(value);
         }
     }
@@ -320,16 +320,16 @@ async function onSuccessCallback(token) {
     for (const cookie of cookies) {
         const [name, value] = cookie.trim().split('=');
         console.log('[PROTECT] Cookie:', name, '=', value);
-        if (name === 'target_patch' && value) {
+        if (name === 'target_path' && value) {
             targetPath = decodeURIComponent(value);
-            console.log('[PROTECT] Found target_patch:', targetPath);
+            console.log('[PROTECT] Found target_path:', targetPath);
         }
     }
     
     let redirectUrl = '/';
     if (targetPath) {
         redirectUrl = targetPath;
-        console.log('[PROTECT] Using target_patch for redirect:', redirectUrl);
+        console.log('[PROTECT] Using target_path for redirect:', redirectUrl);
     } else {
         const urlParams = new URLSearchParams(window.location.search);
         redirectUrl = (urlParams.get('redirect') || '/').trim();

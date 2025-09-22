@@ -41,7 +41,7 @@ export default function DebugPage() {
     
     document.cookie = `access_granted=true; ${cookieOptions}`;
     document.cookie = `access_hash=1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef; ${cookieOptions}`;
-    document.cookie = `target_patch=/auth; ${cookieOptions}`;
+    document.cookie = `target_path=/auth; ${cookieOptions}`;
     
     console.log('Test cookies set for domain:', domain || 'localhost');
     window.location.reload();
