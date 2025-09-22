@@ -6,11 +6,11 @@ export function middleware(request: NextRequest) {
   const accessHash = request.cookies.get('access_hash')?.value;
   
   if (accessGranted && accessHash) {
-    const targetPath = request.cookies.get('target_patch')?.value;
+    const targetPath = request.cookies.get('target_path')?.value;
     
-    if (targetPath) {
+    if (targetPath && targetPath !== pathname) {
       const response = NextResponse.redirect(new URL(targetPath, request.url));
-      response.cookies.delete('target_patch');
+      response.cookies.delete('target_path');
       return response;
     }
     
@@ -21,9 +21,14 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
   
-  if (pathname.startsWith('/auth') || pathname.startsWith('/dashboard') || pathname.startsWith('/legal') || pathname === '/') {
+  if (pathname.startsWith('/auth') || pathname.startsWith('/dashboard') || pathname === '/') {
+    if (pathname === '/protection') {
+      return NextResponse.next();
+    }
+    
     const targetPath = pathname + request.nextUrl.search;
     const response = NextResponse.redirect(new URL(`/protection?redirect=${encodeURIComponent(targetPath)}`, request.url));
+    
     const hostname = request.nextUrl.hostname;
     const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
     const isVercel = hostname.includes('vercel.app');
@@ -34,10 +39,10 @@ export function middleware(request: NextRequest) {
     } else if (isVercel) {
       domain = undefined;
     } else {
-      domain = '.rvn.guru';
+      domain = 'rvn.guru';
     }
     
-    response.cookies.set('target_patch', targetPath, {
+    response.cookies.set('target_path', targetPath, {
       maxAge: 60 * 60 * 2,
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production' && !isLocalhost,

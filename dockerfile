@@ -1,17 +1,13 @@
 FROM node:20-alpine AS base
 
-# Install dependencies only when needed
 FROM base AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
-# Копируем только package.json и package-lock.json
 COPY package.json package-lock.json ./
 
-# Устанавливаем зависимости строго по lockfile
 RUN npm ci
 
-# Rebuild the source code only when needed
 FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
