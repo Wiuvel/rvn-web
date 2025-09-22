@@ -1,14 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import "../globals.css";
 import "./legal.css";
+import { pageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "Правовая информация — RVN.GURU",
-  description: "Политики конфиденциальности, пользовательские соглашения и другие правовые документы Raven Private.",
-  icons: {
-    icon: "/static/favicon.ico",
-  },
-};
+export const metadata: Metadata = pageMetadata.legal;
 
 export const viewport: Viewport = {
   themeColor: "#0f7fdb",

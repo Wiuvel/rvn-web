@@ -1,15 +1,12 @@
 import type { Metadata, Viewport } from "next";
 import "../globals.css";
+import { pageMetadata } from "@/lib/seo";
 
 export const metadata: Metadata = {
-  title: "Личный кабинет — Raven Private",
-  description: "Панель управления аккаунтом Raven Private.",
+  ...pageMetadata.dashboard,
   robots: {
     index: false,
     follow: false,
-  },
-  icons: {
-    icon: "/static/favicon.ico",
   },
 };
 

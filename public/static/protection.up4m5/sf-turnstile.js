@@ -16,11 +16,11 @@ function isMobileDevice() {
 
 function getTimeouts() {
     return isMobileDevice() ? {
-        observeDelay: 300,
-        iframeCheck: 6000,
+        observeDelay: 500,
+        iframeCheck: 8000,
         mainTimeout: 25000
     } : {
-        observeDelay: 50,
+        observeDelay: 100,
         iframeCheck: 3000,
         mainTimeout: 15000
     };

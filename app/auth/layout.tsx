@@ -1,14 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import "../globals.css";
 import Script from "next/script";
+import { pageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "Авторизация — RVN.GURU",
-  description: "Страница входа и регистрации. Личный кабинет. Raven Private.",
-  icons: {
-    icon: "/static/favicon.ico",
-  },
-};
+export const metadata: Metadata = pageMetadata.auth;
 
 export const viewport: Viewport = {
   themeColor: "#0f7fdb",

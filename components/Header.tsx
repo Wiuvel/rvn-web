@@ -34,7 +34,8 @@ export default function Header() {
               alt="RVNPrivate" 
               width={24} 
               height={24} 
-              className="w-6 h-6" 
+              className="w-6 h-6"
+              priority
             />
             <span className="font-semibold text-white">Raven Private</span>
           </Link>

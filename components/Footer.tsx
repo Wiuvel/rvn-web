@@ -45,6 +45,7 @@ export default function Footer() {
                 width={20} 
                 height={20} 
                 className="w-7 h-7"
+                loading="lazy"
               />
               <span className="text-base md:text-lg font-medium">Raven Private</span>
             </div>
@@ -105,10 +106,10 @@ export default function Footer() {
               © {currentYear} RVNPrivate. Все права защищены.
             </div>
             <div className="hidden md:flex items-center gap-3 md:gap-4 flex-wrap justify-center lg:mr-20 order-1 md:order-2 select-none drop-shadow-[0_0_50px_rgba(22,163,255,0.8)]">
-              <Image src="/static/payments/merchant-spb.svg" alt="СПБ" width={70} height={70} className="h-8" />
-              <Image src="/static/payments/merchant-mir.svg" alt="МИР" width={70} height={70} className="h-5" />
-              <Image src="/static/payments/merchant-visa.svg" alt="Visa" width={40} height={40} className="h-10" />
-              <Image src="/static/payments/merchant-mcard.svg" alt="Mastercard" width={40} height={40} className="h-10" />
+              <Image src="/static/payments/merchant-spb.svg" alt="СПБ" width={70} height={70} className="h-8" loading="lazy" />
+              <Image src="/static/payments/merchant-mir.svg" alt="МИР" width={70} height={70} className="h-5" loading="lazy" />
+              <Image src="/static/payments/merchant-visa.svg" alt="Visa" width={40} height={40} className="h-10" loading="lazy" />
+              <Image src="/static/payments/merchant-mcard.svg" alt="Mastercard" width={40} height={40} className="h-10" loading="lazy" />
             </div>
           </div>
         </div>
