@@ -63,7 +63,7 @@ export default function DashboardPage() {
       </header>
       {/* Main content */}
       <main className="pt-32 pb-16 relative overflow-hidden">
-        {/* Background decoration */}
+        {/* Background Decoration */}
         <svg className="absolute inset-0 w-full h-full opacity-20 -z-10" xmlns="https://www.w3.org/2000/svg" preserveAspectRatio="none" aria-hidden="true">
           <defs>
             <radialGradient id="dash-grad" cx="50%" cy="50%" r="75%" fx="50%" fy="50%">
