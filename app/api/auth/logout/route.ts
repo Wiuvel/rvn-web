@@ -6,8 +6,6 @@ export async function POST(request: NextRequest) {
     const cookieStore = await cookies();
     const hostname = request.nextUrl.hostname;
     const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
-
-    // Удаляем куки аутентификации
     cookieStore.set('admin_authenticated', '', {
       maxAge: 0,
       httpOnly: true,

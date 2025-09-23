@@ -59,7 +59,7 @@ export default function AdminPanel() {
   }
 
   if (!authState.isAuthenticated) {
-    return <AdminAuthForm />;
+    return <AdminAuthForm onAuthSuccess={checkAuthStatus} />;
   }
 
   const tabs = [

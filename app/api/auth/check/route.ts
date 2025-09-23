@@ -7,8 +7,6 @@ export async function GET() {
     const cookieStore = await cookies();
     const isAuthenticated = cookieStore.get('admin_authenticated')?.value === 'true';
     const username = cookieStore.get('admin_username')?.value;
-
-    // Проверяем, есть ли админы в системе
     const adminExists = await checkAdminExists();
 
     return NextResponse.json({

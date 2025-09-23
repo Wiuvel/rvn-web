@@ -14,7 +14,6 @@ export function middleware(request: NextRequest) {
   const accessHash = request.cookies.get('access_hash')?.value;
   
   if (accessGranted && accessHash) {
-    console.log('Access granted, allowing:', pathname);
     return NextResponse.next();
   }
   
@@ -39,6 +38,6 @@ export function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!api|_next/static|_next/image|favicon.ico|public|static|debug|robots.txt|sitemap.xml).*)',
+    '/((?!api|_next/static|_next/image|favicon.ico|public|static|robots.txt|sitemap.xml).*)',
   ],
 };

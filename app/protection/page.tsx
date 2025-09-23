@@ -16,84 +16,58 @@ export default function ProtectionPage() {
     const script = document.createElement('script');
     script.src = '/static/protection.up4m5/sf-turnstile.js';
     script.defer = true;
-    script.onload = () => {
-      console.log('Protection script loaded successfully');
-      setTimeout(() => {
-        if (typeof window === 'undefined') return;
+        script.onload = () => {
+          setTimeout(() => {
+            if (typeof window === 'undefined') return;
 
-        const win = window as TurnstileWindow;
+            const win = window as TurnstileWindow;
 
-        if (win.turnstile) {
-          console.log('Initializing Turnstile with JavaScript API.');
-          const container = document.getElementById('turnstile-container');
-          if (container) {
-            container.innerHTML = '';
-            const widgetId = win.turnstile.render(container, {
-              sitekey: '0x4AAAAAAB0s4O-sxm9ZnAQk',
-              theme: 'dark',
-              size: 'flexible',
-              callback: (token: string) => {
-                console.log('Turnstile success:', token);
-                if (typeof win.onSuccessCallback === 'function') {
-                  win.onSuccessCallback(token);
-                }
-              },
-              'error-callback': () => {
-                console.log('Turnstile error');
-                if (typeof win.onErrorCallback === 'function') {
-                  win.onErrorCallback();
-                }
-              },
-              'before-interactive-callback': () => {
-                console.log('Turnstile before interactive');
-                if (typeof win.onBeforeInteractiveCallback === 'function') {
-                  win.onBeforeInteractiveCallback();
-                }
-              },
-              'after-interactive-callback': () => {
-                console.log('Turnstile after interactive');
-                if (typeof win.onAfterInteractiveCallback === 'function') {
-                  win.onAfterInteractiveCallback();
-                }
-              },
-              'unsupported-callback': () => {
-                console.log('Turnstile unsupported');
-                if (typeof win.onUnsupportedCallback === 'function') {
-                  win.onUnsupportedCallback();
-                }
+            if (win.turnstile) {
+              const container = document.getElementById('turnstile-container');
+              if (container) {
+                container.innerHTML = '';
+                const widgetId = win.turnstile.render(container, {
+                  sitekey: '0x4AAAAAAB0s4O-sxm9ZnAQk',
+                  theme: 'dark',
+                  size: 'flexible',
+                  callback: (token: string) => {
+                    if (typeof win.onSuccessCallback === 'function') {
+                      win.onSuccessCallback(token);
+                    }
+                  },
+                  'error-callback': () => {
+                    if (typeof win.onErrorCallback === 'function') {
+                      win.onErrorCallback();
+                    }
+                  },
+                  'before-interactive-callback': () => {
+                    if (typeof win.onBeforeInteractiveCallback === 'function') {
+                      win.onBeforeInteractiveCallback();
+                    }
+                  },
+                  'after-interactive-callback': () => {
+                    if (typeof win.onAfterInteractiveCallback === 'function') {
+                      win.onAfterInteractiveCallback();
+                    }
+                  },
+                  'unsupported-callback': () => {
+                    if (typeof win.onUnsupportedCallback === 'function') {
+                      win.onUnsupportedCallback();
+                    }
+                  }
+                });
               }
-            });
-            
-            console.log('Turnstile widget created with ID:', widgetId);
-          }
-        }
-        
-        console.log('Skipping checkExistingCookie on protection page to avoid redirects.');
-        
-        if (win.resetTitleFill) {
-          console.log('Calling resetTitleFill.');
-          win.resetTitleFill();
-        }
-        
-        if (win.updateStatusText) {
-          console.log('Calling updateStatusText.');
-          win.updateStatusText();
-        }
-        
-        const siteTitleBase = document.getElementById('site-title-base');
-        const siteTitleFill = document.getElementById('site-title-fill');
-        const siteDesc = document.getElementById('site-desc');
-        const footer = document.getElementById('footer');
-        const turnstileContainer = document.querySelector('.cf-turnstile');
-        console.log('DOM elements check:', {
-          siteTitleBase: !!siteTitleBase,
-          siteTitleFill: !!siteTitleFill,
-          siteDesc: !!siteDesc,
-          footer: !!footer,
-          turnstileContainer: !!turnstileContainer
-        });
-      }, 100);
-    };
+            }
+
+            if (win.resetTitleFill) {
+              win.resetTitleFill();
+            }
+
+            if (win.updateStatusText) {
+              win.updateStatusText();
+            }
+          }, 100);
+        };
     script.onerror = (error) => {
       console.error('Failed to load protection script:', error);
     };
@@ -112,16 +86,13 @@ export default function ProtectionPage() {
 
   return (
     <>
-      <Script
-        src="https://challenges.cloudflare.com/turnstile/v0/api.js"
-        strategy="beforeInteractive"
-        onLoad={() => {
-          console.log('Turnstile API loaded successfully');
-        }}
-        onError={(error) => {
-          console.error('Failed to load Turnstile API:', error);
-        }}
-      />
+          <Script
+            src="https://challenges.cloudflare.com/turnstile/v0/api.js"
+            strategy="beforeInteractive"
+            onError={(error) => {
+              console.error('Failed to load Turnstile API:', error);
+            }}
+          />
       <div className="protection-page">
         <div className="center-container">
           {/* Site Title */}

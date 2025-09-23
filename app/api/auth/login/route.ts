@@ -6,7 +6,6 @@ export async function POST(request: NextRequest) {
   try {
     const { username, password } = await request.json();
 
-    // Валидация входных данных
     if (!username || !password) {
       return NextResponse.json(
         { error: 'Username and password are required' },
@@ -14,8 +13,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Проверяем, есть ли админы в системе
     const adminExists = await checkAdminExists();
+    
     if (!adminExists) {
       return NextResponse.json(
         { error: 'No admin exists. Please register first.' },
@@ -23,7 +22,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Аутентифицируем админа
     const result = await authenticateAdmin(username, password);
 
     if (!result.success) {
@@ -33,12 +31,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Устанавливаем куки для сессии
     const cookieStore = await cookies();
     const hostname = request.nextUrl.hostname;
     const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
-
-    // Устанавливаем куки аутентификации
     cookieStore.set('admin_authenticated', 'true', {
       maxAge: 60 * 60 * 24 * 7, // 7 дней
       httpOnly: true,

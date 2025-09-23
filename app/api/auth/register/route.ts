@@ -5,7 +5,6 @@ export async function POST(request: NextRequest) {
   try {
     const { username, password } = await request.json();
 
-    // Валидация входных данных
     if (!username || !password) {
       return NextResponse.json(
         { error: 'Username and password are required' },
@@ -27,7 +26,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Проверяем, есть ли уже админы в системе
     const adminExists = await checkAdminExists();
     if (adminExists) {
       return NextResponse.json(
@@ -36,7 +34,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Создаем админа
     const result = await createAdmin(username, password);
 
     if (!result.success) {
@@ -58,4 +55,6 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
+
 
