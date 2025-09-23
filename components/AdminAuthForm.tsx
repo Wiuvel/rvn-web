@@ -31,6 +31,9 @@ export default function AdminAuthForm({ onAuthSuccess }: AdminAuthFormProps) {
   const [showForm, setShowForm] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loginSuccess, setLoginSuccess] = useState(false);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const [csrfToken, setCsrfToken] = useState('');
 
   const validateUsername = (username: string): string | null => {
     if (!username) return 'Логин обязателен';
@@ -51,21 +54,35 @@ export default function AdminAuthForm({ onAuthSuccess }: AdminAuthFormProps) {
     return null;
   };
 
+  const getCsrfToken = useCallback(async () => {
+    try {
+      const response = await fetch('/api/auth/csrf');
+      const data = await response.json();
+      setCsrfToken(data.csrfToken);
+    } catch (error) {
+      console.error('Error getting CSRF token:', error);
+    }
+  }, []);
+
   const checkAuthStatus = useCallback(async () => {
     try {
+      setIsCheckingAuth(true);
       const response = await fetch('/api/auth/check');
       const data = await response.json();
       setAuthState(data);
     } catch (error) {
       console.error('Error checking auth status:', error);
+    } finally {
+      setIsCheckingAuth(false);
     }
   }, []);
 
   useEffect(() => {
     checkAuthStatus();
+    getCsrfToken();
     const timer = setTimeout(() => setShowForm(true), 100);
     return () => clearTimeout(timer);
-  }, [checkAuthStatus]);
+  }, [checkAuthStatus, getCsrfToken]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -119,7 +136,9 @@ export default function AdminAuthForm({ onAuthSuccess }: AdminAuthFormProps) {
         },
         body: JSON.stringify({
           username: formData.username,
-          password: formData.password
+          password: formData.password,
+          confirmPassword: formData.confirmPassword,
+          csrfToken
         }),
       });
 
@@ -142,13 +161,17 @@ export default function AdminAuthForm({ onAuthSuccess }: AdminAuthFormProps) {
         }, 2000);
       } else {
         setError('');
-        setIsLogin(true);
-        setFormData({
-          username: '',
-          password: '',
-          confirmPassword: ''
-        });
-        alert('Admin created successfully! Please log in.');
+        setIsTransitioning(true);
+        setTimeout(() => {
+          setIsLogin(true);
+          setFormData({
+            username: '',
+            password: '',
+            confirmPassword: ''
+          });
+          setIsTransitioning(false);
+          alert('Запись успешно создана. Войдите в систему.');
+        }, 300);
       }
     } catch (error) {
       console.error('Auth error:', error);
@@ -171,8 +194,10 @@ export default function AdminAuthForm({ onAuthSuccess }: AdminAuthFormProps) {
         />
         <div className={`relative z-10 max-w-md w-full space-y-8 p-6 sm:p-8 bg-neutral-900/40 backdrop-blur-md border border-neutral-800/50 rounded-2xl shadow-lg transition-all duration-700 ease-out ${
           showForm ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-8 scale-95'
-        }`}>
-          <div className="text-center">
+        } ${isTransitioning ? 'opacity-50 scale-95' : ''}`}>
+          <div className={`text-center transition-all duration-300 ease-in-out ${
+            isTransitioning ? 'opacity-0 transform scale-95' : 'opacity-100 transform scale-100'
+          }`}>
             {/* Logo */}
             <div className="flex justify-center mb-6">
               <div className="w-16 h-16 flex items-center justify-center">
@@ -182,6 +207,8 @@ export default function AdminAuthForm({ onAuthSuccess }: AdminAuthFormProps) {
                   width={64}
                   height={64}
                   className="w-full h-full object-contain"
+                  priority
+                  placeholder="empty"
                 />
               </div>
             </div>
@@ -193,22 +220,9 @@ export default function AdminAuthForm({ onAuthSuccess }: AdminAuthFormProps) {
               Войдите в систему для доступа к панели
             </p>
           </div>
-          <form onSubmit={handleSubmit} className="mt-8 space-y-6">
-            {error && (
-              <div className="bg-red-500/20 backdrop-blur-sm border border-red-400/50 text-red-200 px-4 py-3 rounded-xl text-sm">
-                {error}
-              </div>
-            )}
-            
-            {loginSuccess && (
-              <div className="bg-green-500/20 backdrop-blur-sm border border-green-400/50 text-green-200 px-4 py-3 rounded-xl text-sm flex items-center">
-                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-                Вход выполнен успешно! Переход в панель...
-              </div>
-            )}
-
+          <form className={`mt-8 space-y-6 transition-all duration-300 ease-in-out ${
+            isTransitioning ? 'opacity-0 transform translate-y-4' : 'opacity-100 transform translate-y-0'
+          }`} onSubmit={handleSubmit}>
             <div className="space-y-1">
               <label htmlFor="username" className="block text-sm font-medium text-white">
                 Логин
@@ -239,6 +253,25 @@ export default function AdminAuthForm({ onAuthSuccess }: AdminAuthFormProps) {
                 placeholder="Введите пароль"
               />
             </div>
+            
+            {error && (
+              <div className="bg-red-500/20 backdrop-blur-sm border border-red-400/50 text-red-200 px-4 py-3 rounded-xl text-sm flex items-center">
+                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                {error}
+              </div>
+            )}
+            
+            {loginSuccess && (
+              <div className="bg-green-500/20 backdrop-blur-sm border border-green-400/50 text-green-200 px-4 py-3 rounded-xl text-sm flex items-center">
+                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                Вход выполнен успешно. Переход в панель..
+              </div>
+            )}
+
             <div>
               <button
                 type="submit"
@@ -272,8 +305,10 @@ export default function AdminAuthForm({ onAuthSuccess }: AdminAuthFormProps) {
       />
       <div className={`relative z-10 max-w-md w-full space-y-8 p-6 sm:p-8 bg-neutral-900/40 backdrop-blur-md border border-neutral-800/50 rounded-2xl shadow-lg transition-all duration-700 ease-out ${
         showForm ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-8 scale-95'
-      }`}>
-        <div className="text-center">
+      } ${isTransitioning ? 'opacity-50 scale-95' : ''}`}>
+        <div className={`text-center transition-all duration-300 ease-in-out ${
+          isTransitioning ? 'opacity-0 transform scale-95' : 'opacity-100 transform scale-100'
+        }`}>
           {/* Logo */}
           <div className="flex justify-center mb-6">
             <div className="w-16 h-16 flex items-center justify-center">
@@ -283,12 +318,14 @@ export default function AdminAuthForm({ onAuthSuccess }: AdminAuthFormProps) {
                 width={64}
                 height={64}
                 className="w-full h-full object-contain"
+                priority
+                placeholder="empty"
               />
             </div>
           </div>
           
           <h2 className="text-2xl sm:text-3xl font-bold text-white">
-            {isLogin ? 'Admin Room' : 'Welcome!'}
+            {isLogin ? 'Raven Private' : 'Welcome!'}
           </h2>
           <p className="mt-2 text-sm sm:text-base text-neutral-400">
             {isLogin 
@@ -297,7 +334,9 @@ export default function AdminAuthForm({ onAuthSuccess }: AdminAuthFormProps) {
             }
           </p>
         </div>
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+        <form className={`mt-8 space-y-6 transition-all duration-300 ease-in-out ${
+          isTransitioning ? 'opacity-0 transform translate-y-4' : 'opacity-100 transform translate-y-0'
+        }`} onSubmit={handleSubmit}>
           <div className="space-y-4">
             <div className="space-y-1">
               <label htmlFor="username" className="block text-sm font-medium text-white">
@@ -347,14 +386,18 @@ export default function AdminAuthForm({ onAuthSuccess }: AdminAuthFormProps) {
               </div>
             )}
           </div>
+          
           {error && (
-            <div className="text-red-200 text-sm text-center bg-red-500/20 backdrop-blur-sm border border-red-400/50 rounded-xl p-3">
+            <div className="bg-red-500/20 backdrop-blur-sm border border-red-400/50 text-red-200 px-4 py-3 rounded-xl text-sm flex items-center">
+              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
               {error}
             </div>
           )}
 
           {loginSuccess && (
-            <div className="text-green-200 text-sm text-center bg-green-500/20 backdrop-blur-sm border border-green-400/50 rounded-xl p-3 flex items-center justify-center">
+            <div className="bg-green-500/20 backdrop-blur-sm border border-green-400/50 text-green-200 px-4 py-3 rounded-xl text-sm flex items-center">
               <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
@@ -380,26 +423,39 @@ export default function AdminAuthForm({ onAuthSuccess }: AdminAuthFormProps) {
               )}
             </button>
           </div>
-          <div className="text-center">
-            <button
-              type="button"
-              onClick={() => {
-                setIsLogin(!isLogin);
-                setError('');
-                setFormData({
-                  username: '',
-                  password: '',
-                  confirmPassword: ''
-                });
-              }}
-              className="text-sky-300 hover:underline text-sm font-medium transition-colors duration-200"
-            >
-              {isLogin 
-                ? "Нет аккаунта? Зарегистрироваться" 
-                : "Уже есть аккаунт? Войти"
-              }
-            </button>
-          </div>
+          {isCheckingAuth ? (
+            <div className="text-center">
+              <div className="flex items-center justify-center text-neutral-400 text-sm">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-sky-300 mr-2"></div>
+                Проверка статуса...
+              </div>
+            </div>
+          ) : !authState.adminExists ? (
+            <div className="text-center">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsTransitioning(true);
+                  setTimeout(() => {
+                    setIsLogin(!isLogin);
+                    setError('');
+                    setFormData({
+                      username: '',
+                      password: '',
+                      confirmPassword: ''
+                    });
+                    setIsTransitioning(false);
+                  }, 300);
+                }}
+                className="text-sky-300 hover:underline text-sm font-medium transition-colors duration-200"
+              >
+                {isLogin 
+                  ? "Нет аккаунта? Зарегистрироваться" 
+                  : "Уже есть аккаунт? Войти"
+                }
+              </button>
+            </div>
+          ) : null}
         </form>
       </div>
     </div>
