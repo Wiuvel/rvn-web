@@ -5,7 +5,7 @@ export const metadata: Metadata = {
   title: "Авторизация — RVN.GURU",
   description: "Страница входа и регистрации. Личный кабинет. Raven Private.",
   icons: {
-    icon: "/static/favicon.ico",
+    icon: "/favicon.ico",
   },
 };
 

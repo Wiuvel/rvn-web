@@ -4,7 +4,14 @@ import SmoothScroll from "@/components/SmoothScroll";
 import ConditionalLayout from "@/components/ConditionalLayout";
 import { pageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = pageMetadata.home;
+export const metadata: Metadata = {
+  ...pageMetadata.home,
+  icons: {
+    icon: '/favicon.ico',
+    shortcut: '/favicon.ico',
+    apple: '/favicon.ico',
+  },
+};
 
 export const viewport: Viewport = {
   themeColor: "#0f7fdb",
