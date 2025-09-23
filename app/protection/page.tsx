@@ -1,42 +1,14 @@
 'use client';
 
-import { useEffect, useState, Suspense } from 'react';
+import { useEffect, useState } from 'react';
 import Script from 'next/script';
-import { useRouter, useSearchParams } from 'next/navigation';
 
-function ProtectionPageContent() {
+export default function ProtectionPage() {
   const [isMounted, setIsMounted] = useState(false);
-  const router = useRouter();
-  const searchParams = useSearchParams();
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
-
-  useEffect(() => {
-    if (!isMounted) return;
-
-    const checkCookies = () => {
-      const accessGranted = document.cookie
-        .split('; ')
-        .find(row => row.startsWith('access_granted='))
-        ?.split('=')[1] === 'true';
-      
-      const accessHash = document.cookie
-        .split('; ')
-        .find(row => row.startsWith('access_hash='))
-        ?.split('=')[1];
-
-      if (accessGranted && accessHash) {
-        console.log('Access cookies found, redirecting user');
-        const redirectPath = searchParams.get('redirect') || '/';
-        router.push(redirectPath);
-        return;
-      }
-    };
-
-    checkCookies();
-  }, [isMounted, router, searchParams]);
 
   useEffect(() => {
     if (!isMounted) return;
@@ -96,7 +68,7 @@ function ProtectionPageContent() {
           }
         }
         
-        console.log('Protection page loaded, checking for existing cookies.');
+        console.log('Skipping checkExistingCookie on protection page to avoid redirects.');
         
         if (win.resetTitleFill) {
           console.log('Calling resetTitleFill.');
@@ -211,19 +183,4 @@ interface TurnstileWindow extends Window {
   checkExistingCookie?: () => boolean;
   resetTitleFill?: () => void;
   updateStatusText?: () => void;
-}
-
-export default function ProtectionPage() {
-  return (
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
-        </div>
-      </div>
-    }>
-      <ProtectionPageContent />
-    </Suspense>
-  );
 }
