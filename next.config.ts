@@ -6,6 +6,7 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   assetPrefix: process.env.NODE_ENV === 'production' ? '' : '',
   trailingSlash: false,
+  outputFileTracingRoot: process.cwd(),
 };
 
 export default nextConfig;

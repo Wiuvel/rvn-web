@@ -102,7 +102,7 @@ export default function AdvancedBentoGrid() {
       >
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
-            <div className="text-2xl sm:text-3xl font-bold text-white mb-2 animate-pulse">1,234</div>
+            <div className="text-2xl sm:text-3xl font-bold text-white mb-2 animate-pulse">0</div>
             <div className="text-xs sm:text-sm text-green-400 flex items-center justify-center">
               <span className="mr-1">↗</span>
               +12% за месяц

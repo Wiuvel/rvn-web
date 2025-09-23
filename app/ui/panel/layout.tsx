@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import '../../globals.css';
+import './panel.css';
 
 export const metadata: Metadata = {
   title: 'Серверная панель | Raven Private',

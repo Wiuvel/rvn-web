@@ -19,6 +19,7 @@ export default function AdminPanel() {
   });
   const [loading, setLoading] = useState(true);
   const [showPanel, setShowPanel] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     checkAuthStatus();
@@ -32,6 +33,18 @@ export default function AdminPanel() {
       setShowPanel(false);
     }
   }, [authState.isAuthenticated]);
+
+  // Закрытие мобильного меню при изменении размера экрана
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 768) {
+        setMobileMenuOpen(false);
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const checkAuthStatus = async () => {
     try {
@@ -81,19 +94,25 @@ export default function AdminPanel() {
     { id: 'settings', name: 'Настройки', icon: '⚙️' },
   ];
 
-  const stats = [
-    { title: 'Всего пользователей', value: '0', change: '0%', trend: 'up' },
-    { title: 'Активные сессии', value: '0', change: '0%', trend: 'up' },
-    { title: 'Серверы онлайн', value: '0/0', change: '0%', trend: 'stable' },
-    { title: 'Трафик за день', value: '0 GB', change: '0%', trend: 'up' },
-  ];
-
   return (
     <div className={`flex h-screen transition-all duration-700 ease-out ${
       showPanel ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
     }`}> 
+      {/* Mobile Menu Overlay */}
+      {mobileMenuOpen && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
-      <div className="w-64 bg-neutral-900 border-r border-neutral-800 flex flex-col">
+      <div className={`
+        fixed md:static inset-y-0 left-0 z-50 md:z-auto
+        w-64 bg-neutral-900 border-r border-neutral-800 flex flex-col
+        transform transition-transform duration-300 ease-in-out
+        ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+      `}>
         {/* Header */}
         <div className="p-6 border-b border-neutral-800">
           <div className="flex items-center space-x-3">
@@ -109,15 +128,21 @@ export default function AdminPanel() {
           {tabs.map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-left transition-colors ${
+              onClick={() => {
+                setActiveTab(tab.id);
+                // Закрываем мобильное меню при выборе вкладки
+                if (window.innerWidth < 768) {
+                  setMobileMenuOpen(false);
+                }
+              }}
+              className={`w-full flex items-center space-x-3 px-3 py-3 rounded-lg text-left transition-all duration-200 touch-manipulation ${
                 activeTab === tab.id
-                  ? 'bg-blue-600 text-white'
-                  : 'text-neutral-300 hover:bg-neutral-800 hover:text-white'
+                  ? 'bg-blue-600 text-white shadow-lg'
+                  : 'text-neutral-300 hover:bg-neutral-800 hover:text-white active:bg-neutral-700'
               }`}
             >
               <span className="text-lg">{tab.icon}</span>
-              <span className="font-medium">{tab.name}</span>
+              <span className="font-medium text-sm sm:text-base">{tab.name}</span>
             </button>
           ))}
         </nav>
@@ -132,32 +157,47 @@ export default function AdminPanel() {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col lg:ml-0">
         {/* Top Bar */}
-        <header className="bg-neutral-900 border-b border-neutral-800 px-6 py-4">
+        <header className="bg-neutral-900 border-b border-neutral-800 px-4 sm:px-6 py-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-white capitalize">
-              {tabs.find(tab => tab.id === activeTab)?.name}
-            </h2>
             <div className="flex items-center space-x-4">
-              <div className="text-sm text-neutral-400">
+              {/* Mobile Menu Button */}
+              <button
+                onClick={() => setMobileMenuOpen(true)}
+                className="md:hidden p-2 rounded-lg text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors touch-manipulation"
+                aria-label="Открыть меню"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </button>
+              
+              <h2 className="text-lg sm:text-xl font-semibold text-white capitalize">
+                {tabs.find(tab => tab.id === activeTab)?.name}
+              </h2>
+            </div>
+            
+            <div className="flex items-center space-x-2 sm:space-x-4">
+              <div className="hidden sm:block text-sm text-neutral-400">
                 {authState.username}
               </div>
-              <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white font-semibold">
+              <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white font-semibold text-sm">
                 {authState.username?.charAt(0).toUpperCase() || 'A'}
               </div>
               <button
                 onClick={handleLogout}
-                className="px-3 py-1 text-sm text-neutral-400 hover:text-white border border-neutral-600 hover:border-neutral-500 rounded transition-colors"
+                className="px-3 py-2 text-sm text-neutral-400 hover:text-white border border-neutral-600 hover:border-neutral-500 rounded-lg transition-colors touch-manipulation active:bg-neutral-800"
               >
-                Выйти
+                <span className="hidden sm:inline">Выйти</span>
+                <span className="sm:hidden">🚪</span>
               </button>
             </div>
           </div>
         </header>
 
         {/* Content */}
-        <main className="flex-1 p-6 overflow-y-auto">
+        <main className="flex-1 p-4 sm:p-6 overflow-y-auto">
           {activeTab === 'dashboard' && (
             <div className="space-y-6">
               <MagicBentoGrid />
@@ -165,44 +205,44 @@ export default function AdminPanel() {
           )}
 
           {activeTab === 'users' && (
-            <div className="space-y-6">
-              <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-6">
+            <div className="space-y-4 sm:space-y-6">
+              <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-4 sm:p-6">
                 <h3 className="text-lg font-semibold text-white mb-4">Управление пользователями</h3>
-                <div className="h-96 bg-neutral-800 rounded flex items-center justify-center">
-                  <p className="text-neutral-400">Таблица пользователей</p>
+                <div className="h-64 sm:h-96 bg-neutral-800 rounded flex items-center justify-center">
+                  <p className="text-neutral-400 text-sm sm:text-base">Таблица пользователей</p>
                 </div>
               </div>
             </div>
           )}
 
           {activeTab === 'servers' && (
-            <div className="space-y-6">
-              <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-6">
+            <div className="space-y-4 sm:space-y-6">
+              <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-4 sm:p-6">
                 <h3 className="text-lg font-semibold text-white mb-4">Управление серверами</h3>
-                <div className="h-96 bg-neutral-800 rounded flex items-center justify-center">
-                  <p className="text-neutral-400">Список серверов</p>
+                <div className="h-64 sm:h-96 bg-neutral-800 rounded flex items-center justify-center">
+                  <p className="text-neutral-400 text-sm sm:text-base">Список серверов</p>
                 </div>
               </div>
             </div>
           )}
 
           {activeTab === 'analytics' && (
-            <div className="space-y-6">
-              <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-6">
+            <div className="space-y-4 sm:space-y-6">
+              <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-4 sm:p-6">
                 <h3 className="text-lg font-semibold text-white mb-4">Аналитика и отчеты</h3>
-                <div className="h-96 bg-neutral-800 rounded flex items-center justify-center">
-                  <p className="text-neutral-400">Аналитические данные</p>
+                <div className="h-64 sm:h-96 bg-neutral-800 rounded flex items-center justify-center">
+                  <p className="text-neutral-400 text-sm sm:text-base">Аналитические данные</p>
                 </div>
               </div>
             </div>
           )}
 
           {activeTab === 'settings' && (
-            <div className="space-y-6">
-              <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-6">
+            <div className="space-y-4 sm:space-y-6">
+              <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-4 sm:p-6">
                 <h3 className="text-lg font-semibold text-white mb-4">Настройки системы</h3>
-                <div className="h-96 bg-neutral-800 rounded flex items-center justify-center">
-                  <p className="text-neutral-400">Настройки</p>
+                <div className="h-64 sm:h-96 bg-neutral-800 rounded flex items-center justify-center">
+                  <p className="text-neutral-400 text-sm sm:text-base">Настройки</p>
                 </div>
               </div>
             </div>

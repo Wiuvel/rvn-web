@@ -26,7 +26,7 @@ export default function ProtectionPage() {
               const container = document.getElementById('turnstile-container');
               if (container) {
                 container.innerHTML = '';
-                const widgetId = win.turnstile.render(container, {
+                win.turnstile.render(container, {
                   sitekey: '0x4AAAAAAB0s4O-sxm9ZnAQk',
                   theme: 'dark',
                   size: 'flexible',

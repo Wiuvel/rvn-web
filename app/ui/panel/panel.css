@@ -1,0 +1,31 @@
+.admin-panel-layout {
+    font-family: 'Exo 2', -apple-system, system-ui, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+}
+
+.admin-panel-layout * {
+    font-family: inherit;
+}
+
+@media (hover: none) and (pointer: coarse) {
+    .touch-manipulation {
+        touch-action: manipulation;
+        -webkit-tap-highlight-color: transparent;
+    }
+    
+    .admin-panel-layout button {
+        min-height: 44px;
+        min-width: 44px;
+    }
+}
+
+@media (min-width: 768px) and (max-width: 1024px) {
+    .admin-panel-layout {
+        font-size: 14px;
+    }
+}
+
+.admin-panel-layout input[type="text"],
+.admin-panel-layout input[type="password"],
+.admin-panel-layout input[type="email"] {
+    font-size: 16px;
+}
