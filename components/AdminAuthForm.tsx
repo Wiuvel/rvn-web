@@ -27,6 +27,8 @@ export default function AdminAuthForm({ onAuthSuccess }: AdminAuthFormProps) {
     username: null,
     adminExists: false
   });
+  const [showForm, setShowForm] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const validateUsername = (username: string): string | null => {
     if (!username) return 'Логин обязателен';
@@ -49,6 +51,8 @@ export default function AdminAuthForm({ onAuthSuccess }: AdminAuthFormProps) {
 
   useEffect(() => {
     checkAuthStatus();
+    const timer = setTimeout(() => setShowForm(true), 100);
+    return () => clearTimeout(timer);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -74,29 +78,30 @@ export default function AdminAuthForm({ onAuthSuccess }: AdminAuthFormProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setIsSubmitting(true);
     setError('');
 
     try {
-      // Валидация логина
       const usernameError = validateUsername(formData.username);
       if (usernameError) {
         setError(usernameError);
         setLoading(false);
+        setIsSubmitting(false);
         return;
       }
 
-      // Валидация пароля
       const passwordError = validatePassword(formData.password);
       if (passwordError) {
         setError(passwordError);
         setLoading(false);
+        setIsSubmitting(false);
         return;
       }
 
-      // Валидация подтверждения пароля для регистрации
       if (!isLogin && formData.password !== formData.confirmPassword) {
         setError('Пароли не совпадают');
         setLoading(false);
+        setIsSubmitting(false);
         return;
       }
 
@@ -122,19 +127,18 @@ export default function AdminAuthForm({ onAuthSuccess }: AdminAuthFormProps) {
       }
 
       if (isLogin) {
-        // Обновляем состояние аутентификации
-        setAuthState({
-          isAuthenticated: true,
-          username: formData.username,
-          adminExists: true
-        });
-        
-        // Вызываем callback для обновления родительского компонента
-        if (onAuthSuccess) {
-          onAuthSuccess();
-        }
+        setTimeout(() => {
+          setAuthState({
+            isAuthenticated: true,
+            username: formData.username,
+            adminExists: true
+          });
+          
+          if (onAuthSuccess) {
+            onAuthSuccess();
+          }
+        }, 500);
       } else {
-        // После регистрации переключаемся на форму входа
         setError('');
         setIsLogin(true);
         setFormData({
@@ -149,6 +153,7 @@ export default function AdminAuthForm({ onAuthSuccess }: AdminAuthFormProps) {
       setError('Network error. Please try again.');
     } finally {
       setLoading(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -199,7 +204,7 @@ export default function AdminAuthForm({ onAuthSuccess }: AdminAuthFormProps) {
                 onClick={() => window.location.reload()}
                 className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
               >
-                Перейти в админ панель
+                Перейти в серверную панель
               </button>
               <button
                 onClick={handleLogout}
@@ -215,8 +220,10 @@ export default function AdminAuthForm({ onAuthSuccess }: AdminAuthFormProps) {
   }
   if (authState.adminExists) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-neutral-900">
-        <div className="max-w-md w-full space-y-8 p-8 bg-neutral-800 border border-neutral-700 rounded-lg shadow-xl">
+      <div className="min-h-screen flex items-center justify-center bg-neutral-900 px-4 sm:px-6 lg:px-8">
+        <div className={`max-w-md w-full space-y-8 p-6 sm:p-8 bg-neutral-800 border border-neutral-700 rounded-lg shadow-xl transition-all duration-700 ease-out ${
+          showForm ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-8 scale-95'
+        }`}>
           <div className="text-center">
             {/* Logo */}
             <div className="flex justify-center mb-6">
@@ -231,10 +238,10 @@ export default function AdminAuthForm({ onAuthSuccess }: AdminAuthFormProps) {
               </div>
             </div>
 
-            <h2 className="text-3xl font-bold text-white">
-              Sign In
+            <h2 className="text-2xl sm:text-3xl font-bold text-white">
+              Control Panel
             </h2>
-            <p className="mt-2 text-neutral-400">
+            <p className="mt-2 text-sm sm:text-base text-neutral-400">
               Войдите в систему для доступа к панели
             </p>
           </div>
@@ -245,8 +252,8 @@ export default function AdminAuthForm({ onAuthSuccess }: AdminAuthFormProps) {
               </div>
             )}
 
-            <div>
-              <label htmlFor="username" className="block text-sm font-medium text-neutral-300 mb-2">
+            <div className="space-y-1">
+              <label htmlFor="username" className="block text-sm font-medium text-neutral-300">
                 Логин
               </label>
               <input
@@ -256,12 +263,12 @@ export default function AdminAuthForm({ onAuthSuccess }: AdminAuthFormProps) {
                 required
                 value={formData.username}
                 onChange={handleChange}
-                className="w-full px-3 py-3 border border-neutral-600 rounded-md shadow-sm placeholder-neutral-500 bg-neutral-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Введите логин (только английские буквы и цифры)"
+                className="w-full px-4 py-3 border border-neutral-600 rounded-lg shadow-sm placeholder-neutral-500 bg-neutral-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:border-neutral-500"
+                placeholder="Введите логин"
               />
             </div>
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-neutral-300 mb-2">
+            <div className="space-y-1">
+              <label htmlFor="password" className="block text-sm font-medium text-neutral-300">
                 Пароль
               </label>
               <input
@@ -271,17 +278,26 @@ export default function AdminAuthForm({ onAuthSuccess }: AdminAuthFormProps) {
                 required
                 value={formData.password}
                 onChange={handleChange}
-                className="w-full px-3 py-3 border border-neutral-600 rounded-md shadow-sm placeholder-neutral-500 bg-neutral-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Введите пароль (английские буквы, цифры, спецсимволы, без пробелов)"
+                className="w-full px-4 py-3 border border-neutral-600 rounded-lg shadow-sm placeholder-neutral-500 bg-neutral-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:border-neutral-500"
+                placeholder="Введите пароль"
               />
             </div>
             <div>
               <button
                 type="submit"
-                disabled={loading}
-                className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                disabled={loading || isSubmitting}
+                className={`w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98] ${
+                  isSubmitting ? 'animate-pulse' : ''
+                }`}
               >
-                {loading ? 'Вход...' : 'Войти'}
+                {loading || isSubmitting ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Вход...
+                  </>
+                ) : (
+                  'Войти'
+                )}
               </button>
             </div>
           </form>
@@ -290,8 +306,10 @@ export default function AdminAuthForm({ onAuthSuccess }: AdminAuthFormProps) {
     );
   }
   return (
-    <div className="min-h-screen flex items-center justify-center bg-neutral-900">
-      <div className="max-w-md w-full space-y-8 p-8 bg-neutral-800 border border-neutral-700 rounded-lg shadow-xl">
+    <div className="min-h-screen flex items-center justify-center bg-neutral-900 px-4 sm:px-6 lg:px-8">
+      <div className={`max-w-md w-full space-y-8 p-6 sm:p-8 bg-neutral-800 border border-neutral-700 rounded-lg shadow-xl transition-all duration-700 ease-out ${
+        showForm ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-8 scale-95'
+      }`}>
         <div className="text-center">
           {/* Logo */}
           <div className="flex justify-center mb-6">
@@ -306,10 +324,10 @@ export default function AdminAuthForm({ onAuthSuccess }: AdminAuthFormProps) {
             </div>
           </div>
           
-          <h2 className="text-3xl font-bold text-white">
-            {isLogin ? 'Sign In' : 'Sign Up'}
+          <h2 className="text-2xl sm:text-3xl font-bold text-white">
+            {isLogin ? 'Control Room' : 'Welcome!'}
           </h2>
-          <p className="mt-2 text-neutral-400">
+          <p className="mt-2 text-sm sm:text-base text-neutral-400">
             {isLogin 
               ? 'Войдите в систему для доступа к панели' 
               : 'Создайте первый аккаунт для входа'
@@ -318,7 +336,7 @@ export default function AdminAuthForm({ onAuthSuccess }: AdminAuthFormProps) {
         </div>
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           <div className="space-y-4">
-            <div>
+            <div className="space-y-1">
               <label htmlFor="username" className="block text-sm font-medium text-neutral-300">
                 Логин
               </label>
@@ -329,11 +347,11 @@ export default function AdminAuthForm({ onAuthSuccess }: AdminAuthFormProps) {
                 required
                 value={formData.username}
                 onChange={handleChange}
-                className="mt-1 block w-full px-3 py-3 border border-neutral-600 rounded-md shadow-sm placeholder-neutral-500 bg-neutral-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                className="block w-full px-4 py-3 border border-neutral-600 rounded-lg shadow-sm placeholder-neutral-500 bg-neutral-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:border-neutral-500"
                 placeholder="Введите логин"
               />
             </div>
-            <div>
+            <div className="space-y-1">
               <label htmlFor="password" className="block text-sm font-medium text-neutral-300">
                 Пароль
               </label>
@@ -344,12 +362,12 @@ export default function AdminAuthForm({ onAuthSuccess }: AdminAuthFormProps) {
                 required
                 value={formData.password}
                 onChange={handleChange}
-                className="mt-1 block w-full px-3 py-3 border border-neutral-600 rounded-md shadow-sm placeholder-neutral-500 bg-neutral-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                className="block w-full px-4 py-3 border border-neutral-600 rounded-lg shadow-sm placeholder-neutral-500 bg-neutral-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:border-neutral-500"
                 placeholder="Введите пароль"
               />
             </div>
             {!isLogin && (
-              <div>
+              <div className="space-y-1">
                 <label htmlFor="confirmPassword" className="block text-sm font-medium text-neutral-300">
                   Подтвердите пароль
                 </label>
@@ -360,7 +378,7 @@ export default function AdminAuthForm({ onAuthSuccess }: AdminAuthFormProps) {
                   required={!isLogin}
                   value={formData.confirmPassword}
                   onChange={handleChange}
-                  className="mt-1 block w-full px-3 py-3 border border-neutral-600 rounded-md shadow-sm placeholder-neutral-500 bg-neutral-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                  className="block w-full px-4 py-3 border border-neutral-600 rounded-lg shadow-sm placeholder-neutral-500 bg-neutral-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:border-neutral-500"
                   placeholder="Подтвердите пароль"
                 />
               </div>
@@ -375,10 +393,19 @@ export default function AdminAuthForm({ onAuthSuccess }: AdminAuthFormProps) {
           <div>
             <button
               type="submit"
-              disabled={loading}
-              className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              disabled={loading || isSubmitting}
+              className={`w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98] ${
+                isSubmitting ? 'animate-pulse' : ''
+              }`}
             >
-              {loading ? 'Обработка...' : (isLogin ? 'Войти' : 'Зарегистрироваться')}
+              {loading || isSubmitting ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  {isLogin ? 'Вход...' : 'Регистрация...'}
+                </>
+              ) : (
+                isLogin ? 'Войти' : 'Зарегистрироваться'
+              )}
             </button>
           </div>
           <div className="text-center">

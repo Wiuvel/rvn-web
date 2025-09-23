@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import AdminAuthForm from '@/components/AdminAuthForm';
+import MagicBentoGrid from '@/components/ui/MagicBentoGrid';
 
 interface AuthState {
   isAuthenticated: boolean;
@@ -17,10 +18,20 @@ export default function AdminPanel() {
     adminExists: false
   });
   const [loading, setLoading] = useState(true);
+  const [showPanel, setShowPanel] = useState(false);
 
   useEffect(() => {
     checkAuthStatus();
   }, []);
+
+  useEffect(() => {
+    if (authState.isAuthenticated) {
+      const timer = setTimeout(() => setShowPanel(true), 100);
+      return () => clearTimeout(timer);
+    } else {
+      setShowPanel(false);
+    }
+  }, [authState.isAuthenticated]);
 
   const checkAuthStatus = async () => {
     try {
@@ -78,7 +89,9 @@ export default function AdminPanel() {
   ];
 
   return (
-    <div className="flex h-screen"> 
+    <div className={`flex h-screen transition-all duration-700 ease-out ${
+      showPanel ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+    }`}> 
       {/* Sidebar */}
       <div className="w-64 bg-neutral-900 border-r border-neutral-800 flex flex-col">
         {/* Header */}
@@ -147,42 +160,7 @@ export default function AdminPanel() {
         <main className="flex-1 p-6 overflow-y-auto">
           {activeTab === 'dashboard' && (
             <div className="space-y-6">
-              {/* Stats Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {stats.map((stat, index) => (
-                  <div key={index} className="bg-neutral-900 border border-neutral-800 rounded-lg p-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-neutral-400">{stat.title}</p>
-                        <p className="text-2xl font-bold text-white mt-1">{stat.value}</p>
-                      </div>
-                      <div className={`text-sm ${
-                        stat.trend === 'up' ? 'text-green-400' : 
-                        stat.trend === 'down' ? 'text-red-400' : 
-                        'text-neutral-400'
-                      }`}>
-                        {stat.change}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Charts Placeholder */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-6">
-                  <h3 className="text-lg font-semibold text-white mb-4">Активность пользователей</h3>
-                  <div className="h-64 bg-neutral-800 rounded flex items-center justify-center">
-                    <p className="text-neutral-400">График активности</p>
-                  </div>
-                </div>
-                <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-6">
-                  <h3 className="text-lg font-semibold text-white mb-4">Использование серверов</h3>
-                  <div className="h-64 bg-neutral-800 rounded flex items-center justify-center">
-                    <p className="text-neutral-400">График серверов</p>
-                  </div>
-                </div>
-              </div>
+              <MagicBentoGrid />
             </div>
           )}
 
