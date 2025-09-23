@@ -18,27 +18,23 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
   
-  if (pathname.startsWith('/auth') || pathname.startsWith('/dashboard') || pathname.startsWith('/legal') || pathname === '/') {
-    if (pathname === '/protection') {
-      return NextResponse.next();
-    }
-    
-    const targetPath = pathname + request.nextUrl.search;
-    const response = NextResponse.redirect(new URL(`/protection?redirect=${encodeURIComponent(targetPath)}`, request.url));
-    const hostname = request.nextUrl.hostname;
-    const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
-    
-    response.cookies.set('target_path', targetPath, {
-      maxAge: 60 * 60 * 2,
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production' && !isLocalhost,
-      sameSite: 'strict',
-      path: '/'
-    });
-    return response;
+  if (pathname === '/protection' || pathname.startsWith('/ui/panel')) {
+    return NextResponse.next();
   }
   
-  return NextResponse.next();
+  const targetPath = pathname + request.nextUrl.search;
+  const response = NextResponse.redirect(new URL(`/protection?redirect=${encodeURIComponent(targetPath)}`, request.url));
+  const hostname = request.nextUrl.hostname;
+  const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
+  
+  response.cookies.set('target_path', targetPath, {
+    maxAge: 60 * 60 * 2,
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production' && !isLocalhost,
+    sameSite: 'strict',
+    path: '/'
+  });
+  return response;
 }
 
 export const config = {

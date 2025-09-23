@@ -10,7 +10,10 @@
   },
   "dependencies": {
     "@headlessui/react": "^2.2.8",
+    "@supabase/supabase-js": "^2.57.4",
     "@tanstack/react-query": "^5.89.0",
+    "@types/bcryptjs": "^2.4.6",
+    "bcryptjs": "^3.0.2",
     "framer-motion": "^12.23.16",
     "gsap": "^3.13.0",
     "next": "15.5.3",

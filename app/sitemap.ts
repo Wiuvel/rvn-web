@@ -65,13 +65,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
 
   const dynamicPages: MetadataRoute.Sitemap = [];
 
-  // - Страницы блога
-  // - Страницы новостей
-  // - Страницы тарифов
-  // - Страницы приложений
+  // - Page Apps, News..
 
   return [...staticPages, ...legalPages, ...dynamicPages];
 }
+
+
 
 
 

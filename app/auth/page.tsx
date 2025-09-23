@@ -1,13 +1,8 @@
 import { Metadata } from 'next';
 import AuthIsolatedClient from './AuthIsolatedClient';
+import { pageMetadata } from '@/lib/seo';
 
-export const metadata: Metadata = {
-  title: "Авторизация — RVN.GURU",
-  description: "Страница входа и регистрации. Личный кабинет. Raven Private.",
-  icons: {
-    icon: "/favicon.ico",
-  },
-};
+export const metadata: Metadata = pageMetadata.auth;
 
 export default function AuthPage() {
   return <AuthIsolatedClient />;

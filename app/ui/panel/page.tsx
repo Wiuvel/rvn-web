@@ -1,10 +1,66 @@
 'use client';
 
-import { useState } from 'react';
-import Image from 'next/image';
+import { useState, useEffect } from 'react';
+import AdminAuthForm from '@/components/AdminAuthForm';
+
+interface AuthState {
+  isAuthenticated: boolean;
+  username: string | null;
+  adminExists: boolean;
+}
 
 export default function AdminPanel() {
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [authState, setAuthState] = useState<AuthState>({
+    isAuthenticated: false,
+    username: null,
+    adminExists: false
+  });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    checkAuthStatus();
+  }, []);
+
+  const checkAuthStatus = async () => {
+    try {
+      const response = await fetch('/api/auth/check');
+      const data = await response.json();
+      setAuthState(data);
+    } catch (error) {
+      console.error('Error checking auth status:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      setAuthState({
+        isAuthenticated: false,
+        username: null,
+        adminExists: false
+      });
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-neutral-900">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-neutral-400">Загрузка...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!authState.isAuthenticated) {
+    return <AdminAuthForm />;
+  }
 
   const tabs = [
     { id: 'dashboard', name: 'Обзор', icon: '📊' },
@@ -72,11 +128,17 @@ export default function AdminPanel() {
             </h2>
             <div className="flex items-center space-x-4">
               <div className="text-sm text-neutral-400">
-                Администратор
+                {authState.username}
               </div>
               <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white font-semibold">
-                A
+                {authState.username?.charAt(0).toUpperCase() || 'A'}
               </div>
+              <button
+                onClick={handleLogout}
+                className="px-3 py-1 text-sm text-neutral-400 hover:text-white border border-neutral-600 hover:border-neutral-500 rounded transition-colors"
+              >
+                Выйти
+              </button>
             </div>
           </div>
         </header>
@@ -172,4 +234,3 @@ export default function AdminPanel() {
     </div>
   );
 }
-
