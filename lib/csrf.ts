@@ -1,47 +1,36 @@
 import { randomBytes, createHmac, timingSafeEqual } from 'crypto';
+import { redisManager } from './redis';
+import { logger } from './secure-logger';
 
 const CSRF_SECRET = process.env.CSRF_SECRET || 'default-csrf-secret-change-in-production';
-const CSRF_TOKEN_LIFETIME = 60 * 60 * 1000; // 1 hour
+const CSRF_TOKEN_LIFETIME = 60 * 60; // 1 hour in seconds
 
-interface CSRFStore {
-  [sessionId: string]: {
-    token: string;
-    createdAt: number;
-  };
+export async function generateCSRFToken(sessionId: string): Promise<string> {
+  try {
+    const timestamp = Date.now().toString();
+    const nonce = randomBytes(16).toString('hex');
+    const data = `${sessionId}-${timestamp}-${nonce}`;
+    const signature = createHmac('sha256', CSRF_SECRET)
+      .update(data)
+      .digest('hex');
+    
+    const token = `${data}-${signature}`;
+    
+    // Store token in Redis with TTL
+    const redisKey = `csrf:${sessionId}`;
+    await redisManager.set(redisKey, token, CSRF_TOKEN_LIFETIME);
+    
+    return token;
+  } catch (error) {
+    logger.error('Error generating CSRF token', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      sessionId: sessionId.substring(0, 8) + '...'
+    });
+    throw new Error('Failed to generate CSRF token');
+  }
 }
 
-const csrfStore: CSRFStore = {};
-
-// Cleanup expired tokens
-setInterval(() => {
-  const now = Date.now();
-  Object.keys(csrfStore).forEach(sessionId => {
-    if (now - csrfStore[sessionId].createdAt > CSRF_TOKEN_LIFETIME) {
-      delete csrfStore[sessionId];
-    }
-  });
-}, 5 * 60 * 1000); // Cleanup every 5 minutes
-
-export function generateCSRFToken(sessionId: string): string {
-  const timestamp = Date.now().toString();
-  const nonce = randomBytes(16).toString('hex');
-  const data = `${sessionId}-${timestamp}-${nonce}`;
-  const signature = createHmac('sha256', CSRF_SECRET)
-    .update(data)
-    .digest('hex');
-  
-  const token = `${data}-${signature}`;
-  
-  // Store token for validation
-  csrfStore[sessionId] = {
-    token,
-    createdAt: Date.now()
-  };
-  
-  return token;
-}
-
-export function verifyCSRFToken(token: string, sessionId: string): boolean {
+export async function verifyCSRFToken(token: string, sessionId: string): Promise<boolean> {
   try {
     const parts = token.split('-');
     if (parts.length < 4) return false;
@@ -53,15 +42,16 @@ export function verifyCSRFToken(token: string, sessionId: string): boolean {
     
     if (tokenSessionId !== sessionId) return false;
     
-    // Check if token exists in store
-    const storedToken = csrfStore[sessionId];
-    if (!storedToken || storedToken.token !== token) return false;
+    // Check if token exists in Redis
+    const redisKey = `csrf:${sessionId}`;
+    const storedToken = await redisManager.get(redisKey);
+    if (!storedToken || storedToken !== token) return false;
     
     // Check token is not older than 1 hour
     const tokenTime = parseInt(timestamp || '0');
     const now = Date.now();
-    if (now - tokenTime > CSRF_TOKEN_LIFETIME) {
-      delete csrfStore[sessionId];
+    if (now - tokenTime > CSRF_TOKEN_LIFETIME * 1000) {
+      await redisManager.del(redisKey);
       return false;
     }
     
@@ -75,7 +65,11 @@ export function verifyCSRFToken(token: string, sessionId: string): boolean {
     const expectedBuffer = Buffer.from(expectedSignature, 'hex');
     
     return timingSafeEqual(signatureBuffer, expectedBuffer);
-  } catch {
+  } catch (error) {
+    logger.error('Error verifying CSRF token', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      sessionId: sessionId.substring(0, 8) + '...'
+    });
     return false;
   }
 }
@@ -84,6 +78,14 @@ export function generateSessionId(): string {
   return randomBytes(32).toString('hex');
 }
 
-export function revokeCSRFToken(sessionId: string): void {
-  delete csrfStore[sessionId];
+export async function revokeCSRFToken(sessionId: string): Promise<void> {
+  try {
+    const redisKey = `csrf:${sessionId}`;
+    await redisManager.del(redisKey);
+  } catch (error) {
+    logger.error('Error revoking CSRF token', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      sessionId: sessionId.substring(0, 8) + '...'
+    });
+  }
 }

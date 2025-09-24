@@ -420,8 +420,10 @@ button, a {
 }
 
 .glass-btn {
-    display: inline-block;
-    min-width: 180px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 120px;
     padding: 0.75rem 1.5rem;
     border-radius: 0.75rem;
     font-weight: 500;
@@ -431,6 +433,7 @@ button, a {
     background: rgba(255, 255, 255, 0.08);
     backdrop-filter: blur(12px);
     transition: all 0.3s ease;
+    gap: 8px;
 }
 
 .glass-btn:hover {
@@ -551,7 +554,7 @@ button, a {
     border-radius: 50%;
     border-top-color: #fff;
     animation: spin 1s ease-in-out infinite;
-    margin-right: 8px;
+    margin-right: 0;
 }
 
 @keyframes spin {

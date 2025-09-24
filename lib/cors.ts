@@ -11,7 +11,7 @@ interface CorsOptions {
 const defaultOptions: CorsOptions = {
   origin: process.env.NODE_ENV === 'production' 
     ? process.env.ALLOWED_ORIGINS?.split(',') || false
-    : true, // Allow all origins in development
+    : true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: [
     'Content-Type',
@@ -22,7 +22,7 @@ const defaultOptions: CorsOptions = {
     'Origin'
   ],
   credentials: true,
-  maxAge: 86400 // 24 hours
+  maxAge: 86400
 };
 
 export function setCorsHeaders(response: NextResponse, options: CorsOptions = {}): NextResponse {

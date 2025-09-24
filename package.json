@@ -13,6 +13,7 @@
     "@supabase/supabase-js": "^2.57.4",
     "@tanstack/react-query": "^5.89.0",
     "@types/bcryptjs": "^2.4.6",
+    "@types/redis": "^4.0.10",
     "bcryptjs": "^3.0.2",
     "clsx": "^2.1.1",
     "framer-motion": "^12.23.16",
@@ -22,6 +23,7 @@
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-hook-form": "^7.63.0",
+    "redis": "^5.8.2",
     "tailwind-merge": "^3.3.1",
     "zod": "^4.1.9",
     "zustand": "^5.0.8"

@@ -41,7 +41,6 @@ class SecureLogger {
       )) {
         sanitized[key] = '[REDACTED]';
       } else if (key.toLowerCase().includes('ip')) {
-        // Anonymize IP addresses
         sanitized[key] = this.anonymizeIP(String(sanitized[key]));
       } else if (typeof sanitized[key] === 'object') {
         sanitized[key] = this.sanitizeData(sanitized[key]);
@@ -54,7 +53,6 @@ class SecureLogger {
   private anonymizeIP(ip: string): string {
     if (!ip || ip === 'unknown') return 'unknown';
     
-    // IPv4 anonymization (keep first 3 octets)
     if (ip.includes('.')) {
       const parts = ip.split('.');
       if (parts.length === 4) {
@@ -62,7 +60,6 @@ class SecureLogger {
       }
     }
     
-    // IPv6 anonymization (keep first 3 groups)
     if (ip.includes(':')) {
       const parts = ip.split(':');
       if (parts.length >= 4) {
@@ -94,7 +91,6 @@ class SecureLogger {
         entry.context ? entry.context : ''
       );
     } else {
-      // In production, send to external logging service
       console.log(JSON.stringify(entry));
     }
   }

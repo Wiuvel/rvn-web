@@ -29,7 +29,6 @@ export class ServerValidator {
       errors.push('Username can only contain English letters and numbers');
     }
 
-    // Check for potentially dangerous characters
     if (/[<>'"&]/.test(username)) {
       errors.push('Username contains invalid characters');
     }
@@ -69,7 +68,6 @@ export class ServerValidator {
       errors.push('Password can only contain English letters, numbers and special characters');
     }
 
-    // Check for weak passwords
     if (password === password.toLowerCase() || password === password.toUpperCase()) {
       errors.push('Password must contain both uppercase and lowercase letters');
     }
@@ -82,7 +80,6 @@ export class ServerValidator {
       errors.push('Password must contain at least one special character');
     }
 
-    // Check for common passwords
     const commonPasswords = [
       'password', '123456', 'admin', 'root', 'user', 'test',
       'qwerty', 'abc123', 'password123', 'admin123'
@@ -118,8 +115,8 @@ export class ServerValidator {
 
     return input
       .trim()
-      .replace(/[<>'"&]/g, '') // Remove potentially dangerous characters
-      .slice(0, 1000); // Limit length
+      .replace(/[<>'"&]/g, '')
+      .slice(0, 1000);
   }
 
   static validateRequestData(data: unknown): ValidationResult {
@@ -130,7 +127,6 @@ export class ServerValidator {
       return { isValid: false, errors };
     }
 
-    // Check that all values are strings
     for (const key in data) {
       if (typeof (data as Record<string, unknown>)[key] !== 'string') {
         errors.push(`Field '${key}' must be a string`);

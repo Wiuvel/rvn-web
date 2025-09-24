@@ -1,21 +1,5 @@
-interface RateLimitStore {
-  [key: string]: {
-    count: number;
-    resetTime: number;
-  };
-}
-
-const store: RateLimitStore = {};
-
-// Automatic cleanup every 5 minutes
-setInterval(() => {
-  const now = Date.now();
-  Object.keys(store).forEach(key => {
-    if (store[key].resetTime < now) {
-      delete store[key];
-    }
-  });
-}, 5 * 60 * 1000);
+import { redisManager } from './redis';
+import { logger } from './secure-logger';
 
 export interface RateLimitOptions {
   windowMs: number;
@@ -40,60 +24,58 @@ export class RateLimiter {
     return ip;
   }
 
-  private cleanup(): void {
-    const now = Date.now();
-    Object.keys(store).forEach(key => {
-      if (store[key].resetTime < now) {
-        delete store[key];
-      }
-    });
-  }
-
   async check(request: Request): Promise<{
     allowed: boolean;
     remaining: number;
     resetTime: number;
   }> {
-    this.cleanup();
-    
-    const key = this.getKey(request);
-    const now = Date.now();
-    const windowStart = now - this.options.windowMs;
-    
-    if (!store[key] || store[key].resetTime < windowStart) {
-      store[key] = {
-        count: 1,
-        resetTime: now + this.options.windowMs
-      };
+    try {
+      const key = this.getKey(request);
+      const redisKey = `rate_limit:${key}`;
+      const windowSeconds = Math.floor(this.options.windowMs / 1000);
+      
+      // Use Redis INCR with TTL for atomic operations
+      const count = await redisManager.incr(redisKey, windowSeconds);
+      
+      if (count === 1) {
+        // First request in window, set TTL
+        await redisManager.expire(redisKey, windowSeconds);
+      }
+      
+      const remaining = Math.max(0, this.options.maxRequests - count);
+      const resetTime = Date.now() + this.options.windowMs;
+      
+      if (count > this.options.maxRequests) {
+        return {
+          allowed: false,
+          remaining: 0,
+          resetTime
+        };
+      }
       
       return {
         allowed: true,
-        remaining: this.options.maxRequests - 1,
-        resetTime: store[key].resetTime
+        remaining,
+        resetTime
       };
-    }
-    
-    if (store[key].count >= this.options.maxRequests) {
+    } catch (error) {
+      logger.error('Rate limiting error', {
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+      
+      // Fail open - allow request if Redis is down
       return {
-        allowed: false,
-        remaining: 0,
-        resetTime: store[key].resetTime
+        allowed: true,
+        remaining: this.options.maxRequests - 1,
+        resetTime: Date.now() + this.options.windowMs
       };
     }
-    
-    store[key].count++;
-    
-    return {
-      allowed: true,
-      remaining: this.options.maxRequests - store[key].count,
-      resetTime: store[key].resetTime
-    };
   }
 }
 
 export const authRateLimit = new RateLimiter({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  maxRequests: 5, // 5 login attempts
+  windowMs: 5 * 60 * 1000,
+  maxRequests: 5,
   keyGenerator: (request) => {
     const forwarded = request.headers.get('x-forwarded-for');
     const ip = forwarded ? forwarded.split(',')[0] : 'unknown';
@@ -103,6 +85,6 @@ export const authRateLimit = new RateLimiter({
 });
 
 export const generalRateLimit = new RateLimiter({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  maxRequests: 100, // 100 requests
+  windowMs: 5 * 60 * 1000,
+  maxRequests: 100,
 });

@@ -30,7 +30,6 @@ export async function POST(request: NextRequest) {
 
     const { username, password, csrfToken } = await request.json();
 
-    // Валидация входных данных
     const dataValidation = ServerValidator.validateRequestData({ username, password });
     if (!dataValidation.isValid) {
       return setCorsHeaders(
@@ -41,7 +40,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Валидация username
     const usernameValidation = ServerValidator.validateUsername(username);
     if (!usernameValidation.isValid) {
       return setCorsHeaders(
@@ -52,7 +50,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Валидация password
     const passwordValidation = ServerValidator.validatePassword(password);
     if (!passwordValidation.isValid) {
       return setCorsHeaders(
@@ -65,7 +62,7 @@ export async function POST(request: NextRequest) {
 
     // CSRF protection
     const currentSessionId = request.cookies.get('session_id')?.value;
-    if (!currentSessionId || !csrfToken || !verifyCSRFToken(csrfToken, currentSessionId)) {
+    if (!currentSessionId || !csrfToken || !(await verifyCSRFToken(csrfToken, currentSessionId))) {
       logger.warn('Invalid CSRF token for login attempt', {
         ip: request.headers.get('x-forwarded-for'),
         hasSessionId: !!currentSessionId,
@@ -82,7 +79,6 @@ export async function POST(request: NextRequest) {
     const adminExists = await checkAdminExists();
     
     if (!adminExists) {
-      // Унифицированное сообщение об ошибке
       return setCorsHeaders(
         NextResponse.json(
           { error: 'Authentication failed' },
@@ -91,17 +87,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const result = await authenticateAdmin(username, password);
+    const result = await authenticateAdmin(username, password, request);
 
     if (!result.success) {
       logger.warn('Failed login attempt', {
         username: ServerValidator.sanitizeInput(username),
         ip: request.headers.get('x-forwarded-for'),
-        userAgent: request.headers.get('user-agent')
+        userAgent: request.headers.get('user-agent'),
+        remainingAttempts: result.remainingAttempts,
+        blockTimeRemaining: result.blockTimeRemaining
       });
+      
+      const errorMessage = result.blockTimeRemaining 
+        ? `Too many failed attempts. Please try again in ${Math.ceil(result.blockTimeRemaining / 60000)} minutes.`
+        : 'Authentication failed';
+        
       return setCorsHeaders(
         NextResponse.json(
-          { error: 'Authentication failed' },
+          { error: errorMessage },
           { status: 401 }
         )
       );
@@ -113,7 +116,7 @@ export async function POST(request: NextRequest) {
     const hostname = request.nextUrl.hostname;
     const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
     
-    const sessionId = SessionManager.createSession(
+    const sessionId = await SessionManager.createSession(
       result.admin!.id,
       ServerValidator.sanitizeInput(username),
       ipAddress,
@@ -121,7 +124,7 @@ export async function POST(request: NextRequest) {
     );
 
     // Revoke old CSRF token and set new session
-    revokeCSRFToken(sessionId);
+    await revokeCSRFToken(sessionId);
     await SessionManager.setSessionCookie(sessionId, isLocalhost);
 
     logger.info('Successful login', {
