@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
 
     // CSRF защита
     const sessionId = request.cookies.get('session_id')?.value;
-    if (!sessionId || !csrfToken || !(await verifyCSRFToken(csrfToken, sessionId))) {
+    if (!sessionId || !csrfToken || !verifyCSRFToken(csrfToken, sessionId)) {
       logger.warn('Invalid CSRF token for registration attempt', {
         ip: request.headers.get('x-forwarded-for'),
         hasSessionId: !!sessionId,

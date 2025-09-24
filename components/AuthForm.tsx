@@ -455,7 +455,7 @@ export default function AuthForm() {
             )}
 
             <div className="flex justify-center">
-              <button type="submit" className="glass-btn" disabled={isLoading}>
+              <button type="submit" className="glass-btn flex items-center justify-center gap-2" disabled={isLoading}>
                 {isLoading && <span className="spinner"></span>}
                 <span>{isLoading ? 'Отправка...' : 'Зарегистрироваться'}</span>
               </button>
@@ -541,7 +541,7 @@ export default function AuthForm() {
             <input type="hidden" name="cf-turnstile-response" value={captchaResponse.login} />
 
             <div className="flex justify-center">
-              <button type="submit" className="glass-btn" disabled={isLoading}>
+              <button type="submit" className="glass-btn flex items-center justify-center gap-2" disabled={isLoading}>
                 {isLoading && <span className="spinner"></span>}
                 <span>{isLoading ? 'Вход...' : 'Войти'}</span>
               </button>

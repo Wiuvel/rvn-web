@@ -17,8 +17,8 @@ export async function POST(request: NextRequest) {
     
     // Destroy session if exists
     if (sessionId) {
-      await SessionManager.destroySession(sessionId);
-      await revokeCSRFToken(sessionId);
+      SessionManager.destroySession(sessionId);
+      revokeCSRFToken(sessionId);
     }
     
     // Secure cookie deletion

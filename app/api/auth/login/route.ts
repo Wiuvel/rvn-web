@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
 
     // CSRF protection
     const currentSessionId = request.cookies.get('session_id')?.value;
-    if (!currentSessionId || !csrfToken || !(await verifyCSRFToken(csrfToken, currentSessionId))) {
+    if (!currentSessionId || !csrfToken || !verifyCSRFToken(csrfToken, currentSessionId)) {
       logger.warn('Invalid CSRF token for login attempt', {
         ip: request.headers.get('x-forwarded-for'),
         hasSessionId: !!currentSessionId,
@@ -87,24 +87,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const result = await authenticateAdmin(username, password, request);
+    const result = await authenticateAdmin(username, password);
 
     if (!result.success) {
       logger.warn('Failed login attempt', {
         username: ServerValidator.sanitizeInput(username),
         ip: request.headers.get('x-forwarded-for'),
-        userAgent: request.headers.get('user-agent'),
-        remainingAttempts: result.remainingAttempts,
-        blockTimeRemaining: result.blockTimeRemaining
+        userAgent: request.headers.get('user-agent')
       });
-      
-      const errorMessage = result.blockTimeRemaining 
-        ? `Too many failed attempts. Please try again in ${Math.ceil(result.blockTimeRemaining / 60000)} minutes.`
-        : 'Authentication failed';
-        
       return setCorsHeaders(
         NextResponse.json(
-          { error: errorMessage },
+          { error: 'Authentication failed' },
           { status: 401 }
         )
       );
@@ -116,7 +109,7 @@ export async function POST(request: NextRequest) {
     const hostname = request.nextUrl.hostname;
     const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
     
-    const sessionId = await SessionManager.createSession(
+    const sessionId = SessionManager.createSession(
       result.admin!.id,
       ServerValidator.sanitizeInput(username),
       ipAddress,
@@ -124,7 +117,7 @@ export async function POST(request: NextRequest) {
     );
 
     // Revoke old CSRF token and set new session
-    await revokeCSRFToken(sessionId);
+    revokeCSRFToken(sessionId);
     await SessionManager.setSessionCookie(sessionId, isLocalhost);
 
     logger.info('Successful login', {

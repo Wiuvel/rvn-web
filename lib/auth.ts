@@ -3,7 +3,6 @@ import { supabaseAdmin, Admin } from './supabase';
 import { logger } from './secure-logger';
 import { ServerValidator } from './server-validation';
 import { timingSafePasswordVerify, addRandomDelay } from './timing-safe';
-import { bruteForceProtection, getBruteForceIdentifier } from './brute-force-protection';
 
 export async function hashPassword(password: string): Promise<string> {
   const saltRounds = 12;
@@ -63,28 +62,10 @@ export async function createAdmin(username: string, password: string): Promise<{
   }
 }
 
-export async function authenticateAdmin(username: string, password: string, request?: Request): Promise<{ success: boolean; admin?: Admin; error?: string; remainingAttempts?: number; blockTimeRemaining?: number }> {
+export async function authenticateAdmin(username: string, password: string): Promise<{ success: boolean; admin?: Admin; error?: string }> {
   try {
     if (!supabaseAdmin) {
       return { success: false, error: 'Database not configured' };
-    }
-
-    // Check brute force protection
-    const identifier = request ? getBruteForceIdentifier(request, username) : `user:${username}`;
-    const isBlocked = await bruteForceProtection.isBlocked(identifier);
-    
-    if (isBlocked) {
-      const blockTimeRemaining = await bruteForceProtection.getBlockTimeRemaining(identifier);
-      logger.warn('Authentication blocked due to brute force protection', {
-        username: ServerValidator.sanitizeInput(username),
-        identifier: identifier.substring(0, 20) + '...',
-        blockTimeRemaining
-      });
-      return { 
-        success: false, 
-        error: 'Too many failed attempts. Please try again later.',
-        blockTimeRemaining
-      };
     }
 
     // Always perform the same operations to prevent timing attacks
@@ -103,28 +84,19 @@ export async function authenticateAdmin(username: string, password: string, requ
         code: fetchError.code,
         username: ServerValidator.sanitizeInput(username)
       });
-      await bruteForceProtection.recordFailedAttempt(identifier, 'user_not_found');
-      const remainingAttempts = await bruteForceProtection.getRemainingAttempts(identifier);
-      return { success: false, error: 'Invalid credentials', remainingAttempts };
+      return { success: false, error: 'Invalid credentials' };
     }
 
     if (!admin) {
-      await bruteForceProtection.recordFailedAttempt(identifier, 'user_not_found');
-      const remainingAttempts = await bruteForceProtection.getRemainingAttempts(identifier);
-      return { success: false, error: 'Invalid credentials', remainingAttempts };
+      return { success: false, error: 'Invalid credentials' };
     }
 
     // Use timing-safe password verification
     const isValidPassword = await verifyPassword(password, admin.password_hash);
     
     if (!isValidPassword) {
-      await bruteForceProtection.recordFailedAttempt(identifier, 'invalid_password');
-      const remainingAttempts = await bruteForceProtection.getRemainingAttempts(identifier);
-      return { success: false, error: 'Invalid credentials', remainingAttempts };
+      return { success: false, error: 'Invalid credentials' };
     }
-
-    // Clear brute force protection on successful login
-    await bruteForceProtection.recordSuccessfulAttempt(identifier);
 
     return { success: true, admin };
   } catch (error) {

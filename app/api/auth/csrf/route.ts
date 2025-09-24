@@ -44,7 +44,7 @@ export async function GET(request: Request) {
       });
     }
 
-    const csrfToken = await generateCSRFToken(sessionId);
+    const csrfToken = generateCSRFToken(sessionId);
 
     return setCorsHeaders(
       NextResponse.json({
