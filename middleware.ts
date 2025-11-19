@@ -10,6 +10,30 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
   
+  if (pathname === '/auth') {
+    return NextResponse.next();
+  }
+  
+  const isAuthenticated = request.cookies.get('user_authenticated')?.value === 'true';
+  const dashboardToken = request.cookies.get('dashboard_token')?.value;
+  
+  if (pathname.startsWith('/dashboard')) {
+    if (!isAuthenticated || !dashboardToken) {
+      return NextResponse.redirect(new URL('/auth', request.url));
+    }
+    
+    const urlToken = pathname.split('/dashboard/')[1];
+    if (urlToken && urlToken !== dashboardToken) {
+      return NextResponse.redirect(new URL('/auth', request.url));
+    }
+    
+    return NextResponse.next();
+  }
+  
+  if (pathname === '/protection') {
+    return NextResponse.next();
+  }
+  
   const accessGranted = request.cookies.get('access_granted')?.value === 'true';
   const accessHash = request.cookies.get('access_hash')?.value;
   
@@ -17,7 +41,7 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
   
-  if (pathname === '/protection' || pathname.startsWith('/ui/panel')) {
+  if (pathname.startsWith('/ui/panel')) {
     return NextResponse.next();
   }
   

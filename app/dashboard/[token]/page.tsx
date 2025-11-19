@@ -1,13 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
 import { useFadeIn, useStaggeredFadeIn } from '@/hooks/useGSAP';
 
 interface UserData {
   id: string;
+  user_id: string;
   username: string;
   dashboard_token: string;
   created_at: string;
@@ -20,6 +21,8 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [currentYear] = useState(new Date().getFullYear());
   const router = useRouter();
+  const params = useParams();
+  const token = params?.token as string;
   
   const titleRef = useFadeIn(0.1) as React.RefObject<HTMLDivElement>;
   const profileRef = useFadeIn(0.2) as React.RefObject<HTMLDivElement>;
@@ -28,19 +31,24 @@ export default function DashboardPage() {
   const eventsRef = useFadeIn(0.5) as React.RefObject<HTMLDivElement>;
 
   useEffect(() => {
+    if (!token) {
+      router.push('/auth');
+      return;
+    }
     fetchUserData();
-  }, []);
+  }, [token]);
 
   const fetchUserData = async () => {
     try {
       const response = await fetch('/api/auth/me');
       if (response.ok) {
         const data = await response.json();
-        setUserData(data);
-        // Перенаправляем на правильный URL с токеном
-        if (data.dashboard_token) {
-          router.push(`/dashboard/${data.dashboard_token}`);
+        // Проверяем что токен совпадает
+        if (data.dashboard_token !== token) {
+          router.push('/auth');
+          return;
         }
+        setUserData(data);
       } else {
         router.push('/auth');
       }
@@ -74,8 +82,8 @@ export default function DashboardPage() {
     });
   };
 
-  const getShortId = (id: string) => {
-    return `#${id.substring(0, 8).toUpperCase()}`;
+  const getShortId = (userId: string) => {
+    return `#${userId}`;
   };
 
   if (loading) {
@@ -85,7 +93,7 @@ export default function DashboardPage() {
       </div>
     );
   }
-  
+
   return (
     <div className="dashboard-page">
       {/* Header */}
@@ -128,6 +136,9 @@ export default function DashboardPage() {
                 <Link href="/auth/" onClick={() => setOpen(false)} className="block text-white/80 hover:text-white transition-colors duration-300 py-2">
                   Профиль
                 </Link>
+                <button onClick={() => { setOpen(false); handleLogout(); }} className="block text-white/80 hover:text-white transition-colors duration-300 py-2">
+                  Выйти
+                </button>
               </div>
             </div>
           )}
@@ -168,8 +179,11 @@ export default function DashboardPage() {
               <div className="flex-1">
                 <div className="text-lg font-medium">{userData?.username || '—'}</div>
                 <div className="mt-1 text-sm text-neutral-400 flex flex-wrap gap-x-4 gap-y-1">
-                  <div><span className="text-neutral-500">ID:</span> {userData ? getShortId(userData.id) : '#0000'}</div>
+                  <div><span className="text-neutral-500">ID:</span> {userData ? getShortId(userData.user_id) : '—'}</div>
                   <div><span className="text-neutral-500">Дата регистрации:</span> {userData ? formatDate(userData.created_at) : '—'}</div>
+                </div>
+                <div className="mt-2 text-xs text-neutral-500">
+                  Ссылка на личный кабинет: <span className="text-primary-400 font-mono">{typeof window !== 'undefined' ? window.location.origin : ''}/dashboard/{userData?.dashboard_token}</span>
                 </div>
               </div>
             </div>

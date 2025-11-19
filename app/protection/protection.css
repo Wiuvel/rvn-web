@@ -267,6 +267,11 @@
   padding: 6px 10px;
   border-radius: 999px;
   backdrop-filter: blur(6px);
+  transition: transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, padding 0.3s ease;
+}
+
+.cloudflare-badge.badge-loading {
+  padding-right: 14px;
 }
 
 .cloudflare-badge a {
@@ -296,5 +301,95 @@
     transform: translateX(-50%);
     font-size: 11px;
     padding: 5px 9px;
+  }
+}
+
+.cloudflare-badge .badge-text {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.cloudflare-badge .badge-divider {
+  opacity: 0.4;
+}
+
+.cloudflare-badge .badge-ip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-family: 'Exo 2', 'SFMono-Regular', 'Menlo', monospace;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  transition: padding 0.3s ease, gap 0.3s ease, min-width 0.3s ease;
+}
+
+.cloudflare-badge .ip-label {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 10px;
+}
+
+.cloudflare-badge .badge-ip.loading {
+  padding: 3px 12px;
+  gap: 6px;
+  min-width: 56px;
+}
+
+.cloudflare-badge .ip-spinner {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-top-color: #ffffff;
+  animation: ip-spin 0.8s linear infinite;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
+.cloudflare-badge .ip-value {
+  color: #ffffff;
+  font-size: 11px;
+  transition: filter 0.3s ease;
+}
+
+.cloudflare-badge .ip-value.blurred {
+  filter: blur(8px);
+}
+
+.cloudflare-badge[role="button"] {
+  cursor: pointer;
+}
+
+.cloudflare-badge[role="button"]:hover {
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  transform: translateX(-50%) translateY(-1px);
+}
+
+.cloudflare-badge[aria-disabled="true"] {
+  cursor: default;
+}
+
+.cloudflare-badge[aria-disabled="true"]:hover {
+  transform: translateX(-50%);
+}
+
+@keyframes ip-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
   }
 }

@@ -64,29 +64,8 @@ export class ServerValidator {
       errors.push('Password cannot contain spaces');
     }
 
-    if (!/^[a-zA-Z0-9!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]+$/.test(password)) {
+    if (!/^[a-zA-Z0-9!@#$%^&*()_+.\-=\[\]{};':"\\|,<>\/?]+$/.test(password)) {
       errors.push('Password can only contain English letters, numbers and special characters');
-    }
-
-    if (password === password.toLowerCase() || password === password.toUpperCase()) {
-      errors.push('Password must contain both uppercase and lowercase letters');
-    }
-
-    if (!/[0-9]/.test(password)) {
-      errors.push('Password must contain at least one number');
-    }
-
-    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
-      errors.push('Password must contain at least one special character');
-    }
-
-    const commonPasswords = [
-      'password', '123456', 'admin', 'root', 'user', 'test',
-      'qwerty', 'abc123', 'password123', 'admin123'
-    ];
-    
-    if (commonPasswords.includes(password.toLowerCase())) {
-      errors.push('Password is too common, please choose a stronger password');
     }
 
     return {

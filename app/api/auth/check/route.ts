@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { checkAdminExists } from '@/lib/auth';
 import { generalRateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/secure-logger';
 import { setCorsHeaders, handleCorsPreflight } from '@/lib/cors';
@@ -27,15 +26,15 @@ export async function GET(request: Request) {
     }
 
     const cookieStore = await cookies();
-    const isAuthenticated = cookieStore.get('admin_authenticated')?.value === 'true';
-    const username = cookieStore.get('admin_username')?.value;
-    const adminExists = await checkAdminExists();
+    const isAuthenticated = cookieStore.get('user_authenticated')?.value === 'true';
+    const userId = cookieStore.get('user_id')?.value;
+    const dashboardToken = cookieStore.get('dashboard_token')?.value;
 
     return setCorsHeaders(
       NextResponse.json({
         isAuthenticated,
-        username: isAuthenticated ? username : null,
-        adminExists
+        userId: isAuthenticated ? userId : null,
+        dashboardToken: isAuthenticated ? dashboardToken : null
       })
     );
   } catch (error) {

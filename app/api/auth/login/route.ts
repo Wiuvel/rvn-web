@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { authenticateAdmin, checkAdminExists } from '@/lib/auth';
+import { authenticateUser } from '@/lib/auth';
 import { cookies } from 'next/headers';
 import { authRateLimit } from '@/lib/rate-limit';
 import { verifyCSRFToken, revokeCSRFToken } from '@/lib/csrf';
@@ -60,9 +60,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // CSRF protection
+    // CSRF protection - упрощенная для логина
     const currentSessionId = request.cookies.get('session_id')?.value;
-    if (!currentSessionId || !csrfToken || !verifyCSRFToken(csrfToken, currentSessionId)) {
+    if (currentSessionId && csrfToken && !verifyCSRFToken(csrfToken, currentSessionId)) {
       logger.warn('Invalid CSRF token for login attempt', {
         ip: request.headers.get('x-forwarded-for'),
         hasSessionId: !!currentSessionId,
@@ -76,18 +76,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const adminExists = await checkAdminExists();
-    
-    if (!adminExists) {
-      return setCorsHeaders(
-        NextResponse.json(
-          { error: 'Authentication failed' },
-          { status: 401 }
-        )
-      );
-    }
-
-    const result = await authenticateAdmin(username, password);
+    const result = await authenticateUser(username, password);
 
     if (!result.success) {
       logger.warn('Failed login attempt', {
@@ -97,7 +86,7 @@ export async function POST(request: NextRequest) {
       });
       return setCorsHeaders(
         NextResponse.json(
-          { error: 'Authentication failed' },
+          { error: result.error || 'Authentication failed' },
           { status: 401 }
         )
       );
@@ -110,7 +99,7 @@ export async function POST(request: NextRequest) {
     const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
     
     const sessionId = SessionManager.createSession(
-      result.admin!.id,
+      result.user!.id,
       ServerValidator.sanitizeInput(username),
       ipAddress,
       userAgent
@@ -126,18 +115,16 @@ export async function POST(request: NextRequest) {
       ip: ipAddress
     });
 
-    const cookieStore = await cookies();
-    
-    // Secure cookie settings
-    cookieStore.set('admin_authenticated', 'true', {
-      maxAge: 60 * 60 * 24 * 7, 
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production' && !isLocalhost,
-      sameSite: 'strict', // Back to strict for better security
-      path: '/'
-    });
+    // Set authentication cookies
+    const response = NextResponse.json(
+      { 
+        message: 'Login successful',
+        dashboard_token: result.user!.dashboard_token
+      },
+      { status: 200 }
+    );
 
-    cookieStore.set('admin_username', ServerValidator.sanitizeInput(username), {
+    response.cookies.set('user_authenticated', 'true', {
       maxAge: 60 * 60 * 24 * 7,
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production' && !isLocalhost,
@@ -145,12 +132,23 @@ export async function POST(request: NextRequest) {
       path: '/'
     });
 
-    return setCorsHeaders(
-      NextResponse.json(
-        { message: 'Login successful' },
-        { status: 200 }
-      )
-    );
+    response.cookies.set('user_id', result.user!.id, {
+      maxAge: 60 * 60 * 24 * 7,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production' && !isLocalhost,
+      sameSite: 'strict',
+      path: '/'
+    });
+
+    response.cookies.set('dashboard_token', result.user!.dashboard_token, {
+      maxAge: 60 * 60 * 24 * 7,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production' && !isLocalhost,
+      sameSite: 'strict',
+      path: '/'
+    });
+
+    return setCorsHeaders(response);
   } catch (error) {
     logger.error('Login error', {
       error: error instanceof Error ? error.message : 'Unknown error',

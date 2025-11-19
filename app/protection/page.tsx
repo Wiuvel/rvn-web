@@ -1,14 +1,54 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import type { KeyboardEvent } from 'react';
 import Script from 'next/script';
 
 export default function ProtectionPage() {
   const [isMounted, setIsMounted] = useState(false);
+  const [ipAddress, setIpAddress] = useState<string | null>(null);
+  const [ipError, setIpError] = useState(false);
+  const [isIpRevealed, setIsIpRevealed] = useState(false);
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (!isMounted) return;
+
+    let isCancelled = false;
+
+    const fetchIp = async () => {
+      try {
+        const response = await fetch('/api/ip', {
+          method: 'GET',
+          cache: 'no-store',
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch IP');
+        }
+
+        const data = await response.json();
+
+        if (!isCancelled) {
+          setIpAddress(data.ip ?? '—');
+        }
+      } catch (error) {
+        console.error('Failed to fetch IP address:', error);
+        if (!isCancelled) {
+          setIpError(true);
+        }
+      }
+    };
+
+    fetchIp();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [isMounted]);
 
   useEffect(() => {
     if (!isMounted) return;
@@ -84,6 +124,27 @@ export default function ProtectionPage() {
     };
   }, [isMounted]);
 
+  const canReveal = Boolean(ipAddress) && !ipError && !isIpRevealed;
+  const isIpLoading = !ipError && !ipAddress;
+
+  const handleReveal = () => {
+    if (canReveal) {
+      setIsIpRevealed(true);
+    }
+  };
+
+  const handleCardKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (!canReveal) return;
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      setIsIpRevealed(true);
+    }
+  };
+
+  const ipDisplayText = ipError
+    ? 'Не удалось определить'
+    : ipAddress ?? 'Определяем…';
+
   return (
     <>
           <Script
@@ -118,9 +179,44 @@ export default function ProtectionPage() {
           <div className="footer" id="footer" suppressHydrationWarning></div>
         </div>
         {/* Cloudflare Badge */}
-        <div className="cloudflare-badge">
+        <div
+          className={`cloudflare-badge ${isIpLoading ? 'badge-loading' : ''}`}
+          role={canReveal ? 'button' : undefined}
+          aria-disabled={!canReveal}
+          tabIndex={canReveal ? 0 : -1}
+          onClick={handleReveal}
+          onKeyDown={handleCardKeyDown}
+        >
           <span className="pulse" aria-hidden="true"></span>
-          <span>Protected by <a href="https://www.cloudflare.com/products/turnstile/" target="_blank" rel="noopener noreferrer">Cloudflare</a></span>
+          <span className="badge-text">
+            Protected by{' '}
+            <a
+              href="https://www.cloudflare.com/products/turnstile/"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Cloudflare
+            </a>
+          </span>
+          <span className="badge-divider" aria-hidden="true">
+            •
+          </span>
+          <span className={`badge-ip ${isIpLoading ? 'loading' : ''}`}>
+            <span className="ip-label">IP:</span>
+            {isIpLoading ? (
+              <>
+                <span className="ip-spinner" aria-hidden="true"></span>
+                <span className="sr-only">Определяем IP…</span>
+              </>
+            ) : (
+              <span
+                className={`ip-value ${!isIpRevealed ? 'blurred' : ''}`}
+                aria-live="polite"
+              >
+                {ipDisplayText}
+              </span>
+            )}
+          </span>
         </div>
       </div>
     </>

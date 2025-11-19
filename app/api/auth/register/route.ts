@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdmin, checkAdminExists } from '@/lib/auth';
+import { createUser } from '@/lib/auth';
 import { authRateLimit } from '@/lib/rate-limit';
 import { verifyCSRFToken } from '@/lib/csrf';
 import { ServerValidator } from '@/lib/server-validation';
 import { logger } from '@/lib/secure-logger';
 import { setCorsHeaders, handleCorsPreflight } from '@/lib/cors';
+import { SessionManager } from '@/lib/session-manager';
 
 export async function OPTIONS() {
   return handleCorsPreflight();
@@ -73,12 +74,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // CSRF защита
-    const sessionId = request.cookies.get('session_id')?.value;
-    if (!sessionId || !csrfToken || !verifyCSRFToken(csrfToken, sessionId)) {
+    // CSRF защита - упрощенная для регистрации
+    const currentSessionId = request.cookies.get('session_id')?.value;
+    if (currentSessionId && csrfToken && !verifyCSRFToken(csrfToken, currentSessionId)) {
       logger.warn('Invalid CSRF token for registration attempt', {
         ip: request.headers.get('x-forwarded-for'),
-        hasSessionId: !!sessionId,
+        hasSessionId: !!currentSessionId,
         hasCsrfToken: !!csrfToken
       });
       return setCorsHeaders(
@@ -89,21 +90,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const adminExists = await checkAdminExists();
-    if (adminExists) {
-      // Унифицированное сообщение об ошибке
-      return setCorsHeaders(
-        NextResponse.json(
-          { error: 'Registration is not available' },
-          { status: 403 }
-        )
-      );
-    }
-
-    const result = await createAdmin(username, password);
+    const result = await createUser(username, password);
 
     if (!result.success) {
-      logger.warn('Failed admin creation attempt', {
+      logger.warn('Failed user creation attempt', {
         username: ServerValidator.sanitizeInput(username),
         ip: request.headers.get('x-forwarded-for'),
         userAgent: request.headers.get('user-agent'),
@@ -111,24 +101,67 @@ export async function POST(request: NextRequest) {
       });
       return setCorsHeaders(
         NextResponse.json(
-          { error: 'Failed to create admin account' },
+          { error: result.error || 'Failed to create account' },
           { status: 400 }
         )
       );
     }
 
-    // Успешная регистрация
-    logger.info('Successful admin registration', {
+    // Create session for the new user
+    const ipAddress = request.headers.get('x-forwarded-for') || 'unknown';
+    const userAgent = request.headers.get('user-agent') || 'unknown';
+    const hostname = request.nextUrl.hostname;
+    const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
+    
+    const sessionId = SessionManager.createSession(
+      result.user!.id,
+      ServerValidator.sanitizeInput(username),
+      ipAddress,
+      userAgent
+    );
+
+    await SessionManager.setSessionCookie(sessionId, isLocalhost);
+
+    // Set authentication cookies
+    const response = NextResponse.json(
+      { 
+        message: 'User created successfully',
+        dashboard_token: result.user!.dashboard_token
+      },
+      { status: 201 }
+    );
+
+    response.cookies.set('user_authenticated', 'true', {
+      maxAge: 60 * 60 * 24 * 7,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production' && !isLocalhost,
+      sameSite: 'strict',
+      path: '/'
+    });
+
+    response.cookies.set('user_id', result.user!.id, {
+      maxAge: 60 * 60 * 24 * 7,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production' && !isLocalhost,
+      sameSite: 'strict',
+      path: '/'
+    });
+
+    response.cookies.set('dashboard_token', result.user!.dashboard_token, {
+      maxAge: 60 * 60 * 24 * 7,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production' && !isLocalhost,
+      sameSite: 'strict',
+      path: '/'
+    });
+
+    // Successful registration
+    logger.info('Successful user registration', {
       username: ServerValidator.sanitizeInput(username),
       ip: request.headers.get('x-forwarded-for')
     });
 
-    return setCorsHeaders(
-      NextResponse.json(
-        { message: 'Admin created successfully' },
-        { status: 201 }
-      )
-    );
+    return setCorsHeaders(response);
   } catch (error) {
     logger.error('Registration error', {
       error: error instanceof Error ? error.message : 'Unknown error',

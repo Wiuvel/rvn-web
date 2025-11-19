@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
   try {
     const cookieStore = await cookies();
     const sessionId = cookieStore.get('session_id')?.value;
-    const username = cookieStore.get('admin_username')?.value;
+    const userId = cookieStore.get('user_id')?.value;
     
     // Destroy session if exists
     if (sessionId) {
@@ -23,13 +23,14 @@ export async function POST(request: NextRequest) {
     
     // Secure cookie deletion
     await SessionManager.clearSessionCookie();
-    cookieStore.delete('admin_authenticated');
-    cookieStore.delete('admin_username');
+    cookieStore.delete('user_authenticated');
+    cookieStore.delete('user_id');
+    cookieStore.delete('dashboard_token');
 
     // Log successful logout
-    if (username) {
+    if (userId) {
       logger.info('User logout', {
-        username: username,
+        userId: userId,
         sessionId: sessionId ? sessionId.substring(0, 8) + '...' : 'none',
         ip: request.headers.get('x-forwarded-for')
       });
