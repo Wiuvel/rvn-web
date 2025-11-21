@@ -67,7 +67,7 @@ export default function ProtectionPage() {
               if (container) {
                 container.innerHTML = '';
                 win.turnstile.render(container, {
-                  sitekey: '3x00000000000000000000FF',
+                  sitekey: '0x4AAAAAAB0s4O-sxm9ZnAQk',
                   theme: 'dark',
                   size: 'flexible',
                   callback: (token: string) => {
