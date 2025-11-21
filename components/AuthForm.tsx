@@ -300,9 +300,7 @@ export default function AuthForm() {
     if (formType === 'register') {
       isValidConfirm = validateConfirmPassword();
     }
-    // Капча опциональна - если токен есть, используем его
     const hasCaptcha = !!captchaResponse[formType];
-    // Для упрощения тестирования капча не обязательна
     // if (!hasCaptcha) {
     //   setErrors(prev => ({ ...prev, global: 'Подтвердите, что вы не робот' }));
     //   return false;
@@ -367,7 +365,7 @@ export default function AuthForm() {
 
     if (typeof window !== 'undefined' && window.turnstile) {
       const widgetId = window.turnstile.render('#' + containerId, {
-        sitekey: '3x00000000000000000000FF',
+        sitekey: '0x4AAAAAAB0s4O-sxm9ZnAQk',
         theme: 'dark',
         callback: (token: string) => {
           setCaptchaResponse(prev => ({ ...prev, [formType]: token }));
