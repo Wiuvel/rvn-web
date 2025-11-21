@@ -56,7 +56,7 @@ export default function AdminAuthForm({ onAuthSuccess }: AdminAuthFormProps) {
 
   const getCsrfToken = useCallback(async () => {
     try {
-      const response = await fetch('/api/auth/csrf');
+      const response = await fetch('/api/admin/csrf');
       const data = await response.json();
       setCsrfToken(data.csrfToken);
     } catch (error) {
@@ -67,7 +67,7 @@ export default function AdminAuthForm({ onAuthSuccess }: AdminAuthFormProps) {
   const checkAuthStatus = useCallback(async () => {
     try {
       setIsCheckingAuth(true);
-      const response = await fetch('/api/auth/check');
+      const response = await fetch('/api/admin/check');
       const data = await response.json();
       setAuthState(data);
     } catch (error) {
@@ -127,7 +127,7 @@ export default function AdminAuthForm({ onAuthSuccess }: AdminAuthFormProps) {
         return;
       }
 
-      const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
+      const endpoint = isLogin ? '/api/admin/login' : '/api/admin/register';
 
       const response = await fetch(endpoint, {
         method: 'POST',

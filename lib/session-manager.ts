@@ -16,12 +16,12 @@ interface SessionStore {
 }
 
 const sessions: SessionStore = {};
-const SESSION_TIMEOUT = 60 * 60 * 1000; 
+const SESSION_TIMEOUT = 60 * 60 * 1000;
 const SESSION_CLEANUP_INTERVAL = 5 * 60 * 1000;
 
 setInterval(() => {
   const now = Date.now();
-  Object.keys(sessions).forEach(sessionId => {
+  Object.keys(sessions).forEach((sessionId) => {
     if (now - sessions[sessionId].lastActivity > SESSION_TIMEOUT) {
       delete sessions[sessionId];
     }
@@ -33,10 +33,15 @@ export class SessionManager {
     return randomBytes(32).toString('hex');
   }
 
-  static createSession(userId: string, username: string, ipAddress: string, userAgent: string): string {
+  static createSession(
+    userId: string,
+    username: string,
+    ipAddress: string,
+    userAgent: string,
+  ): string {
     const sessionId = this.generateSessionId();
     const now = Date.now();
-    
+
     sessions[sessionId] = {
       id: sessionId,
       userId,
@@ -44,22 +49,22 @@ export class SessionManager {
       createdAt: now,
       lastActivity: now,
       ipAddress,
-      userAgent
+      userAgent,
     };
-    
+
     return sessionId;
   }
 
   static getSession(sessionId: string): SessionData | null {
     const session = sessions[sessionId];
     if (!session) return null;
-    
+
     const now = Date.now();
     if (now - session.lastActivity > SESSION_TIMEOUT) {
       delete sessions[sessionId];
       return null;
     }
-    
+
     session.lastActivity = now;
     return session;
   }
@@ -67,7 +72,7 @@ export class SessionManager {
   static updateSession(sessionId: string, updates: Partial<SessionData>): boolean {
     const session = sessions[sessionId];
     if (!session) return false;
-    
+
     Object.assign(session, updates);
     session.lastActivity = Date.now();
     return true;
@@ -83,7 +88,7 @@ export class SessionManager {
 
   static destroyAllUserSessions(userId: string): number {
     let destroyed = 0;
-    Object.keys(sessions).forEach(sessionId => {
+    Object.keys(sessions).forEach((sessionId) => {
       if (sessions[sessionId].userId === userId) {
         delete sessions[sessionId];
         destroyed++;
@@ -92,31 +97,35 @@ export class SessionManager {
     return destroyed;
   }
 
-  static async setSessionCookie(sessionId: string, isLocalhost: boolean = false): Promise<void> {
+  static async setSessionCookie(
+    sessionId: string,
+    isLocalhost: boolean = false,
+    cookieName = 'session_id',
+  ): Promise<void> {
     const cookieStore = await cookies();
-    cookieStore.set('session_id', sessionId, {
+    cookieStore.set(cookieName, sessionId, {
       maxAge: SESSION_TIMEOUT / 1000,
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production' && !isLocalhost,
       sameSite: 'strict',
-      path: '/'
+      path: '/',
     });
   }
 
-  static async clearSessionCookie(): Promise<void> {
+  static async clearSessionCookie(cookieName = 'session_id'): Promise<void> {
     const cookieStore = await cookies();
-    cookieStore.delete('session_id');
+    cookieStore.delete(cookieName);
   }
 
   static validateSession(sessionId: string, ipAddress: string, userAgent: string): boolean {
     const session = this.getSession(sessionId);
     if (!session) return false;
-    
+
     if (session.ipAddress !== ipAddress || session.userAgent !== userAgent) {
       this.destroySession(sessionId);
       return false;
     }
-    
+
     return true;
   }
 }

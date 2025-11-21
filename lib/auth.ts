@@ -161,16 +161,13 @@ export function generateDashboardToken(): string {
 }
 
 export function generateUserId(): string {
-  // Генерируем ID формата: AA1111 (2 большие буквы + 4 цифры)
   const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
   const digits = '0123456789';
   
   let id = '';
-  // 2 большие буквы
   for (let i = 0; i < 2; i++) {
     id += letters[Math.floor(Math.random() * letters.length)];
   }
-  // 4 цифры
   for (let i = 0; i < 4; i++) {
     id += digits[Math.floor(Math.random() * digits.length)];
   }
@@ -184,7 +181,6 @@ export async function createUser(username: string, password: string): Promise<{ 
       return { success: false, error: 'База данных не настроена' };
     }
 
-    // Check if username already exists
     const { data: existingUser, error: checkError } = await supabaseAdmin
       .from('users')
       .select('id')
@@ -207,7 +203,6 @@ export async function createUser(username: string, password: string): Promise<{ 
     const dashboardToken = generateDashboardToken();
     let userId = generateUserId();
     
-    // Проверяем уникальность user_id
     let retryCount = 0;
     while (retryCount < 10) {
       const { data: existingUserId } = await supabaseAdmin
@@ -217,7 +212,7 @@ export async function createUser(username: string, password: string): Promise<{ 
         .single();
       
       if (!existingUserId) {
-        break; // user_id уникален
+        break;
       }
       
       userId = generateUserId();
@@ -285,14 +280,12 @@ export async function authenticateUser(username: string, password: string): Prom
       return { success: false, error: 'Account is disabled' };
     }
 
-    // Use timing-safe password verification
     const isValidPassword = await verifyPassword(password, user.password_hash);
     
     if (!isValidPassword) {
       return { success: false, error: 'Invalid credentials' };
     }
 
-    // Update last login
     await supabaseAdmin
       .from('users')
       .update({ last_login: new Date().toISOString() })

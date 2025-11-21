@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import AdminAuthForm from '@/components/AdminAuthForm';
 import MagicBentoGrid from '@/components/ui/MagicBentoGrid';
 
@@ -8,6 +8,16 @@ interface AuthState {
   isAuthenticated: boolean;
   username: string | null;
   adminExists: boolean;
+}
+
+interface PanelUser {
+  id: string;
+  user_id: string;
+  username: string;
+  created_at: string;
+  last_login?: string | null;
+  is_active: boolean;
+  dashboard_token?: string;
 }
 
 export default function AdminPanel() {
@@ -20,6 +30,13 @@ export default function AdminPanel() {
   const [loading, setLoading] = useState(true);
   const [showPanel, setShowPanel] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [users, setUsers] = useState<PanelUser[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [usersError, setUsersError] = useState('');
+  const [userSearch, setUserSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [userActionMessage, setUserActionMessage] = useState('');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
   useEffect(() => {
     checkAuthStatus();
@@ -46,9 +63,17 @@ export default function AdminPanel() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      setDebouncedSearch(userSearch.trim());
+    }, 350);
+
+    return () => clearTimeout(timeoutId);
+  }, [userSearch]);
+
   const checkAuthStatus = async () => {
     try {
-      const response = await fetch('/api/auth/check');
+      const response = await fetch('/api/admin/check');
       const data = await response.json();
       setAuthState(data);
     } catch (error) {
@@ -60,15 +85,92 @@ export default function AdminPanel() {
 
   const handleLogout = async () => {
     try {
-      await fetch('/api/auth/logout', { method: 'POST' });
-      setAuthState({
+      await fetch('/api/admin/logout', { method: 'POST' });
+      setAuthState((prev) => ({
+        ...prev,
         isAuthenticated: false,
         username: null,
-        adminExists: false
-      });
+      }));
+      checkAuthStatus();
     } catch (error) {
       console.error('Logout error:', error);
     }
+  };
+
+  const fetchUsers = useCallback(
+    async (query: string, sort: 'asc' | 'desc') => {
+      if (!authState.isAuthenticated) return;
+      setUsersLoading(true);
+      setUsersError('');
+      try {
+        const params = new URLSearchParams();
+        if (query) {
+          params.set('q', query);
+        }
+        params.set('order', sort);
+        const response = await fetch(
+          `/api/admin/users?${params.toString()}`,
+          { credentials: 'include' },
+        );
+        const data = await response.json();
+        if (!response.ok) {
+          setUsers([]);
+          setUsersError(data.error || 'Не удалось загрузить пользователей');
+          return;
+        }
+        setUsers(Array.isArray(data.users) ? data.users : []);
+      } catch (error) {
+        console.error('Failed to load users:', error);
+        setUsers([]);
+        setUsersError('Ошибка загрузки списка пользователей');
+      } finally {
+        setUsersLoading(false);
+      }
+    },
+    [authState.isAuthenticated],
+  );
+
+  useEffect(() => {
+    if (authState.isAuthenticated && activeTab === 'users') {
+      fetchUsers(debouncedSearch, sortDirection);
+    }
+  }, [activeTab, authState.isAuthenticated, debouncedSearch, fetchUsers, sortDirection]);
+
+  const formatDate = (value?: string | null) => {
+    if (!value) return '—';
+    try {
+      return new Intl.DateTimeFormat('ru-RU', {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+      }).format(new Date(value));
+    } catch {
+      return value;
+    }
+  };
+
+  const handleCopy = async (label: string, value?: string) => {
+    if (!value) return;
+    try {
+      await navigator.clipboard.writeText(value);
+      setUserActionMessage(`${label} скопирован в буфер обмена`);
+    } catch {
+      setUserActionMessage(`Не удалось скопировать ${label.toLowerCase()}`);
+    } finally {
+      setTimeout(() => setUserActionMessage(''), 2500);
+    }
+  };
+
+  const handleOpenDashboard = (token?: string) => {
+    if (!token) {
+      setUserActionMessage('У пользователя нет привязанного токена');
+      setTimeout(() => setUserActionMessage(''), 2500);
+      return;
+    }
+    window.open(`/dashboard/${token}`, '_blank', 'noopener,noreferrer');
+  };
+  const handleSubscriptionManage = (user: PanelUser) => {
+    setUserActionMessage(`Управление подпиской для ${user.username} (${user.user_id})`);
+    setTimeout(() => setUserActionMessage(''), 2500);
   };
 
   if (loading) {
@@ -206,10 +308,169 @@ export default function AdminPanel() {
 
           {activeTab === 'users' && (
             <div className="space-y-4 sm:space-y-6">
-              <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-4 sm:p-6">
-                <h3 className="text-lg font-semibold text-white mb-4">Управление пользователями</h3>
-                <div className="h-64 sm:h-96 bg-neutral-800 rounded flex items-center justify-center">
-                  <p className="text-neutral-400 text-sm sm:text-base">Таблица пользователей</p>
+              <div className="user-management-card">
+                <div className="user-management-header">
+                  <div>
+                    <h3 className="text-lg font-semibold text-white">Управление пользователями</h3>
+                    <p className="text-sm text-neutral-400 mt-1">
+                      Всего записей: {users.length}
+                    </p>
+                  </div>
+                  <div className="user-search">
+                    <div className="user-search-wrapper">
+                      <svg
+                        className="user-search-icon"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={1.6}
+                          d="M11 5a6 6 0 014.472 10.07l3.679 3.679a1 1 0 01-1.414 1.414l-3.679-3.679A6 6 0 1111 5z"
+                        />
+                      </svg>
+                      <input
+                        type="text"
+                        className="user-search-input"
+                        placeholder="Поиск по логину или ID"
+                        value={userSearch}
+                        onChange={(e) => setUserSearch(e.target.value)}
+                      />
+                    </div>
+                    <button
+                      onClick={() => fetchUsers(debouncedSearch, sortDirection)}
+                      className="user-refresh-btn"
+                      disabled={usersLoading}
+                    >
+                      <svg
+                        className={`w-4 h-4 ${usersLoading ? 'animate-spin' : ''}`}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={1.6}
+                          d="M4 4v5h.582m0 0A7 7 0 0112 5a7 7 0 016.418 4.582M20 20v-5h-.581m0 0A7 7 0 0112 19a7 7 0 01-6.418-4.582"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+
+                {userActionMessage && (
+                  <div className="user-feedback" role="status">
+                    {userActionMessage}
+                  </div>
+                )}
+                {usersError && (
+                  <div className="user-error" role="alert">
+                    {usersError}
+                  </div>
+                )}
+
+                <div className="user-table">
+                  <div className="user-table-head">
+                    <span>Логин</span>
+                    <span>ID</span>
+                    <button
+                      className="user-sort-btn"
+                      onClick={() =>
+                        setSortDirection((prev) => (prev === 'desc' ? 'asc' : 'desc'))
+                      }
+                    >
+                      Создан
+                      <svg
+                        className={`sort-arrow ${sortDirection === 'desc' ? 'down' : 'up'}`}
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 9l6-6 6 6M18 15l-6 6-6-6" />
+                      </svg>
+                    </button>
+                    <span className="hidden xl:inline">Последний вход</span>
+                    <span>Действия</span>
+                  </div>
+
+                  <div className="user-table-body">
+                    {usersLoading && (
+                      <div className="user-row user-row-loading">
+                        <div className="skeleton w-32" />
+                        <div className="skeleton w-20" />
+                        <div className="skeleton w-28" />
+                        <div className="skeleton w-32 hidden xl:block" />
+                        <div className="skeleton w-40" />
+                      </div>
+                    )}
+
+                    {!usersLoading && users.length === 0 && !usersError && (
+                      <div className="user-empty-state">
+                        <p>Пользователи не найдены</p>
+                        <span>Попробуйте изменить запрос или обновить список</span>
+                      </div>
+                    )}
+
+                    {!usersLoading &&
+                      users.map((user) => (
+                        <div key={user.id} className="user-row">
+                          <div>
+                            <p className="user-primary">{user.username}</p>
+                            <span className="user-muted">
+                              {user.is_active ? 'Активен' : 'Отключен'}
+                            </span>
+                          </div>
+                          <div>
+                            <p className="user-primary tracking-wide">{user.user_id}</p>
+                            <span className="user-muted">Internal ID</span>
+                          </div>
+                          <div>
+                            <p className="user-primary">{formatDate(user.created_at)}</p>
+                            <span className="user-muted">Регистрация</span>
+                          </div>
+                          <div className="hidden xl:flex flex-col">
+                            <p className="user-primary">{formatDate(user.last_login)}</p>
+                            <span className="user-muted">Последний вход</span>
+                          </div>
+                          <div className="user-actions">
+                            <button
+                              className="user-action-btn"
+                              onClick={() => handleSubscriptionManage(user)}
+                              title="Управление подпиской"
+                            >
+                              🎁
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              </div>
+              <div className="user-bulk-actions">
+                <div className="user-bulk-info">
+                  <h4>Массовые действия</h4>
+                  <p>Быстрая работа с подписками и статусами пользователей</p>
+                </div>
+                <div className="user-bulk-controls">
+                  <button className="bulk-btn">
+                    <span>⏳</span>
+                    Продлить подписку на 30 дней
+                  </button>
+                  <button className="bulk-btn">
+                    <span>🎯</span>
+                    Продлить всем активным на 7 дней
+                  </button>
+                  <button className="bulk-btn">
+                    <span>🧹</span>
+                    Очистить просроченные аккаунты
+                  </button>
+                  <button className="bulk-btn">
+                    <span>📬</span>
+                    Отправить напоминание о продлении
+                  </button>
                 </div>
               </div>
             </div>
