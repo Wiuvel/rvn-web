@@ -77,7 +77,7 @@ export default function Footer() {
             <div className="text-neutral-300 font-medium text-base mb-3 md:mb-4">Информация</div>
             <ul className="space-y-2 md:space-y-3">
               <li><Link href="#" className="hover:text-neutral-200 transition-colors duration-200 block py-1">О проекте</Link></li>
-              <li><Link href="/legal/cookies" className="hover:text-neutral-200 transition-colors duration-200 block py-1">Cookie Policy</Link></li>
+              <li><Link href="/legal/cookies" prefetch={false} className="hover:text-neutral-200 transition-colors duration-200 block py-1">Cookie Policy</Link></li>
             </ul>
           </div>
           <div className="md:col-span-2">
@@ -90,12 +90,12 @@ export default function Footer() {
           <div className="md:col-span-4">
             <div className="text-neutral-300 font-medium text-base mb-3 md:mb-4">Правовое</div>
             <ul className="space-y-2 md:space-y-3">
-              <li><Link href="/legal/privacy" className="hover:text-neutral-200 transition-colors duration-200 block py-1">Политика конфиденциальности</Link></li>
-              <li><Link href="/legal/terms" className="hover:text-neutral-200 transition-colors duration-200 block py-1">Пользовательское соглашение</Link></li>
+              <li><Link href="/legal/privacy" prefetch={false} className="hover:text-neutral-200 transition-colors duration-200 block py-1">Политика конфиденциальности</Link></li>
+              <li><Link href="/legal/terms" prefetch={false} className="hover:text-neutral-200 transition-colors duration-200 block py-1">Пользовательское соглашение</Link></li>
               <li>
-                <Link href="/legal/offer" className="hover:text-neutral-200 transition-colors duration-200 inline-block py-1">Публичная оферта</Link>
+                <Link href="/legal/offer" prefetch={false} className="hover:text-neutral-200 transition-colors duration-200 inline-block py-1">Публичная оферта</Link>
                 <span className="mx-1">&amp;</span>
-                <Link href="/legal/refunds" className="hover:text-neutral-200 transition-colors duration-200 inline-block py-1">Политика возвратов</Link>
+                <Link href="/legal/refunds" prefetch={false} className="hover:text-neutral-200 transition-colors duration-200 inline-block py-1">Политика возвратов</Link>
               </li>
             </ul>
           </div>

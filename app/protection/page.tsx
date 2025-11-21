@@ -54,7 +54,7 @@ export default function ProtectionPage() {
     if (!isMounted) return;
 
     const script = document.createElement('script');
-    script.src = '/static/protection.up4m5/sf-turnstile.js';
+    script.src = '/static/protection/sf-turnstile.js';
     script.defer = true;
         script.onload = () => {
           setTimeout(() => {
@@ -67,7 +67,7 @@ export default function ProtectionPage() {
               if (container) {
                 container.innerHTML = '';
                 win.turnstile.render(container, {
-                  sitekey: '0x4AAAAAAB0s4O-sxm9ZnAQk',
+                  sitekey: '3x00000000000000000000FF',
                   theme: 'dark',
                   size: 'flexible',
                   callback: (token: string) => {
@@ -112,7 +112,7 @@ export default function ProtectionPage() {
       console.error('Failed to load protection script:', error);
     };
     
-    const existingScript = document.querySelector('script[src="/static/protection.up4m5/sf-turnstile.js"]');
+    const existingScript = document.querySelector('script[src="/static/protection/sf-turnstile.js"]');
     if (!existingScript) {
       document.head.appendChild(script);
     }

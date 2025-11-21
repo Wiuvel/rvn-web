@@ -56,7 +56,9 @@ export default function AuthForm() {
     register: '',
     login: ''
   });
+  const [csrfToken, setCsrfToken] = useState('');
   const [currentWidgetId, setCurrentWidgetId] = useState<string | null>(null);
+  const [loginAttemptState, setLoginAttemptState] = useState<'idle' | 'error'>('idle');
 
   const validateUsername = (username: string, formType: 'login' | 'register') => {
     const usernameRegex = /^[a-zA-Z0-9_]+$/;
@@ -140,9 +142,14 @@ export default function AuthForm() {
     return true;
   };
 
-  const validateConfirmPassword = () => {
-    // Если пароль не введен, не показываем ошибку
-    if (!registerData.password) {
+  const validateConfirmPassword = (
+    confirmValue?: string,
+    passwordValue?: string
+  ) => {
+    const password = passwordValue ?? registerData.password;
+    const confirmation = confirmValue ?? registerData.confirmPassword;
+
+    if (!password) {
       setErrors(prev => ({
         ...prev,
         register: { ...prev.register, confirmPassword: '' }
@@ -150,8 +157,7 @@ export default function AuthForm() {
       return true;
     }
     
-    // Если подтверждение пароля пустое
-    if (!registerData.confirmPassword) {
+    if (!confirmation) {
       setErrors(prev => ({
         ...prev,
         register: { ...prev.register, confirmPassword: '' }
@@ -161,8 +167,7 @@ export default function AuthForm() {
     
     setShowPasswordStrength(prev => ({ ...prev, register: false }));
     
-    // Проверяем совпадение паролей
-    if (registerData.confirmPassword !== registerData.password) {
+    if (confirmation !== password) {
       setErrors(prev => ({
         ...prev,
         register: { ...prev.register, confirmPassword: 'Пароли не совпадают' }
@@ -177,9 +182,38 @@ export default function AuthForm() {
     return true;
   };
 
+  const fetchCsrfToken = async (): Promise<string | null> => {
+    try {
+      const response = await fetch('/api/auth/csrf', {
+        method: 'GET',
+        credentials: 'include',
+        cache: 'no-store'
+      });
+      if (!response.ok) {
+        throw new Error('Failed to fetch CSRF token');
+      }
+      const data = await response.json();
+      const token = data?.csrfToken || '';
+      setCsrfToken(token);
+      return token;
+    } catch (error) {
+      console.error('CSRF token fetch error:', error);
+      setCsrfToken('');
+      setErrors(prev => ({
+        ...prev,
+        global: 'Не удалось получить токен безопасности. Обновите страницу.'
+      }));
+      return null;
+    }
+  };
+
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateForm('register')) return;
+    const tokenToUse = csrfToken || (await fetchCsrfToken());
+    if (!tokenToUse) {
+      return;
+    }
     setIsLoading(true);
     setErrors(prev => ({ ...prev, global: '' }));
     
@@ -191,7 +225,7 @@ export default function AuthForm() {
           username: escapeHtml(registerData.username),
           password: registerData.password,
           confirmPassword: registerData.confirmPassword,
-          csrfToken: captchaResponse.register || ''
+          csrfToken: tokenToUse
         })
       });
       const data = await response.json();
@@ -200,9 +234,13 @@ export default function AuthForm() {
         window.location.href = `/dashboard/${data.dashboard_token}`;
       } else {
         setErrors(prev => ({ ...prev, global: escapeHtml(data.error || 'Ошибка регистрации') }));
+        if (response.status === 403) {
+          fetchCsrfToken();
+        }
       }
     } catch {
       setErrors(prev => ({ ...prev, global: 'API ERROR: 405.' }));
+      fetchCsrfToken();
     } finally {
       setIsLoading(false);
     }
@@ -211,7 +249,12 @@ export default function AuthForm() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateForm('login')) return;
+    const tokenToUse = csrfToken || (await fetchCsrfToken());
+    if (!tokenToUse) {
+      return;
+    }
     setIsLoading(true);
+    setLoginAttemptState('idle');
     setErrors(prev => ({ ...prev, global: '' }));
     
     try {
@@ -221,7 +264,7 @@ export default function AuthForm() {
         body: JSON.stringify({
           username: escapeHtml(loginData.username),
           password: loginData.password,
-          csrfToken: captchaResponse.login || ''
+          csrfToken: tokenToUse
         })
       });
       const data = await response.json();
@@ -229,10 +272,16 @@ export default function AuthForm() {
         // Перенаправляем на dashboard с токеном
         window.location.href = `/dashboard/${data.dashboard_token}`;
       } else {
+        setLoginAttemptState('error');
         setErrors(prev => ({ ...prev, global: escapeHtml(data.error || 'Ошибка входа') }));
+        if (response.status === 403) {
+          fetchCsrfToken();
+        }
       }
     } catch {
+      setLoginAttemptState('error');
       setErrors(prev => ({ ...prev, global: 'Ошибка сети. Попробуйте позже.' }));
+      fetchCsrfToken();
     } finally {
       setIsLoading(false);
     }
@@ -292,12 +341,15 @@ export default function AuthForm() {
     setIsPasswordValid({ register: false, login: false });
     setShowPasswordStrength({ register: false, login: false });
     setCaptchaResponse({ register: '', login: '' });
+    setIsLoading(false);
+    setLoginAttemptState('idle');
   };
 
   const switchTab = (tab: 'login' | 'register') => {
     setCurrentTab(tab);
     resetForm();
     setTimeout(() => loadCaptcha(tab), 50);
+    fetchCsrfToken();
   };
 
   const loadCaptcha = (formType: 'login' | 'register') => {
@@ -337,6 +389,11 @@ export default function AuthForm() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentTab]);
 
+  useEffect(() => {
+    fetchCsrfToken();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <div className="w-full max-w-md mx-auto">
       <div className="bg-neutral-900/80 backdrop-blur-md p-8 rounded-2xl border border-neutral-800 shadow-lg animate-fadeIn overflow-hidden">
@@ -353,6 +410,9 @@ export default function AuthForm() {
                 type="text"
                 value={registerData.username}
                 onChange={(e) => {
+                  if (errors.global) {
+                    setErrors(prev => ({ ...prev, global: '' }));
+                  }
                   setRegisterData(prev => ({ ...prev, username: e.target.value }));
                   validateUsername(e.target.value, 'register');
                 }}
@@ -375,8 +435,12 @@ export default function AuthForm() {
                   type={showPassword.register ? 'text' : 'password'}
                   value={registerData.password}
                   onChange={(e) => {
-                    setRegisterData(prev => ({ ...prev, password: e.target.value }));
-                    validatePassword(e.target.value, 'register');
+                  const nextValue = e.target.value;
+                  setRegisterData(prev => ({ ...prev, password: nextValue }));
+                  validatePassword(nextValue, 'register');
+                  if (registerData.confirmPassword) {
+                    validateConfirmPassword(registerData.confirmPassword, nextValue);
+                  }
                   }}
                   placeholder="Пароль"
                   required
@@ -429,8 +493,9 @@ export default function AuthForm() {
                 type="password"
                 value={registerData.confirmPassword}
                 onChange={(e) => {
-                  setRegisterData(prev => ({ ...prev, confirmPassword: e.target.value }));
-                  validateConfirmPassword();
+                  const nextValue = e.target.value;
+                  setRegisterData(prev => ({ ...prev, confirmPassword: nextValue }));
+                  validateConfirmPassword(nextValue);
                 }}
                 placeholder="Подтверждение пароля"
                 required
@@ -450,11 +515,23 @@ export default function AuthForm() {
             <div className="flex justify-center select-none">
               <p className="text-xs text-neutral-400 text-center">
                 При регистрации вы соглашаетесь с{' '}
-                <Link href="/legal/terms/" target="_blank" rel="noopener noreferrer" className="text-primary-400 hover:underline">
+                <Link
+                  href="/legal/terms/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  prefetch={false}
+                  className="text-primary-400 hover:underline"
+                >
                   Пользовательским соглашением
                 </Link>
                 {' '}и{' '}
-                <Link href="/legal/privacy/" target="_blank" rel="noopener noreferrer" className="text-primary-400 hover:underline">
+                <Link
+                  href="/legal/privacy/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  prefetch={false}
+                  className="text-primary-400 hover:underline"
+                >
                   Политикой конфиденциальности
                 </Link>
                 .
@@ -467,22 +544,25 @@ export default function AuthForm() {
             <input type="hidden" name="cf-turnstile-response" value={captchaResponse.register} />
 
             {errors.global && (
-              <p className="text-red-400 text-sm text-center mt-2" role="alert">
+              <p
+                className={`auth-feedback ${errors.global ? 'visible' : ''}`}
+                role="alert"
+                aria-live="assertive"
+              >
                 {errors.global}
               </p>
             )}
 
             <div className="flex justify-center">
-              <button type="submit" className="glass-btn flex items-center justify-center gap-2" disabled={isLoading || !captchaResponse.register}>
+              <button
+                type="submit"
+                className="glass-btn"
+                disabled={isLoading || !captchaResponse.register}
+              >
                 {isLoading && <span className="spinner"></span>}
                 <span>{isLoading ? 'Отправка...' : 'Зарегистрироваться'}</span>
               </button>
             </div>
-            {!captchaResponse.register && !isLoading && (
-              <p className="text-yellow-400 text-xs text-center mt-2">
-                Пожалуйста, пройдите проверку
-              </p>
-            )}
 
             <p className="text-center text-sm">
               Уже есть аккаунт?{' '}
@@ -506,6 +586,12 @@ export default function AuthForm() {
                 type="text"
                 value={loginData.username}
                 onChange={(e) => {
+                  if (errors.global) {
+                    setErrors(prev => ({ ...prev, global: '' }));
+                  }
+                  if (loginAttemptState === 'error') {
+                    setLoginAttemptState('idle');
+                  }
                   setLoginData(prev => ({ ...prev, username: e.target.value }));
                   validateUsername(e.target.value, 'login');
                 }}
@@ -528,6 +614,12 @@ export default function AuthForm() {
                   type={showPassword.login ? 'text' : 'password'}
                   value={loginData.password}
                   onChange={(e) => {
+                  if (errors.global) {
+                    setErrors(prev => ({ ...prev, global: '' }));
+                  }
+                  if (loginAttemptState === 'error') {
+                    setLoginAttemptState('idle');
+                  }
                     setLoginData(prev => ({ ...prev, password: e.target.value }));
                     validatePassword(e.target.value, 'login');
                   }}
@@ -564,14 +656,23 @@ export default function AuthForm() {
             <input type="hidden" name="cf-turnstile-response" value={captchaResponse.login} />
 
             <div className="flex justify-center">
-              <button type="submit" className="glass-btn flex items-center justify-center gap-2" disabled={isLoading || !captchaResponse.login}>
+              <button
+                type="submit"
+                className={`glass-btn ${loginAttemptState === 'error' ? 'btn-shake' : ''}`}
+                disabled={isLoading || !captchaResponse.login}
+              >
                 {isLoading && <span className="spinner"></span>}
                 <span>{isLoading ? 'Вход...' : 'Войти'}</span>
               </button>
             </div>
-            {!captchaResponse.login && !isLoading && (
-              <p className="text-yellow-400 text-xs text-center mt-2">
-                Пожалуйста, пройдите проверку
+
+            {errors.global && (
+              <p
+                className={`auth-feedback ${errors.global ? 'visible' : ''}`}
+                role="alert"
+                aria-live="assertive"
+              >
+                {errors.global}
               </p>
             )}
 

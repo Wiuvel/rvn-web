@@ -208,7 +208,7 @@ function updateStatusText() {
             if (footer) animateTextChange(footer, '', '#888');
             break;
         case captchaStates.SUCCESS:
-            animateTextChange(desc, 'Проверка пройдена успешно.', '#b0b0b0');
+            animateTextChange(desc, 'Проверка пройдена успешно.', '#5bd1a9');
             if (footer) animateTextChange(footer, 'Выполняется перенаправление на сайт..', '#888');
             setTitleFill();
             break;
