@@ -28,6 +28,8 @@ export default function Header() {
   const router = useRouter();
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
     gsap.fromTo('.header-container', 
       { 
         opacity: 0, 
@@ -44,11 +46,76 @@ export default function Header() {
   }, []);
 
   useEffect(() => {
+    let isMounted = true;
+    let controller: AbortController | null = null;
+    let timeoutId: NodeJS.Timeout | null = null;
+
+    const checkAuth = async () => {
+      try {
+        // Создаем AbortController для таймаута
+        controller = new AbortController();
+        timeoutId = setTimeout(() => controller!.abort(), 10000);
+
+        try {
+          const response = await fetch('/api/auth/me', {
+            signal: controller.signal
+          });
+          
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+            timeoutId = null;
+          }
+
+          if (!isMounted) return;
+
+          if (response.ok) {
+            const data = await response.json();
+            setUserData(data);
+          }
+        } catch (fetchError: any) {
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+            timeoutId = null;
+          }
+
+          if (!isMounted) return;
+
+          // Если запрос был прерван из-за таймаута, просто не устанавливаем userData
+          if (fetchError.name === 'AbortError') {
+            console.error('Auth check timeout');
+            // Не перенаправляем на /500, так как это просто проверка для header
+          } else {
+            throw fetchError;
+          }
+        }
+      } catch (error) {
+        if (!isMounted) return;
+        console.error('Failed to check auth:', error);
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
     checkAuth();
+
+    // Очистка при размонтировании
+    return () => {
+      isMounted = false;
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+      if (controller) {
+        controller.abort();
+      }
+    };
   }, []);
 
   // GSAP анимация для спиннера
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
     if (loading) {
       const elements = [spinnerRef.current, mobileSpinnerRef.current].filter(Boolean);
       
@@ -84,8 +151,30 @@ export default function Header() {
     }
   }, [loading]);
 
+  // Блокировка скролла при открытом меню
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    if (userMenuOpen) {
+      // Блокируем скролл
+      document.body.style.overflow = 'hidden';
+    } else {
+      // Разблокируем скролл
+      document.body.style.overflow = '';
+    }
+
+    // Очистка при размонтировании
+    return () => {
+      if (typeof window !== 'undefined') {
+        document.body.style.overflow = '';
+      }
+    };
+  }, [userMenuOpen]);
+
   // Управление рендерингом и анимацией меню
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
     if (userMenuOpen) {
       // Показываем меню
       setShouldRenderMenu(true);
@@ -125,6 +214,8 @@ export default function Header() {
 
   // Закрытие меню при клике вне его
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
     const handleClickOutside = (event: MouseEvent) => {
       if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
         setUserMenuOpen(false);
@@ -139,20 +230,6 @@ export default function Header() {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [userMenuOpen]);
-
-  const checkAuth = async () => {
-    try {
-      const response = await fetch('/api/auth/me');
-      if (response.ok) {
-        const data = await response.json();
-        setUserData(data);
-      }
-    } catch (error) {
-      console.error('Failed to check auth:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleLogout = async () => {
     try {
@@ -193,7 +270,7 @@ export default function Header() {
             <Link href="#apps" className="hover:text-white transition">Приложения</Link>
             <Link href="#faq" className="hover:text-white transition">FAQ</Link>
           </nav>
-          <div className="hidden lg:flex relative" ref={userMenuRef}>
+          <div className="hidden lg:flex items-center gap-2 relative" ref={userMenuRef}>
             {loading ? (
               <div 
                 ref={spinnerRef}
@@ -202,8 +279,24 @@ export default function Header() {
             ) : userData ? (
               <>
                 <button
+                  onClick={() => {
+                    // TODO: Открыть уведомления
+                  }}
+                  className="w-10 h-10 rounded-full bg-neutral-800/60 hover:bg-neutral-700/60 flex items-center justify-center text-white/80 hover:text-white transition-all duration-200 hover:scale-110 cursor-pointer"
+                  title="Уведомления"
+                  aria-label="Уведомления"
+                >
+                  <Image 
+                    src="/static/icons/accounts/bell.svg" 
+                    alt="Уведомления" 
+                    width={18} 
+                    height={18} 
+                    className="w-[18px] h-[18px]"
+                  />
+                </button>
+                <button
                   onClick={() => setUserMenuOpen(!userMenuOpen)}
-                  className="w-10 h-10 rounded-full bg-primary-500 hover:bg-primary-400 flex items-center justify-center text-white font-semibold text-sm shadow-glow transition cursor-pointer"
+                  className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold text-sm shadow-glow transition-transform duration-200 hover:scale-110 cursor-pointer"
                   title={userData.username}
                   aria-label="Меню пользователя"
                   aria-expanded={userMenuOpen}
@@ -217,7 +310,7 @@ export default function Header() {
                   >
                     <div className="p-4 border-b border-white/10">
                       <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-full bg-primary-500 flex items-center justify-center text-white font-semibold text-base flex-shrink-0">
+                        <div className="w-12 h-12 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold text-base flex-shrink-0">
                           {getInitial(userData.username)}
                         </div>
                         <div className="min-w-0 flex-1">
@@ -233,13 +326,27 @@ export default function Header() {
                         className="flex items-center gap-3 px-4 py-3 text-white/80 hover:text-white hover:bg-white/5 transition-colors duration-200"
                       >
                         <Image 
-                          src="/static/icons/accounts/user.svg" 
-                          alt="Личный кабинет" 
+                          src="/static/icons/accounts/users.svg" 
+                          alt="Профиль" 
                           width={20} 
                           height={20} 
                           className="w-5 h-5"
                         />
-                        <span>Личный кабинет</span>
+                        <span>Профиль</span>
+                      </Link>
+                      <Link
+                        href={`/dashboard/${userData.dashboard_token}#subscriptions`}
+                        onClick={() => setUserMenuOpen(false)}
+                        className="flex items-center gap-3 px-4 py-3 text-white/80 hover:text-white hover:bg-white/5 transition-colors duration-200"
+                      >
+                        <Image 
+                          src="/static/icons/accounts/wallet.svg" 
+                          alt="Мои тарифы" 
+                          width={20} 
+                          height={20} 
+                          className="w-5 h-5"
+                        />
+                        <span>Мои тарифы</span>
                       </Link>
                       <Link
                         href="/contacts"
@@ -340,7 +447,7 @@ export default function Header() {
                     onClick={() => setOpen(false)}
                     className="flex items-center gap-3 text-white/80 hover:text-white transition-colors duration-300 py-2"
                   >
-                    <div className="w-10 h-10 rounded-full bg-primary-500 flex items-center justify-center text-white font-semibold text-sm">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold text-sm">
                       {getInitial(userData.username)}
                     </div>
                     <span>{userData.username}</span>

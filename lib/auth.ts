@@ -181,13 +181,17 @@ export async function createUser(username: string, password: string): Promise<{ 
       return { success: false, error: 'База данных не настроена' };
     }
 
-    const { data: existingUser, error: checkError } = await supabaseAdmin
-      .from('users')
-      .select('id')
-      .eq('username', username)
-      .single();
+    // Нормализуем username в lowercase для проверки
+    const normalizedUsername = username.toLowerCase();
 
-    if (checkError && checkError.code !== 'PGRST116') {
+    // Проверяем существование пользователя без учета регистра
+    // Используем .or() с ilike для case-insensitive поиска (точное совпадение)
+    const { data: existingUsers, error: checkError } = await supabaseAdmin
+      .from('users')
+      .select('id, username')
+      .or(`username.ilike.${normalizedUsername}`);
+
+    if (checkError) {
       logger.error('Error checking existing user', {
         error: checkError.message,
         code: checkError.code
@@ -195,6 +199,11 @@ export async function createUser(username: string, password: string): Promise<{ 
       return { success: false, error: 'Database ERROR' };
     }
 
+    // Проверяем точное совпадение (без учета регистра)
+    const existingUser = existingUsers?.find(
+      (u) => u.username.toLowerCase() === normalizedUsername
+    );
+    
     if (existingUser) {
       return { success: false, error: 'Пользователь с таким именем уже существует' };
     }
@@ -219,11 +228,12 @@ export async function createUser(username: string, password: string): Promise<{ 
       retryCount++;
     }
 
+    // Сохраняем username в оригинальном регистре, но проверяем по lowercase
     const { data: newUser, error: insertError } = await supabaseAdmin
       .from('users')
       .insert({
         user_id: userId,
-        username,
+        username: username, // Сохраняем в оригинальном регистре для отображения
         password_hash: passwordHash,
         dashboard_token: dashboardToken
       })
@@ -253,12 +263,15 @@ export async function authenticateUser(username: string, password: string): Prom
       return { success: false, error: 'Database not configured' };
     }
 
+    // Нормализуем username в lowercase для поиска
+    const normalizedUsername = username.toLowerCase();
+
     // Always perform the same operations to prevent timing attacks
-    const { data: user, error: fetchError } = await supabaseAdmin
+    // Используем .or() с ilike для case-insensitive поиска
+    const { data: users, error: fetchError } = await supabaseAdmin
       .from('users')
       .select('*')
-      .eq('username', username)
-      .single();
+      .or(`username.ilike.${normalizedUsername}`);
 
     // Always add random delay regardless of result
     await addRandomDelay(50, 150);
@@ -271,6 +284,11 @@ export async function authenticateUser(username: string, password: string): Prom
       });
       return { success: false, error: 'Invalid credentials' };
     }
+
+    // Ищем точное совпадение (без учета регистра)
+    const user = users?.find(
+      (u) => u.username.toLowerCase() === normalizedUsername
+    ) || null;
 
     if (!user) {
       return { success: false, error: 'Invalid credentials' };

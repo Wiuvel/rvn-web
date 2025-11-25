@@ -7,39 +7,51 @@ export default function robots(): MetadataRoute.Robots {
     rules: [
       {
         userAgent: '*',
-        allow: '/',
+        allow: [
+          '/',
+          '/auth',
+          '/legal/'
+        ],
         disallow: [
           '/api/',
           '/dashboard/',
-          '/auth/',
           '/protection/',
           '/_next/',
           '/admin/',
-          '/ui/'
+          '/ui/',
+          '/error/'
         ],
       },
       {
         userAgent: 'Googlebot',
-        allow: '/',
+        allow: [
+          '/',
+          '/auth',
+          '/legal/'
+        ],
         disallow: [
           '/api/',
           '/dashboard/',
-          '/auth/',
           '/protection/',
           '/_next/',
           '/ui/',
+          '/error/'
         ],
       },
       {
         userAgent: 'Bingbot',
-        allow: '/',
+        allow: [
+          '/',
+          '/auth',
+          '/legal/'
+        ],
         disallow: [
           '/api/',
           '/dashboard/',
-          '/auth/',
           '/protection/',
           '/_next/',
           '/ui/',
+          '/error/'
         ],
       },
     ],

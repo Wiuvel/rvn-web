@@ -14,6 +14,7 @@ interface SEOProps {
   author?: string;
   section?: string;
   tags?: string[];
+  noindex?: boolean; // Для запрета индексации
 }
 
 export function generateMetadata({
@@ -26,7 +27,8 @@ export function generateMetadata({
   modifiedTime,
   author,
   section,
-  tags = []
+  tags = [],
+  noindex = false
 }: SEOProps): Metadata {
   const fullTitle = title ? 
     (title.includes('Raven Private — безопасный доступ в сеть через VLESS и PROXY') ? title : `${title} | ${siteName}`) : 
@@ -70,11 +72,11 @@ export function generateMetadata({
       site: '@rvnprivate'
     },
     robots: {
-      index: true,
-      follow: true,
-      'max-snippet': -1,
-      'max-image-preview': 'large',
-      'max-video-preview': -1,
+      index: !noindex,
+      follow: !noindex,
+      'max-snippet': noindex ? undefined : -1,
+      'max-image-preview': noindex ? undefined : 'large',
+      'max-video-preview': noindex ? undefined : -1,
     },
     alternates: {
       canonical: fullUrl,
@@ -118,14 +120,16 @@ export const pageMetadata = {
     title: 'Панель управления',
     description: 'Удобная панель управления для вашей подписки и настроек VLESS.',
     keywords: ['панель управления', 'профиль', 'аккаунт', 'настройки'],
-    url: '/dashboard'
+    url: '/dashboard',
+    noindex: true
   }),
 
   protection: generateMetadata({
     title: 'Проверка безопасности',
     description: 'Подтвердите, что вы человек, чтобы получить доступ к сайту Raven Private.',
     keywords: ['проверка', 'безопасность', 'captcha', 'защита'],
-    url: '/protection'
+    url: '/protection',
+    noindex: true
   }),
 
   legal: generateMetadata({

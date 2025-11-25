@@ -51,10 +51,7 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
   
-  if (pathname.startsWith('/ui/panel')) {
-    return NextResponse.next();
-  }
-  
+  // Редирект на protection для всех остальных страниц (включая /ui/panel)
   const targetPath = pathname + request.nextUrl.search;
   const response = NextResponse.redirect(new URL(`/protection?redirect=${encodeURIComponent(targetPath)}`, request.url));
   const hostname = request.nextUrl.hostname;

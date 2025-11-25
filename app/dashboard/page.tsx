@@ -28,29 +28,85 @@ export default function DashboardPage() {
   const eventsRef = useFadeIn(0.5) as React.RefObject<HTMLDivElement>;
 
   useEffect(() => {
-    fetchUserData();
-  }, []);
+    let isMounted = true;
+    let controller: AbortController | null = null;
+    let timeoutId: NodeJS.Timeout | null = null;
 
-  const fetchUserData = async () => {
-    try {
-      const response = await fetch('/api/auth/me');
-      if (response.ok) {
-        const data = await response.json();
-        setUserData(data);
-        // Перенаправляем на правильный URL с токеном
-        if (data.dashboard_token) {
-          router.push(`/dashboard/${data.dashboard_token}`);
+    const fetchUserData = async () => {
+      try {
+        // Создаем AbortController для таймаута
+        controller = new AbortController();
+        timeoutId = setTimeout(() => controller!.abort(), 10000);
+
+        try {
+          const response = await fetch('/api/auth/me', {
+            signal: controller.signal
+          });
+          
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+            timeoutId = null;
+          }
+
+          if (!isMounted) return;
+
+          if (response.ok) {
+            const data = await response.json();
+            setUserData(data);
+            // Перенаправляем на правильный URL с токеном
+            if (data.dashboard_token) {
+              router.push(`/dashboard/${data.dashboard_token}`);
+            }
+          } else {
+            router.push('/auth');
+          }
+        } catch (fetchError: any) {
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+            timeoutId = null;
+          }
+
+          if (!isMounted) return;
+
+          // Если запрос был прерван из-за таймаута
+          if (fetchError.name === 'AbortError') {
+            // Перенаправляем на страницу 500
+            router.push('/error/500');
+            return;
+          }
+          throw fetchError;
         }
-      } else {
-        router.push('/auth');
+      } catch (error) {
+        if (!isMounted) return;
+
+        console.error('Failed to fetch user data:', error);
+        // Проверяем, не является ли это таймаутом
+        if (error instanceof Error && error.name === 'AbortError') {
+          router.push('/error/500');
+        } else {
+          router.push('/auth');
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
       }
-    } catch (error) {
-      console.error('Failed to fetch user data:', error);
-      router.push('/auth');
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
+
+    fetchUserData();
+
+    // Очистка при размонтировании
+    return () => {
+      isMounted = false;
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+      if (controller) {
+        controller.abort();
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleLogout = async () => {
     try {

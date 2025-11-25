@@ -35,30 +35,86 @@ export default function DashboardPage() {
       router.push('/auth');
       return;
     }
-    fetchUserData();
-  }, [token]);
 
-  const fetchUserData = async () => {
-    try {
-      const response = await fetch('/api/auth/me');
-      if (response.ok) {
-        const data = await response.json();
-        // Проверяем что токен совпадает
-        if (data.dashboard_token !== token) {
-          router.push('/auth');
-          return;
+    let isMounted = true;
+    let controller: AbortController | null = null;
+    let timeoutId: NodeJS.Timeout | null = null;
+
+    const fetchUserData = async () => {
+      try {
+        // Создаем AbortController для таймаута
+        controller = new AbortController();
+        timeoutId = setTimeout(() => controller!.abort(), 10000);
+
+        try {
+          const response = await fetch('/api/auth/me', {
+            signal: controller.signal
+          });
+          
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+            timeoutId = null;
+          }
+
+          if (!isMounted) return;
+
+          if (response.ok) {
+            const data = await response.json();
+            // Проверяем что токен совпадает
+            if (data.dashboard_token !== token) {
+              router.push('/auth');
+              return;
+            }
+            setUserData(data);
+          } else {
+            router.push('/auth');
+          }
+        } catch (fetchError: any) {
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+            timeoutId = null;
+          }
+
+          if (!isMounted) return;
+
+          // Если запрос был прерван из-за таймаута
+          if (fetchError.name === 'AbortError') {
+            // Перенаправляем на страницу 500
+            router.push('/error/500');
+            return;
+          }
+          throw fetchError;
         }
-        setUserData(data);
-      } else {
-        router.push('/auth');
+      } catch (error) {
+        if (!isMounted) return;
+
+        console.error('Failed to fetch user data:', error);
+        // Проверяем, не является ли это таймаутом
+        if (error instanceof Error && error.name === 'AbortError') {
+          router.push('/error/500');
+        } else {
+          router.push('/auth');
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
       }
-    } catch (error) {
-      console.error('Failed to fetch user data:', error);
-      router.push('/auth');
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
+
+    fetchUserData();
+
+    return () => {
+      isMounted = false;
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+      if (controller) {
+        controller.abort();
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
 
   const handleLogout = async () => {
     try {
@@ -181,9 +237,6 @@ export default function DashboardPage() {
                 <div className="mt-1 text-sm text-neutral-400 flex flex-wrap gap-x-4 gap-y-1">
                   <div><span className="text-neutral-500">ID:</span> {userData ? getShortId(userData.user_id) : '—'}</div>
                   <div><span className="text-neutral-500">Дата регистрации:</span> {userData ? formatDate(userData.created_at) : '—'}</div>
-                </div>
-                <div className="mt-2 text-xs text-neutral-500">
-                  Ссылка на личный кабинет: <span className="text-primary-400 font-mono">{typeof window !== 'undefined' ? window.location.origin : ''}/dashboard/{userData?.dashboard_token}</span>
                 </div>
               </div>
             </div>
