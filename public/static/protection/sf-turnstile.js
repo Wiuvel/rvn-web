@@ -268,10 +268,10 @@ async function setSecureCookie(token) {
         document.cookie = `access_hash=${secureHash}; ${cookieOptions}`;
         document.cookie = `access_time=${Date.now()}; ${cookieOptions}`;
         
-        console.log('[COOKIE] Secure cookies set successfully for domain:', domain || hostname);
+        console.log('[CAPTCHA] Secure session established with:', domain || hostname);
         return true;
     } catch (error) {
-        console.error('[COOKIE] Error setting secure cookies:', error);
+        console.error('[CAPTCHA] ERR_SECURE_SESSION_INIT_FAILURE:', error);
         return false;
     }
 }

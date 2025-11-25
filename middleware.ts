@@ -10,16 +10,26 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
   
-  if (pathname === '/auth') {
-    return NextResponse.next();
-  }
-  
   const isAuthenticated = request.cookies.get('user_authenticated')?.value === 'true';
   const dashboardToken = request.cookies.get('dashboard_token')?.value;
   
+  // Проверка для /auth/ - если авторизован, редирект в dashboard
+  if (pathname === '/auth' || pathname.startsWith('/auth/')) {
+    if (isAuthenticated && dashboardToken) {
+      return NextResponse.redirect(new URL(`/dashboard/${dashboardToken}`, request.url));
+    }
+    return NextResponse.next();
+  }
+  
+  // Проверка для /dashboard
   if (pathname.startsWith('/dashboard')) {
     if (!isAuthenticated || !dashboardToken) {
       return NextResponse.redirect(new URL('/auth', request.url));
+    }
+    
+    // Если зашли на /dashboard/ без токена, редиректим на /dashboard/{token}
+    if (pathname === '/dashboard' || pathname === '/dashboard/') {
+      return NextResponse.redirect(new URL(`/dashboard/${dashboardToken}`, request.url));
     }
     
     const urlToken = pathname.split('/dashboard/')[1];

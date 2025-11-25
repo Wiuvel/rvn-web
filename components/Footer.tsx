@@ -40,7 +40,7 @@ export default function Footer() {
           <div className="md:col-span-4">
             <div className="flex items-center gap-2 text-neutral-200 drop-shadow-[0_0_8px_rgba(22,163,255,0.8)]">
               <Image 
-                src="/static/icons/main/footer-logo.svg" 
+                src="/static/footer-logo.svg" 
                 alt="Raven Private" 
                 width={20} 
                 height={20} 

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import AuroraBackground from './ui/AuroraBackground';
+import { translateError } from '@/lib/error-translations';
 
 interface AuthState {
   isAuthenticated: boolean;
@@ -145,7 +146,8 @@ export default function AdminAuthForm({ onAuthSuccess }: AdminAuthFormProps) {
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.error || 'An error occurred');
+        const translatedError = translateError(data.error || 'An error occurred');
+        setError(translatedError);
         setLoading(false);
         setLoginSuccess(false);
         return;
@@ -175,7 +177,7 @@ export default function AdminAuthForm({ onAuthSuccess }: AdminAuthFormProps) {
       }
     } catch (error) {
       console.error('Auth error:', error);
-      setError('Network error. Please try again.');
+      setError('Ошибка сети. Попробуйте позже.');
       setLoginSuccess(false);
     } finally {
       setLoading(false);

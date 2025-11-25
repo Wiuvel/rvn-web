@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { translateError } from '@/lib/error-translations';
 
 interface Turnstile {
   render: (
@@ -233,7 +234,8 @@ export default function AuthForm() {
         // Перенаправляем на dashboard с токеном
         window.location.href = `/dashboard/${data.dashboard_token}`;
       } else {
-        setErrors(prev => ({ ...prev, global: escapeHtml(data.error || 'Ошибка регистрации') }));
+        const translatedError = translateError(data.error || 'Ошибка регистрации');
+        setErrors(prev => ({ ...prev, global: escapeHtml(translatedError) }));
         if (response.status === 403) {
           fetchCsrfToken();
         }
@@ -273,7 +275,8 @@ export default function AuthForm() {
         window.location.href = `/dashboard/${data.dashboard_token}`;
       } else {
         setLoginAttemptState('error');
-        setErrors(prev => ({ ...prev, global: escapeHtml(data.error || 'Ошибка входа') }));
+        const translatedError = translateError(data.error || 'Ошибка входа');
+        setErrors(prev => ({ ...prev, global: escapeHtml(translatedError) }));
         if (response.status === 403) {
           fetchCsrfToken();
         }

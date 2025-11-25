@@ -29,7 +29,8 @@ const config: Config = {
       animation: {
         fadeIn: 'fadeIn 0.5s ease-in forwards',
         float: 'float 3s ease-in-out infinite',
-        pulseFloat: 'pulseFloat 3s ease-in-out infinite'
+        pulseFloat: 'pulseFloat 3s ease-in-out infinite',
+        shimmer: 'shimmer 1.5s ease-in-out infinite'
       },
       keyframes: {
         fadeIn: {
@@ -46,6 +47,10 @@ const config: Config = {
           '50%': { transform: 'translateY(0) scale(1)' },
           '75%': { transform: 'translateY(4px) scale(0.98)' },
           '100%': { transform: 'translateY(0) scale(1)' }
+        },
+        shimmer: {
+          '0%': { backgroundPosition: '200% 0' },
+          '100%': { backgroundPosition: '-200% 0' }
         }
       }
     },
