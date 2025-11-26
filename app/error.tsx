@@ -4,7 +4,8 @@ import { useEffect } from 'react';
 
 export default function Error({
   error,
-  reset,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  reset: _reset,
 }: {
   error: Error & { digest?: string };
   reset: () => void;

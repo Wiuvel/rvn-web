@@ -10,7 +10,8 @@ export default function robots(): MetadataRoute.Robots {
         allow: [
           '/',
           '/auth',
-          '/legal/'
+          '/legal/',
+          '/support'
         ],
         disallow: [
           '/api/',
@@ -19,7 +20,8 @@ export default function robots(): MetadataRoute.Robots {
           '/_next/',
           '/admin/',
           '/ui/',
-          '/error/'
+          '/error/',
+          '/support/help'
         ],
       },
       {

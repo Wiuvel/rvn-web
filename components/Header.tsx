@@ -15,14 +15,27 @@ interface UserData {
   last_login?: string;
 }
 
+interface Notification {
+  id: string;
+  title: string;
+  message: string;
+  created_at: string;
+}
+
 export default function Header() {
   const [open, setOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [shouldRenderMenu, setShouldRenderMenu] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [shouldRenderNotificationsMenu, setShouldRenderNotificationsMenu] = useState(false);
   const [userData, setUserData] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [readNotifications, setReadNotifications] = useState<Set<string>>(new Set());
   const userMenuRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const notificationsMenuRef = useRef<HTMLDivElement>(null);
+  const notificationsMenuContainerRef = useRef<HTMLDivElement>(null);
   const spinnerRef = useRef<HTMLDivElement>(null);
   const mobileSpinnerRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
@@ -72,7 +85,7 @@ export default function Header() {
             const data = await response.json();
             setUserData(data);
           }
-        } catch (fetchError: any) {
+        } catch (fetchError: unknown) {
           if (timeoutId) {
             clearTimeout(timeoutId);
             timeoutId = null;
@@ -81,7 +94,7 @@ export default function Header() {
           if (!isMounted) return;
 
           // Если запрос был прерван из-за таймаута, просто не устанавливаем userData
-          if (fetchError.name === 'AbortError') {
+          if (fetchError instanceof Error && fetchError.name === 'AbortError') {
             console.error('Auth check timeout');
             // Не перенаправляем на /500, так как это просто проверка для header
           } else {
@@ -110,6 +123,19 @@ export default function Header() {
         controller.abort();
       }
     };
+  }, []);
+
+  // Инициализация уведомлений и загрузка из localStorage
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    // Загружаем прочитанные уведомления из localStorage
+    const storedRead = localStorage.getItem('readNotifications');
+    const readSet = storedRead ? new Set<string>(JSON.parse(storedRead)) : new Set<string>();
+    setReadNotifications(readSet);
+
+    // Пока уведомления пустые, в будущем можно загружать с сервера
+    setNotifications([]);
   }, []);
 
   // GSAP анимация для спиннера
@@ -155,7 +181,7 @@ export default function Header() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
-    if (userMenuOpen) {
+    if (userMenuOpen || notificationsOpen) {
       // Блокируем скролл
       document.body.style.overflow = 'hidden';
     } else {
@@ -169,9 +195,22 @@ export default function Header() {
         document.body.style.overflow = '';
       }
     };
-  }, [userMenuOpen]);
+  }, [userMenuOpen, notificationsOpen]);
 
-  // Управление рендерингом и анимацией меню
+  // Взаимное закрытие меню
+  useEffect(() => {
+    if (notificationsOpen && userMenuOpen) {
+      setUserMenuOpen(false);
+    }
+  }, [notificationsOpen, userMenuOpen]);
+
+  useEffect(() => {
+    if (userMenuOpen && notificationsOpen) {
+      setNotificationsOpen(false);
+    }
+  }, [userMenuOpen, notificationsOpen]);
+
+  // Управление рендерингом и анимацией меню профиля
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
@@ -212,24 +251,84 @@ export default function Header() {
     }
   }, [userMenuOpen, shouldRenderMenu]);
 
+  // Управление рендерингом и анимацией меню уведомлений
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    if (notificationsOpen) {
+      // Показываем меню
+      setShouldRenderNotificationsMenu(true);
+      // Небольшая задержка для применения начальных стилей
+      requestAnimationFrame(() => {
+        if (notificationsMenuContainerRef.current) {
+          // Устанавливаем начальное состояние
+          gsap.set(notificationsMenuContainerRef.current, {
+            opacity: 0,
+            y: -10,
+            scale: 0.95
+          });
+          // Анимация появления
+          gsap.to(notificationsMenuContainerRef.current, {
+            opacity: 1,
+            y: 0,
+            scale: 1,
+            duration: 0.2,
+            ease: "power2.out"
+          });
+        }
+      });
+    } else if (shouldRenderNotificationsMenu && notificationsMenuContainerRef.current) {
+      // Анимация исчезновения
+      gsap.to(notificationsMenuContainerRef.current, {
+        opacity: 0,
+        y: -10,
+        scale: 0.95,
+        duration: 0.15,
+        ease: "power2.in",
+        onComplete: () => {
+          setShouldRenderNotificationsMenu(false);
+        }
+      });
+    }
+  }, [notificationsOpen, shouldRenderNotificationsMenu]);
+
   // Закрытие меню при клике вне его
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
     const handleClickOutside = (event: MouseEvent) => {
-      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (userMenuRef.current && !userMenuRef.current.contains(target)) {
         setUserMenuOpen(false);
+      }
+      if (notificationsMenuRef.current && !notificationsMenuRef.current.contains(target)) {
+        setNotificationsOpen(false);
       }
     };
 
-    if (userMenuOpen) {
+    if (userMenuOpen || notificationsOpen) {
       document.addEventListener('mousedown', handleClickOutside);
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [userMenuOpen]);
+  }, [userMenuOpen, notificationsOpen]);
+
+  // Функция для отметки уведомления как прочитанного
+  const markNotificationAsRead = (notificationId: string) => {
+    const newReadSet = new Set(readNotifications);
+    newReadSet.add(notificationId);
+    setReadNotifications(newReadSet);
+    
+    // Сохраняем в localStorage
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('readNotifications', JSON.stringify(Array.from(newReadSet)));
+    }
+  };
+
+  // Проверка наличия непрочитанных уведомлений
+  const hasUnreadNotifications = notifications.some(n => !readNotifications.has(n.id));
 
   const handleLogout = async () => {
     try {
@@ -267,7 +366,7 @@ export default function Header() {
           </Link>
           <nav className="hidden lg:flex items-center gap-8 text-sm text-neutral-300">
             <Link href="#pricing" className="hover:text-white transition">Тарифы</Link>
-            <Link href="#apps" className="hover:text-white transition">Приложения</Link>
+            <Link href="/support" className="hover:text-white transition">Поддержка</Link>
             <Link href="#faq" className="hover:text-white transition">FAQ</Link>
           </nav>
           <div className="hidden lg:flex items-center gap-2 relative" ref={userMenuRef}>
@@ -278,22 +377,79 @@ export default function Header() {
               ></div>
             ) : userData ? (
               <>
-                <button
-                  onClick={() => {
-                    // TODO: Открыть уведомления
-                  }}
-                  className="w-10 h-10 rounded-full bg-neutral-800/60 hover:bg-neutral-700/60 flex items-center justify-center text-white/80 hover:text-white transition-all duration-200 hover:scale-110 cursor-pointer"
-                  title="Уведомления"
-                  aria-label="Уведомления"
-                >
-                  <Image 
-                    src="/static/icons/accounts/bell.svg" 
-                    alt="Уведомления" 
-                    width={18} 
-                    height={18} 
-                    className="w-[18px] h-[18px]"
-                  />
-                </button>
+                <div className="relative" ref={notificationsMenuRef}>
+                  <button
+                    onClick={() => setNotificationsOpen(!notificationsOpen)}
+                    className="w-10 h-10 rounded-full bg-neutral-800/60 hover:bg-neutral-700/60 flex items-center justify-center text-white/80 hover:text-white transition-all duration-200 hover:scale-110 cursor-pointer mr-2"
+                    title="Уведомления"
+                    aria-label="Уведомления"
+                    aria-expanded={notificationsOpen}
+                  >
+                    <Image 
+                      src={hasUnreadNotifications ? "/static/icons/accounts/bell-dot.svg" : "/static/icons/accounts/bell.svg"} 
+                      alt="Уведомления" 
+                      width={18} 
+                      height={18} 
+                      className="w-[18px] h-[18px]"
+                    />
+                  </button>
+                  {shouldRenderNotificationsMenu && (
+                    <div 
+                      ref={notificationsMenuContainerRef}
+                      className="absolute -right-3 top-full mt-4 w-80 bg-neutral-900/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-xl overflow-hidden z-50"
+                    >
+                      <div className="p-4 border-b border-white/10 mx-2">
+                        <h3 className="text-white font-semibold text-sm">Уведомления</h3>
+                      </div>
+                      <div className="max-h-96 overflow-y-auto">
+                        {notifications.length === 0 ? (
+                          <div className="p-4 text-center text-neutral-400 text-sm">
+                            Нет уведомлений
+                          </div>
+                        ) : (
+                          <div className="py-2">
+                            {notifications.map((notification) => {
+                              const isRead = readNotifications.has(notification.id);
+                              return (
+                                <div
+                                  key={notification.id}
+                                  onClick={() => markNotificationAsRead(notification.id)}
+                                  className={`px-4 py-3 mx-2 my-1 rounded-xl cursor-pointer transition-colors duration-200 ${
+                                    !isRead 
+                                      ? 'bg-blue-500/10 hover:bg-blue-500/20 border-l-2 border-blue-500' 
+                                      : 'hover:bg-white/5'
+                                  }`}
+                                >
+                                  <div className="flex items-start gap-3">
+                                    {!isRead && (
+                                      <div className="w-2 h-2 rounded-full bg-blue-500 mt-2 flex-shrink-0"></div>
+                                    )}
+                                    <div className="flex-1 min-w-0">
+                                      <div className="text-white font-medium text-sm mb-1">
+                                        {notification.title}
+                                      </div>
+                                      <div className="text-neutral-400 text-xs">
+                                        {notification.message}
+                                      </div>
+                                      <div className="text-neutral-500 text-xs mt-1">
+                                        {new Date(notification.created_at).toLocaleDateString('ru-RU', {
+                                          day: 'numeric',
+                                          month: 'short',
+                                          hour: '2-digit',
+                                          minute: '2-digit'
+                                        })}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
                 <button
                   onClick={() => setUserMenuOpen(!userMenuOpen)}
                   className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold text-sm shadow-glow transition-transform duration-200 hover:scale-110 cursor-pointer"
@@ -308,7 +464,11 @@ export default function Header() {
                     ref={menuRef}
                     className="absolute -right-3 top-full mt-4 w-64 bg-neutral-900/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-xl overflow-hidden z-50"
                   >
-                    <div className="p-4 border-b border-white/10">
+                    <Link
+                      href={`/dashboard/${userData.dashboard_token}`}
+                      onClick={() => setUserMenuOpen(false)}
+                      className="block p-4 border-b border-white/10 hover:bg-white/5 transition-colors duration-200 cursor-pointer mx-2 my-1 rounded-xl"
+                    >
                       <div className="flex items-center gap-3">
                         <div className="w-12 h-12 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold text-base flex-shrink-0">
                           {getInitial(userData.username)}
@@ -318,12 +478,12 @@ export default function Header() {
                           <div className="text-neutral-400 text-xs truncate">ID: {userData.user_id}</div>
                         </div>
                       </div>
-                    </div>
+                    </Link>
                     <div className="py-2">
                       <Link
                         href={`/dashboard/${userData.dashboard_token}`}
                         onClick={() => setUserMenuOpen(false)}
-                        className="flex items-center gap-3 px-4 py-3 text-white/80 hover:text-white hover:bg-white/5 transition-colors duration-200"
+                        className="flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-xl text-white/80 hover:text-white hover:bg-white/5 transition-colors duration-200"
                       >
                         <Image 
                           src="/static/icons/accounts/users.svg" 
@@ -337,7 +497,7 @@ export default function Header() {
                       <Link
                         href={`/dashboard/${userData.dashboard_token}#subscriptions`}
                         onClick={() => setUserMenuOpen(false)}
-                        className="flex items-center gap-3 px-4 py-3 text-white/80 hover:text-white hover:bg-white/5 transition-colors duration-200"
+                        className="flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-xl text-white/80 hover:text-white hover:bg-white/5 transition-colors duration-200"
                       >
                         <Image 
                           src="/static/icons/accounts/wallet.svg" 
@@ -349,9 +509,9 @@ export default function Header() {
                         <span>Мои тарифы</span>
                       </Link>
                       <Link
-                        href="/contacts"
+                        href="/support"
                         onClick={() => setUserMenuOpen(false)}
-                        className="flex items-center gap-3 px-4 py-3 text-white/80 hover:text-white hover:bg-white/5 transition-colors duration-200"
+                        className="flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-xl text-white/80 hover:text-white hover:bg-white/5 transition-colors duration-200"
                       >
                         <Image 
                           src="/static/icons/accounts/support.svg" 
@@ -362,9 +522,10 @@ export default function Header() {
                         />
                         <span>Поддержка</span>
                       </Link>
+                      <div className="border-t border-white/10 my-1 mx-2"></div>
                       <button
                         onClick={handleLogout}
-                        className="w-full flex items-center gap-3 px-4 py-3 text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors duration-200"
+                        className="w-full flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-xl text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors duration-200"
                       >
                         <Image 
                           src="/static/icons/accounts/log-out.svg" 
@@ -413,54 +574,123 @@ export default function Header() {
         </div>
         {open && (
           <div className="lg:hidden mt-4 py-4 bg-black/50 backdrop-blur-xl rounded-2xl border border-white/10">
-            <div className="px-4 space-y-4">
-              <Link 
-                href="#pricing" 
-                onClick={() => setOpen(false)} 
-                className="block text-white/80 hover:text-white transition-colors duration-300 py-2"
-              >
-                Тарифы
-              </Link>
-              <Link 
-                href="#apps" 
-                onClick={() => setOpen(false)} 
-                className="block text-white/80 hover:text-white transition-colors duration-300 py-2"
-              >
-                Приложения
-              </Link>
-              <Link 
-                href="#faq" 
-                onClick={() => setOpen(false)} 
-                className="block text-white/80 hover:text-white transition-colors duration-300 py-2"
-              >
-                FAQ
-              </Link>
-              <div className="pt-4 border-t border-white/10 space-y-3">
-                {loading ? (
-                  <div 
-                    ref={mobileSpinnerRef}
-                    className="w-10 h-10 rounded-full bg-gradient-to-r from-neutral-700 via-neutral-600 to-neutral-700 bg-[length:200%_100%] animate-[shimmer_1.5s_ease-in-out_infinite]"
-                  ></div>
-                ) : userData ? (
-                  <Link 
+            <div className="px-4 space-y-2">
+              {loading ? (
+                <div 
+                  ref={mobileSpinnerRef}
+                  className="w-10 h-10 rounded-full bg-gradient-to-r from-neutral-700 via-neutral-600 to-neutral-700 bg-[length:200%_100%] animate-[shimmer_1.5s_ease-in-out_infinite]"
+                ></div>
+              ) : userData ? (
+                <>
+                  <Link
                     href={`/dashboard/${userData.dashboard_token}`}
                     onClick={() => setOpen(false)}
-                    className="flex items-center gap-3 text-white/80 hover:text-white transition-colors duration-300 py-2"
+                    className="block p-4 border-b border-white/10 hover:bg-white/5 transition-colors duration-200 cursor-pointer mx-2 my-1 rounded-xl"
                   >
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold text-sm">
-                      {getInitial(userData.username)}
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold text-base flex-shrink-0">
+                        {getInitial(userData.username)}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-white font-medium truncate">{userData.username}</div>
+                      </div>
                     </div>
-                    <span>{userData.username}</span>
                   </Link>
-                ) : (
+                  <div className="py-2">
+                    <Link
+                      href={`/dashboard/${userData.dashboard_token}`}
+                      onClick={() => setOpen(false)}
+                      className="flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-xl text-white/80 hover:text-white hover:bg-white/5 transition-colors duration-200"
+                    >
+                      <Image 
+                        src="/static/icons/accounts/users.svg" 
+                        alt="Профиль" 
+                        width={20} 
+                        height={20} 
+                        className="w-5 h-5"
+                      />
+                      <span>Профиль</span>
+                    </Link>
+                    <Link
+                      href={`/dashboard/${userData.dashboard_token}#subscriptions`}
+                      onClick={() => setOpen(false)}
+                      className="flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-xl text-white/80 hover:text-white hover:bg-white/5 transition-colors duration-200"
+                    >
+                      <Image 
+                        src="/static/icons/accounts/wallet.svg" 
+                        alt="Мои тарифы" 
+                        width={20} 
+                        height={20} 
+                        className="w-5 h-5"
+                      />
+                      <span>Мои тарифы</span>
+                    </Link>
+                    <Link
+                      href="/support"
+                      onClick={() => setOpen(false)}
+                      className="flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-xl text-white/80 hover:text-white hover:bg-white/5 transition-colors duration-200"
+                    >
+                      <Image 
+                        src="/static/icons/accounts/support.svg" 
+                        alt="Поддержка" 
+                        width={20} 
+                        height={20} 
+                        className="w-5 h-5"
+                      />
+                      <span>Поддержка</span>
+                    </Link>
+                    <div className="border-t border-white/10 my-1 mx-2"></div>
+                    <button
+                      onClick={() => {
+                        setOpen(false);
+                        handleLogout();
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-xl text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors duration-200"
+                    >
+                      <Image 
+                        src="/static/icons/accounts/log-out.svg" 
+                        alt="Выйти" 
+                        width={20} 
+                        height={20} 
+                        className="w-5 h-5"
+                      />
+                      <span>Выйти</span>
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
                   <Link 
-                    href="/auth" 
+                    href="#pricing" 
+                    onClick={() => setOpen(false)} 
                     className="block text-white/80 hover:text-white transition-colors duration-300 py-2"
                   >
-                    Войти
+                    Тарифы
                   </Link>
-                )}
-              </div>
+                  <Link 
+                    href="/contacts" 
+                    onClick={() => setOpen(false)} 
+                    className="block text-white/80 hover:text-white transition-colors duration-300 py-2"
+                  >
+                    Поддержка
+                  </Link>
+                  <Link 
+                    href="#faq" 
+                    onClick={() => setOpen(false)} 
+                    className="block text-white/80 hover:text-white transition-colors duration-300 py-2"
+                  >
+                    FAQ
+                  </Link>
+                  <div className="pt-4 border-t border-white/10">
+                    <Link 
+                      href="/auth" 
+                      className="block text-white/80 hover:text-white transition-colors duration-300 py-2"
+                    >
+                      Войти
+                    </Link>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         )}

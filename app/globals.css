@@ -609,6 +609,34 @@ button, a {
     to { transform: rotate(360deg); }
 }
 
+/* Кастомный скролл для support страницы */
+.support-tickets-list,
+.support-chat-messages {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+}
+
+.support-tickets-list::-webkit-scrollbar,
+.support-chat-messages::-webkit-scrollbar {
+    width: 6px;
+}
+
+.support-tickets-list::-webkit-scrollbar-track,
+.support-chat-messages::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.support-tickets-list::-webkit-scrollbar-thumb,
+.support-chat-messages::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.15), rgba(86, 162, 255, 0.35));
+}
+
+.support-tickets-list::-webkit-scrollbar-thumb:hover,
+.support-chat-messages::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.25), rgba(86, 162, 255, 0.55));
+}
+
 .auth-feedback {
     margin-top: 0.75rem;
     margin-bottom: 0.75rem;

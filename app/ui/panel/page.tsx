@@ -148,26 +148,6 @@ export default function AdminPanel() {
     }
   };
 
-  const handleCopy = async (label: string, value?: string) => {
-    if (!value) return;
-    try {
-      await navigator.clipboard.writeText(value);
-      setUserActionMessage(`${label} скопирован в буфер обмена`);
-    } catch {
-      setUserActionMessage(`Не удалось скопировать ${label.toLowerCase()}`);
-    } finally {
-      setTimeout(() => setUserActionMessage(''), 2500);
-    }
-  };
-
-  const handleOpenDashboard = (token?: string) => {
-    if (!token) {
-      setUserActionMessage('У пользователя нет привязанного токена');
-      setTimeout(() => setUserActionMessage(''), 2500);
-      return;
-    }
-    window.open(`/dashboard/${token}`, '_blank', 'noopener,noreferrer');
-  };
   const handleSubscriptionManage = (user: PanelUser) => {
     setUserActionMessage(`Управление подпиской для ${user.username} (${user.user_id})`);
     setTimeout(() => setUserActionMessage(''), 2500);

@@ -303,7 +303,7 @@ export default function AuthForm() {
     if (formType === 'register') {
       isValidConfirm = validateConfirmPassword();
     }
-    const hasCaptcha = !!captchaResponse[formType];
+    // const hasCaptcha = !!captchaResponse[formType];
     // if (!hasCaptcha) {
     //   setErrors(prev => ({ ...prev, global: 'Подтвердите, что вы не робот' }));
     //   return false;
@@ -368,7 +368,7 @@ export default function AuthForm() {
 
     if (typeof window !== 'undefined' && window.turnstile) {
       const widgetId = window.turnstile.render('#' + containerId, {
-        sitekey: '0x4AAAAAAB0s4O-sxm9ZnAQk',
+        sitekey: '3x00000000000000000000FF',
         theme: 'dark',
         callback: (token: string) => {
           setCaptchaResponse(prev => ({ ...prev, [formType]: token }));
@@ -392,7 +392,6 @@ export default function AuthForm() {
 
   useEffect(() => {
     fetchCsrfToken();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (

@@ -52,13 +52,13 @@ export default function Footer() {
             <p className="mt-3 md:mt-4 text-sm md:text-base">Приватность без компромиссов</p>
             <div className="mt-4 md:mt-5 flex items-center gap-4 flex-wrap">
               <Link 
-                href="/contacts" 
+                href="/support" 
                 className="flex items-center gap-2 hover:text-neutral-200 transition-all duration-200 p-2 rounded-lg hover:bg-neutral-800/50 hover:scale-105"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 md:h-6 md:w-6 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l9 6 9-6M4 6h16a1 1 0 011 1v10a1 1 0 01-1 1H4a1 1 0 01-1-1V7a1 1 0 011-1z"/>
                 </svg>
-                Контакты
+                Поддержка
               </Link>
               <a 
                 href="https://t.me/" 

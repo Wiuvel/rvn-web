@@ -39,6 +39,19 @@ export function middleware(request: NextRequest) {
     
     return NextResponse.next();
   }
+
+  // Проверка для /support
+  if (pathname === '/support' || pathname.startsWith('/support/')) {
+    // /support/help доступна без авторизации
+    if (pathname === '/support/help' || pathname === '/support/help/') {
+      return NextResponse.next();
+    }
+    // Остальные страницы /support требуют авторизации
+    if (!isAuthenticated || !dashboardToken) {
+      return NextResponse.redirect(new URL('/support/help', request.url));
+    }
+    return NextResponse.next();
+  }
   
   if (pathname === '/protection') {
     return NextResponse.next();

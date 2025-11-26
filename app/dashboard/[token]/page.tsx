@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useFadeIn, useStaggeredFadeIn } from '@/hooks/useGSAP';
+import { gsap } from 'gsap';
 
 interface UserData {
   id: string;
@@ -15,14 +16,31 @@ interface UserData {
   last_login?: string;
 }
 
+interface Notification {
+  id: string;
+  title: string;
+  message: string;
+  created_at: string;
+}
+
 export default function DashboardPage() {
   const [open, setOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [shouldRenderMenu, setShouldRenderMenu] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [shouldRenderNotificationsMenu, setShouldRenderNotificationsMenu] = useState(false);
   const [userData, setUserData] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
   const [currentYear] = useState(new Date().getFullYear());
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [readNotifications, setReadNotifications] = useState<Set<string>>(new Set());
   const router = useRouter();
   const params = useParams();
   const token = params?.token as string;
+  const userMenuRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const notificationsMenuRef = useRef<HTMLDivElement>(null);
+  const notificationsMenuContainerRef = useRef<HTMLDivElement>(null);
   
   const titleRef = useFadeIn(0.1) as React.RefObject<HTMLDivElement>;
   const profileRef = useFadeIn(0.2) as React.RefObject<HTMLDivElement>;
@@ -69,7 +87,7 @@ export default function DashboardPage() {
           } else {
             router.push('/auth');
           }
-        } catch (fetchError: any) {
+        } catch (fetchError: unknown) {
           if (timeoutId) {
             clearTimeout(timeoutId);
             timeoutId = null;
@@ -78,7 +96,7 @@ export default function DashboardPage() {
           if (!isMounted) return;
 
           // Если запрос был прерван из-за таймаута
-          if (fetchError.name === 'AbortError') {
+          if (fetchError instanceof Error && fetchError.name === 'AbortError') {
             // Перенаправляем на страницу 500
             router.push('/error/500');
             return;
@@ -142,6 +160,165 @@ export default function DashboardPage() {
     return `#${userId}`;
   };
 
+  const getInitial = (username: string) => {
+    return username.charAt(0).toUpperCase();
+  };
+
+  // Инициализация уведомлений и загрузка из localStorage
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    // Загружаем прочитанные уведомления из localStorage
+    const storedRead = localStorage.getItem('readNotifications');
+    const readSet = storedRead ? new Set<string>(JSON.parse(storedRead)) : new Set<string>();
+    setReadNotifications(readSet);
+
+    // Пока уведомления пустые, в будущем можно загружать с сервера
+    setNotifications([]);
+  }, []);
+
+  // Обработка открытия/закрытия меню
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    if (userMenuOpen) {
+      setShouldRenderMenu(true);
+      if (menuRef.current) {
+        gsap.fromTo(menuRef.current,
+          { opacity: 0, y: -10, scale: 0.95 },
+          { opacity: 1, y: 0, scale: 1, duration: 0.2, ease: "power2.out" }
+        );
+      }
+      // Блокируем скролл
+      document.body.style.overflow = 'hidden';
+    } else {
+      if (menuRef.current) {
+        gsap.to(menuRef.current, {
+          opacity: 0,
+          y: -10,
+          scale: 0.95,
+          duration: 0.15,
+          ease: "power2.in",
+          onComplete: () => {
+            setShouldRenderMenu(false);
+          }
+        });
+      } else {
+        setShouldRenderMenu(false);
+      }
+      // Разблокируем скролл
+      document.body.style.overflow = '';
+    }
+
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [userMenuOpen]);
+
+  // Блокировка скролла при открытом меню уведомлений
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    if (notificationsOpen) {
+      document.body.style.overflow = 'hidden';
+    } else if (!userMenuOpen) {
+      document.body.style.overflow = '';
+    }
+
+    return () => {
+      if (!userMenuOpen) {
+        document.body.style.overflow = '';
+      }
+    };
+  }, [notificationsOpen, userMenuOpen]);
+
+  // Взаимное закрытие меню
+  useEffect(() => {
+    if (notificationsOpen && userMenuOpen) {
+      setUserMenuOpen(false);
+    }
+  }, [notificationsOpen, userMenuOpen]);
+
+  useEffect(() => {
+    if (userMenuOpen && notificationsOpen) {
+      setNotificationsOpen(false);
+    }
+  }, [userMenuOpen, notificationsOpen]);
+
+  // Управление рендерингом и анимацией меню уведомлений
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    if (notificationsOpen) {
+      setShouldRenderNotificationsMenu(true);
+      requestAnimationFrame(() => {
+        if (notificationsMenuContainerRef.current) {
+          gsap.set(notificationsMenuContainerRef.current, {
+            opacity: 0,
+            y: -10,
+            scale: 0.95
+          });
+          gsap.to(notificationsMenuContainerRef.current, {
+            opacity: 1,
+            y: 0,
+            scale: 1,
+            duration: 0.2,
+            ease: "power2.out"
+          });
+        }
+      });
+    } else if (shouldRenderNotificationsMenu && notificationsMenuContainerRef.current) {
+      gsap.to(notificationsMenuContainerRef.current, {
+        opacity: 0,
+        y: -10,
+        scale: 0.95,
+        duration: 0.15,
+        ease: "power2.in",
+        onComplete: () => {
+          setShouldRenderNotificationsMenu(false);
+        }
+      });
+    }
+  }, [notificationsOpen, shouldRenderNotificationsMenu]);
+
+  // Обработка кликов вне меню
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (userMenuRef.current && !userMenuRef.current.contains(target)) {
+        setUserMenuOpen(false);
+      }
+      if (notificationsMenuRef.current && !notificationsMenuRef.current.contains(target)) {
+        setNotificationsOpen(false);
+      }
+    };
+
+    if (userMenuOpen || notificationsOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [userMenuOpen, notificationsOpen]);
+
+  // Функция для отметки уведомления как прочитанного
+  const markNotificationAsRead = (notificationId: string) => {
+    const newReadSet = new Set(readNotifications);
+    newReadSet.add(notificationId);
+    setReadNotifications(newReadSet);
+    
+    // Сохраняем в localStorage
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('readNotifications', JSON.stringify(Array.from(newReadSet)));
+    }
+  };
+
+  // Проверка наличия непрочитанных уведомлений
+  const hasUnreadNotifications = notifications.some(n => !readNotifications.has(n.id));
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -164,11 +341,161 @@ export default function DashboardPage() {
               <Link href="/" className="hover:text-white transition">Главная</Link>
               <Link href="/auth/" className="hover:text-white transition">Профиль</Link>
             </nav>
-            <div className="hidden lg:flex">
-              <button onClick={handleLogout} className="rounded-xl bg-primary-500 hover:bg-primary-400 px-4 py-2 text-sm font-medium text-white shadow-glow transition">
-                Выйти
-              </button>
-            </div>
+            {userData && (
+              <div className="hidden lg:flex items-center gap-2 relative" ref={userMenuRef}>
+                <div className="relative" ref={notificationsMenuRef}>
+                  <button
+                    onClick={() => setNotificationsOpen(!notificationsOpen)}
+                    className="w-10 h-10 rounded-full bg-neutral-800/60 hover:bg-neutral-700/60 flex items-center justify-center text-white/80 hover:text-white transition-all duration-200 hover:scale-110 cursor-pointer mr-2"
+                    title="Уведомления"
+                    aria-label="Уведомления"
+                    aria-expanded={notificationsOpen}
+                  >
+                    <Image 
+                      src={hasUnreadNotifications ? "/static/icons/accounts/bell-dot.svg" : "/static/icons/accounts/bell.svg"} 
+                      alt="Уведомления" 
+                      width={18} 
+                      height={18} 
+                      className="w-[18px] h-[18px]"
+                    />
+                  </button>
+                  {shouldRenderNotificationsMenu && (
+                    <div 
+                      ref={notificationsMenuContainerRef}
+                      className="absolute -right-3 top-full mt-4 w-80 bg-neutral-900/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-xl overflow-hidden z-50"
+                    >
+                      <div className="p-4 border-b border-white/10 mx-2">
+                        <h3 className="text-white font-semibold text-sm">Уведомления</h3>
+                      </div>
+                      <div className="max-h-96 overflow-y-auto">
+                        {notifications.length === 0 ? (
+                          <div className="p-4 text-center text-neutral-400 text-sm">
+                            Нет уведомлений
+                          </div>
+                        ) : (
+                          <div className="py-2">
+                            {notifications.map((notification) => {
+                              const isRead = readNotifications.has(notification.id);
+                              return (
+                                <div
+                                  key={notification.id}
+                                  onClick={() => markNotificationAsRead(notification.id)}
+                                  className={`px-4 py-3 mx-2 my-1 rounded-xl cursor-pointer transition-colors duration-200 ${
+                                    !isRead 
+                                      ? 'bg-blue-500/10 hover:bg-blue-500/20 border-l-2 border-blue-500' 
+                                      : 'hover:bg-white/5'
+                                  }`}
+                                >
+                                  <div className="flex items-start gap-3">
+                                    {!isRead && (
+                                      <div className="w-2 h-2 rounded-full bg-blue-500 mt-2 flex-shrink-0"></div>
+                                    )}
+                                    <div className="flex-1 min-w-0">
+                                      <div className="text-white font-medium text-sm mb-1">
+                                        {notification.title}
+                                      </div>
+                                      <div className="text-neutral-400 text-xs">
+                                        {notification.message}
+                                      </div>
+                                      <div className="text-neutral-500 text-xs mt-1">
+                                        {new Date(notification.created_at).toLocaleDateString('ru-RU', {
+                                          day: 'numeric',
+                                          month: 'short',
+                                          hour: '2-digit',
+                                          minute: '2-digit'
+                                        })}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <button
+                  onClick={() => setUserMenuOpen(!userMenuOpen)}
+                  className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold text-sm shadow-glow transition-transform duration-200 hover:scale-110 cursor-pointer"
+                  title={userData.username}
+                  aria-label="Меню пользователя"
+                  aria-expanded={userMenuOpen}
+                >
+                  {getInitial(userData.username)}
+                </button>
+                {shouldRenderMenu && (
+                  <div 
+                    ref={menuRef}
+                    className="absolute -right-3 top-full mt-4 w-64 bg-neutral-900/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-xl overflow-hidden z-50"
+                  >
+                    <Link
+                      href={`/dashboard/${userData.dashboard_token}`}
+                      onClick={() => setUserMenuOpen(false)}
+                      className="block p-4 border-b border-white/10 hover:bg-white/5 transition-colors duration-200 cursor-pointer mx-2 my-1 rounded-xl"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold text-base flex-shrink-0">
+                          {getInitial(userData.username)}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-white font-medium truncate">{userData.username}</div>
+                          <div className="text-neutral-400 text-xs truncate">Пользователь</div>
+                        </div>
+                      </div>
+                    </Link>
+                    <div className="py-2">
+                      <Link
+                        href={`/dashboard/${userData.dashboard_token}#subscriptions`}
+                        onClick={() => setUserMenuOpen(false)}
+                        className="flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-xl text-white/80 hover:text-white hover:bg-white/5 transition-colors duration-200"
+                      >
+                        <Image 
+                          src="/static/icons/accounts/wallet.svg" 
+                          alt="Мои тарифы" 
+                          width={20} 
+                          height={20} 
+                          className="w-5 h-5"
+                        />
+                        <span>Мои тарифы</span>
+                      </Link>
+                      <Link
+                        href="/support"
+                        onClick={() => setUserMenuOpen(false)}
+                        className="flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-xl text-white/80 hover:text-white hover:bg-white/5 transition-colors duration-200"
+                      >
+                        <Image 
+                          src="/static/icons/accounts/support.svg" 
+                          alt="Поддержка" 
+                          width={20} 
+                          height={20} 
+                          className="w-5 h-5"
+                        />
+                        <span>Поддержка</span>
+                      </Link>
+                      <div className="border-t border-white/10 my-1 mx-2"></div>
+                      <button
+                        onClick={() => {
+                          setUserMenuOpen(false);
+                          handleLogout();
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-xl text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors duration-200"
+                      >
+                        <Image 
+                          src="/static/icons/accounts/log-out.svg" 
+                          alt="Выйти" 
+                          width={20} 
+                          height={20} 
+                          className="w-5 h-5"
+                        />
+                        <span>Выйти</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
             <button 
               onClick={() => setOpen(!open)} className="lg:hidden p-2 text-white/80 hover:text-white transition-colors duration-300" aria-label="Открыть меню">
               {!open ? (
@@ -183,18 +510,70 @@ export default function DashboardPage() {
             </button>
           </div>
           {/* Mobile menu */}
-          {open && (
+          {open && userData && (
             <div className="lg:hidden mt-4 py-4 bg-black/50 backdrop-blur-lg rounded-2xl border border-white/10"style={{animation: 'fadeIn 0.2s ease-out'}}>
-              <div className="px-4 space-y-4">
-                <Link href="/" onClick={() => setOpen(false)} className="block text-white/80 hover:text-white transition-colors duration-300 py-2">
-                  Главная
+              <div className="px-4 space-y-2">
+                <Link
+                  href={`/dashboard/${userData.dashboard_token}`}
+                  onClick={() => setOpen(false)}
+                  className="block p-4 border-b border-white/10 hover:bg-white/5 transition-colors duration-200 cursor-pointer mx-2 my-1 rounded-xl"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold text-base flex-shrink-0">
+                      {getInitial(userData.username)}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-white font-medium truncate">{userData.username}</div>
+                    </div>
+                  </div>
                 </Link>
-                <Link href="/auth/" onClick={() => setOpen(false)} className="block text-white/80 hover:text-white transition-colors duration-300 py-2">
-                  Профиль
-                </Link>
-                <button onClick={() => { setOpen(false); handleLogout(); }} className="block text-white/80 hover:text-white transition-colors duration-300 py-2">
-                  Выйти
-                </button>
+                <div className="py-2">
+                  <Link
+                    href={`/dashboard/${userData.dashboard_token}#subscriptions`}
+                    onClick={() => setOpen(false)}
+                    className="flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-xl text-white/80 hover:text-white hover:bg-white/5 transition-colors duration-200"
+                  >
+                    <Image 
+                      src="/static/icons/accounts/wallet.svg" 
+                      alt="Мои тарифы" 
+                      width={20} 
+                      height={20} 
+                      className="w-5 h-5"
+                    />
+                    <span>Мои тарифы</span>
+                  </Link>
+                  <Link
+                    href="/contacts"
+                    onClick={() => setOpen(false)}
+                    className="flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-xl text-white/80 hover:text-white hover:bg-white/5 transition-colors duration-200"
+                  >
+                    <Image 
+                      src="/static/icons/accounts/support.svg" 
+                      alt="Поддержка" 
+                      width={20} 
+                      height={20} 
+                      className="w-5 h-5"
+                    />
+                    <span>Поддержка</span>
+                  </Link>
+                  <div className="border-t border-white/10 my-1 mx-2"></div>
+                  <button
+                    onClick={() => {
+                      setOpen(false);
+                      handleLogout();
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-xl text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors duration-200"
+                  >
+                    <Image 
+                      src="/static/icons/accounts/log-out.svg" 
+                      alt="Выйти" 
+                      width={20} 
+                      height={20} 
+                      className="w-5 h-5"
+                    />
+                    <span>Выйти</span>
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -253,7 +632,7 @@ export default function DashboardPage() {
             </section>
             <section className="rounded-2xl border border-neutral-800 bg-neutral-900 p-5">
               <div className="text-sm text-neutral-400">Поддержка</div>
-              <Link href="/contacts" className="mt-2 inline-block text-primary-400 hover:underline hover:text-primary-300 transition-colors">
+              <Link href="/support" className="mt-2 inline-block text-primary-400 hover:underline hover:text-primary-300 transition-colors">
                 Связаться с нами
               </Link>
             </section>

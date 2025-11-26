@@ -1,0 +1,893 @@
+'use client';
+
+import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import Image from 'next/image';
+import { gsap } from 'gsap';
+
+interface UserData {
+  id: string;
+  user_id: string;
+  username: string;
+  dashboard_token: string;
+  created_at: string;
+  last_login?: string;
+}
+
+interface Message {
+  id: string;
+  text: string;
+  sender: 'user' | 'support';
+  timestamp: Date;
+  isRead?: boolean;
+}
+
+interface Ticket {
+  id: string;
+  subject: string;
+  status: 'open' | 'closed' | 'pending';
+  createdAt: Date;
+  messages: Message[];
+}
+
+// Компонент для анимированного сообщения
+function MessageItem({ 
+  message, 
+  showDate, 
+  userData, 
+  formatDate, 
+  formatTime 
+}: { 
+  message: Message; 
+  showDate: boolean; 
+  userData: UserData | null;
+  formatDate: (date: Date) => string;
+  formatTime: (date: Date) => string;
+}) {
+  const messageRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (messageRef.current && typeof window !== 'undefined') {
+      gsap.fromTo(messageRef.current,
+        { opacity: 0, y: 10, scale: 0.95 },
+        { opacity: 1, y: 0, scale: 1, duration: 0.3, ease: "power2.out" }
+      );
+    }
+  }, [message.id]);
+
+  return (
+    <div ref={messageRef}>
+      {showDate && (
+        <div className="text-center text-xs text-neutral-500 my-4">
+          {formatDate(message.timestamp)}
+        </div>
+      )}
+      <div className={`flex flex-col ${message.sender === 'user' ? 'items-end' : 'items-start'}`}>
+        {message.sender === 'user' && userData && (
+          <div className="mb-1 px-1 flex items-baseline gap-1">
+            <span className="text-xs sm:text-sm font-medium text-white bg-white/10 px-1.5 sm:px-2 py-0.5 rounded">{userData.username}</span>
+            <span className="text-[10px] sm:text-xs text-neutral-400">#{userData.user_id}</span>
+          </div>
+        )}
+        <div className={`flex items-end gap-2 ${message.sender === 'user' ? 'flex-row-reverse' : 'flex-row'} w-full`}>
+          {message.sender === 'support' && (
+            <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-full bg-neutral-800 flex items-center justify-center flex-shrink-0 mb-1">
+              <Image 
+                src="/static/logo.svg" 
+                alt="Support" 
+                width={36} 
+                height={36} 
+                className="w-5 h-5 sm:w-9 sm:h-9"
+              />
+            </div>
+          )}
+          <div className={`max-w-[85%] sm:max-w-[70%] min-w-0 flex-shrink-0 rounded-2xl px-3 py-2 sm:px-4 ${
+            message.sender === 'user'
+              ? 'bg-primary-500 text-white rounded-br-sm'
+              : 'bg-neutral-800 text-neutral-100 rounded-bl-sm'
+          }`} style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>
+            <p className="text-xs sm:text-sm whitespace-pre-wrap break-words">
+              {message.text}
+            </p>
+            <div className={`text-[10px] sm:text-xs mt-1 ${
+              message.sender === 'user' ? 'text-primary-100' : 'text-neutral-400'
+            }`}>
+              {formatTime(message.timestamp)}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function SupportPage() {
+  const [open, setOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [shouldRenderMenu, setShouldRenderMenu] = useState(false);
+  const [userData, setUserData] = useState<UserData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [activeTicket, setActiveTicket] = useState<Ticket | null>(null);
+  const [messageText, setMessageText] = useState('');
+  const [showNewTicketForm, setShowNewTicketForm] = useState(false);
+  const [newTicketSubject, setNewTicketSubject] = useState('');
+  const [ticketsLoading, setTicketsLoading] = useState(false);
+  const [lastMessageTime, setLastMessageTime] = useState<number | null>(null);
+  const [timeoutSeconds, setTimeoutSeconds] = useState<number>(0);
+  const [notification, setNotification] = useState<{ message: string; show: boolean }>({ message: '', show: false });
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
+  const userMenuRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const messageInputRef = useRef<HTMLInputElement>(null);
+  const subjectInputRef = useRef<HTMLInputElement>(null);
+  
+  // Лимиты символов
+  const MAX_MESSAGE_LENGTH = 500;
+  const MAX_SUBJECT_LENGTH = 50;
+  
+  // Функция для показа notification
+  const showNotification = (message: string) => {
+    setNotification({ message, show: true });
+    setTimeout(() => {
+      setNotification({ message: '', show: false });
+    }, 3000);
+  };
+  
+  // Функция для анимации тряски с GSAP
+  const triggerShake = (inputType: 'message' | 'subject') => {
+    if (typeof window === 'undefined') return;
+    
+    const inputRef = inputType === 'message' ? messageInputRef : subjectInputRef;
+    if (!inputRef.current) return;
+    
+    const tl = gsap.timeline();
+    tl.to(inputRef.current, { x: -3, duration: 0.05, ease: "power2.out" })
+      .to(inputRef.current, { x: 3, duration: 0.05, ease: "power2.out" })
+      .to(inputRef.current, { x: -2, duration: 0.05, ease: "power2.out" })
+      .to(inputRef.current, { x: 2, duration: 0.05, ease: "power2.out" })
+      .to(inputRef.current, { x: -1, duration: 0.05, ease: "power2.out" })
+      .to(inputRef.current, { x: 1, duration: 0.05, ease: "power2.out" })
+      .to(inputRef.current, { x: 0, duration: 0.05, ease: "power2.out" });
+  };
+
+  // Проверка авторизации
+  useEffect(() => {
+    let isMounted = true;
+    let controller: AbortController | null = null;
+    let timeoutId: NodeJS.Timeout | null = null;
+
+    const fetchUserData = async () => {
+      try {
+        controller = new AbortController();
+        timeoutId = setTimeout(() => controller!.abort(), 10000);
+
+        try {
+          const response = await fetch('/api/auth/me', {
+            signal: controller.signal
+          });
+          
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+            timeoutId = null;
+          }
+
+          if (!isMounted) return;
+
+          if (response.ok) {
+            const data = await response.json();
+            setUserData(data);
+          } else {
+            setUserData(null);
+          }
+        } catch (fetchError: unknown) {
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+            timeoutId = null;
+          }
+
+          if (!isMounted) return;
+
+          if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+            router.push('/error/500');
+            return;
+          }
+          setUserData(null);
+        }
+      } catch (error) {
+        if (!isMounted) return;
+        console.error('Failed to fetch user data:', error);
+        setUserData(null);
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchUserData();
+
+    return () => {
+      isMounted = false;
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+      if (controller) {
+        controller.abort();
+      }
+    };
+  }, [router]);
+
+  // Обработка открытия/закрытия меню профиля
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    if (userMenuOpen) {
+      setShouldRenderMenu(true);
+      if (menuRef.current) {
+        gsap.fromTo(menuRef.current,
+          { opacity: 0, y: -10, scale: 0.95 },
+          { opacity: 1, y: 0, scale: 1, duration: 0.2, ease: "power2.out" }
+        );
+      }
+      document.body.style.overflow = 'hidden';
+    } else {
+      if (menuRef.current) {
+        gsap.to(menuRef.current, {
+          opacity: 0,
+          y: -10,
+          scale: 0.95,
+          duration: 0.15,
+          ease: "power2.in",
+          onComplete: () => {
+            setShouldRenderMenu(false);
+          }
+        });
+      } else {
+        setShouldRenderMenu(false);
+      }
+      document.body.style.overflow = '';
+    }
+
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [userMenuOpen]);
+
+  // Обработка кликов вне меню
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (userMenuRef.current && !userMenuRef.current.contains(target)) {
+        setUserMenuOpen(false);
+      }
+    };
+
+    if (userMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [userMenuOpen]);
+
+  const handleLogout = async () => {
+    try {
+      const response = await fetch('/api/auth/logout', {
+        method: 'POST'
+      });
+      if (response.ok) {
+        router.push('/auth');
+      }
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+  };
+
+  const getInitial = (username: string) => {
+    return username.charAt(0).toUpperCase();
+  };
+
+  // Автопрокрутка к последнему сообщению
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [activeTicket?.messages]);
+
+  // Таймер тайм-аута между сообщениями
+  useEffect(() => {
+    if (lastMessageTime === null || timeoutSeconds <= 0) return;
+
+    const interval = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - lastMessageTime) / 1000);
+      const remaining = 60 - elapsed;
+      
+      if (remaining <= 0) {
+        setTimeoutSeconds(0);
+        setLastMessageTime(null);
+      } else {
+        setTimeoutSeconds(remaining);
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [lastMessageTime, timeoutSeconds]);
+
+  const handleCreateTicket = () => {
+    if (!newTicketSubject.trim()) return;
+    
+    // Проверка лимита символов
+    if (newTicketSubject.length > MAX_SUBJECT_LENGTH) {
+      showNotification(`Максимальная длина темы: ${MAX_SUBJECT_LENGTH} символов`);
+      triggerShake('subject');
+      return;
+    }
+    
+    // Ограничение: максимум 2 тикета
+    if (tickets.length >= 2) {
+      alert('Вы можете создать максимум 2 тикета. Закройте один из существующих тикетов, чтобы создать новый.');
+      return;
+    }
+
+    const newTicket: Ticket = {
+      id: `ticket-${Date.now()}`,
+      subject: newTicketSubject,
+      status: 'open',
+      createdAt: new Date(),
+      messages: []
+    };
+
+    setTickets([newTicket, ...tickets]);
+    setActiveTicket(newTicket);
+    setNewTicketSubject('');
+    setShowNewTicketForm(false);
+  };
+
+  const handleSendMessage = () => {
+    if (!messageText.trim() || !activeTicket || !activeTicket.messages || !Array.isArray(activeTicket.messages)) return;
+    
+    // Проверка лимита символов
+    if (messageText.length > MAX_MESSAGE_LENGTH) {
+      showNotification(`Максимальная длина сообщения: ${MAX_MESSAGE_LENGTH} символов`);
+      triggerShake('message');
+      return;
+    }
+    
+    // Проверка тайм-аута (1 минута между сообщениями)
+    if (timeoutSeconds > 0) {
+      return;
+    }
+
+    const isFirstMessage = activeTicket.messages.length === 0;
+
+    const newMessage: Message = {
+      id: `msg-${Date.now()}`,
+      text: messageText,
+      sender: 'user',
+      timestamp: new Date(),
+      isRead: false
+    };
+
+    const updatedTicket = {
+      ...activeTicket,
+      messages: [...activeTicket.messages, newMessage]
+    };
+
+    setTickets(tickets.map(t => t.id === activeTicket.id ? updatedTicket : t));
+    setActiveTicket(updatedTicket);
+    setMessageText('');
+    
+    // Устанавливаем тайм-аут на 1 минуту
+    setLastMessageTime(Date.now());
+    setTimeoutSeconds(60);
+
+    // Показываем спиннер загрузки и автоматический ответ только при первом сообщении
+    if (isFirstMessage) {
+      setTicketsLoading(true);
+
+      setTimeout(() => {
+        const supportMessage: Message = {
+          id: `msg-${Date.now()}`,
+          text: 'Спасибо за ваше сообщение. Мы получили ваш запрос и ответим в ближайшее время.',
+          sender: 'support',
+          timestamp: new Date(),
+          isRead: true
+        };
+
+        const updatedTicketWithResponse = {
+          ...updatedTicket,
+          messages: [...updatedTicket.messages, supportMessage]
+        };
+
+        setTickets(tickets.map(t => t.id === activeTicket.id ? updatedTicketWithResponse : t));
+        setActiveTicket(updatedTicketWithResponse);
+        setTicketsLoading(false);
+      }, 1000);
+    }
+  };
+
+  const formatTime = (date: Date) => {
+    return new Intl.DateTimeFormat('ru-RU', {
+      hour: '2-digit',
+      minute: '2-digit'
+    }).format(date);
+  };
+
+  const formatDate = (date: Date) => {
+    const today = new Date();
+    const messageDate = new Date(date);
+    const diffTime = today.getTime() - messageDate.getTime();
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) return 'Сегодня';
+    if (diffDays === 1) return 'Вчера';
+    if (diffDays < 7) return `${diffDays} дн. назад`;
+    
+    return new Intl.DateTimeFormat('ru-RU', {
+      day: 'numeric',
+      month: 'short'
+    }).format(date);
+  };
+
+  const formatDateShort = (date: Date) => {
+    const d = new Date(date);
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = String(d.getFullYear()).slice(-2);
+    return `${day}.${month}.${year}`;
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-neutral-950">
+        <div className="spinner"></div>
+      </div>
+    );
+  }
+
+  if (!userData) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-neutral-950">
+        <div className="spinner"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-screen bg-neutral-950 text-neutral-100 flex flex-col overflow-hidden">
+      {/* Header */}
+      <header className="fixed top-0 left-0 right-0 pt-4 z-[999]">
+        <div className="mx-auto max-w-6xl px-4">
+          <div className="backdrop-blur-lg bg-neutral-900/40 border border-white/10 rounded-full px-6 py-3 flex items-center justify-between shadow-lg">
+            <Link href="/" className="flex items-center gap-2">
+              <Image src="/static/logo.svg" alt="Raven Logo" width={24} height={24} className="w-6 h-6" priority/>
+              <span className="font-semibold text-white">Raven Private</span>
+            </Link>
+            <nav className="hidden lg:flex items-center gap-8 text-sm text-neutral-300">
+              <Link href="/" className="hover:text-white transition">Главная</Link>
+              <Link href="/auth/" className="hover:text-white transition">Профиль</Link>
+            </nav>
+            {userData && (
+              <div className="hidden lg:flex items-center gap-2 relative" ref={userMenuRef}>
+                <button
+                  onClick={() => setUserMenuOpen(!userMenuOpen)}
+                  className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold text-sm shadow-glow transition-transform duration-200 hover:scale-110 cursor-pointer"
+                  title={userData.username}
+                  aria-label="Меню пользователя"
+                  aria-expanded={userMenuOpen}
+                >
+                  {getInitial(userData.username)}
+                </button>
+                {shouldRenderMenu && (
+                  <div 
+                    ref={menuRef}
+                    className="absolute -right-3 top-full mt-4 w-64 bg-neutral-900/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-xl overflow-hidden z-50"
+                  >
+                    <Link
+                      href={`/dashboard/${userData.dashboard_token}`}
+                      onClick={() => setUserMenuOpen(false)}
+                      className="block p-4 border-b border-white/10 hover:bg-white/5 transition-colors duration-200 cursor-pointer mx-2 my-1 rounded-xl"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold text-base flex-shrink-0">
+                          {getInitial(userData.username)}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-white font-medium truncate">{userData.username}</div>
+                          <div className="text-neutral-400 text-xs truncate">ID: {userData.user_id}</div>
+                        </div>
+                      </div>
+                    </Link>
+                    <div className="py-2">
+                      <Link
+                        href={`/dashboard/${userData.dashboard_token}`}
+                        onClick={() => setUserMenuOpen(false)}
+                        className="flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-xl text-white/80 hover:text-white hover:bg-white/5 transition-colors duration-200"
+                      >
+                        <Image 
+                          src="/static/icons/accounts/users.svg" 
+                          alt="Профиль" 
+                          width={20} 
+                          height={20} 
+                          className="w-5 h-5"
+                        />
+                        <span>Профиль</span>
+                      </Link>
+                      <Link
+                        href={`/dashboard/${userData.dashboard_token}#subscriptions`}
+                        onClick={() => setUserMenuOpen(false)}
+                        className="flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-xl text-white/80 hover:text-white hover:bg-white/5 transition-colors duration-200"
+                      >
+                        <Image 
+                          src="/static/icons/accounts/wallet.svg" 
+                          alt="Мои тарифы" 
+                          width={20} 
+                          height={20} 
+                          className="w-5 h-5"
+                        />
+                        <span>Мои тарифы</span>
+                      </Link>
+                      <div className="border-t border-white/10 my-1 mx-2"></div>
+                      <button
+                        onClick={() => {
+                          setUserMenuOpen(false);
+                          handleLogout();
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-xl text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors duration-200"
+                      >
+                        <Image 
+                          src="/static/icons/accounts/log-out.svg" 
+                          alt="Выйти" 
+                          width={20} 
+                          height={20} 
+                          className="w-5 h-5"
+                        />
+                        <span>Выйти</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            <button 
+              onClick={() => setOpen(!open)} 
+              className="lg:hidden p-2 text-white/80 hover:text-white transition-colors duration-300" 
+              aria-label="Открыть меню"
+            >
+              {!open ? (
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"/>
+                </svg>
+              ) : (
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+              )}
+            </button>
+          </div>
+          {/* Mobile menu */}
+          {open && userData && (
+            <div className="lg:hidden mt-4 py-4 bg-black/50 backdrop-blur-lg rounded-2xl border border-white/10" style={{animation: 'fadeIn 0.2s ease-out'}}>
+              <div className="px-4 space-y-2">
+                <Link
+                  href={`/dashboard/${userData.dashboard_token}`}
+                  onClick={() => setOpen(false)}
+                  className="block p-4 border-b border-white/10 hover:bg-white/5 transition-colors duration-200 cursor-pointer mx-2 my-1 rounded-xl"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold text-base flex-shrink-0">
+                      {getInitial(userData.username)}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-white font-medium truncate">{userData.username}</div>
+                    </div>
+                  </div>
+                </Link>
+                <div className="py-2">
+                  <Link
+                    href={`/dashboard/${userData.dashboard_token}`}
+                    onClick={() => setOpen(false)}
+                    className="flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-xl text-white/80 hover:text-white hover:bg-white/5 transition-colors duration-200"
+                  >
+                    <Image 
+                      src="/static/icons/accounts/users.svg" 
+                      alt="Профиль" 
+                      width={20} 
+                      height={20} 
+                      className="w-5 h-5"
+                    />
+                    <span>Профиль</span>
+                  </Link>
+                  <Link
+                    href={`/dashboard/${userData.dashboard_token}#subscriptions`}
+                    onClick={() => setOpen(false)}
+                    className="flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-xl text-white/80 hover:text-white hover:bg-white/5 transition-colors duration-200"
+                  >
+                    <Image 
+                      src="/static/icons/accounts/wallet.svg" 
+                      alt="Мои тарифы" 
+                      width={20} 
+                      height={20} 
+                      className="w-5 h-5"
+                    />
+                    <span>Мои тарифы</span>
+                  </Link>
+                  <div className="border-t border-white/10 my-1 mx-2"></div>
+                  <button
+                    onClick={() => {
+                      setOpen(false);
+                      handleLogout();
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-xl text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors duration-200"
+                  >
+                    <Image 
+                      src="/static/icons/accounts/log-out.svg" 
+                      alt="Выйти" 
+                      width={20} 
+                      height={20} 
+                      className="w-5 h-5"
+                    />
+                    <span>Выйти</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="flex-1 pt-24 pb-4 overflow-hidden min-h-0">
+        <div className="mx-auto max-w-7xl px-3 sm:px-4 lg:px-8 h-full flex flex-col overflow-hidden">
+          <div className="mb-3 sm:mb-6 hidden sm:block">
+            <p className="text-xs sm:text-sm text-neutral-400">Обратитесь в службу поддержки. Создайте новый тикет или выберите существующий для продолжения диалога.</p>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-6 flex-1 min-h-0">
+            {/* Список тикетов - меньше на мобильном */}
+            <div className="lg:col-span-1 flex flex-col min-h-0">
+              <div className="bg-neutral-900 border border-white/10 rounded-2xl p-2 sm:p-4 flex-1 flex flex-col overflow-hidden">
+                <div className="flex items-center justify-between mb-2 sm:mb-4 flex-shrink-0">
+                  <h2 className="text-base sm:text-lg font-semibold">Мои тикеты</h2>
+                  <button
+                    onClick={() => {
+                      if (tickets.length >= 2) {
+                        alert('Вы можете создать максимум 2 тикета. Закройте один из существующих тикетов, чтобы создать новый.');
+                        return;
+                      }
+                      setShowNewTicketForm(!showNewTicketForm);
+                    }}
+                    disabled={tickets.length >= 2}
+                    className="px-3 py-1.5 bg-primary-500 hover:bg-primary-400 disabled:bg-neutral-700 disabled:text-neutral-500 disabled:cursor-not-allowed text-white text-sm rounded-lg transition-colors"
+                  >
+                    + Новый
+                  </button>
+                </div>
+
+                {showNewTicketForm && (
+                  <div className="mb-4 p-3 bg-neutral-800/50 rounded-xl border border-white/10 flex-shrink-0">
+                    <input
+                      ref={subjectInputRef}
+                      type="text"
+                      value={newTicketSubject}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        if (value.length <= MAX_SUBJECT_LENGTH) {
+                          setNewTicketSubject(value);
+                        } else {
+                          showNotification(`Максимальная длина темы: ${MAX_SUBJECT_LENGTH} символов`);
+                          triggerShake('subject');
+                        }
+                      }}
+                      placeholder="Тема обращения..."
+                      className="w-full px-3 py-2 bg-neutral-900 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-primary-500"
+                      onKeyPress={(e) => e.key === 'Enter' && handleCreateTicket()}
+                      autoFocus
+                    />
+                    <div className="text-xs text-neutral-500 mt-1 text-right">
+                      {newTicketSubject.length}/{MAX_SUBJECT_LENGTH}
+                    </div>
+                    <div className="flex gap-2 mt-2">
+                      <button
+                        onClick={handleCreateTicket}
+                        className="flex-1 px-3 py-1.5 bg-primary-500 hover:bg-primary-400 text-white text-sm rounded-lg transition-colors"
+                      >
+                        Создать
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowNewTicketForm(false);
+                          setNewTicketSubject('');
+                        }}
+                        className="px-3 py-1.5 bg-neutral-700 hover:bg-neutral-600 text-white text-sm rounded-lg transition-colors"
+                      >
+                        Отмена
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                <div className="support-tickets-list flex-1 overflow-y-auto min-h-0">
+                  {tickets.length === 0 ? (
+                    <div className="text-center text-neutral-400 text-sm py-8">
+                      Нет открытых тикетов.
+                    </div>
+                  ) : (
+                    tickets.map((ticket) => (
+                      <button
+                        key={ticket.id}
+                        onClick={() => setActiveTicket(ticket)}
+                        className={`w-full text-left p-3 rounded-xl transition-colors ${
+                          activeTicket?.id === ticket.id
+                            ? 'bg-primary-500/20 border border-primary-500/50'
+                            : 'bg-neutral-800/50 hover:bg-neutral-800 border border-transparent'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between mb-1">
+                          <span className="text-sm font-medium text-white truncate flex-1">
+                            {ticket.subject}
+                          </span>
+                          <span className={`ml-2 px-2 py-0.5 text-xs rounded ${
+                            ticket.status === 'open' 
+                              ? 'bg-green-500/20 text-green-400' 
+                              : ticket.status === 'pending'
+                              ? 'bg-yellow-500/20 text-yellow-400'
+                              : 'bg-neutral-700 text-neutral-400'
+                          }`}>
+                            {ticket.status === 'open' ? 'Открыт' : ticket.status === 'pending' ? 'В ожидании' : 'Закрыт'}
+                          </span>
+                        </div>
+                        <div className="text-xs text-neutral-400">
+                          {formatDate(ticket.createdAt)}
+                        </div>
+                        {ticket.messages && Array.isArray(ticket.messages) && ticket.messages.length > 0 && (
+                          <div className="text-xs text-neutral-500 mt-1 truncate">
+                            {ticket.messages[ticket.messages.length - 1].text}
+                          </div>
+                        )}
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Чат - больше на мобильном */}
+            <div className="lg:col-span-2 flex flex-col min-h-0">
+              <div className="bg-neutral-900 border border-white/10 rounded-2xl flex-1 flex flex-col overflow-hidden">
+                {activeTicket ? (
+                  <>
+                    <div className="p-3 sm:p-4 border-b border-white/10 flex-shrink-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <h3 className="text-sm sm:text-lg font-semibold truncate">{activeTicket.subject}</h3>
+                          <p className="text-xs sm:text-sm text-neutral-400">
+                            Создан {formatDateShort(activeTicket.createdAt)}
+                          </p>
+                        </div>
+                        <span className={`px-3 py-1 text-xs rounded-full ${
+                          activeTicket.status === 'open' 
+                            ? 'bg-green-500/20 text-green-400' 
+                            : activeTicket.status === 'pending'
+                            ? 'bg-yellow-500/20 text-yellow-400'
+                            : 'bg-neutral-700 text-neutral-400'
+                        }`}>
+                          {activeTicket.status === 'open' ? 'Открыт' : activeTicket.status === 'pending' ? 'В ожидании' : 'Закрыт'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="support-chat-messages flex-1 overflow-y-auto min-h-0 relative">
+                      <div className="p-2 sm:p-4 flex flex-col gap-3 sm:gap-4 h-full">
+                        {ticketsLoading && (
+                          <div className="absolute top-4 right-4 flex items-center gap-2 text-neutral-400 text-sm z-10">
+                            <div className="w-4 h-4 border-2 border-neutral-400 border-t-transparent rounded-full animate-spin"></div>
+                            <span>Отправка...</span>
+                          </div>
+                        )}
+                        {activeTicket.messages && Array.isArray(activeTicket.messages) && activeTicket.messages.length > 0 ? (
+                          activeTicket.messages.map((message, index) => {
+                            const showDate = index === 0 || 
+                              new Date(message.timestamp).getDate() !== 
+                              new Date(activeTicket.messages[index - 1].timestamp).getDate();
+                            
+                            return (
+                              <MessageItem 
+                                key={message.id}
+                                message={message}
+                                showDate={showDate}
+                                userData={userData}
+                                formatDate={formatDate}
+                                formatTime={formatTime}
+                              />
+                            );
+                          })
+                        ) : (
+                          <div className="flex-1 flex items-center justify-center">
+                            <p className="text-neutral-500 text-sm">Опишите свою проблему</p>
+                          </div>
+                        )}
+                        <div ref={messagesEndRef} />
+                      </div>
+                    </div>
+
+                    <div className="p-2 sm:p-4 border-t border-white/10 flex-shrink-0">
+                      <div className="flex gap-2">
+                        <div className="flex-1 relative">
+                          <input
+                            ref={messageInputRef}
+                            type="text"
+                            value={messageText}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              if (value.length <= MAX_MESSAGE_LENGTH) {
+                                setMessageText(value);
+                              } else {
+                                showNotification(`Максимальная длина сообщения: ${MAX_MESSAGE_LENGTH} символов`);
+                                triggerShake('message');
+                              }
+                            }}
+                            onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
+                            placeholder={timeoutSeconds > 0 ? "Ожидание.." : "Напишите сообщение..."}
+                            disabled={timeoutSeconds > 0}
+                            className="w-full min-w-0 px-3 py-2 sm:px-4 text-sm sm:text-base bg-neutral-800 border border-white/10 rounded-xl text-white focus:outline-none focus:border-primary-500 disabled:opacity-50 disabled:cursor-not-allowed pr-10"
+                          />
+                          {timeoutSeconds === 0 && (
+                            <div className="absolute bottom-1 right-3 text-[10px] text-neutral-500">
+                              {messageText.length}/{MAX_MESSAGE_LENGTH}
+                            </div>
+                          )}
+                          {timeoutSeconds > 0 && (
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 text-neutral-400">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              <span className="text-xs font-medium">{timeoutSeconds}с</span>
+                            </div>
+                          )}
+                        </div>
+                        <button
+                          onClick={handleSendMessage}
+                          disabled={!messageText.trim() || timeoutSeconds > 0}
+                          className="px-4 sm:px-6 py-2 bg-primary-500 hover:bg-primary-400 disabled:bg-neutral-700 disabled:cursor-not-allowed text-white rounded-xl transition-colors text-sm sm:text-base"
+                        >
+                          Отправить
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex-1 flex items-center justify-center">
+                    <div className="text-center">
+                      <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-neutral-800 flex items-center justify-center">
+                        <svg className="w-8 h-8 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                        </svg>
+                      </div>
+                      <p className="text-neutral-400">Выберите тикет или создайте новый</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+      
+      {/* Notification */}
+      {notification.show && (
+        <div className="fixed bottom-4 left-4 z-[1000] animate-slide-in-left">
+          <div className="bg-neutral-900 border border-red-500/50 rounded-xl px-4 py-3 shadow-xl backdrop-blur-xl">
+            <p className="text-sm text-white">{notification.message}</p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

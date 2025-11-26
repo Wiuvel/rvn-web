@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateUser } from '@/lib/auth';
-import { cookies } from 'next/headers';
 import { authRateLimit } from '@/lib/rate-limit';
 import { verifyCSRFToken, revokeCSRFToken } from '@/lib/csrf';
 import { ServerValidator } from '@/lib/server-validation';
