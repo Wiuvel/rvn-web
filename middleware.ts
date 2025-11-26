@@ -1,18 +1,53 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-export function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
-  const userAgent = request.headers.get('user-agent') || '';
-  const isBot = /googlebot|bingbot|yandex|duckduckbot|twitterbot|whatsapp|telegrambot|discordbot|applebot|redditbot/i.test(userAgent);
-  const isSpecialFile = pathname === '/robots.txt' || pathname === '/sitemap.xml' || pathname === '/favicon.ico' || pathname.startsWith('/api/');
+// Быстрая проверка ботов и специальных файлов (выполняется первой)
+function isBotOrSpecialFile(pathname: string, userAgent: string): boolean {
+  if (pathname === '/robots.txt' || pathname === '/sitemap.xml' || pathname === '/favicon.ico' || pathname.startsWith('/api/')) {
+    return true;
+  }
+  return /googlebot|bingbot|yandex|duckduckbot|twitterbot|whatsapp|telegrambot|discordbot|applebot|redditbot/i.test(userAgent);
+}
+
+// Protection middleware - работает на всех страницах (кроме исключений)
+function handleProtection(request: NextRequest, pathname: string): NextResponse | null {
+  const accessGranted = request.cookies.get('access_granted')?.value === 'true';
+  const accessHash = request.cookies.get('access_hash')?.value;
   
-  if (isBot || isSpecialFile) {
+  // Исключения для protection
+  if (pathname === '/protection' || pathname.startsWith('/protection/')) {
+    // Если cookies уже установлены, редиректим только на главную
+    if (accessGranted && accessHash) {
+      return NextResponse.redirect(new URL('/', request.url));
+    }
     return NextResponse.next();
   }
+
+  // Проверка cookies для всех остальных страниц
+  if (accessGranted && accessHash) {
+    return null; // Доступ разрешен, продолжаем проверки
+  }
   
+  // Редирект на protection
+  const targetPath = pathname + request.nextUrl.search;
+  const response = NextResponse.redirect(new URL(`/protection?redirect=${encodeURIComponent(targetPath)}`, request.url));
+  const hostname = request.nextUrl.hostname;
+  const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
+  
+  response.cookies.set('target_path', targetPath, {
+    maxAge: 60 * 60 * 2,
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production' && !isLocalhost,
+    sameSite: 'strict',
+    path: '/'
+  });
+  return response;
+}
+
+// Auth middleware - только для страниц, требующих авторизации
+function handleAuth(request: NextRequest, pathname: string): NextResponse | null {
   const isAuthenticated = request.cookies.get('user_authenticated')?.value === 'true';
   const dashboardToken = request.cookies.get('dashboard_token')?.value;
-  
+
   // Проверка для /auth/ - если авторизован, редирект в dashboard
   if (pathname === '/auth' || pathname.startsWith('/auth/')) {
     if (isAuthenticated && dashboardToken) {
@@ -52,32 +87,33 @@ export function middleware(request: NextRequest) {
     }
     return NextResponse.next();
   }
+
+  return null; // Не требует проверки авторизации
+}
+
+export function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+  const userAgent = request.headers.get('user-agent') || '';
   
-  if (pathname === '/protection') {
+  // 1. Быстрая проверка ботов и специальных файлов (самая первая)
+  if (isBotOrSpecialFile(pathname, userAgent)) {
     return NextResponse.next();
   }
   
-  const accessGranted = request.cookies.get('access_granted')?.value === 'true';
-  const accessHash = request.cookies.get('access_hash')?.value;
-  
-  if (accessGranted && accessHash) {
-    return NextResponse.next();
+  // 2. Protection middleware - работает всегда (кроме исключений)
+  const protectionResponse = handleProtection(request, pathname);
+  if (protectionResponse) {
+    return protectionResponse;
   }
   
-  // Редирект на protection для всех остальных страниц (включая /ui/panel)
-  const targetPath = pathname + request.nextUrl.search;
-  const response = NextResponse.redirect(new URL(`/protection?redirect=${encodeURIComponent(targetPath)}`, request.url));
-  const hostname = request.nextUrl.hostname;
-  const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
+  // 3. Auth middleware - только для страниц, требующих авторизации
+  const authResponse = handleAuth(request, pathname);
+  if (authResponse) {
+    return authResponse;
+  }
   
-  response.cookies.set('target_path', targetPath, {
-    maxAge: 60 * 60 * 2,
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production' && !isLocalhost,
-    sameSite: 'strict',
-    path: '/'
-  });
-  return response;
+  // 4. Все остальные страницы проходят без дополнительных проверок
+  return NextResponse.next();
 }
 
 export const config = {

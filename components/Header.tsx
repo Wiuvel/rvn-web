@@ -668,7 +668,7 @@ export default function Header() {
                     Тарифы
                   </Link>
                   <Link 
-                    href="/contacts" 
+                    href="/support" 
                     onClick={() => setOpen(false)} 
                     className="block text-white/80 hover:text-white transition-colors duration-300 py-2"
                   >
