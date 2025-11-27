@@ -256,7 +256,7 @@ async function setSecureCookie(token) {
             domain = '';
             secure = 'Secure';
         } else {
-            domain = '.rvn.guru';
+            domain = '.rvn.market';
             secure = 'Secure';
         }
         

@@ -1,6 +1,6 @@
 import { Metadata } from 'next';
 
-const baseUrl = 'https://rvn.guru';
+const baseUrl = 'https://rvn.market';
 const siteName = 'Raven Private';
 
 interface SEOProps {
@@ -31,9 +31,9 @@ export function generateMetadata({
   noindex = false
 }: SEOProps): Metadata {
   const fullTitle = title ? 
-    (title.includes('Raven Private — безопасный доступ в сеть через VLESS и PROXY') ? title : `${title} | ${siteName}`) : 
-    `${siteName} — безопасный доступ в сеть через VLESS и PROXY`;
-  const fullDescription = description || 'RVN.GURU — современный сервис приватного доступа в сеть. Высокая скорость и полная анонимность. Стабильные сервера с минимальным пингом.';
+    (title.includes('Raven Private — безопасный доступ в сеть') ? title : `${title} | ${siteName}`) : 
+    `${siteName} — безопасный доступ в сеть`;
+  const fullDescription = description || 'RVN.MARKET — современный сервис приватного доступа в сеть. Высокая скорость и полная анонимность. Стабильные сервера с минимальным пингом.';
   const fullUrl = url ? `${baseUrl}${url}` : baseUrl;
 
   const metadata: Metadata = {
@@ -41,7 +41,7 @@ export function generateMetadata({
     description: fullDescription,
     keywords: [
       'Raven Private',
-      'RVN.GURU',
+      'RVN.MARKET',
       'VLESS',
       'PROXY',
       'прокси',
@@ -103,15 +103,15 @@ export function generateMetadata({
 
 export const pageMetadata = {
   home: generateMetadata({
-    title: 'Raven Private — безопасный доступ в сеть через VLESS и PROXY',
-    description: 'RVN.GURU — современный сервис приватного доступа в сеть. Высокая скорость и полная анонимность. Стабильные сервера с минимальным пингом.',
+    title: 'Raven Private — безопасный доступ в сеть',
+    description: 'RVN.MARKET — современный сервис приватного доступа в сеть. Высокая скорость и полная анонимность. Стабильные сервера с минимальным пингом.',
     keywords: ['VPN', 'Proxy', 'безопасность', 'приватность', 'VLESS'],
     url: '/'
   }),
 
   auth: generateMetadata({
     title: 'Авторизация',
-    description: 'Регистрация и вход в личный кабинет RVN.GURU.',
+    description: 'Регистрация и вход в личный кабинет RVN.MARKET.',
     keywords: ['вход', 'регистрация', 'авторизация'],
     url: '/auth'
   }),

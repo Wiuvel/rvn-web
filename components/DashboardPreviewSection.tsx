@@ -52,7 +52,7 @@ export default function DashboardPreviewSection() {
                 <div className="col-span-2 rounded-xl border border-neutral-800 bg-neutral-900 p-3">
                   <div className="text-neutral-400 text-xs">Ваш ключ</div>
                   <div className="mt-1 font-mono text-sm truncate">
-                    vless://<span className="blur-sm hover:blur-none transition cursor-pointer select-none">xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx</span>@rvn.guru
+                    vless://<span className="blur-sm hover:blur-none transition cursor-pointer select-none">xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx</span>@rvn.market
                   </div>
                 </div>
               </div>

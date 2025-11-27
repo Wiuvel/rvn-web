@@ -60,7 +60,7 @@ export default function RateLimitCaptcha({ isOpen, onSuccess, onClose }: RateLim
 
     try {
       const widgetId = window.turnstile.render(containerRef.current, {
-        sitekey: '3x00000000000000000000FF', // Используем тот же sitekey, что и в AuthForm
+        sitekey: '0x4AAAAAACDQkGbAxIWAKp08',
         theme: 'dark',
         callback: async (token: string) => {
           setIsVerifying(true);

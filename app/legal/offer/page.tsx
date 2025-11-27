@@ -25,9 +25,9 @@ export default function PublicOfferPage() {
           <div ref={contentRef} className="policy-card">
             <h2><strong>1. Стороны договора</strong></h2>
             <p>
-              <strong>ОФЕРЕНТ</strong> — Физическое лицо <strong>Сысоев Артем Олегович</strong>, 
+              <strong>ОФЕРЕНТ</strong> — Физическое лицо <strong>XXX</strong>, 
               действующее на основании законодательства Российской Федерации, являющееся владельцем 
-              интернет-сайта (сервиса) <strong>rvn.guru</strong>, с одной стороны.
+              интернет-сайта (сервиса) <strong>rvn.market</strong>, с одной стороны.
             </p>
             <p>
               <strong>АКЦЕПТАНТ</strong> — любое полностью дееспособное физическое лицо,{' '}

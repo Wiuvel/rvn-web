@@ -67,7 +67,7 @@ export default function ProtectionPage() {
               if (container) {
                 container.innerHTML = '';
                 win.turnstile.render(container, {
-                  sitekey: '0x4AAAAAAB0s4O-sxm9ZnAQk',
+                  sitekey: '0x4AAAAAACDQkGbAxIWAKp08',
                   theme: 'dark',
                   size: 'flexible',
                   callback: (token: string) => {
@@ -158,8 +158,8 @@ export default function ProtectionPage() {
         <div className="center-container">
           {/* Site Title */}
           <div className="site-title" id="site-title-wrap">
-            <span className="site-title-base" id="site-title-base">rvn.guru</span>
-            <span className="site-title-fill" id="site-title-fill">rvn.guru</span>
+            <span className="site-title-base" id="site-title-base">rvn.market</span>
+            <span className="site-title-fill" id="site-title-fill">rvn.market</span>
           </div>
           {/* Site Description */}
           <div className="site-desc" id="site-desc" suppressHydrationWarning>

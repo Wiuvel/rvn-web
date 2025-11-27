@@ -1,7 +1,7 @@
 import { MetadataRoute } from 'next';
 
 export default function robots(): MetadataRoute.Robots {
-  const baseUrl = 'https://rvn.guru';
+  const baseUrl = 'https://rvn.market';
 
   return {
     rules: [
