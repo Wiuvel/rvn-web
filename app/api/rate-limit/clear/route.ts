@@ -42,10 +42,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-
     const secretKey = process.env.TURNSTILE_SECRET_KEY;
-    
-    // КРИТИЧНО: Проверяем наличие секретного ключа
     if (!secretKey || secretKey === '1x0000000000000000000000000000000AA') {
       logger.error('Turnstile secret key not configured', {
         ip: request.headers.get('x-forwarded-for'),
@@ -109,7 +106,7 @@ export async function POST(request: NextRequest) {
     // grantImmunity возвращает время истечения для синхронизации с cookie
     const immunityExpiry = await generalRateLimit.grantImmunity(request);
 
-    logger.info('Rate limit cleared and immunity granted after CAPTCHA', {
+    logger.info('Rate limit cleared and immunity granted (CAPTCHA)', {
       ip: request.headers.get('x-forwarded-for'),
       immunityExpiry
     });

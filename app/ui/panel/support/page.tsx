@@ -69,7 +69,8 @@ function MessageItem({
   isUser,
   formatDate, 
   formatTime,
-  getInitial
+  getInitial,
+  isInitialLoad = false
 }: { 
   message: Message; 
   showDate: boolean; 
@@ -79,17 +80,29 @@ function MessageItem({
   formatDate: (date: string) => string;
   formatTime: (date: string) => string;
   getInitial: (username: string) => string;
+  isInitialLoad?: boolean;
 }) {
   const messageRef = useRef<HTMLDivElement>(null);
+  const hasAnimatedRef = useRef(false);
 
   useEffect(() => {
-    if (messageRef.current && typeof window !== 'undefined') {
+    // При первой загрузке не анимируем, чтобы избежать дергания
+    if (isInitialLoad) {
+      if (messageRef.current) {
+        gsap.set(messageRef.current, { opacity: 1, y: 0, scale: 1 });
+      }
+      return;
+    }
+    
+    // Анимируем только новые сообщения (не при первой загрузке)
+    if (messageRef.current && typeof window !== 'undefined' && !hasAnimatedRef.current) {
+      hasAnimatedRef.current = true;
       gsap.fromTo(messageRef.current,
         { opacity: 0, y: 10, scale: 0.95 },
         { opacity: 1, y: 0, scale: 1, duration: 0.3, ease: "power2.out" }
       );
     }
-  }, [message.id]);
+  }, [message.id, isInitialLoad]);
 
   return (
     <div ref={messageRef}>
@@ -214,6 +227,7 @@ export default function SupportPanel() {
   const [showCloseReasonModal, setShowCloseReasonModal] = useState(false);
   const [closeReason, setCloseReason] = useState('');
   const [ticketToClose, setTicketToClose] = useState<string | null>(null);
+  const [archiveSearchQuery, setArchiveSearchQuery] = useState(''); // Поисковый запрос для архива
   const [rightPanelCollapsed, setRightPanelCollapsed] = useState(() => {
     // На мобильных устройствах панель свернута по умолчанию
     if (typeof window !== 'undefined') {
@@ -261,6 +275,7 @@ export default function SupportPanel() {
   const notificationRef = useRef<HTMLDivElement>(null);
   const currentFilterRef = useRef<'active' | 'archive'>('active');
   const fetchTicketsAbortControllerRef = useRef<AbortController | null>(null);
+  const isInitialMessagesLoadRef = useRef(true); // Флаг первой загрузки сообщений
   
   // Функция для получения инициалов
   const getInitial = (username: string) => {
@@ -544,6 +559,8 @@ export default function SupportPanel() {
 
   useEffect(() => {
     if (activeTicket) {
+      // Сбрасываем флаг первой загрузки при смене тикета
+      isInitialMessagesLoadRef.current = true;
       fetchMessages(activeTicket.id);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -556,7 +573,7 @@ export default function SupportPanel() {
       if (notificationRef.current) {
         gsap.to(notificationRef.current, {
           opacity: 0,
-          y: -10,
+          y: -20,
           scale: 0.95,
           duration: GSAP_DEFAULT_DURATION * 0.6,
           ease: "power2.in",
@@ -574,7 +591,7 @@ export default function SupportPanel() {
   useEffect(() => {
     if (notification.show && notificationRef.current) {
       gsap.fromTo(notificationRef.current,
-        { opacity: 0, y: 20, scale: 0.9 },
+        { opacity: 0, y: -20, scale: 0.9 },
         { 
           opacity: 1, 
           y: 0, 
@@ -615,12 +632,15 @@ export default function SupportPanel() {
       }
 
       if (!data.hasSupportAccess) {
-        showNotification('У вас нет доступа к панели поддержки. Обратитесь к администратору.', 'error');
+        setAuthState({
+          isAuthenticated: true,
+          hasSupportAccess: false,
+          username: data.username || null,
+          userId: data.userId || null,
+          user_id: data.user_id || null
+        });
         setLoading(false);
-        setTimeout(() => {
-          router.push('/');
-        }, 2000);
-        return;
+        return; // Не редиректим, показываем сообщение на странице
       }
 
       setAuthState({
@@ -894,6 +914,9 @@ export default function SupportPanel() {
     // Обновляем ref текущего тикета
     currentTicketIdRef.current = ticketId;
     
+    // Определяем, является ли это первой загрузкой сообщений для этого тикета
+    const isFirstLoad = isInitialMessagesLoadRef.current;
+    
     // Не блокируем загрузку сообщений заранее - мы должны получать актуальные данные с сервера
     // даже если тикет занят другим саппортом, чтобы корректно обновить состояние UI
     
@@ -921,6 +944,22 @@ export default function SupportPanel() {
       
       if (response.ok) {
         setMessages(data.messages || []);
+        
+        // После первой загрузки сбрасываем флаг
+        if (isFirstLoad) {
+          // Используем setTimeout, чтобы дать React время отрендерить сообщения без анимации
+          setTimeout(() => {
+            isInitialMessagesLoadRef.current = false;
+          }, 100);
+        }
+        
+        // После первой загрузки сбрасываем флаг
+        if (isFirstLoad) {
+          // Используем setTimeout, чтобы дать React время отрендерить сообщения без анимации
+          setTimeout(() => {
+            isInitialMessagesLoadRef.current = false;
+          }, 100);
+        }
         
         // Обновляем activeTicket с актуальными данными тикета (статус, назначение и т.д.)
         // чтобы UI корректно отображал состояние тикета после получения новых сообщений
@@ -1407,6 +1446,20 @@ export default function SupportPanel() {
     return '';
   };
 
+  // Фильтруем тикеты по поисковому запросу (только для архива)
+  const filteredTickets = statusFilter === 'archive' && archiveSearchQuery.trim()
+    ? tickets.filter((ticket) => {
+        const query = archiveSearchQuery.trim().toLowerCase();
+        // Поиск по ID тикета
+        const matchesId = ticket.id.toLowerCase().includes(query);
+        // Поиск по логину пользователя
+        const matchesUsername = ticket.user?.username?.toLowerCase().includes(query) || false;
+        // Поиск по user_id пользователя
+        const matchesUserId = ticket.user?.user_id?.toLowerCase().includes(query) || false;
+        return matchesId || matchesUsername || matchesUserId;
+      })
+    : tickets;
+
   if (loading) {
     return <LoadingSpinner />;
   }
@@ -1423,7 +1476,7 @@ export default function SupportPanel() {
             </div>
             <h1 className="text-2xl font-bold text-white mb-2">Доступ ограничен</h1>
             <p className="text-neutral-400 mb-6">
-              У вас нет доступа к панели поддержки. Обратитесь к администратору для получения прав доступа.
+              У вас нет доступа к панели поддержки. Обратитесь к администратору для получения прав доступа или попробуйте позже.
             </p>
             <Link
               href="/ui/panel"
@@ -1446,7 +1499,7 @@ export default function SupportPanel() {
       {notification.show && (
         <div 
           ref={notificationRef}
-          className="fixed bottom-4 left-4 z-50 px-4 py-3 rounded-lg shadow-lg bg-red-500/20 text-red-400 border border-red-500/30"
+          className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-3 rounded-lg shadow-lg bg-red-500/20 text-red-400 border border-red-500/30"
         >
           {notification.message}
         </div>
@@ -1473,7 +1526,7 @@ export default function SupportPanel() {
         </div>
 
         {/* Filters */}
-        <div className="p-4 border-b border-neutral-800">
+        <div className="p-4 border-b border-neutral-800 space-y-3">
           <div className="flex gap-2">
             <button
               onClick={() => {
@@ -1485,6 +1538,7 @@ export default function SupportPanel() {
                 setMessages([]);
                 setTickets([]); // Очищаем список для устранения глитча
                 currentTicketIdRef.current = null;
+                setArchiveSearchQuery(''); // Очищаем поиск при переключении
                 // Отменяем текущие запросы
                 if (fetchTicketsAbortControllerRef.current) {
                   fetchTicketsAbortControllerRef.current.abort();
@@ -1514,6 +1568,7 @@ export default function SupportPanel() {
                 setMessages([]);
                 setTickets([]); // Очищаем список для устранения глитча
                 currentTicketIdRef.current = null;
+                setArchiveSearchQuery(''); // Очищаем поиск при переключении
                 // Отменяем текущие запросы
                 if (fetchTicketsAbortControllerRef.current) {
                   fetchTicketsAbortControllerRef.current.abort();
@@ -1534,6 +1589,37 @@ export default function SupportPanel() {
               Архив
             </button>
           </div>
+          
+          {/* Поиск в архиве */}
+          {statusFilter === 'archive' && (
+            <div className="relative">
+              <input
+                type="text"
+                value={archiveSearchQuery}
+                onChange={(e) => setArchiveSearchQuery(e.target.value)}
+                placeholder="Поиск по логину или ID"
+                className="w-full px-3 py-2 pl-10 bg-neutral-800 border border-neutral-700 rounded-lg text-sm text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+              <svg 
+                className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-neutral-500" 
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              {archiveSearchQuery && (
+                <button
+                  onClick={() => setArchiveSearchQuery('')}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-neutral-500 hover:text-white transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Tickets List */}
@@ -1561,12 +1647,18 @@ export default function SupportPanel() {
                 ))}
               </div>
             )
-          ) : tickets.length === 0 ? (
-            <div className="text-center py-8 text-neutral-400 text-sm">
-              Нет тикетов
-            </div>
+          ) : filteredTickets.length === 0 ? (
+            archiveSearchQuery.trim() ? (
+              <div className="text-center py-8 text-neutral-400 text-sm">
+                Ничего не найдено
+              </div>
+            ) : (
+              <div className="text-center py-8 text-neutral-400 text-sm">
+                Нет тикетов
+              </div>
+            )
           ) : (
-            tickets.map((ticket) => {
+            filteredTickets.map((ticket) => {
               const urgencyColor = getTicketUrgencyColor(ticket);
               const urgencyText = getTicketUrgencyText(ticket);
               const urgencyTextColor = getTicketUrgencyTextColor(ticket);
@@ -1752,9 +1844,11 @@ export default function SupportPanel() {
                 {/* Messages */}
                 <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar min-h-0">
                 {messagesLoading ? (
-                  <div className="text-center py-8">
-                    <div className="spinner mx-auto"></div>
-                    <p className="mt-2 text-sm text-neutral-400">Загрузка сообщений...</p>
+                  <div className="flex items-center justify-center h-full">
+                    <div className="text-center">
+                      <div className="spinner mx-auto"></div>
+                      <p className="mt-2 text-sm text-neutral-400">Загрузка сообщений...</p>
+                    </div>
                   </div>
                 ) : messages.length === 0 ? (
                   <div className="text-center py-8 text-neutral-400 text-sm">
@@ -1817,6 +1911,7 @@ export default function SupportPanel() {
                         formatDate={formatMessageDate}
                         formatTime={formatTime}
                         getInitial={getInitial}
+                        isInitialLoad={isInitialMessagesLoadRef.current}
                       />
                     );
                   })

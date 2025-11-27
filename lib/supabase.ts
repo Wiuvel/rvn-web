@@ -37,31 +37,6 @@ export const supabaseAdmin = supabaseUrl && supabaseServiceKey
     })
   : null;
 
-// Log database configuration status (only in server environment)
-if (typeof window === 'undefined') {
-  if (!supabaseAdmin) {
-    console.error('⚠️ Supabase Admin client not initialized. Missing environment variables:');
-    if (!supabaseUrl) {
-      console.error('  - SUPABASE_URL or NEXT_PUBLIC_SUPABASE_URL');
-    }
-    if (!supabaseServiceKey) {
-      console.error('  - SUPABASE_SERVICE_ROLE_KEY');
-    }
-  } else {
-    console.log('✅ Supabase Admin client initialized successfully');
-  }
-  
-  // Проверка конфигурации Turnstile
-  const turnstileSecretKey = process.env.TURNSTILE_SECRET_KEY;
-  if (!turnstileSecretKey || turnstileSecretKey === '1x0000000000000000000000000000000AA') {
-    console.error('⚠️ Turnstile secret key not configured or using test key:');
-    console.error('  - TURNSTILE_SECRET_KEY environment variable is missing or invalid');
-    console.error('  - CAPTCHA verification will fail in production!');
-  } else {
-    console.log('✅ Turnstile secret key configured');
-  }
-}
-
 export interface Admin {
   id: string;
   username: string;

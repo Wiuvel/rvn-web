@@ -8,6 +8,10 @@ const nextConfig: NextConfig = {
   trailingSlash: false,
   outputFileTracingRoot: process.cwd(),
   allowedDevOrigins: ['192.168.1.66'],
+  devIndicators: {
+    buildActivity: true,
+    buildActivityPosition: 'bottom-left',
+  },
 };
 
 export default nextConfig;

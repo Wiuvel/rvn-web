@@ -45,7 +45,7 @@ export default function PanelSelection() {
                 Панель поддержки
               </h2>
               <p className="text-sm text-neutral-400">
-                Работа с тикетами пользователей
+                Работа c тикетами пользователей
               </p>
             </div>
           </Link>

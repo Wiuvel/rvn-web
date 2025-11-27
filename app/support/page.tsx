@@ -164,6 +164,7 @@ export default function SupportPage() {
   const [ticketsLoading, setTicketsLoading] = useState(false);
   const [lastMessageTime, setLastMessageTime] = useState<number | null>(null);
   const [timeoutSeconds, setTimeoutSeconds] = useState<number>(0);
+  const [isCreatingTicket, setIsCreatingTicket] = useState(false); // Флаг для блокировки кнопки создания тикета
   const [messagesSentCount, setMessagesSentCount] = useState<number>(0);
   const [notification, setNotification] = useState<{ message: string; show: boolean }>({ message: '', show: false });
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -630,6 +631,9 @@ export default function SupportPage() {
   }, [lastMessageTime, timeoutSeconds]);
 
   const handleCreateTicket = async () => {
+    // Блокируем повторное создание тикета
+    if (isCreatingTicket) return;
+    
     if (!newTicketSubject.trim()) return;
     
     // Если есть текст сообщения, создаем тикет с первым сообщением
@@ -650,6 +654,9 @@ export default function SupportPage() {
       triggerShake('message');
       return;
     }
+
+    // Устанавливаем флаг создания тикета
+    setIsCreatingTicket(true);
 
     try {
       const response = await fetchWithRateLimit(
@@ -752,10 +759,14 @@ export default function SupportPage() {
     } catch (error) {
       if (error instanceof Error && error.message === 'RATE_LIMIT_EXCEEDED') {
         // Rate limit обрабатывается через капчу, не показываем ошибку
+        // НЕ сбрасываем флаг, так как после капчи запрос повторится
         return;
       }
       console.error('Error creating ticket:', error);
       showNotification('Ошибка создания тикета');
+    } finally {
+      // Сбрасываем флаг создания тикета в любом случае
+      setIsCreatingTicket(false);
     }
   };
 
@@ -1287,10 +1298,10 @@ export default function SupportPage() {
                     <div className="flex gap-2">
                       <button
                         onClick={handleCreateTicket}
-                        disabled={!newTicketSubject.trim() || !messageText.trim()}
+                        disabled={!newTicketSubject.trim() || !messageText.trim() || isCreatingTicket}
                         className="flex-1 px-3 py-1.5 bg-primary-500 hover:bg-primary-400 disabled:bg-neutral-700 disabled:text-neutral-500 disabled:cursor-not-allowed text-white text-sm rounded-lg transition-colors"
                       >
-                        Создать
+                        {isCreatingTicket ? 'Создание...' : 'Создать'}
                       </button>
                       <button
                         onClick={() => {
@@ -1316,6 +1327,11 @@ export default function SupportPage() {
                       <button
                         key={ticket.id}
                         onClick={async () => {
+                          // Предотвращаем клик на уже выбранный тикет
+                          if (activeTicket?.id === ticket.id) {
+                            return;
+                          }
+                          
                           // Сразу загружаем сообщения при выборе тикета (даже если закрыт)
                           const ticketData = {
                             id: ticket.id,
@@ -1332,9 +1348,10 @@ export default function SupportPage() {
                           // Загружаем сообщения асинхронно
                           await fetchTicketMessages(ticket.id);
                         }}
+                        disabled={activeTicket?.id === ticket.id}
                         className={`w-full text-left p-3 rounded-xl transition-colors ${
                           activeTicket?.id === ticket.id
-                            ? 'bg-primary-500/20 border border-primary-500/50'
+                            ? 'bg-primary-500/20 border border-primary-500/50 cursor-default'
                             : 'bg-neutral-800/50 hover:bg-neutral-800 border border-transparent'
                         }`}
                       >
