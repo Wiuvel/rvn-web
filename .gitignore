@@ -12,6 +12,7 @@
 /temp
 .DS_Store
 *.pem
+*.md
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

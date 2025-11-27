@@ -2,11 +2,15 @@ interface RateLimitStore {
   [key: string]: {
     count: number;
     resetTime: number;
+    immuneUntil?: number; // Время до которого пользователь имеет иммунитет
   };
 }
 
+import { RATE_LIMIT_CLEANUP_INTERVAL, RATE_LIMIT_IMMUNITY_DURATION } from './constants';
+
 const store: RateLimitStore = {};
 
+// Периодическая очистка устаревших записей
 setInterval(() => {
   const now = Date.now();
   Object.keys(store).forEach(key => {
@@ -14,7 +18,7 @@ setInterval(() => {
       delete store[key];
     }
   });
-}, 5 * 60 * 1000);
+}, RATE_LIMIT_CLEANUP_INTERVAL);
 
 export interface RateLimitOptions {
   windowMs: number;
@@ -39,25 +43,46 @@ export class RateLimiter {
     return ip;
   }
 
-  private cleanup(): void {
-    const now = Date.now();
-    Object.keys(store).forEach(key => {
-      if (store[key].resetTime < now) {
-        delete store[key];
-      }
-    });
-  }
-
   async check(request: Request): Promise<{
     allowed: boolean;
     remaining: number;
     resetTime: number;
   }> {
-    this.cleanup();
+    // Очистка выполняется периодически через setInterval, не нужно делать на каждый запрос
     
     const key = this.getKey(request);
     const now = Date.now();
     const windowStart = now - this.options.windowMs;
+    
+    // Проверяем иммунитет ПЕРВЫМ делом - если пользователь имеет иммунитет, пропускаем все проверки
+    // Это критично для правильной работы иммунитета после CAPTCHA
+    // Также проверяем иммунитет через cookie для надежности
+    const cookieHeader = request.headers.get('cookie') || '';
+    const immunityCookie = cookieHeader.split(';').find(c => c.trim().startsWith('rate_limit_immunity='));
+    if (immunityCookie) {
+      const immunityTimestamp = parseInt(immunityCookie.split('=')[1], 10);
+      if (!isNaN(immunityTimestamp) && immunityTimestamp > now) {
+        // Иммунитет активен через cookie - пропускаем все проверки
+        return {
+          allowed: true,
+          remaining: this.options.maxRequests,
+          resetTime: immunityTimestamp
+        };
+      }
+    }
+    
+    if (store[key]?.immuneUntil && store[key].immuneUntil > now) {
+      return {
+        allowed: true,
+        remaining: this.options.maxRequests,
+        resetTime: store[key].resetTime || (now + this.options.windowMs)
+      };
+    }
+    
+    // Если иммунитет истек, удаляем его
+    if (store[key]?.immuneUntil && store[key].immuneUntil <= now) {
+      delete store[key].immuneUntil;
+    }
     
     if (!store[key] || store[key].resetTime < windowStart) {
       store[key] = {
@@ -87,6 +112,39 @@ export class RateLimiter {
       remaining: this.options.maxRequests - store[key].count,
       resetTime: store[key].resetTime
     };
+  }
+
+  async clear(request: Request): Promise<boolean> {
+    const key = this.getKey(request);
+    if (store[key]) {
+      delete store[key];
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Устанавливает временный иммунитет от rate limiting после прохождения капчи
+   * @param request - Request объект
+   * @param immunityDurationMs - Длительность иммунитета в миллисекундах (по умолчанию из константы)
+   */
+  async grantImmunity(request: Request, immunityDurationMs: number = RATE_LIMIT_IMMUNITY_DURATION): Promise<void> {
+    const key = this.getKey(request);
+    const now = Date.now();
+    
+    // Очищаем rate limit и устанавливаем иммунитет
+    // ВАЖНО: всегда создаем/обновляем запись, чтобы иммунитет точно применился
+    store[key] = {
+      count: 0, // Сбрасываем счетчик
+      resetTime: now + immunityDurationMs, // Устанавливаем resetTime на время иммунитета
+      immuneUntil: now + immunityDurationMs // Устанавливаем иммунитет
+    };
+  }
+
+  static clearAll(): void {
+    Object.keys(store).forEach(key => {
+      delete store[key];
+    });
   }
 }
 

@@ -1,5 +1,6 @@
 import { randomBytes } from 'crypto';
 import { cookies } from 'next/headers';
+import { SESSION_TIMEOUT, SESSION_CLEANUP_INTERVAL } from './constants';
 
 interface SessionData {
   id: string;
@@ -16,8 +17,6 @@ interface SessionStore {
 }
 
 const sessions: SessionStore = {};
-const SESSION_TIMEOUT = 60 * 60 * 1000;
-const SESSION_CLEANUP_INTERVAL = 5 * 60 * 1000;
 
 setInterval(() => {
   const now = Date.now();

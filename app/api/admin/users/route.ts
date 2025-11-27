@@ -4,6 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { generalRateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/secure-logger';
 import { setCorsHeaders, handleCorsPreflight } from '@/lib/cors';
+import { getUserRoles, UserRole } from '@/lib/user-roles';
 
 export async function OPTIONS() {
   return handleCorsPreflight();
@@ -71,9 +72,35 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Загружаем роли для каждого пользователя с таймаутом и обработкой ошибок
+    const usersWithRoles = await Promise.allSettled(
+      (data ?? []).map(async (user) => {
+        try {
+          // Добавляем таймаут для каждого запроса ролей (2 секунды)
+          const rolesPromise = getUserRoles(user.id);
+          const timeoutPromise = new Promise<UserRole[]>((_, reject) => {
+            setTimeout(() => reject(new Error('Timeout')), 2000);
+          });
+          
+          const roles = await Promise.race([rolesPromise, timeoutPromise]);
+          return { ...user, roles };
+        } catch {
+          // Тихо обрабатываем ошибки, не логируем для каждого пользователя
+          // чтобы не замедлять загрузку таблицы
+          return { ...user, roles: ['user'] as UserRole[] };
+        }
+      })
+    ).then(results => 
+      results.map((result, index) => 
+        result.status === 'fulfilled' 
+          ? result.value 
+          : { ...(data ?? [])[index], roles: ['user'] as UserRole[] }
+      )
+    );
+
     return setCorsHeaders(
       NextResponse.json({
-        users: data ?? [],
+        users: usersWithRoles,
       }),
     );
   } catch (error) {

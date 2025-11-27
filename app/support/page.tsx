@@ -5,6 +5,9 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { gsap } from 'gsap';
+import { MESSAGE_MAX_LENGTH, TICKET_SUBJECT_MAX_LENGTH, MAX_TICKETS_PER_USER, MESSAGE_TIMEOUT, AUTH_FETCH_TIMEOUT, GSAP_DEFAULT_DURATION, GSAP_DEFAULT_EASE } from '@/lib/constants';
+import { translateError } from '@/lib/error-translations';
+import RateLimitCaptcha from '@/components/RateLimitCaptcha';
 
 interface UserData {
   id: string;
@@ -21,6 +24,11 @@ interface Message {
   sender: 'user' | 'support';
   timestamp: Date;
   isRead?: boolean;
+  senderData?: {
+    id: string;
+    username: string;
+    user_id: string;
+  };
 }
 
 interface Ticket {
@@ -56,6 +64,14 @@ function MessageItem({
     }
   }, [message.id]);
 
+  // Определяем, является ли сообщение системным
+  const SYSTEM_MESSAGE_TEXT = 'Спасибо за ваше сообщение. Мы получили ваш запрос и ответим в ближайшее время.';
+  const isStatusChangeMessage = message.text.includes('Статус тикета изменен') || 
+    message.text.includes('Ваше обращение приняли в обработку') ||
+    message.text.includes('Ваше обращение было закрыто');
+  const isSystemMessage = (message.text === SYSTEM_MESSAGE_TEXT || isStatusChangeMessage) && 
+    message.sender === 'support';
+
   return (
     <div ref={messageRef}>
       {showDate && (
@@ -63,41 +79,72 @@ function MessageItem({
           {formatDate(message.timestamp)}
         </div>
       )}
-      <div className={`flex flex-col ${message.sender === 'user' ? 'items-end' : 'items-start'}`}>
-        {message.sender === 'user' && userData && (
+      {isSystemMessage ? (
+        <div className="flex flex-col items-start w-full">
+          {/* Заголовок с именем "Система" */}
           <div className="mb-1 px-1 flex items-baseline gap-1">
-            <span className="text-xs sm:text-sm font-medium text-white bg-white/10 px-1.5 sm:px-2 py-0.5 rounded">{userData.username}</span>
-            <span className="text-[10px] sm:text-xs text-neutral-400">#{userData.user_id}</span>
+            <span className="text-xs sm:text-sm font-medium text-yellow-400 bg-white/10 px-1.5 sm:px-2 py-0.5 rounded">Система</span>
           </div>
-        )}
-        <div className={`flex items-end gap-2 ${message.sender === 'user' ? 'flex-row-reverse' : 'flex-row'} w-full`}>
-          {message.sender === 'support' && (
-            <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-full bg-neutral-800 flex items-center justify-center flex-shrink-0 mb-1">
-              <Image 
-                src="/static/logo.svg" 
-                alt="Support" 
-                width={36} 
-                height={36} 
-                className="w-5 h-5 sm:w-9 sm:h-9"
-              />
-            </div>
-          )}
-          <div className={`max-w-[85%] sm:max-w-[70%] min-w-0 flex-shrink-0 rounded-2xl px-3 py-2 sm:px-4 ${
-            message.sender === 'user'
-              ? 'bg-primary-500 text-white rounded-br-sm'
-              : 'bg-neutral-800 text-neutral-100 rounded-bl-sm'
-          }`} style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>
+          
+          {/* Сообщение */}
+          <div className="max-w-[85%] sm:max-w-[70%] min-w-0 flex-shrink-0 rounded-2xl px-3 py-2 sm:px-4 bg-neutral-700/50 text-neutral-300" style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>
             <p className="text-xs sm:text-sm whitespace-pre-wrap break-words">
               {message.text}
             </p>
-            <div className={`text-[10px] sm:text-xs mt-1 ${
-              message.sender === 'user' ? 'text-primary-100' : 'text-neutral-400'
-            }`}>
-              {formatTime(message.timestamp)}
+            <div className="flex items-center gap-2 text-[10px] sm:text-xs mt-1 text-neutral-400">
+              <span>{formatTime(message.timestamp)}</span>
             </div>
           </div>
         </div>
-      </div>
+      ) : (
+        <div className={`flex flex-col ${message.sender === 'user' ? 'items-end' : 'items-start'}`}>
+          {message.sender === 'user' && userData && (
+            <div className="mb-1 px-1 flex items-baseline gap-1">
+              <span className="text-xs sm:text-sm font-medium text-white bg-white/10 px-1.5 sm:px-2 py-0.5 rounded">{userData.username}</span>
+              <span className="text-[10px] sm:text-xs text-neutral-400">#{userData.user_id}</span>
+            </div>
+          )}
+          {message.sender === 'support' && message.senderData && (
+            <div className="mb-1 px-1 flex items-baseline gap-1">
+              <span className="text-xs sm:text-sm font-medium text-white bg-white/10 px-1.5 sm:px-2 py-0.5 rounded">{message.senderData.username}</span>
+              <span className="text-[10px] sm:text-xs text-white">Поддержка</span>
+            </div>
+          )}
+          <div className={`flex items-end gap-2 ${message.sender === 'user' ? 'flex-row-reverse' : 'flex-row'} w-full`}>
+            {message.sender === 'support' && (
+              <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-full bg-neutral-800 flex items-center justify-center flex-shrink-0 mb-1">
+                <Image 
+                  src="/static/logo.svg" 
+                  alt="Support" 
+                  width={36} 
+                  height={36} 
+                  className="w-5 h-5 sm:w-9 sm:h-9"
+                />
+              </div>
+            )}
+            <div className={`max-w-[85%] sm:max-w-[70%] min-w-0 flex-shrink-0 rounded-2xl px-3 py-2 sm:px-4 ${
+              message.sender === 'user'
+                ? message.isRead !== false
+                  ? 'bg-primary-500 text-white rounded-br-sm'
+                  : 'bg-neutral-600 text-white rounded-br-sm'
+                : 'bg-neutral-800 text-neutral-100 rounded-bl-sm'
+            }`} style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>
+              <p className="text-xs sm:text-sm whitespace-pre-wrap break-words">
+                {message.text}
+              </p>
+              <div className={`text-[10px] sm:text-xs mt-1 ${
+                message.sender === 'user' 
+                  ? message.isRead !== false 
+                    ? 'text-primary-100' 
+                    : 'text-neutral-300'
+                  : 'text-neutral-400'
+              }`}>
+                <span>{formatTime(message.timestamp)}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -108,6 +155,7 @@ export default function SupportPage() {
   const [shouldRenderMenu, setShouldRenderMenu] = useState(false);
   const [userData, setUserData] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isSupport, setIsSupport] = useState(false);
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [activeTicket, setActiveTicket] = useState<Ticket | null>(null);
   const [messageText, setMessageText] = useState('');
@@ -116,41 +164,126 @@ export default function SupportPage() {
   const [ticketsLoading, setTicketsLoading] = useState(false);
   const [lastMessageTime, setLastMessageTime] = useState<number | null>(null);
   const [timeoutSeconds, setTimeoutSeconds] = useState<number>(0);
+  const [messagesSentCount, setMessagesSentCount] = useState<number>(0);
   const [notification, setNotification] = useState<{ message: string; show: boolean }>({ message: '', show: false });
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const userMenuRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const notificationRef = useRef<HTMLDivElement>(null);
   const messageInputRef = useRef<HTMLInputElement>(null);
+  const messageTextareaRef = useRef<HTMLTextAreaElement>(null);
   const subjectInputRef = useRef<HTMLInputElement>(null);
+  const fetchingTicketIdRef = useRef<string | null>(null);
+  const [showRateLimitCaptcha, setShowRateLimitCaptcha] = useState(false);
+  const pendingRequestRef = useRef<(() => Promise<void>) | null>(null);
+  const markReadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
-  // Лимиты символов
-  const MAX_MESSAGE_LENGTH = 500;
-  const MAX_SUBJECT_LENGTH = 50;
+  // Лимиты символов (используем константы из lib/constants.ts)
+  
+  // Обертка для fetch с обработкой rate limit
+  const fetchWithRateLimit = async (
+    url: string,
+    options: RequestInit = {},
+    retryCallback?: () => Promise<void>
+  ): Promise<Response> => {
+    const response = await fetch(url, options);
+    
+    if (response.status === 429) {
+      // Сохраняем callback для повторного выполнения после прохождения капчи
+      if (retryCallback) {
+        pendingRequestRef.current = retryCallback;
+      }
+      setShowRateLimitCaptcha(true);
+      throw new Error('RATE_LIMIT_EXCEEDED');
+    }
+    
+    return response;
+  };
+
+  const handleRateLimitSuccess = async () => {
+    setShowRateLimitCaptcha(false);
+    // Небольшая задержка, чтобы иммунитет успел примениться на сервере
+    await new Promise(resolve => setTimeout(resolve, 500));
+    // Повторяем последний запрос после успешного прохождения капчи
+    if (pendingRequestRef.current) {
+      try {
+        await pendingRequestRef.current();
+      } catch (error) {
+        // Если снова получили rate limit, не показываем капчу сразу (иммунитет должен работать)
+        if (error instanceof Error && error.message === 'RATE_LIMIT_EXCEEDED') {
+          // Ждем еще немного и пробуем снова
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          if (pendingRequestRef.current) {
+            try {
+              await pendingRequestRef.current();
+            } catch (retryError) {
+              console.error('Error retrying request after rate limit clear:', retryError);
+            }
+          }
+        } else {
+          console.error('Error retrying request after rate limit clear:', error);
+        }
+      }
+      pendingRequestRef.current = null;
+    }
+  };
   
   // Функция для показа notification
   const showNotification = (message: string) => {
     setNotification({ message, show: true });
     setTimeout(() => {
-      setNotification({ message: '', show: false });
+      // Анимация исчезновения
+      if (notificationRef.current) {
+        gsap.to(notificationRef.current, {
+          opacity: 0,
+          y: -10,
+          scale: 0.95,
+          duration: GSAP_DEFAULT_DURATION * 0.6,
+          ease: "power2.in",
+          onComplete: () => {
+            setNotification({ message: '', show: false });
+          }
+        });
+      } else {
+        setNotification({ message: '', show: false });
+      }
     }, 3000);
   };
+
+  // Анимация появления уведомления
+  useEffect(() => {
+    if (notification.show && notificationRef.current) {
+      gsap.fromTo(notificationRef.current,
+        { opacity: 0, y: 20, scale: 0.9 },
+        { 
+          opacity: 1, 
+          y: 0, 
+          scale: 1, 
+          duration: GSAP_DEFAULT_DURATION, 
+          ease: GSAP_DEFAULT_EASE 
+        }
+      );
+    }
+  }, [notification.show]);
   
   // Функция для анимации тряски с GSAP
   const triggerShake = (inputType: 'message' | 'subject') => {
     if (typeof window === 'undefined') return;
     
-    const inputRef = inputType === 'message' ? messageInputRef : subjectInputRef;
-    if (!inputRef.current) return;
+    const inputElement = inputType === 'message' 
+      ? (messageTextareaRef.current || messageInputRef.current)
+      : subjectInputRef.current;
+    if (!inputElement) return;
     
     const tl = gsap.timeline();
-    tl.to(inputRef.current, { x: -3, duration: 0.05, ease: "power2.out" })
-      .to(inputRef.current, { x: 3, duration: 0.05, ease: "power2.out" })
-      .to(inputRef.current, { x: -2, duration: 0.05, ease: "power2.out" })
-      .to(inputRef.current, { x: 2, duration: 0.05, ease: "power2.out" })
-      .to(inputRef.current, { x: -1, duration: 0.05, ease: "power2.out" })
-      .to(inputRef.current, { x: 1, duration: 0.05, ease: "power2.out" })
-      .to(inputRef.current, { x: 0, duration: 0.05, ease: "power2.out" });
+    tl.to(inputElement, { x: -3, duration: 0.05, ease: "power2.out" })
+      .to(inputElement, { x: 3, duration: 0.05, ease: "power2.out" })
+      .to(inputElement, { x: -2, duration: 0.05, ease: "power2.out" })
+      .to(inputElement, { x: 2, duration: 0.05, ease: "power2.out" })
+      .to(inputElement, { x: -1, duration: 0.05, ease: "power2.out" })
+      .to(inputElement, { x: 1, duration: 0.05, ease: "power2.out" })
+      .to(inputElement, { x: 0, duration: 0.05, ease: "power2.out" });
   };
 
   // Проверка авторизации
@@ -162,7 +295,7 @@ export default function SupportPage() {
     const fetchUserData = async () => {
       try {
         controller = new AbortController();
-        timeoutId = setTimeout(() => controller!.abort(), 10000);
+        timeoutId = setTimeout(() => controller!.abort(), AUTH_FETCH_TIMEOUT);
 
         try {
           const response = await fetch('/api/auth/me', {
@@ -178,7 +311,15 @@ export default function SupportPage() {
 
           if (response.ok) {
             const data = await response.json();
-            setUserData(data);
+            // Проверяем, что пользователь авторизован
+            if (data.authenticated === false || !data.dashboard_token) {
+              setUserData(null);
+              setIsSupport(false);
+            } else {
+              setUserData(data);
+              // Проверяем, является ли пользователь саппортом (данные приходят из API)
+              setIsSupport(data.isSupport === true);
+            }
           } else {
             setUserData(null);
           }
@@ -219,6 +360,158 @@ export default function SupportPage() {
       }
     };
   }, [router]);
+
+  // Загрузка тикетов при монтировании
+  useEffect(() => {
+    if (userData) {
+      fetchTickets();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userData]);
+
+  // Загрузка сообщений при выборе тикета
+  useEffect(() => {
+    if (!activeTicket || !activeTicket.id) {
+      fetchingTicketIdRef.current = null;
+      return;
+    }
+    
+    // Загружаем сообщения только если тикет действительно изменился
+    // Проверяем, что сообщения еще не загружены или тикет новый
+    const shouldFetch = !activeTicket.messages || activeTicket.messages.length === 0;
+    
+    // Предотвращаем дублирующиеся запросы
+    if (shouldFetch && fetchingTicketIdRef.current !== activeTicket.id) {
+      fetchingTicketIdRef.current = activeTicket.id;
+      fetchTicketMessages(activeTicket.id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTicket?.id]);
+
+  // Умное обновление сообщений: только когда страница активна и только проверка новых
+  useEffect(() => {
+    if (!activeTicket || !userData) return;
+
+    let interval: NodeJS.Timeout | null = null;
+    let lastMessageCount = activeTicket.messages?.length || 0;
+    // Хэш последних сообщений для оптимизации проверки изменений
+    let lastMessagesHash = '';
+
+    // Простая функция хэширования для сравнения сообщений
+    const hashMessages = (messages: Array<{ id: string; created_at: string }>): string => {
+      return messages.map(m => `${m.id}-${m.created_at}`).join('|');
+    };
+
+    const checkForNewMessages = async () => {
+      // Проверяем только если страница видима
+      if (document.hidden) return;
+
+      try {
+        const response = await fetchWithRateLimit(
+          `/api/support/tickets/${activeTicket.id}`,
+          {
+            credentials: 'include'
+          },
+          async () => {
+            // Retry callback для обновления сообщений
+            if (activeTicket) {
+              await fetchTicketMessages(activeTicket.id);
+            }
+          }
+        );
+        const data = await response.json();
+        
+        if (response.ok && data.ticket && data.messages) {
+          const currentMessageCount = data.messages.length;
+          const currentMessagesHash = hashMessages(data.messages);
+          
+          // Обновляем статус тикета (может измениться в панели поддержки)
+          const statusChanged = activeTicket.status !== data.ticket.status;
+          
+          // Проверяем переход между активными и архивными статусами
+          const wasActive = activeTicket.status === 'open' || activeTicket.status === 'pending';
+          const isNowActive = data.ticket.status === 'open' || data.ticket.status === 'pending';
+          const statusCategoryChanged = wasActive !== isNowActive;
+          
+          // Обновляем только если появились новые сообщения, изменился статус или хэш сообщений
+          if (currentMessageCount > lastMessageCount || statusChanged || currentMessagesHash !== lastMessagesHash) {
+            const mappedMessages = data.messages.map((m: { id: string; message_text: string; sender_type: string; created_at: string; is_read: boolean; sender?: { id: string; username: string; user_id: string } }) => ({
+              id: m.id,
+              text: m.message_text,
+              sender: m.sender_type,
+              timestamp: new Date(m.created_at),
+              isRead: m.is_read,
+              senderData: m.sender
+            }));
+
+            setActiveTicket({
+              ...activeTicket,
+              status: data.ticket.status, // Обновляем статус
+              messages: mappedMessages
+            });
+            lastMessageCount = currentMessageCount;
+            lastMessagesHash = currentMessagesHash;
+            
+            // Обновляем список тикетов при изменении статуса (особенно при переходе между активными и архивными)
+            if (statusChanged || statusCategoryChanged) {
+              // Немедленное обновление списка тикетов
+              fetchTickets();
+            }
+            
+            // Отмечаем сообщения как прочитанные
+            markMessagesAsRead(activeTicket.id);
+          }
+        }
+      } catch (error) {
+        console.error('Error checking for new messages:', error);
+      }
+    };
+
+    // Инициализируем хэш при первом запуске
+    if (activeTicket.messages && activeTicket.messages.length > 0) {
+      lastMessagesHash = hashMessages(activeTicket.messages.map(m => ({
+        id: m.id,
+        created_at: m.timestamp.toISOString()
+      })));
+    }
+
+    // Проверяем каждые 5 секунд для более динамичного обновления статуса
+    interval = setInterval(checkForNewMessages, 5000);
+
+    // Отмечаем сообщения как прочитанные при открытии тикета
+    markMessagesAsRead(activeTicket.id);
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTicket?.id, userData, activeTicket?.status]);
+
+  // Отметка сообщений как прочитанных с debounce
+  const markMessagesAsRead = async (ticketId: string) => {
+    // Используем debounce для уменьшения количества запросов
+    if (markReadTimeoutRef.current) {
+      clearTimeout(markReadTimeoutRef.current);
+    }
+    
+    markReadTimeoutRef.current = setTimeout(async () => {
+      try {
+        await fetchWithRateLimit(
+          `/api/support/tickets/${ticketId}/messages/read`,
+          {
+            method: 'POST',
+            credentials: 'include'
+          },
+          () => markMessagesAsRead(ticketId) // Retry callback
+        );
+      } catch (error) {
+        // Не логируем RATE_LIMIT_EXCEEDED, так как это обрабатывается через капчу
+        if (error instanceof Error && error.message !== 'RATE_LIMIT_EXCEEDED') {
+          console.error('Error marking messages as read:', error);
+        }
+      }
+    }, 2000);
+  };
 
   // Обработка открытия/закрытия меню профиля
   useEffect(() => {
@@ -306,11 +599,12 @@ export default function SupportPage() {
 
     const interval = setInterval(() => {
       const elapsed = Math.floor((Date.now() - lastMessageTime) / 1000);
-      const remaining = 60 - elapsed;
+      const remaining = MESSAGE_TIMEOUT / 1000 - elapsed;
       
       if (remaining <= 0) {
         setTimeoutSeconds(0);
         setLastMessageTime(null);
+        setMessagesSentCount(0); // Сбрасываем счетчик после таймаута
       } else {
         setTimeoutSeconds(remaining);
       }
@@ -319,96 +613,333 @@ export default function SupportPage() {
     return () => clearInterval(interval);
   }, [lastMessageTime, timeoutSeconds]);
 
-  const handleCreateTicket = () => {
+  const handleCreateTicket = async () => {
     if (!newTicketSubject.trim()) return;
     
+    // Если есть текст сообщения, создаем тикет с первым сообщением
+    if (!messageText.trim()) {
+      showNotification('Введите сообщение для тикета');
+      return;
+    }
+    
     // Проверка лимита символов
-    if (newTicketSubject.length > MAX_SUBJECT_LENGTH) {
-      showNotification(`Максимальная длина темы: ${MAX_SUBJECT_LENGTH} символов`);
+    if (newTicketSubject.length > TICKET_SUBJECT_MAX_LENGTH) {
+      showNotification(`Максимальная длина темы: ${TICKET_SUBJECT_MAX_LENGTH} символов`);
       triggerShake('subject');
       return;
     }
-    
-    // Ограничение: максимум 2 тикета
-    if (tickets.length >= 2) {
-      alert('Вы можете создать максимум 2 тикета. Закройте один из существующих тикетов, чтобы создать новый.');
+
+    if (messageText.length > MESSAGE_MAX_LENGTH) {
+      showNotification(`Максимальная длина сообщения: ${MESSAGE_MAX_LENGTH} символов`);
+      triggerShake('message');
       return;
     }
 
-    const newTicket: Ticket = {
-      id: `ticket-${Date.now()}`,
-      subject: newTicketSubject,
-      status: 'open',
-      createdAt: new Date(),
-      messages: []
-    };
+    try {
+      const response = await fetchWithRateLimit(
+        '/api/support/tickets',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            subject: newTicketSubject.trim(),
+            message: messageText.trim()
+          })
+        },
+        handleCreateTicket // Retry callback
+      );
 
-    setTickets([newTicket, ...tickets]);
-    setActiveTicket(newTicket);
-    setNewTicketSubject('');
-    setShowNewTicketForm(false);
+      const data = await response.json();
+
+      if (response.ok && data.ticket) {
+        // Сначала очищаем старый тикет, чтобы избежать показа старой истории
+        setActiveTicket(null);
+        fetchingTicketIdRef.current = null;
+        
+        // Загружаем тикеты заново
+        await fetchTickets();
+        
+        // Сбрасываем счетчик сообщений при создании нового тикета
+        setMessagesSentCount(0);
+        setLastMessageTime(null);
+        setTimeoutSeconds(0);
+        
+        // Устанавливаем активный тикет напрямую, без вызова fetchTicketMessages
+        // чтобы избежать дублирующихся запросов (useEffect не будет вызывать fetchTicketMessages,
+        // так как сообщения уже будут загружены)
+        const ticketResponse = await fetchWithRateLimit(
+          `/api/support/tickets/${data.ticket.id}`,
+          {
+            credentials: 'include'
+          },
+          async () => {
+            // Retry callback
+            const retryResponse = await fetch(`/api/support/tickets/${data.ticket.id}`, {
+              credentials: 'include'
+            });
+            const retryData = await retryResponse.json();
+            if (retryResponse.ok) {
+              fetchingTicketIdRef.current = data.ticket.id;
+              setActiveTicket({
+                id: retryData.ticket.id,
+                subject: retryData.ticket.subject,
+                status: retryData.ticket.status,
+                createdAt: new Date(retryData.ticket.created_at),
+                messages: (retryData.messages || []).map((m: { id: string; message_text: string; sender_type: string; created_at: string; is_read: boolean; sender?: { id: string; username: string; user_id: string } }) => ({
+                  id: m.id,
+                  text: m.message_text,
+                  sender: m.sender_type,
+                  timestamp: new Date(m.created_at),
+                  isRead: m.is_read,
+                  senderData: m.sender
+                }))
+              });
+              markMessagesAsRead(data.ticket.id);
+            }
+          }
+        );
+        const ticketData = await ticketResponse.json();
+        if (ticketResponse.ok) {
+          fetchingTicketIdRef.current = data.ticket.id;
+          setActiveTicket({
+            id: ticketData.ticket.id,
+            subject: ticketData.ticket.subject,
+            status: ticketData.ticket.status,
+            createdAt: new Date(ticketData.ticket.created_at),
+            messages: (ticketData.messages || []).map((m: { id: string; message_text: string; sender_type: string; created_at: string; is_read: boolean; sender?: { id: string; username: string; user_id: string } }) => ({
+              id: m.id,
+              text: m.message_text,
+              sender: m.sender_type,
+              timestamp: new Date(m.created_at),
+              isRead: m.is_read,
+              senderData: m.sender
+            }))
+          });
+          
+          // Отмечаем сообщения как прочитанные
+          markMessagesAsRead(data.ticket.id);
+        }
+        setNewTicketSubject('');
+        setMessageText('');
+        setShowNewTicketForm(false);
+        showNotification('Тикет создан');
+      } else {
+        const errorMessage = data.error || 'Ошибка создания тикета';
+        showNotification(translateError(errorMessage));
+        if (data.error && (data.error.toLowerCase().includes('limit') || data.error.toLowerCase().includes('лимит'))) {
+          triggerShake('subject');
+        }
+      }
+    } catch (error) {
+      if (error instanceof Error && error.message === 'RATE_LIMIT_EXCEEDED') {
+        // Rate limit обрабатывается через капчу, не показываем ошибку
+        return;
+      }
+      console.error('Error creating ticket:', error);
+      showNotification('Ошибка создания тикета');
+    }
   };
 
-  const handleSendMessage = () => {
-    if (!messageText.trim() || !activeTicket || !activeTicket.messages || !Array.isArray(activeTicket.messages)) return;
+  const handleSendMessage = async () => {
+    if (!messageText.trim() || !activeTicket) return;
     
     // Проверка лимита символов
-    if (messageText.length > MAX_MESSAGE_LENGTH) {
-      showNotification(`Максимальная длина сообщения: ${MAX_MESSAGE_LENGTH} символов`);
+    if (messageText.length > MESSAGE_MAX_LENGTH) {
+      showNotification(`Максимальная длина сообщения: ${MESSAGE_MAX_LENGTH} символов`);
       triggerShake('message');
       return;
     }
     
-    // Проверка тайм-аута (1 минута между сообщениями)
+    // Проверка тайм-аута (разрешаем отправить 2 сообщения подряд, затем таймаут)
     if (timeoutSeconds > 0) {
       return;
     }
 
-    const isFirstMessage = activeTicket.messages.length === 0;
+    try {
+      const response = await fetchWithRateLimit(
+        `/api/support/tickets/${activeTicket.id}/messages`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            message: messageText.trim()
+          })
+        },
+        handleSendMessage // Retry callback
+      );
 
-    const newMessage: Message = {
-      id: `msg-${Date.now()}`,
-      text: messageText,
-      sender: 'user',
-      timestamp: new Date(),
-      isRead: false
-    };
+      const data = await response.json();
 
-    const updatedTicket = {
-      ...activeTicket,
-      messages: [...activeTicket.messages, newMessage]
-    };
+      if (response.ok && data.message) {
+        setMessageText('');
+        
+        // Увеличиваем счетчик отправленных сообщений
+        const newCount = messagesSentCount + 1;
+        setMessagesSentCount(newCount);
+        
+        // Устанавливаем тайм-аут только после второго сообщения
+        if (newCount >= 2) {
+          setLastMessageTime(Date.now());
+          setTimeoutSeconds(MESSAGE_TIMEOUT / 1000);
+        }
+        
+        // Загружаем сообщения заново
+        const ticketResponse = await fetchWithRateLimit(
+          `/api/support/tickets/${activeTicket.id}`,
+          {
+            credentials: 'include'
+          },
+          async () => {
+            // Retry callback
+            const retryResponse = await fetch(`/api/support/tickets/${activeTicket.id}`, {
+              credentials: 'include'
+            });
+            const retryData = await retryResponse.json();
+            if (retryResponse.ok) {
+              setActiveTicket({
+                ...activeTicket,
+                messages: (retryData.messages || []).map((m: { id: string; message_text: string; sender_type: string; created_at: string; is_read: boolean; sender?: { id: string; username: string; user_id: string } }) => ({
+                  id: m.id,
+                  text: m.message_text,
+                  sender: m.sender_type,
+                  timestamp: new Date(m.created_at),
+                  isRead: m.is_read,
+                  senderData: m.sender
+                }))
+              });
+              markMessagesAsRead(activeTicket.id);
+            }
+          }
+        );
+        const ticketData = await ticketResponse.json();
+        if (ticketResponse.ok) {
+          setActiveTicket({
+            ...activeTicket,
+            messages: (ticketData.messages || []).map((m: { id: string; message_text: string; sender_type: string; created_at: string; is_read: boolean; sender?: { id: string; username: string; user_id: string } }) => ({
+              id: m.id,
+              text: m.message_text,
+              sender: m.sender_type,
+              timestamp: new Date(m.created_at),
+              isRead: m.is_read,
+              senderData: m.sender
+            }))
+          });
+          
+          // Отмечаем сообщения как прочитанные
+          markMessagesAsRead(activeTicket.id);
+        }
+        // Обновляем список тикетов
+        await fetchTickets();
+      } else {
+        const errorMessage = data.error || 'Ошибка отправки сообщения';
+        showNotification(translateError(errorMessage));
+      }
+    } catch (error) {
+      if (error instanceof Error && error.message === 'RATE_LIMIT_EXCEEDED') {
+        // Rate limit обрабатывается через капчу, не показываем ошибку
+        return;
+      }
+      console.error('Error sending message:', error);
+      showNotification('Ошибка отправки сообщения');
+    }
+  };
 
-    setTickets(tickets.map(t => t.id === activeTicket.id ? updatedTicket : t));
-    setActiveTicket(updatedTicket);
-    setMessageText('');
-    
-    // Устанавливаем тайм-аут на 1 минуту
-    setLastMessageTime(Date.now());
-    setTimeoutSeconds(60);
-
-    // Показываем спиннер загрузки и автоматический ответ только при первом сообщении
-    if (isFirstMessage) {
-      setTicketsLoading(true);
-
-      setTimeout(() => {
-        const supportMessage: Message = {
-          id: `msg-${Date.now()}`,
-          text: 'Спасибо за ваше сообщение. Мы получили ваш запрос и ответим в ближайшее время.',
-          sender: 'support',
-          timestamp: new Date(),
-          isRead: true
-        };
-
-        const updatedTicketWithResponse = {
-          ...updatedTicket,
-          messages: [...updatedTicket.messages, supportMessage]
-        };
-
-        setTickets(tickets.map(t => t.id === activeTicket.id ? updatedTicketWithResponse : t));
-        setActiveTicket(updatedTicketWithResponse);
+  const fetchTickets = async () => {
+    setTicketsLoading(true);
+    try {
+      const response = await fetchWithRateLimit(
+        '/api/support/tickets?status=all&forUser=true',
+        {
+          credentials: 'include'
+        },
+        fetchTickets // Retry callback
+      );
+      const data = await response.json();
+      
+      if (response.ok) {
+        setTickets((data.tickets || []).map((t: { id: string; subject: string; status: string; created_at: string }) => ({
+          id: t.id,
+          subject: t.subject,
+          status: t.status,
+          createdAt: new Date(t.created_at),
+          messages: []
+        })));
+      } else {
+        const errorMessage = data.error || 'Ошибка загрузки тикетов';
+        showNotification(translateError(errorMessage));
+      }
+    } catch (error) {
+      if (error instanceof Error && error.message === 'RATE_LIMIT_EXCEEDED') {
+        // Rate limit обрабатывается через капчу, не показываем ошибку
         setTicketsLoading(false);
-      }, 1000);
+        return;
+      }
+      console.error('Error fetching tickets:', error);
+      showNotification('Ошибка загрузки тикетов');
+    } finally {
+      setTicketsLoading(false);
+    }
+  };
+
+  const fetchTicketMessages = async (ticketId: string) => {
+    // Предотвращаем дублирующиеся запросы
+    if (fetchingTicketIdRef.current === ticketId) {
+      return;
+    }
+    
+    try {
+      fetchingTicketIdRef.current = ticketId;
+      
+      const response = await fetchWithRateLimit(
+        `/api/support/tickets/${ticketId}`,
+        {
+          credentials: 'include'
+        },
+        () => fetchTicketMessages(ticketId) // Retry callback
+      );
+      const data = await response.json();
+      
+      if (response.ok) {
+        // Проверяем, что тикет все еще активный (не изменился во время запроса)
+        setActiveTicket(prev => {
+          // Если тикет изменился во время запроса, не обновляем
+          if (prev && prev.id && prev.id !== ticketId) {
+            fetchingTicketIdRef.current = null;
+            return prev;
+          }
+          
+          return {
+            id: data.ticket.id,
+            subject: data.ticket.subject,
+            status: data.ticket.status,
+            createdAt: new Date(data.ticket.created_at),
+            messages: (data.messages || []).map((m: { id: string; message_text: string; sender_type: string; created_at: string; is_read: boolean; sender?: { id: string; username: string; user_id: string } }) => ({
+              id: m.id,
+              text: m.message_text,
+              sender: m.sender_type,
+              timestamp: new Date(m.created_at),
+              isRead: m.is_read,
+              senderData: m.sender // Добавляем данные отправителя
+            }))
+          };
+        });
+        
+        // Отмечаем сообщения как прочитанные после загрузки
+        markMessagesAsRead(ticketId);
+      } else {
+        fetchingTicketIdRef.current = null;
+        const errorMessage = data.error || 'Ошибка загрузки сообщений';
+        showNotification(translateError(errorMessage));
+      }
+    } catch (error) {
+      console.error('Error fetching ticket messages:', error);
+      showNotification('Ошибка загрузки сообщений');
     }
   };
 
@@ -421,18 +952,23 @@ export default function SupportPage() {
 
   const formatDate = (date: Date) => {
     const today = new Date();
+    today.setHours(0, 0, 0, 0);
     const messageDate = new Date(date);
+    messageDate.setHours(0, 0, 0, 0);
     const diffTime = today.getTime() - messageDate.getTime();
     const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
 
-    if (diffDays === 0) return 'Сегодня';
-    if (diffDays === 1) return 'Вчера';
-    if (diffDays < 7) return `${diffDays} дн. назад`;
-    
-    return new Intl.DateTimeFormat('ru-RU', {
-      day: 'numeric',
-      month: 'short'
-    }).format(date);
+    if (diffDays === 0) {
+      return 'Сегодня';
+    } else if (diffDays === 1) {
+      return 'Вчера';
+    } else {
+      // Формат: "11 ноября" (без года)
+      return messageDate.toLocaleDateString('ru-RU', {
+        day: 'numeric',
+        month: 'long'
+      });
+    }
   };
 
   const formatDateShort = (date: Date) => {
@@ -440,7 +976,11 @@ export default function SupportPage() {
     const day = String(d.getDate()).padStart(2, '0');
     const month = String(d.getMonth() + 1).padStart(2, '0');
     const year = String(d.getFullYear()).slice(-2);
-    return `${day}.${month}.${year}`;
+    const time = d.toLocaleTimeString('ru-RU', {
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+    return `${day}.${month}.${year}, ${time}`;
   };
 
   if (loading) {
@@ -657,46 +1197,82 @@ export default function SupportPage() {
                   <h2 className="text-base sm:text-lg font-semibold">Мои тикеты</h2>
                   <button
                     onClick={() => {
-                      if (tickets.length >= 2) {
+                      if (tickets.length >= MAX_TICKETS_PER_USER) {
                         alert('Вы можете создать максимум 2 тикета. Закройте один из существующих тикетов, чтобы создать новый.');
                         return;
                       }
                       setShowNewTicketForm(!showNewTicketForm);
                     }}
-                    disabled={tickets.length >= 2}
+                    disabled={tickets.length >= MAX_TICKETS_PER_USER || isSupport}
                     className="px-3 py-1.5 bg-primary-500 hover:bg-primary-400 disabled:bg-neutral-700 disabled:text-neutral-500 disabled:cursor-not-allowed text-white text-sm rounded-lg transition-colors"
+                    title={isSupport ? 'Создание тикетов недоступно для сотрудников поддержки' : ''}
                   >
                     + Новый
                   </button>
                 </div>
 
-                {showNewTicketForm && (
-                  <div className="mb-4 p-3 bg-neutral-800/50 rounded-xl border border-white/10 flex-shrink-0">
-                    <input
-                      ref={subjectInputRef}
-                      type="text"
-                      value={newTicketSubject}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        if (value.length <= MAX_SUBJECT_LENGTH) {
-                          setNewTicketSubject(value);
-                        } else {
-                          showNotification(`Максимальная длина темы: ${MAX_SUBJECT_LENGTH} символов`);
-                          triggerShake('subject');
-                        }
-                      }}
-                      placeholder="Тема обращения..."
-                      className="w-full px-3 py-2 bg-neutral-900 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-primary-500"
-                      onKeyPress={(e) => e.key === 'Enter' && handleCreateTicket()}
-                      autoFocus
-                    />
-                    <div className="text-xs text-neutral-500 mt-1 text-right">
-                      {newTicketSubject.length}/{MAX_SUBJECT_LENGTH}
+                {showNewTicketForm && !isSupport && (
+                  <div className="mb-4 p-3 bg-neutral-800/50 rounded-xl border border-white/10 flex-shrink-0 space-y-3">
+                    <div>
+                      <input
+                        ref={subjectInputRef}
+                        type="text"
+                        value={newTicketSubject}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          if (value.length <= TICKET_SUBJECT_MAX_LENGTH) {
+                            setNewTicketSubject(value);
+                          } else {
+                            showNotification(`Максимальная длина темы: ${TICKET_SUBJECT_MAX_LENGTH} символов`);
+                            triggerShake('subject');
+                          }
+                        }}
+                        placeholder="Тема обращения..."
+                        className="w-full px-3 py-2 bg-neutral-900 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-primary-500"
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            // Не создаем тикет по Enter, только переходим к полю сообщения
+                          }
+                        }}
+                        autoFocus
+                      />
+                      <div className="text-xs text-neutral-500 mt-1 text-right">
+                        {newTicketSubject.length}/{TICKET_SUBJECT_MAX_LENGTH}
+                      </div>
                     </div>
-                    <div className="flex gap-2 mt-2">
+                    <div>
+                      <textarea
+                        ref={messageTextareaRef}
+                        value={messageText}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          if (value.length <= MESSAGE_MAX_LENGTH) {
+                            setMessageText(value);
+                          } else {
+                            showNotification(`Максимальная длина сообщения: ${MESSAGE_MAX_LENGTH} символов`);
+                            triggerShake('message');
+                          }
+                        }}
+                        placeholder="Опишите свою проблему..."
+                        rows={3}
+                        className="w-full px-3 py-2 bg-neutral-900 border border-white/10 rounded-lg text-white text-sm placeholder-neutral-500 focus:outline-none focus:border-primary-500 resize-none"
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter' && e.ctrlKey) {
+                            e.preventDefault();
+                            handleCreateTicket();
+                          }
+                        }}
+                      />
+                      <div className="text-xs text-neutral-500 mt-1 text-right">
+                        {messageText.length}/{MESSAGE_MAX_LENGTH}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
                       <button
                         onClick={handleCreateTicket}
-                        className="flex-1 px-3 py-1.5 bg-primary-500 hover:bg-primary-400 text-white text-sm rounded-lg transition-colors"
+                        disabled={!newTicketSubject.trim() || !messageText.trim()}
+                        className="flex-1 px-3 py-1.5 bg-primary-500 hover:bg-primary-400 disabled:bg-neutral-700 disabled:text-neutral-500 disabled:cursor-not-allowed text-white text-sm rounded-lg transition-colors"
                       >
                         Создать
                       </button>
@@ -704,6 +1280,7 @@ export default function SupportPage() {
                         onClick={() => {
                           setShowNewTicketForm(false);
                           setNewTicketSubject('');
+                          setMessageText('');
                         }}
                         className="px-3 py-1.5 bg-neutral-700 hover:bg-neutral-600 text-white text-sm rounded-lg transition-colors"
                       >
@@ -722,7 +1299,23 @@ export default function SupportPage() {
                     tickets.map((ticket) => (
                       <button
                         key={ticket.id}
-                        onClick={() => setActiveTicket(ticket)}
+                        onClick={async () => {
+                          // Сразу загружаем сообщения при выборе тикета (даже если закрыт)
+                          const ticketData = {
+                            id: ticket.id,
+                            subject: ticket.subject,
+                            status: ticket.status,
+                            createdAt: ticket.createdAt,
+                            messages: []
+                          };
+                          setActiveTicket(ticketData);
+                          // Сбрасываем счетчик сообщений при смене тикета
+                          setMessagesSentCount(0);
+                          setLastMessageTime(null);
+                          setTimeoutSeconds(0);
+                          // Загружаем сообщения асинхронно
+                          await fetchTicketMessages(ticket.id);
+                        }}
                         className={`w-full text-left p-3 rounded-xl transition-colors ${
                           activeTicket?.id === ticket.id
                             ? 'bg-primary-500/20 border border-primary-500/50'
@@ -740,11 +1333,11 @@ export default function SupportPage() {
                               ? 'bg-yellow-500/20 text-yellow-400'
                               : 'bg-neutral-700 text-neutral-400'
                           }`}>
-                            {ticket.status === 'open' ? 'Открыт' : ticket.status === 'pending' ? 'В ожидании' : 'Закрыт'}
+                            {ticket.status === 'open' ? 'Открыт' : ticket.status === 'pending' ? 'В работе' : 'Закрыт'}
                           </span>
                         </div>
                         <div className="text-xs text-neutral-400">
-                          {formatDate(ticket.createdAt)}
+                          {formatDate(ticket.createdAt)}, {formatTime(ticket.createdAt)}
                         </div>
                         {ticket.messages && Array.isArray(ticket.messages) && ticket.messages.length > 0 && (
                           <div className="text-xs text-neutral-500 mt-1 truncate">
@@ -778,7 +1371,7 @@ export default function SupportPage() {
                             ? 'bg-yellow-500/20 text-yellow-400'
                             : 'bg-neutral-700 text-neutral-400'
                         }`}>
-                          {activeTicket.status === 'open' ? 'Открыт' : activeTicket.status === 'pending' ? 'В ожидании' : 'Закрыт'}
+                          {activeTicket.status === 'open' ? 'Открыт' : activeTicket.status === 'pending' ? 'В работе' : 'Закрыт'}
                         </span>
                       </div>
                     </div>
@@ -788,7 +1381,7 @@ export default function SupportPage() {
                         {ticketsLoading && (
                           <div className="absolute top-4 right-4 flex items-center gap-2 text-neutral-400 text-sm z-10">
                             <div className="w-4 h-4 border-2 border-neutral-400 border-t-transparent rounded-full animate-spin"></div>
-                            <span>Отправка...</span>
+                            <span>Загрузка...</span>
                           </div>
                         )}
                         {activeTicket.messages && Array.isArray(activeTicket.messages) && activeTicket.messages.length > 0 ? (
@@ -826,10 +1419,10 @@ export default function SupportPage() {
                             value={messageText}
                             onChange={(e) => {
                               const value = e.target.value;
-                              if (value.length <= MAX_MESSAGE_LENGTH) {
+                              if (value.length <= MESSAGE_MAX_LENGTH) {
                                 setMessageText(value);
                               } else {
-                                showNotification(`Максимальная длина сообщения: ${MAX_MESSAGE_LENGTH} символов`);
+                                showNotification(`Максимальная длина сообщения: ${MESSAGE_MAX_LENGTH} символов`);
                                 triggerShake('message');
                               }
                             }}
@@ -840,7 +1433,7 @@ export default function SupportPage() {
                           />
                           {timeoutSeconds === 0 && (
                             <div className="absolute bottom-1 right-3 text-[10px] text-neutral-500">
-                              {messageText.length}/{MAX_MESSAGE_LENGTH}
+                              {messageText.length}/{MESSAGE_MAX_LENGTH}
                             </div>
                           )}
                           {timeoutSeconds > 0 && (
@@ -882,12 +1475,21 @@ export default function SupportPage() {
       
       {/* Notification */}
       {notification.show && (
-        <div className="fixed bottom-4 left-4 z-[1000] animate-slide-in-left">
+        <div ref={notificationRef} className="fixed bottom-4 left-4 z-[1000]">
           <div className="bg-neutral-900 border border-red-500/50 rounded-xl px-4 py-3 shadow-xl backdrop-blur-xl">
             <p className="text-sm text-white">{notification.message}</p>
           </div>
         </div>
       )}
+      
+      <RateLimitCaptcha
+        isOpen={showRateLimitCaptcha}
+        onSuccess={handleRateLimitSuccess}
+        onClose={() => {
+          setShowRateLimitCaptcha(false);
+          pendingRequestRef.current = null;
+        }}
+      />
     </div>
   );
 }

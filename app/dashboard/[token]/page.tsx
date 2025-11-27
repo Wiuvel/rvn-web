@@ -6,6 +6,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useFadeIn, useStaggeredFadeIn } from '@/hooks/useGSAP';
 import { gsap } from 'gsap';
+import LoadingSpinner from '@/components/LoadingSpinner';
 
 interface UserData {
   id: string;
@@ -78,6 +79,11 @@ export default function DashboardPage() {
 
           if (response.ok) {
             const data = await response.json();
+            // Проверяем, что пользователь авторизован
+            if (data.authenticated === false || !data.dashboard_token) {
+              router.push('/auth');
+              return;
+            }
             // Проверяем что токен совпадает
             if (data.dashboard_token !== token) {
               router.push('/auth');
@@ -232,18 +238,22 @@ export default function DashboardPage() {
     };
   }, [notificationsOpen, userMenuOpen]);
 
-  // Взаимное закрытие меню
+  // Взаимное закрытие меню - закрываем другое меню при открытии нового
   useEffect(() => {
+    // Если открывается меню уведомлений, закрываем меню пользователя
     if (notificationsOpen && userMenuOpen) {
       setUserMenuOpen(false);
     }
-  }, [notificationsOpen, userMenuOpen]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notificationsOpen]); // Срабатывает только при изменении notificationsOpen
 
   useEffect(() => {
+    // Если открывается меню пользователя, закрываем меню уведомлений
     if (userMenuOpen && notificationsOpen) {
       setNotificationsOpen(false);
     }
-  }, [userMenuOpen, notificationsOpen]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userMenuOpen]); // Срабатывает только при изменении userMenuOpen
 
   // Управление рендерингом и анимацией меню уведомлений
   useEffect(() => {
@@ -287,21 +297,27 @@ export default function DashboardPage() {
 
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Node;
-      if (userMenuRef.current && !userMenuRef.current.contains(target)) {
+      
+      // Закрываем только то меню, которое действительно открыто
+      if (userMenuOpen && userMenuRef.current && !userMenuRef.current.contains(target)) {
         setUserMenuOpen(false);
       }
-      if (notificationsMenuRef.current && !notificationsMenuRef.current.contains(target)) {
+      if (notificationsOpen && notificationsMenuRef.current && !notificationsMenuRef.current.contains(target)) {
         setNotificationsOpen(false);
       }
     };
 
     if (userMenuOpen || notificationsOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
+      // Используем небольшую задержку, чтобы onClick кнопки успел сработать первым
+      const timeoutId = setTimeout(() => {
+        document.addEventListener('mousedown', handleClickOutside);
+      }, 0);
 
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
+      return () => {
+        clearTimeout(timeoutId);
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }
   }, [userMenuOpen, notificationsOpen]);
 
   // Функция для отметки уведомления как прочитанного
@@ -320,11 +336,7 @@ export default function DashboardPage() {
   const hasUnreadNotifications = notifications.some(n => !readNotifications.has(n.id));
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="spinner"></div>
-      </div>
-    );
+    return <LoadingSpinner />;
   }
 
   return (

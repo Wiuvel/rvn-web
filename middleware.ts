@@ -88,7 +88,27 @@ function handleAuth(request: NextRequest, pathname: string): NextResponse | null
     return NextResponse.next();
   }
 
-  return null; // Не требует проверки авторизации
+  // Проверка для /ui/panel/support - требует авторизации и роли support
+  // Проверка роли будет выполнена на стороне клиента через API
+  if (pathname.startsWith('/ui/panel/support')) {
+    if (!isAuthenticated || !dashboardToken) {
+      return NextResponse.redirect(new URL('/auth', request.url));
+    }
+    return NextResponse.next();
+  }
+
+  // Проверка для /ui/panel/admin - требует авторизации админа
+  // Проверка выполняется через cookie admin_authenticated
+  if (pathname.startsWith('/ui/panel/admin')) {
+    const isAdminAuthenticated = request.cookies.get('admin_authenticated')?.value === 'true';
+    if (!isAdminAuthenticated) {
+      // Редирект на страницу авторизации админа (она сама проверит и покажет форму)
+      return NextResponse.next();
+    }
+    return NextResponse.next();
+  }
+
+  return null;
 }
 
 export function middleware(request: NextRequest) {

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateUser } from '@/lib/auth';
 import { authRateLimit } from '@/lib/rate-limit';
-import { verifyCSRFToken, revokeCSRFToken } from '@/lib/csrf';
+import { verifyCSRFToken, revokeCSRFToken, getCSRFTokenInfo, getCSRFStoreSize } from '@/lib/csrf';
 import { ServerValidator } from '@/lib/server-validation';
 import { logger } from '@/lib/secure-logger';
 import { setCorsHeaders, handleCorsPreflight } from '@/lib/cors';
@@ -60,18 +60,60 @@ export async function POST(request: NextRequest) {
     }
 
     const currentSessionId = request.cookies.get('session_id')?.value;
-    if (currentSessionId && csrfToken && !verifyCSRFToken(csrfToken, currentSessionId)) {
-      logger.warn('Invalid CSRF token for login attempt', {
-        ip: request.headers.get('x-forwarded-for'),
-        hasSessionId: !!currentSessionId,
-        hasCsrfToken: !!csrfToken
+    
+    // Если есть session_id, CSRF токен обязателен и должен быть валидным
+    // Если session_id нет, CSRF токен не требуется (первый запрос, но все равно проверяем если передан)
+    if (currentSessionId) {
+      if (!csrfToken) {
+        logger.warn('Missing CSRF token for login attempt with existing session', {
+          ip: request.headers.get('x-forwarded-for'),
+          hasSessionId: true
+        });
+        return setCorsHeaders(
+          NextResponse.json(
+            { error: 'Invalid request. Please refresh the page.' },
+            { status: 403 }
+          )
+        );
+      }
+      
+      // Логируем информацию о токене перед проверкой
+      const tokenInfo = getCSRFTokenInfo(currentSessionId);
+      logger.info('CSRF token verification attempt', {
+        sessionIdPrefix: currentSessionId?.substring(0, 8),
+        tokenExistsInStore: tokenInfo.exists,
+        tokenLength: csrfToken?.length || 0,
+        storeSize: getCSRFStoreSize(),
+        ip: request.headers.get('x-forwarded-for')
       });
-      return setCorsHeaders(
-        NextResponse.json(
-          { error: 'Invalid request' },
-          { status: 403 }
-        )
-      );
+      
+      const csrfValidation = verifyCSRFToken(csrfToken, currentSessionId, true);
+      if (!csrfValidation.valid) {
+        logger.warn('Invalid CSRF token for login attempt', {
+          ip: request.headers.get('x-forwarded-for'),
+          hasSessionId: true,
+          hasCsrfToken: !!csrfToken,
+          tokenLength: csrfToken?.length || 0,
+          sessionIdLength: currentSessionId?.length || 0,
+          reason: csrfValidation.reason,
+          sessionIdPrefix: currentSessionId?.substring(0, 8),
+          tokenExistsInStore: tokenInfo.exists,
+          storeSize: getCSRFStoreSize()
+        });
+        return setCorsHeaders(
+          NextResponse.json(
+            { error: 'Invalid request. Please refresh the page and try again.' },
+            { status: 403 }
+          )
+        );
+      }
+    } else if (csrfToken) {
+      // Если session_id нет, но CSRF токен передан - это подозрительно
+      // Но не блокируем, так как это может быть первый запрос после очистки cookies
+      logger.info('CSRF token provided without session_id for login attempt', {
+        ip: request.headers.get('x-forwarded-for'),
+        hasCsrfToken: true
+      });
     }
 
     const result = await authenticateUser(username, password);

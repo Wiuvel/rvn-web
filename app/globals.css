@@ -611,29 +611,34 @@ button, a {
 
 /* Кастомный скролл для support страницы */
 .support-tickets-list,
-.support-chat-messages {
+.support-chat-messages,
+.custom-scrollbar {
     scrollbar-width: thin;
     scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
 }
 
 .support-tickets-list::-webkit-scrollbar,
-.support-chat-messages::-webkit-scrollbar {
+.support-chat-messages::-webkit-scrollbar,
+.custom-scrollbar::-webkit-scrollbar {
     width: 6px;
 }
 
 .support-tickets-list::-webkit-scrollbar-track,
-.support-chat-messages::-webkit-scrollbar-track {
+.support-chat-messages::-webkit-scrollbar-track,
+.custom-scrollbar::-webkit-scrollbar-track {
     background: transparent;
 }
 
 .support-tickets-list::-webkit-scrollbar-thumb,
-.support-chat-messages::-webkit-scrollbar-thumb {
+.support-chat-messages::-webkit-scrollbar-thumb,
+.custom-scrollbar::-webkit-scrollbar-thumb {
     border-radius: 999px;
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.15), rgba(86, 162, 255, 0.35));
 }
 
 .support-tickets-list::-webkit-scrollbar-thumb:hover,
-.support-chat-messages::-webkit-scrollbar-thumb:hover {
+.support-chat-messages::-webkit-scrollbar-thumb:hover,
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.25), rgba(86, 162, 255, 0.55));
 }
 
@@ -736,5 +741,26 @@ button, a {
 
 .animation-delay-6000 {
   animation-delay: 9s;
+}
+
+/* Shimmer animation for skeleton loaders */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(38, 38, 38, 0.5) 0%,
+    rgba(64, 64, 64, 0.7) 50%,
+    rgba(38, 38, 38, 0.5) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
 }
 

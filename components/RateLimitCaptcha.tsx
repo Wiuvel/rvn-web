@@ -1,0 +1,179 @@
+'use client';
+
+import { useState, useEffect, useRef } from 'react';
+import Script from 'next/script';
+
+interface TurnstileInstance {
+  render: (
+    container: string | HTMLElement,
+    options: {
+      sitekey: string;
+      theme?: string;
+      callback?: (token: string) => void;
+      'error-callback'?: () => void;
+    }
+  ) => string;
+  remove: (widgetId: string) => void;
+}
+
+declare global {
+  interface Window {
+    turnstile?: TurnstileInstance;
+  }
+}
+
+interface RateLimitCaptchaProps {
+  isOpen: boolean;
+  onSuccess: () => void;
+  onClose?: () => void;
+}
+
+export default function RateLimitCaptcha({ isOpen, onSuccess, onClose }: RateLimitCaptchaProps) {
+  const [isScriptLoaded, setIsScriptLoaded] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const widgetIdRef = useRef<string | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (isOpen && isScriptLoaded && containerRef.current && !widgetIdRef.current) {
+      loadCaptcha();
+    }
+
+    return () => {
+      if (widgetIdRef.current && typeof window !== 'undefined' && window.turnstile) {
+        try {
+          window.turnstile.remove(widgetIdRef.current);
+        } catch {
+          // Ignore errors during cleanup
+        }
+        widgetIdRef.current = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, isScriptLoaded]);
+
+  const loadCaptcha = () => {
+    if (!containerRef.current || !window.turnstile) return;
+
+    containerRef.current.innerHTML = '';
+
+    try {
+      const widgetId = window.turnstile.render(containerRef.current, {
+        sitekey: '3x00000000000000000000FF', // Используем тот же sitekey, что и в AuthForm
+        theme: 'dark',
+        callback: async (token: string) => {
+          setIsVerifying(true);
+          setError(null);
+
+          try {
+            const response = await fetch('/api/rate-limit/clear', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              credentials: 'include',
+              body: JSON.stringify({ captchaToken: token })
+            });
+
+            const data = await response.json();
+
+            if (response.ok && data.success) {
+              setIsVerifying(false);
+              onSuccess();
+              // Закрываем модальное окно после успешной очистки
+              if (onClose) {
+                setTimeout(() => {
+                  onClose();
+                }, 500);
+              }
+            } else {
+              setIsVerifying(false);
+              setError(data.error || 'Ошибка очистки лимитов');
+              // Сбрасываем капчу для повторной попытки
+              if (widgetIdRef.current && window.turnstile) {
+                window.turnstile.remove(widgetIdRef.current);
+                widgetIdRef.current = null;
+                setTimeout(() => {
+                  if (isOpen && isScriptLoaded) {
+                    loadCaptcha();
+                  }
+                }, 100);
+              }
+            }
+          } catch {
+            setIsVerifying(false);
+            setError('Ошибка соединения с сервером');
+            if (widgetIdRef.current && window.turnstile) {
+              window.turnstile.remove(widgetIdRef.current);
+              widgetIdRef.current = null;
+              setTimeout(() => {
+                if (isOpen && isScriptLoaded) {
+                  loadCaptcha();
+                }
+              }, 100);
+            }
+          }
+        },
+        'error-callback': () => {
+          setError('Ошибка загрузки капчи');
+          setIsVerifying(false);
+        }
+      });
+
+      widgetIdRef.current = widgetId;
+    } catch (err) {
+      console.error('Error rendering Turnstile:', err);
+      setError('Ошибка инициализации капчи');
+    }
+  };
+
+  const handleScriptLoad = () => {
+    setIsScriptLoaded(true);
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <>
+      <Script
+        src="https://challenges.cloudflare.com/turnstile/v0/api.js"
+        strategy="afterInteractive"
+        onLoad={handleScriptLoad}
+      />
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+        <div className="bg-neutral-900 rounded-2xl p-6 sm:p-8 max-w-md w-full mx-4 border border-neutral-800 shadow-2xl">
+          <div className="text-center mb-6">
+            <h2 className="text-xl sm:text-2xl font-bold text-white mb-2">
+              Ограничение запросов
+            </h2>
+            <p className="text-sm sm:text-base text-neutral-400">
+              Пожалуйста, пройдите проверку, чтобы продолжить
+            </p>
+          </div>
+
+          {error && (
+            <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
+              <p className="text-sm text-red-400 text-center">{error}</p>
+            </div>
+          )}
+
+          <div className="flex justify-center mb-4">
+            <div ref={containerRef} id="rate-limit-captcha-container" />
+          </div>
+
+          {onClose && (
+            <button
+              onClick={onClose}
+              disabled={isVerifying}
+              className="w-full mt-4 px-4 py-2 text-sm text-neutral-400 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Отмена
+            </button>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+

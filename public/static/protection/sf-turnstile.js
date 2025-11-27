@@ -67,12 +67,10 @@ function safeRedirect(url) {
 
 function checkExistingCookie() {
     if (!isValidBrowser()) {
-        console.log('[PROTECT] Invalid browser detected. Requiring verification.');
         return false;
     }
     
     if (window.location.pathname === '/protection') {
-        console.log('[PROTECT] On protection page, skipping cookie check to avoid redirects.');
         return false;
     }
     
@@ -268,7 +266,6 @@ async function setSecureCookie(token) {
         document.cookie = `access_hash=${secureHash}; ${cookieOptions}`;
         document.cookie = `access_time=${Date.now()}; ${cookieOptions}`;
         
-        console.log('[CAPTCHA] Secure session established with:', domain || hostname);
         return true;
     } catch (error) {
         console.error('[CAPTCHA] ERR_SECURE_SESSION_INIT_FAILURE:', error);
@@ -315,31 +312,22 @@ async function onSuccessCallback(token) {
     const cookies = document.cookie.split(';');
     let targetPath = null;
     
-    console.log('[PROTECT] All cookies:', document.cookie);
-    
     for (const cookie of cookies) {
         const [name, value] = cookie.trim().split('=');
-        console.log('[PROTECT] Cookie:', name, '=', value);
         if (name === 'target_path' && value) {
             targetPath = decodeURIComponent(value);
-            console.log('[PROTECT] Found target_path:', targetPath);
         }
     }
     
     let redirectUrl = '/';
     if (targetPath) {
         redirectUrl = targetPath;
-        console.log('[PROTECT] Using target_path for redirect:', redirectUrl);
     } else {
         const urlParams = new URLSearchParams(window.location.search);
         redirectUrl = (urlParams.get('redirect') || '/').trim();
-        console.log('[PROTECT] Using redirect parameter:', redirectUrl);
     }
     
-    console.log('[PROTECT] Final redirect URL:', redirectUrl);
-    
     setTimeout(() => {
-        console.log('[PROTECT] Executing redirect to:', redirectUrl);
         safeRedirect(redirectUrl);
     }, 1000);
 }

@@ -21,7 +21,8 @@ export default function robots(): MetadataRoute.Robots {
           '/admin/',
           '/ui/',
           '/error/',
-          '/support/help'
+          '/support/help',
+          '/ui/panel/'
         ],
       },
       {

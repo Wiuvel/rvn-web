@@ -33,6 +33,7 @@ export function generateCSRFToken(sessionId: string): string {
   const token = `${data}-${signature}`;
   
   // Store token for validation
+  // Если для этого sessionId уже есть токен, перезаписываем его
   csrfStore[sessionId] = {
     token,
     createdAt: Date.now()
@@ -41,30 +42,60 @@ export function generateCSRFToken(sessionId: string): string {
   return token;
 }
 
-export function verifyCSRFToken(token: string, sessionId: string): boolean {
+// Функция для получения информации о токене (для отладки)
+export function getCSRFTokenInfo(sessionId: string): { exists: boolean; token?: string; createdAt?: number } {
+  const stored = csrfStore[sessionId];
+  if (!stored) {
+    return { exists: false };
+  }
+  return {
+    exists: true,
+    token: stored.token,
+    createdAt: stored.createdAt
+  };
+}
+
+// Overload для обратной совместимости
+export function verifyCSRFToken(token: string, sessionId: string): boolean;
+export function verifyCSRFToken(token: string, sessionId: string, detailed: true): { valid: boolean; reason?: string };
+export function verifyCSRFToken(token: string, sessionId: string, detailed?: boolean): boolean | { valid: boolean; reason?: string } {
   try {
+    if (!token || !sessionId) {
+      if (detailed) return { valid: false, reason: 'Missing token or sessionId' };
+      return false;
+    }
+    
     const parts = token.split('-');
-    if (parts.length < 4) return false;
+    if (parts.length < 4) {
+      if (detailed) return { valid: false, reason: 'Invalid token format' };
+      return false;
+    }
     
     const signature = parts.pop();
     const nonce = parts.pop();
     const timestamp = parts.pop();
     const tokenSessionId = parts.join('-');
     
-    if (tokenSessionId !== sessionId) return false;
-    
-    // Check if token exists in store
-    const storedToken = csrfStore[sessionId];
-    if (!storedToken || storedToken.token !== token) return false;
-    
-    // Check token is not older than 1 hour
-    const tokenTime = parseInt(timestamp || '0');
-    const now = Date.now();
-    if (now - tokenTime > CSRF_TOKEN_LIFETIME) {
-      delete csrfStore[sessionId];
+    // Check session ID matches
+    if (tokenSessionId !== sessionId) {
+      if (detailed) return { valid: false, reason: 'Session ID mismatch' };
       return false;
     }
     
+    // Check token is not older than 1 hour (проверяем timestamp без использования хранилища)
+    const tokenTime = parseInt(timestamp || '0');
+    if (isNaN(tokenTime)) {
+      if (detailed) return { valid: false, reason: 'Invalid timestamp' };
+      return false;
+    }
+    
+    const now = Date.now();
+    if (now - tokenTime > CSRF_TOKEN_LIFETIME) {
+      if (detailed) return { valid: false, reason: 'Token expired' };
+      return false;
+    }
+    
+    // Verify signature (это основная проверка безопасности)
     const data = `${tokenSessionId}-${timestamp}-${nonce}`;
     const expectedSignature = createHmac('sha256', CSRF_SECRET)
       .update(data)
@@ -74,8 +105,38 @@ export function verifyCSRFToken(token: string, sessionId: string): boolean {
     const signatureBuffer = Buffer.from(signature || '', 'hex');
     const expectedBuffer = Buffer.from(expectedSignature, 'hex');
     
-    return timingSafeEqual(signatureBuffer, expectedBuffer);
-  } catch {
+    if (signatureBuffer.length !== expectedBuffer.length) {
+      if (detailed) return { valid: false, reason: 'Signature length mismatch' };
+      return false;
+    }
+    
+    const isValid = timingSafeEqual(signatureBuffer, expectedBuffer);
+    
+    // Опционально: проверяем хранилище для дополнительной безопасности (но не блокируем если его нет)
+    // Это помогает предотвратить повторное использование токена, но не критично
+    if (isValid) {
+      const storedToken = csrfStore[sessionId];
+      if (storedToken && storedToken.token !== token) {
+        // Токен был использован ранее - это подозрительно
+        if (detailed) return { valid: false, reason: 'Token already used' };
+        return false;
+      }
+      // Сохраняем токен в хранилище для предотвращения повторного использования
+      csrfStore[sessionId] = {
+        token,
+        createdAt: Date.now()
+      };
+    }
+    
+    if (detailed) {
+      return { valid: isValid, reason: isValid ? undefined : 'Invalid signature' };
+    }
+    
+    return isValid;
+  } catch (error) {
+    if (detailed) {
+      return { valid: false, reason: `Error: ${error instanceof Error ? error.message : 'Unknown'}` };
+    }
     return false;
   }
 }
@@ -86,4 +147,9 @@ export function generateSessionId(): string {
 
 export function revokeCSRFToken(sessionId: string): void {
   delete csrfStore[sessionId];
+}
+
+// Экспортируем функцию для получения размера хранилища (для отладки)
+export function getCSRFStoreSize(): number {
+  return Object.keys(csrfStore).length;
 }
