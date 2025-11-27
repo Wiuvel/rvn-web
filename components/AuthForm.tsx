@@ -24,7 +24,11 @@ declare global {
   }
 }
 
-export default function AuthForm() {
+interface AuthFormProps {
+  retpatch?: string;
+}
+
+export default function AuthForm({ retpatch = '/dashboard/' }: AuthFormProps) {
   const [currentTab, setCurrentTab] = useState<'login' | 'register'>('login');
   const [isLoading, setIsLoading] = useState(false);
   const [registerData, setRegisterData] = useState({
@@ -271,8 +275,14 @@ export default function AuthForm() {
       });
       const data = await response.json();
       if (response.ok) {
-        // Перенаправляем на dashboard с токеном
-        window.location.href = `/dashboard/${data.dashboard_token}`;
+        // Перенаправляем с учетом retpatch
+        if (retpatch && retpatch !== '/dashboard/') {
+          // Если retpatch указан и это не дефолтный путь, используем его
+          window.location.href = retpatch;
+        } else {
+          // По умолчанию - dashboard с токеном
+          window.location.href = `/dashboard/${data.dashboard_token}`;
+        }
       } else {
         setLoginAttemptState('error');
         const translatedError = translateError(data.error || 'Ошибка входа');

@@ -638,7 +638,7 @@ export default function SupportPage() {
     
     // Если есть текст сообщения, создаем тикет с первым сообщением
     if (!messageText.trim()) {
-      showNotification('Введите сообщение для тикета');
+      showNotification('Введите сообщение для обращения');
       return;
     }
     
@@ -748,9 +748,9 @@ export default function SupportPage() {
         setNewTicketSubject('');
         setMessageText('');
         setShowNewTicketForm(false);
-        showNotification('Тикет создан');
+        showNotification('Обращение создано');
       } else {
-        const errorMessage = data.error || 'Ошибка создания тикета';
+        const errorMessage = data.error || 'Ошибка создания обращения';
         showNotification(translateError(errorMessage));
         if (data.error && (data.error.toLowerCase().includes('limit') || data.error.toLowerCase().includes('лимит'))) {
           triggerShake('subject');
@@ -763,7 +763,7 @@ export default function SupportPage() {
         return;
       }
       console.error('Error creating ticket:', error);
-      showNotification('Ошибка создания тикета');
+      showNotification('Ошибка создания обращения');
     } finally {
       // Сбрасываем флаг создания тикета в любом случае
       setIsCreatingTicket(false);
@@ -898,7 +898,7 @@ export default function SupportPage() {
           messages: []
         })));
       } else {
-        const errorMessage = data.error || 'Ошибка загрузки тикетов';
+        const errorMessage = data.error || 'Ошибка загрузки обращений';
         showNotification(translateError(errorMessage));
       }
     } catch (error) {
@@ -908,7 +908,7 @@ export default function SupportPage() {
         return;
       }
       console.error('Error fetching tickets:', error);
-      showNotification('Ошибка загрузки тикетов');
+      showNotification('Ошибка загрузки обращений');
     } finally {
       setTicketsLoading(false);
     }
@@ -1019,9 +1019,41 @@ export default function SupportPage() {
   }
 
   if (!userData) {
+    // Показываем заглушку с предложением авторизации
     return (
-      <div className="min-h-screen flex items-center justify-center bg-neutral-950">
-        <div className="spinner"></div>
+      <div className="min-h-screen bg-neutral-950 text-neutral-100 flex items-center justify-center py-8 px-4">
+        <div className="max-w-md w-full mx-auto text-center">
+          <h1 className="text-xl sm:text-2xl font-semibold mb-4 sm:mb-6 text-white">Требуется авторизация</h1>
+          <p className="text-sm sm:text-base text-neutral-400 mb-6 sm:mb-8 px-2">
+            Не можете войти в аккаунт? Проблемы с оплатой? Мы также предоставляем поддержку в Telegram.
+          </p>
+          <div className="flex flex-col gap-3">
+            <a
+              href="https://t.me/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3 bg-neutral-800/60 hover:bg-neutral-700/60 border border-white/10 rounded-xl text-white transition-colors text-sm sm:text-base"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M9.999 15.17l-.394 5.556c.562 0 .805-.241 1.099-.529l2.635-2.516 5.461 4.043c1.001.551 1.716.264 1.96-.924l3.555-16.725c.314-1.46-.527-2.03-1.49-1.675L1.51 9.043c-1.438.56-1.416 1.364-.245 1.733l5.688 1.769L18.631 5.59c.6-.394 1.149-.176.698.217"/>
+              </svg>
+              <span>Телеграм</span>
+            </a>
+            <Link
+              href={`/auth?retpatch=${encodeURIComponent('/support/')}`}
+              className="flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3 bg-primary-500 hover:bg-primary-400 rounded-xl text-white transition-colors text-sm sm:text-base"
+            >
+              <Image 
+                src="/static/icons/accounts/log-in.svg" 
+                alt="Авторизация" 
+                width={18} 
+                height={18} 
+                className="w-[18px] h-[18px] flex-shrink-0"
+              />
+              <span>Авторизация</span>
+            </Link>
+          </div>
+        </div>
       </div>
     );
   }
@@ -1038,7 +1070,7 @@ export default function SupportPage() {
             </Link>
             <nav className="hidden lg:flex items-center gap-8 text-sm text-neutral-300">
               <Link href="/" className="hover:text-white transition">Главная</Link>
-              <Link href="/auth/" className="hover:text-white transition">Профиль</Link>
+              <Link href="/auth" className="hover:text-white transition">Профиль</Link>
             </nav>
             {userData && (
               <div className="hidden lg:flex items-center gap-2 relative" ref={userMenuRef}>
@@ -1225,13 +1257,13 @@ export default function SupportPage() {
                   <button
                     onClick={() => {
                       if (tickets.length >= MAX_TICKETS_PER_USER) {
-                        alert('Вы можете создать максимум 2 тикета. Закройте один из существующих тикетов, чтобы создать новый.');
+                        alert('Вы можете создать максимум 2 активных обращения');
                         return;
                       }
                       setShowNewTicketForm(!showNewTicketForm);
                     }}
                     disabled={tickets.length >= MAX_TICKETS_PER_USER || isSupport}
-                    className="px-3 py-1.5 bg-primary-500 hover:bg-primary-400 disabled:bg-neutral-700 disabled:text-neutral-500 disabled:cursor-not-allowed text-white text-sm rounded-lg transition-colors"
+                    className="px-3 py-1.5 bg-primary-500 hover:bg-primary-400 disabled:bg-neutral-700 disabled:text-neutral-500 text-white text-sm rounded-lg transition-colors"
                     title={isSupport ? 'Создание тикетов недоступно для сотрудников поддержки' : ''}
                   >
                     + Новый
@@ -1299,7 +1331,7 @@ export default function SupportPage() {
                       <button
                         onClick={handleCreateTicket}
                         disabled={!newTicketSubject.trim() || !messageText.trim() || isCreatingTicket}
-                        className="flex-1 px-3 py-1.5 bg-primary-500 hover:bg-primary-400 disabled:bg-neutral-700 disabled:text-neutral-500 disabled:cursor-not-allowed text-white text-sm rounded-lg transition-colors"
+                        className="flex-1 px-3 py-1.5 bg-primary-500 hover:bg-primary-400 disabled:bg-neutral-700 disabled:text-neutral-500 text-white text-sm rounded-lg transition-colors"
                       >
                         {isCreatingTicket ? 'Создание...' : 'Создать'}
                       </button>
@@ -1462,7 +1494,7 @@ export default function SupportPage() {
                             onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
                             placeholder={timeoutSeconds > 0 ? "Ожидание.." : "Напишите сообщение..."}
                             disabled={timeoutSeconds > 0}
-                            className="w-full min-w-0 px-3 py-2 sm:px-4 text-sm sm:text-base bg-neutral-800 border border-white/10 rounded-xl text-white focus:outline-none focus:border-primary-500 disabled:opacity-50 disabled:cursor-not-allowed pr-10"
+                            className="w-full min-w-0 px-3 py-2 sm:px-4 text-sm sm:text-base bg-neutral-800 border border-white/10 rounded-xl text-white focus:outline-none focus:border-primary-500 disabled:opacity-50 pr-10"
                           />
                           {timeoutSeconds === 0 && (
                             <div className="absolute bottom-1 right-3 text-[10px] text-neutral-500">
@@ -1481,7 +1513,7 @@ export default function SupportPage() {
                         <button
                           onClick={handleSendMessage}
                           disabled={!messageText.trim() || timeoutSeconds > 0}
-                          className="px-4 sm:px-6 py-2 bg-primary-500 hover:bg-primary-400 disabled:bg-neutral-700 disabled:cursor-not-allowed text-white rounded-xl transition-colors text-sm sm:text-base"
+                          className="px-4 sm:px-6 py-2 bg-primary-500 hover:bg-primary-400 disabled:bg-neutral-700 text-white rounded-xl transition-colors text-sm sm:text-base"
                         >
                           Отправить
                         </button>

@@ -1010,7 +1010,7 @@ export default function AdminPanel() {
                     <button
                       onClick={handleBanSubmit}
                       disabled={banLoading || !banReason.trim() || (typeof banDuration === 'number' && banDuration < 1)}
-                      className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-600/50 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
+                      className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-600/50 text-white rounded-lg transition-colors"
                     >
                       {banLoading ? 'Загрузка...' : 'Блокировать'}
                     </button>
@@ -1072,7 +1072,7 @@ export default function AdminPanel() {
                               <button
                                 onClick={() => handleRevokeRole(role as 'support' | 'admin')}
                                 disabled={roleActionLoading !== null}
-                                className="hover:text-red-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                className="hover:text-red-400 disabled:opacity-50 transition-colors"
                                 title="Удалить роль"
                               >
                                 {roleActionLoading === `revoke-${role}` ? (
@@ -1091,7 +1091,7 @@ export default function AdminPanel() {
                           <button
                             onClick={() => setShowAddRoleMenu(!showAddRoleMenu)}
                             disabled={roleActionLoading !== null}
-                            className="w-6 h-6 flex items-center justify-center bg-blue-600 hover:bg-blue-700 disabled:bg-blue-600/50 disabled:cursor-not-allowed text-white rounded transition-colors text-sm"
+                            className="w-6 h-6 flex items-center justify-center bg-blue-600 hover:bg-blue-700 disabled:bg-blue-600/50 text-white rounded transition-colors text-sm"
                             title="Добавить роль"
                           >
                             +
@@ -1105,7 +1105,7 @@ export default function AdminPanel() {
                                     setShowAddRoleMenu(false);
                                   }}
                                   disabled={roleActionLoading !== null}
-                                  className="w-full px-3 py-2 text-left text-sm text-white hover:bg-neutral-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                  className="w-full px-3 py-2 text-left text-sm text-white hover:bg-neutral-700 disabled:opacity-50 flex items-center gap-2"
                                 >
                                   {roleActionLoading === 'grant-support' && (
                                     <div className="spinner" style={{ width: '12px', height: '12px' }}></div>
@@ -1120,7 +1120,7 @@ export default function AdminPanel() {
                                     setShowAddRoleMenu(false);
                                   }}
                                   disabled={roleActionLoading !== null}
-                                  className="w-full px-3 py-2 text-left text-sm text-white hover:bg-neutral-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                  className="w-full px-3 py-2 text-left text-sm text-white hover:bg-neutral-700 disabled:opacity-50 flex items-center gap-2"
                                 >
                                   {roleActionLoading === 'grant-admin' && (
                                     <div className="spinner" style={{ width: '12px', height: '12px' }}></div>

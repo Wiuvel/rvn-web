@@ -7,10 +7,8 @@ const nextConfig: NextConfig = {
   assetPrefix: process.env.NODE_ENV === 'production' ? '' : '',
   trailingSlash: false,
   outputFileTracingRoot: process.cwd(),
-  allowedDevOrigins: ['192.168.1.66'],
   devIndicators: {
-    buildActivity: true,
-    buildActivityPosition: 'bottom-left',
+    position: 'top-right',
   },
 };
 

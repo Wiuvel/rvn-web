@@ -228,6 +228,7 @@ export default function SupportPanel() {
   const [closeReason, setCloseReason] = useState('');
   const [ticketToClose, setTicketToClose] = useState<string | null>(null);
   const [archiveSearchQuery, setArchiveSearchQuery] = useState(''); // Поисковый запрос для архива
+  const [activeSearchQuery, setActiveSearchQuery] = useState(''); // Поисковый запрос для активных тикетов
   const [rightPanelCollapsed, setRightPanelCollapsed] = useState(() => {
     // На мобильных устройствах панель свернута по умолчанию
     if (typeof window !== 'undefined') {
@@ -266,6 +267,63 @@ export default function SupportPanel() {
     }
   }, [rightPanelCollapsed]);
   const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
+  const [shouldRenderMobileActions, setShouldRenderMobileActions] = useState(false);
+  const mobileActionsRef = useRef<HTMLDivElement>(null);
+  
+  // Анимация мобильного меню действий
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    if (mobileActionsOpen && activeTicket) {
+      // Если меню должно быть открыто, начинаем рендеринг
+      if (!shouldRenderMobileActions) {
+        setShouldRenderMobileActions(true);
+      }
+      
+      requestAnimationFrame(() => {
+        if (mobileActionsRef.current) {
+          // Убиваем любые активные анимации на элементе
+          gsap.killTweensOf(mobileActionsRef.current);
+          
+          gsap.set(mobileActionsRef.current, {
+            opacity: 0,
+            y: -10,
+            scale: 0.95
+          });
+          gsap.to(mobileActionsRef.current, {
+            opacity: 1,
+            y: 0,
+            scale: 1,
+            duration: 0.2,
+            ease: GSAP_DEFAULT_EASE
+          });
+        }
+      });
+    } else {
+      // Если меню должно быть закрыто и оно рендерится - запускаем анимацию закрытия
+      if (shouldRenderMobileActions) {
+        if (mobileActionsRef.current) {
+          // Убиваем любые активные анимации на элементе
+          gsap.killTweensOf(mobileActionsRef.current);
+          
+          gsap.to(mobileActionsRef.current, {
+            opacity: 0,
+            y: -10,
+            scale: 0.95,
+            duration: 0.15,
+            ease: "power2.in",
+            onComplete: () => {
+              setShouldRenderMobileActions(false);
+            }
+          });
+        } else {
+          // Если элемент еще не создан, просто закрываем
+          setShouldRenderMobileActions(false);
+        }
+      }
+    }
+  }, [mobileActionsOpen, activeTicket, shouldRenderMobileActions]);
+  
   // Очередь запросов вместо одного callback - исправляет race condition
   const pendingRequestsQueueRef = useRef<Array<() => Promise<void>>>([]);
   const isProcessingCaptchaRef = useRef(false); // Флаг обработки капчи - предотвращает повторные открытия
@@ -1103,6 +1161,12 @@ export default function SupportPanel() {
     try {
       const currentTicket = tickets.find(t => t.id === ticketId) || activeTicket;
       
+      // Архивные тикеты (closed, resolved) не могут быть закреплены/отвязаны
+      if (currentTicket && (currentTicket.status === 'closed' || currentTicket.status === 'resolved')) {
+        showNotification('Архивные тикеты не могут быть закреплены или отвязаны', 'error');
+        return;
+      }
+      
       // Если тикет уже взят текущим саппортом - отвязываем его
       if (currentTicket?.assigned_to === userId) {
         const response = await fetchWithRateLimit(
@@ -1226,6 +1290,13 @@ export default function SupportPanel() {
 
   const handleUpdateTicketStatus = async (ticketId: string, status: string, closeReason?: string) => {
     try {
+      // Проверяем, не является ли текущий тикет архивным
+      const currentTicket = tickets.find(t => t.id === ticketId) || activeTicket;
+      if (currentTicket && (currentTicket.status === 'closed' || currentTicket.status === 'resolved')) {
+        showNotification('Статус архивных тикетов нельзя изменить', 'error');
+        return;
+      }
+      
       const response = await fetchWithRateLimit(
         `/api/support/tickets/${ticketId}`,
         {
@@ -1410,6 +1481,7 @@ export default function SupportPanel() {
     return '';
   };
 
+  // Получить цвет индикатора для тикета (желтый или красный)
   // Получить текст индикатора давности
   const getTicketUrgencyText = (ticket: Ticket): string => {
     if (statusFilter === 'archive') return '';
@@ -1446,19 +1518,22 @@ export default function SupportPanel() {
     return '';
   };
 
-  // Фильтруем тикеты по поисковому запросу (только для архива)
-  const filteredTickets = statusFilter === 'archive' && archiveSearchQuery.trim()
-    ? tickets.filter((ticket) => {
-        const query = archiveSearchQuery.trim().toLowerCase();
-        // Поиск по ID тикета
-        const matchesId = ticket.id.toLowerCase().includes(query);
-        // Поиск по логину пользователя
-        const matchesUsername = ticket.user?.username?.toLowerCase().includes(query) || false;
-        // Поиск по user_id пользователя
-        const matchesUserId = ticket.user?.user_id?.toLowerCase().includes(query) || false;
-        return matchesId || matchesUsername || matchesUserId;
-      })
-    : tickets;
+  // Фильтруем тикеты по поисковому запросу (для архива и активных)
+  const filteredTickets = (() => {
+    const searchQuery = statusFilter === 'archive' ? archiveSearchQuery : activeSearchQuery;
+    if (!searchQuery.trim()) return tickets;
+    
+    const query = searchQuery.trim().toLowerCase();
+    return tickets.filter((ticket) => {
+      // Поиск по ID тикета
+      const matchesId = ticket.id.toLowerCase().includes(query);
+      // Поиск по логину пользователя
+      const matchesUsername = ticket.user?.username?.toLowerCase().includes(query) || false;
+      // Поиск по user_id пользователя
+      const matchesUserId = ticket.user?.user_id?.toLowerCase().includes(query) || false;
+      return matchesId || matchesUsername || matchesUserId;
+    });
+  })();
 
   if (loading) {
     return <LoadingSpinner />;
@@ -1499,7 +1574,7 @@ export default function SupportPanel() {
       {notification.show && (
         <div 
           ref={notificationRef}
-          className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-3 rounded-lg shadow-lg bg-red-500/20 text-red-400 border border-red-500/30"
+          className="hidden lg:block fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-3 rounded-lg shadow-lg bg-red-500/20 text-red-400 border border-red-500/30"
         >
           {notification.message}
         </div>
@@ -1539,6 +1614,7 @@ export default function SupportPanel() {
                 setTickets([]); // Очищаем список для устранения глитча
                 currentTicketIdRef.current = null;
                 setArchiveSearchQuery(''); // Очищаем поиск при переключении
+                setActiveSearchQuery(''); // Очищаем поиск активных при переключении
                 // Отменяем текущие запросы
                 if (fetchTicketsAbortControllerRef.current) {
                   fetchTicketsAbortControllerRef.current.abort();
@@ -1574,6 +1650,7 @@ export default function SupportPanel() {
                   fetchTicketsAbortControllerRef.current.abort();
                 }
                 setStatusFilter('archive');
+                setActiveSearchQuery(''); // Очищаем поиск активных при переключении
                 // Разблокируем после небольшой задержки, чтобы дать время useEffect сработать
                 setTimeout(() => {
                   setIsFilterChanging(false);
@@ -1620,6 +1697,37 @@ export default function SupportPanel() {
               )}
             </div>
           )}
+          
+          {/* Поиск в активных тикетах */}
+          {statusFilter === 'active' && (
+            <div className="relative">
+              <input
+                type="text"
+                value={activeSearchQuery}
+                onChange={(e) => setActiveSearchQuery(e.target.value)}
+                placeholder="Поиск по логину или ID"
+                className="w-full px-3 py-2 pl-10 bg-neutral-800 border border-neutral-700 rounded-lg text-sm text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+              <svg 
+                className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-neutral-500" 
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              {activeSearchQuery && (
+                <button
+                  onClick={() => setActiveSearchQuery('')}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-neutral-500 hover:text-white transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Tickets List */}
@@ -1648,7 +1756,7 @@ export default function SupportPanel() {
               </div>
             )
           ) : filteredTickets.length === 0 ? (
-            archiveSearchQuery.trim() ? (
+            (statusFilter === 'archive' ? archiveSearchQuery.trim() : activeSearchQuery.trim()) ? (
               <div className="text-center py-8 text-neutral-400 text-sm">
                 Ничего не найдено
               </div>
@@ -1668,9 +1776,11 @@ export default function SupportPanel() {
                   key={ticket.id}
                   onClick={() => {
                     if (ticketsLoading) return; // Блокируем только во время загрузки
-                    // Проверяем, не занят ли тикет другим саппортом
-                    if (ticket.assigned_to && ticket.assigned_to !== authState.userId) {
-                      showNotification('Тикет уже закреплен за другим', 'error');
+                    // Для архивных тикетов (closed, resolved) не проверяем привязку - они доступны всем саппортам
+                    const isArchived = ticket.status === 'closed' || ticket.status === 'resolved';
+                    // Проверяем, не занят ли тикет другим саппортом (только для активных тикетов)
+                    if (!isArchived && ticket.assigned_to && ticket.assigned_to !== authState.userId) {
+                      showNotification('Данный тикет уже закреплен за другим саппортом', 'error');
                       return;
                     }
                     currentTicketIdRef.current = ticket.id;
@@ -1681,16 +1791,24 @@ export default function SupportPanel() {
                     }
                   }}
                   className={`p-4 rounded-lg border transition-all ${
-                    ticket.assigned_to && ticket.assigned_to !== authState.userId
-                      ? 'cursor-not-allowed opacity-50'
-                      : 'cursor-pointer'
+                    // Для архивных тикетов не блокируем, для активных - только если назначен другому
+                    (ticket.status === 'closed' || ticket.status === 'resolved') || 
+                    !(ticket.assigned_to && ticket.assigned_to !== authState.userId)
+                      ? 'cursor-pointer'
+                      : ''
                   } ${
                     activeTicket?.id === ticket.id
                       ? 'bg-blue-500/10 border-blue-500/50 shadow-lg'
                       : `bg-neutral-800/50 border-neutral-700 hover:bg-neutral-800 hover:border-neutral-600 ${urgencyColor}`
                   }`}
                 >
-                  <div className="flex items-start justify-between mb-2">
+                  <div className={`flex items-start justify-between mb-2 ${
+                    // Применяем opacity только к заголовку и статусу, если тикет назначен другому
+                    (ticket.status !== 'closed' && ticket.status !== 'resolved') && 
+                    ticket.assigned_to && ticket.assigned_to !== authState.userId
+                      ? 'opacity-50'
+                      : ''
+                  }`}>
                     <h3 className="text-sm font-medium text-white line-clamp-1 flex-1">
                       {ticket.subject}
                     </h3>
@@ -1701,13 +1819,25 @@ export default function SupportPanel() {
                     </span>
                   </div>
                   {ticket.user && (
-                    <div className="flex items-baseline gap-1 mb-1">
+                    <div className={`flex items-baseline gap-1 mb-1 ${
+                      // Применяем opacity к информации о пользователе, если тикет назначен другому
+                      (ticket.status !== 'closed' && ticket.status !== 'resolved') && 
+                      ticket.assigned_to && ticket.assigned_to !== authState.userId
+                        ? 'opacity-50'
+                        : ''
+                    }`}>
                       <span className="text-xs font-medium text-white">{ticket.user.username}</span>
                       <span className="text-xs text-neutral-400">#{ticket.user.user_id}</span>
                     </div>
                   )}
                   <div className="flex items-center justify-between">
-                    <p className="text-xs text-neutral-500">
+                    <p className={`text-xs text-neutral-500 ${
+                      // Применяем opacity к дате, если тикет назначен другому
+                      (ticket.status !== 'closed' && ticket.status !== 'resolved') && 
+                      ticket.assigned_to && ticket.assigned_to !== authState.userId
+                        ? 'opacity-50'
+                        : ''
+                    }`}>
                       {formatDate(ticket.last_message_at)}
                     </p>
                     <div className="flex items-center gap-2">
@@ -1760,8 +1890,8 @@ export default function SupportPanel() {
             )}
           </div>
           {/* Мобильное меню действий */}
-          {activeTicket && mobileActionsOpen && (
-            <div className="lg:hidden mt-4 p-4 bg-neutral-800 rounded-lg border border-neutral-700">
+          {activeTicket && shouldRenderMobileActions && (
+            <div ref={mobileActionsRef} className="lg:hidden mt-4 p-4 bg-neutral-800 rounded-lg border border-neutral-700">
               <div className="flex flex-col gap-2">
                 {(activeTicket.status === 'open' || activeTicket.status === 'pending') && (
                   <>
@@ -1791,19 +1921,26 @@ export default function SupportPanel() {
                     </button>
                   </>
                 )}
-                <select
-                  value={activeTicket.status}
-                  onChange={(e) => {
-                    handleUpdateTicketStatus(activeTicket.id, e.target.value);
-                    setMobileActionsOpen(false);
-                  }}
-                  className="w-full px-3 py-2 bg-neutral-700 border border-neutral-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500"
-                >
-                  <option value="open">Открыт</option>
-                  <option value="pending">В работе</option>
-                  <option value="resolved">Решен</option>
-                  <option value="closed">Закрыт</option>
-                </select>
+                {/* Селект статуса доступен только для активных тикетов */}
+                {(activeTicket.status === 'open' || activeTicket.status === 'pending') ? (
+                  <select
+                    value={activeTicket.status}
+                    onChange={(e) => {
+                      handleUpdateTicketStatus(activeTicket.id, e.target.value);
+                      setMobileActionsOpen(false);
+                    }}
+                    className="w-full px-3 py-2 bg-neutral-700 border border-neutral-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500"
+                  >
+                    <option value="open">Открыт</option>
+                    <option value="pending">В работе</option>
+                    <option value="resolved">Решен</option>
+                    <option value="closed">Закрыт</option>
+                  </select>
+                ) : (
+                  <div className="w-full px-3 py-2 bg-neutral-700 border border-neutral-600 rounded-lg text-white text-sm">
+                    {activeTicket.status === 'closed' ? 'Закрыт' : 'Решен'}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -1828,13 +1965,13 @@ export default function SupportPanel() {
                     </div>
                   </div>
                   <div className="flex gap-2 flex-wrap">
-                    <button className="px-3 py-1.5 text-xs bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded-lg transition-colors border border-neutral-700">
+                    <button className="px-2 sm:px-3 py-1 sm:py-1.5 text-[10px] sm:text-xs bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded-lg transition-colors border border-neutral-700">
                       Заблокировать создание тикетов
                     </button>
-                    <button className="px-3 py-1.5 text-xs bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded-lg transition-colors border border-neutral-700">
+                    <button className="px-2 sm:px-3 py-1 sm:py-1.5 text-[10px] sm:text-xs bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded-lg transition-colors border border-neutral-700">
                       Продлить подписку
                     </button>
-                    <button className="px-3 py-1.5 text-xs bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded-lg transition-colors border border-neutral-700">
+                    <button className="px-2 sm:px-3 py-1 sm:py-1.5 text-[10px] sm:text-xs bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded-lg transition-colors border border-neutral-700">
                       Добавить
                     </button>
                   </div>
@@ -1922,6 +2059,7 @@ export default function SupportPanel() {
                 {/* Input */}
                 {activeTicket.status !== 'closed' && activeTicket.status !== 'resolved' && (
                   <>
+                    {/* Для активных тикетов проверяем привязку, для архивных - не проверяем */}
                     {activeTicket.assigned_to && activeTicket.assigned_to !== authState.userId ? (
                       <div className="border-t border-neutral-800 p-3 bg-neutral-900/50 flex-shrink-0">
                         <div className="text-center py-2">
@@ -1947,7 +2085,7 @@ export default function SupportPanel() {
                           <button
                             onClick={handleSendMessage}
                             disabled={!messageText.trim()}
-                            className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-neutral-700 disabled:cursor-not-allowed text-white rounded-lg transition-colors font-medium text-sm sm:text-base"
+                            className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-neutral-700 text-white rounded-lg transition-colors font-medium text-sm sm:text-base"
                           >
                             Отправить
                           </button>
@@ -2052,7 +2190,7 @@ export default function SupportPanel() {
                       disabled={activeTicket.assigned_to !== authState.userId || activeTicket.status !== 'pending'}
                       className={`w-full px-4 py-2 text-white text-sm rounded-lg transition-colors font-medium ${
                         activeTicket.assigned_to !== authState.userId || activeTicket.status !== 'pending'
-                          ? 'bg-neutral-700 cursor-not-allowed opacity-50'
+                          ? 'bg-neutral-700 opacity-50'
                           : 'bg-red-600 hover:bg-red-700'
                       }`}
                     >
@@ -2060,23 +2198,37 @@ export default function SupportPanel() {
                     </button>
                   </>
                 )}
-                <div className="mt-3 bg-neutral-800 border border-neutral-700 rounded-lg overflow-hidden">
-                  <div className="px-3 py-2 border-b border-neutral-700">
-                    <span className="text-xs text-neutral-400">Укажите статус:</span>
+                {/* Селект статуса доступен только для активных тикетов */}
+                {(activeTicket.status === 'open' || activeTicket.status === 'pending') && (
+                  <div className="mt-3 bg-neutral-800 border border-neutral-700 rounded-lg overflow-hidden">
+                    <div className="px-3 py-2 border-b border-neutral-700">
+                      <span className="text-xs text-neutral-400">Укажите статус:</span>
+                    </div>
+                    <select
+                      value={activeTicket.status}
+                      onChange={(e) => {
+                        handleUpdateTicketStatus(activeTicket.id, e.target.value);
+                      }}
+                      className="w-full px-3 py-2 bg-transparent border-0 text-white text-sm focus:outline-none"
+                    >
+                      <option value="open" className="bg-neutral-800 text-white">Открыт</option>
+                      <option value="pending" className="bg-neutral-800 text-white">В работе</option>
+                      <option value="resolved" className="bg-neutral-800 text-white">Решен</option>
+                      <option value="closed" className="bg-neutral-800 text-white">Закрыт</option>
+                    </select>
                   </div>
-                  <select
-                    value={activeTicket.status}
-                    onChange={(e) => {
-                      handleUpdateTicketStatus(activeTicket.id, e.target.value);
-                    }}
-                    className="w-full px-3 py-2 bg-transparent border-0 text-white text-sm focus:outline-none"
-                  >
-                    <option value="open" className="bg-neutral-800 text-white">Открыт</option>
-                    <option value="pending" className="bg-neutral-800 text-white">В работе</option>
-                    <option value="resolved" className="bg-neutral-800 text-white">Решен</option>
-                    <option value="closed" className="bg-neutral-800 text-white">Закрыт</option>
-                  </select>
-                </div>
+                )}
+                {/* Для архивных тикетов показываем только информацию о статусе */}
+                {(activeTicket.status === 'closed' || activeTicket.status === 'resolved') && (
+                  <div className="mt-3 bg-neutral-800 border border-neutral-700 rounded-lg overflow-hidden">
+                    <div className="px-3 py-2 border-b border-neutral-700">
+                      <span className="text-xs text-neutral-400">Статус:</span>
+                    </div>
+                    <div className="px-3 py-2 text-white text-sm">
+                      {activeTicket.status === 'closed' ? 'Закрыт' : 'Решен'}
+                    </div>
+                  </div>
+                )}
               </>
             ) : (
               <>
@@ -2138,7 +2290,7 @@ export default function SupportPanel() {
               <button
                 onClick={handleConfirmCloseTicket}
                 disabled={!closeReason.trim()}
-                className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-neutral-700 disabled:text-neutral-500 disabled:cursor-not-allowed text-white rounded-lg transition-colors font-medium"
+                className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-neutral-700 disabled:text-neutral-500 text-white rounded-lg transition-colors font-medium"
               >
                 Закрыть
               </button>

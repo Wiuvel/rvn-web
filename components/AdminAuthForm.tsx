@@ -278,7 +278,7 @@ export default function AdminAuthForm({ onAuthSuccess }: AdminAuthFormProps) {
               <button
                 type="submit"
                 disabled={loading || isSubmitting}
-                className={`glass-btn w-full flex justify-center items-center py-3 px-4 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98] ${
+                className={`glass-btn w-full flex justify-center items-center py-3 px-4 text-sm font-medium disabled:opacity-50 transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98] ${
                   isSubmitting ? 'animate-pulse' : ''
                 }`}
               >
@@ -411,7 +411,7 @@ export default function AdminAuthForm({ onAuthSuccess }: AdminAuthFormProps) {
             <button
               type="submit"
               disabled={loading || isSubmitting}
-              className={`glass-btn w-full flex justify-center items-center gap-2 py-3 px-4 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98] ${
+              className={`glass-btn w-full flex justify-center items-center gap-2 py-3 px-4 text-sm font-medium disabled:opacity-50 transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98] ${
                 isSubmitting ? 'animate-pulse' : ''
               }`}
             >

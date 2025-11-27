@@ -48,9 +48,14 @@ function handleAuth(request: NextRequest, pathname: string): NextResponse | null
   const isAuthenticated = request.cookies.get('user_authenticated')?.value === 'true';
   const dashboardToken = request.cookies.get('dashboard_token')?.value;
 
-  // Проверка для /auth/ - если авторизован, редирект в dashboard
+  // Проверка для /auth/ - если авторизован, редирект с учетом retpatch
   if (pathname === '/auth' || pathname.startsWith('/auth/')) {
     if (isAuthenticated && dashboardToken) {
+      // Проверяем retpatch из URL
+      const retpatch = request.nextUrl.searchParams.get('retpatch');
+      if (retpatch) {
+        return NextResponse.redirect(new URL(retpatch, request.url));
+      }
       return NextResponse.redirect(new URL(`/dashboard/${dashboardToken}`, request.url));
     }
     return NextResponse.next();
@@ -59,7 +64,8 @@ function handleAuth(request: NextRequest, pathname: string): NextResponse | null
   // Проверка для /dashboard
   if (pathname.startsWith('/dashboard')) {
     if (!isAuthenticated || !dashboardToken) {
-      return NextResponse.redirect(new URL('/auth', request.url));
+      const retpatch = encodeURIComponent(pathname);
+      return NextResponse.redirect(new URL(`/auth?retpatch=${retpatch}`, request.url));
     }
     
     // Если зашли на /dashboard/ без токена, редиректим на /dashboard/{token}
@@ -69,7 +75,8 @@ function handleAuth(request: NextRequest, pathname: string): NextResponse | null
     
     const urlToken = pathname.split('/dashboard/')[1];
     if (urlToken && urlToken !== dashboardToken) {
-      return NextResponse.redirect(new URL('/auth', request.url));
+      const retpatch = encodeURIComponent(pathname);
+      return NextResponse.redirect(new URL(`/auth?retpatch=${retpatch}`, request.url));
     }
     
     return NextResponse.next();
@@ -77,13 +84,10 @@ function handleAuth(request: NextRequest, pathname: string): NextResponse | null
 
   // Проверка для /support
   if (pathname === '/support' || pathname.startsWith('/support/')) {
-    // /support/help доступна без авторизации
-    if (pathname === '/support/help' || pathname === '/support/help/') {
-      return NextResponse.next();
-    }
     // Остальные страницы /support требуют авторизации
     if (!isAuthenticated || !dashboardToken) {
-      return NextResponse.redirect(new URL('/support/help', request.url));
+      // Не редиректим, просто разрешаем доступ - заглушка будет показана на странице
+      return NextResponse.next();
     }
     return NextResponse.next();
   }
@@ -92,7 +96,8 @@ function handleAuth(request: NextRequest, pathname: string): NextResponse | null
   // Проверка роли будет выполнена на стороне клиента через API
   if (pathname.startsWith('/ui/panel/support')) {
     if (!isAuthenticated || !dashboardToken) {
-      return NextResponse.redirect(new URL('/auth', request.url));
+      const retpatch = encodeURIComponent(pathname);
+      return NextResponse.redirect(new URL(`/auth?retpatch=${retpatch}`, request.url));
     }
     return NextResponse.next();
   }

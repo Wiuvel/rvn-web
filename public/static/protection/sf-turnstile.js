@@ -300,36 +300,65 @@ async function onSuccessCallback(token) {
         return;
     }
     
-    if (!await setSecureCookie(token)) {
-        currentState = captchaStates.ERROR;
-        updateStatusText();
-        return;
-    }
-    
-    currentState = captchaStates.SUCCESS;
+    // Проверяем токен на сервере перед установкой cookie
+    currentState = captchaStates.VERIFYING;
     updateStatusText();
     
-    const cookies = document.cookie.split(';');
-    let targetPath = null;
-    
-    for (const cookie of cookies) {
-        const [name, value] = cookie.trim().split('=');
-        if (name === 'target_path' && value) {
-            targetPath = decodeURIComponent(value);
+    try {
+        const verifyResponse = await fetch('/api/protection/verify', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            credentials: 'include',
+            body: JSON.stringify({ captchaToken: token })
+        });
+        
+        const verifyData = await verifyResponse.json();
+        
+        if (!verifyResponse.ok || !verifyData.success) {
+            console.error('[PROTECT] Token verification failed:', verifyData.error || 'Unknown error');
+            currentState = captchaStates.ERROR;
+            updateStatusText();
+            return;
         }
+        
+        // Токен проверен успешно, устанавливаем cookie
+        if (!await setSecureCookie(token)) {
+            currentState = captchaStates.ERROR;
+            updateStatusText();
+            return;
+        }
+        
+        currentState = captchaStates.SUCCESS;
+        updateStatusText();
+        
+        const cookies = document.cookie.split(';');
+        let targetPath = null;
+        
+        for (const cookie of cookies) {
+            const [name, value] = cookie.trim().split('=');
+            if (name === 'target_path' && value) {
+                targetPath = decodeURIComponent(value);
+            }
+        }
+        
+        let redirectUrl = '/';
+        if (targetPath) {
+            redirectUrl = targetPath;
+        } else {
+            const urlParams = new URLSearchParams(window.location.search);
+            redirectUrl = (urlParams.get('redirect') || '/').trim();
+        }
+        
+        setTimeout(() => {
+            safeRedirect(redirectUrl);
+        }, 1000);
+    } catch (error) {
+        console.error('[PROTECT] Error verifying token:', error);
+        currentState = captchaStates.ERROR;
+        updateStatusText();
     }
-    
-    let redirectUrl = '/';
-    if (targetPath) {
-        redirectUrl = targetPath;
-    } else {
-        const urlParams = new URLSearchParams(window.location.search);
-        redirectUrl = (urlParams.get('redirect') || '/').trim();
-    }
-    
-    setTimeout(() => {
-        safeRedirect(redirectUrl);
-    }, 1000);
 }
 
 function onErrorCallback() {

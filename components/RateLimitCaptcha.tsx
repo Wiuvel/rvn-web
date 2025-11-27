@@ -220,7 +220,7 @@ export default function RateLimitCaptcha({ isOpen, onSuccess, onClose }: RateLim
             <button
               onClick={onClose}
               disabled={isVerifying}
-              className="w-full mt-4 px-4 py-2 text-sm text-neutral-400 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full mt-4 px-4 py-2 text-sm text-neutral-400 hover:text-white transition-colors disabled:opacity-50"
             >
               Отмена
             </button>

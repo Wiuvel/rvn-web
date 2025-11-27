@@ -1,6 +1,6 @@
 // Timeouts
 export const AUTH_FETCH_TIMEOUT = 10000; // 10 seconds
-export const MESSAGE_TIMEOUT = 60000; // 1 minute
+export const MESSAGE_TIMEOUT = 10000; // 10 seconds
 export const RATE_LIMIT_CLEANUP_INTERVAL = 5 * 60 * 1000; // 5 minutes
 export const SESSION_CLEANUP_INTERVAL = 5 * 60 * 1000; // 5 minutes
 export const SESSION_TIMEOUT = 60 * 60 * 1000; // 1 hour
