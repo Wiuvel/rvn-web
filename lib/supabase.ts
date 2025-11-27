@@ -50,6 +50,16 @@ if (typeof window === 'undefined') {
   } else {
     console.log('✅ Supabase Admin client initialized successfully');
   }
+  
+  // Проверка конфигурации Turnstile
+  const turnstileSecretKey = process.env.TURNSTILE_SECRET_KEY;
+  if (!turnstileSecretKey || turnstileSecretKey === '1x0000000000000000000000000000000AA') {
+    console.error('⚠️ Turnstile secret key not configured or using test key:');
+    console.error('  - TURNSTILE_SECRET_KEY environment variable is missing or invalid');
+    console.error('  - CAPTCHA verification will fail in production!');
+  } else {
+    console.log('✅ Turnstile secret key configured');
+  }
 }
 
 export interface Admin {
