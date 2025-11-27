@@ -11,9 +11,9 @@ interface UserMenuProps {
   userData: UserData;
   isOpen: boolean;
   onClose: () => void;
-  showProfile?: boolean; // Показывать ли ссылку "Профиль"
-  showUserId?: boolean; // Показывать ли ID пользователя (иначе "Пользователь")
-  menuRef?: React.RefObject<HTMLDivElement | null>; // Для клика вне меню
+  showProfile?: boolean;
+  showUserId?: boolean;
+  menuRef?: React.RefObject<HTMLDivElement | null>;
 }
 
 export function UserMenu({
@@ -27,7 +27,6 @@ export function UserMenu({
   const router = useRouter();
   const { shouldRender, menuRef: animatedMenuRef } = useMenuAnimation(isOpen);
   
-  // Синхронизируем external ref с animated ref для клика вне меню
   useEffect(() => {
     if (animatedMenuRef.current && externalMenuRef && 'current' in externalMenuRef) {
       (externalMenuRef as React.MutableRefObject<HTMLDivElement | null>).current = animatedMenuRef.current;
