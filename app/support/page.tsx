@@ -176,6 +176,7 @@ export default function SupportPage() {
   const subjectInputRef = useRef<HTMLInputElement>(null);
   const fetchingTicketIdRef = useRef<string | null>(null);
   const [showRateLimitCaptcha, setShowRateLimitCaptcha] = useState(false);
+  const isCaptchaOpenRef = useRef(false);
   const pendingRequestRef = useRef<(() => Promise<void>) | null>(null);
   const markReadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
@@ -194,7 +195,11 @@ export default function SupportPage() {
       if (retryCallback) {
         pendingRequestRef.current = retryCallback;
       }
-      setShowRateLimitCaptcha(true);
+      // Открываем модальное окно только если оно еще не открыто
+      if (!isCaptchaOpenRef.current) {
+        isCaptchaOpenRef.current = true;
+        setShowRateLimitCaptcha(true);
+      }
       throw new Error('RATE_LIMIT_EXCEEDED');
     }
     
@@ -202,6 +207,8 @@ export default function SupportPage() {
   };
 
   const handleRateLimitSuccess = async () => {
+    // Закрываем модальное окно и сбрасываем флаг
+    isCaptchaOpenRef.current = false;
     setShowRateLimitCaptcha(false);
     // Небольшая задержка, чтобы иммунитет успел примениться на сервере
     await new Promise(resolve => setTimeout(resolve, 500));
@@ -209,23 +216,18 @@ export default function SupportPage() {
     if (pendingRequestRef.current) {
       try {
         await pendingRequestRef.current();
+        // Если запрос успешен, очищаем callback
+        pendingRequestRef.current = null;
       } catch (error) {
-        // Если снова получили rate limit, не показываем капчу сразу (иммунитет должен работать)
+        // Если снова получили rate limit после иммунитета - это ошибка
+        // Не показываем капчу снова, просто логируем и очищаем callback
         if (error instanceof Error && error.message === 'RATE_LIMIT_EXCEEDED') {
-          // Ждем еще немного и пробуем снова
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          if (pendingRequestRef.current) {
-            try {
-              await pendingRequestRef.current();
-            } catch (retryError) {
-              console.error('Error retrying request after rate limit clear:', retryError);
-            }
-          }
+          console.error('Rate limit still active after CAPTCHA - immunity may not be working');
         } else {
           console.error('Error retrying request after rate limit clear:', error);
         }
+        pendingRequestRef.current = null;
       }
-      pendingRequestRef.current = null;
     }
   };
   
@@ -1486,6 +1488,7 @@ export default function SupportPage() {
         isOpen={showRateLimitCaptcha}
         onSuccess={handleRateLimitSuccess}
         onClose={() => {
+          isCaptchaOpenRef.current = false;
           setShowRateLimitCaptcha(false);
           pendingRequestRef.current = null;
         }}

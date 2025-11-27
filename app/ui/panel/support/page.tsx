@@ -209,6 +209,7 @@ export default function SupportPanel() {
   const [notification, setNotification] = useState<Notification>({ message: '', type: 'error', show: false });
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showRateLimitCaptcha, setShowRateLimitCaptcha] = useState(false);
+  const isCaptchaOpenRef = useRef(false);
   const [isFilterChanging, setIsFilterChanging] = useState(false);
   const [showCloseReasonModal, setShowCloseReasonModal] = useState(false);
   const [closeReason, setCloseReason] = useState('');
@@ -284,7 +285,11 @@ export default function SupportPanel() {
       if (retryCallback) {
         pendingRequestRef.current = retryCallback;
       }
-      setShowRateLimitCaptcha(true);
+      // Открываем модальное окно только если оно еще не открыто
+      if (!isCaptchaOpenRef.current) {
+        isCaptchaOpenRef.current = true;
+        setShowRateLimitCaptcha(true);
+      }
       throw new Error('RATE_LIMIT_EXCEEDED');
     }
     
@@ -292,6 +297,8 @@ export default function SupportPanel() {
   };
 
   const handleRateLimitSuccess = async () => {
+    // Закрываем модальное окно и сбрасываем флаг
+    isCaptchaOpenRef.current = false;
     setShowRateLimitCaptcha(false);
     // Небольшая задержка для применения иммунитета на сервере
     await new Promise(resolve => setTimeout(resolve, 500));
@@ -1996,6 +2003,7 @@ export default function SupportPanel() {
         isOpen={showRateLimitCaptcha}
         onSuccess={handleRateLimitSuccess}
         onClose={() => {
+          isCaptchaOpenRef.current = false;
           setShowRateLimitCaptcha(false);
           pendingRequestRef.current = null;
         }}

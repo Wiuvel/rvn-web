@@ -34,9 +34,18 @@ export default function RateLimitCaptcha({ isOpen, onSuccess, onClose }: RateLim
   const [error, setError] = useState<string | null>(null);
   const widgetIdRef = useRef<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const isProcessingRef = useRef(false);
+
+  // Сбрасываем ошибку при открытии модального окна
+  useEffect(() => {
+    if (isOpen) {
+      setError(null);
+      isProcessingRef.current = false;
+    }
+  }, [isOpen]);
 
   useEffect(() => {
-    if (isOpen && isScriptLoaded && containerRef.current && !widgetIdRef.current) {
+    if (isOpen && isScriptLoaded && containerRef.current && !widgetIdRef.current && !isProcessingRef.current) {
       loadCaptcha();
     }
 
@@ -54,15 +63,18 @@ export default function RateLimitCaptcha({ isOpen, onSuccess, onClose }: RateLim
   }, [isOpen, isScriptLoaded]);
 
   const loadCaptcha = () => {
-    if (!containerRef.current || !window.turnstile) return;
+    if (!containerRef.current || !window.turnstile || isProcessingRef.current) return;
 
     containerRef.current.innerHTML = '';
+    isProcessingRef.current = true;
 
     try {
       const widgetId = window.turnstile.render(containerRef.current, {
         sitekey: '0x4AAAAAACDQkGbAxIWAKp08',
         theme: 'dark',
         callback: async (token: string) => {
+          if (!isOpen) return; // Проверяем, что модальное окно все еще открыто
+          
           setIsVerifying(true);
           setError(null);
 
@@ -80,44 +92,55 @@ export default function RateLimitCaptcha({ isOpen, onSuccess, onClose }: RateLim
 
             if (response.ok && data.success) {
               setIsVerifying(false);
+              isProcessingRef.current = false;
+              // onSuccess сам закроет модальное окно, не нужно вызывать onClose
               onSuccess();
-              // Закрываем модальное окно после успешной очистки
-              if (onClose) {
-                setTimeout(() => {
-                  onClose();
-                }, 500);
-              }
             } else {
               setIsVerifying(false);
+              isProcessingRef.current = false;
               setError(data.error || 'Ошибка очистки лимитов');
-              // Сбрасываем капчу для повторной попытки
-              if (widgetIdRef.current && window.turnstile) {
+              // Сбрасываем капчу для повторной попытки только если модальное окно все еще открыто
+              if (isOpen && widgetIdRef.current && window.turnstile) {
                 window.turnstile.remove(widgetIdRef.current);
                 widgetIdRef.current = null;
                 setTimeout(() => {
-                  if (isOpen && isScriptLoaded) {
+                  if (isOpen && isScriptLoaded && !isProcessingRef.current) {
                     loadCaptcha();
                   }
-                }, 100);
+                }, 500);
               }
             }
           } catch {
             setIsVerifying(false);
+            isProcessingRef.current = false;
             setError('Ошибка соединения с сервером');
-            if (widgetIdRef.current && window.turnstile) {
+            // Сбрасываем капчу для повторной попытки только если модальное окно все еще открыто
+            if (isOpen && widgetIdRef.current && window.turnstile) {
               window.turnstile.remove(widgetIdRef.current);
               widgetIdRef.current = null;
               setTimeout(() => {
-                if (isOpen && isScriptLoaded) {
+                if (isOpen && isScriptLoaded && !isProcessingRef.current) {
                   loadCaptcha();
                 }
-              }, 100);
+              }, 500);
             }
           }
         },
         'error-callback': () => {
+          if (!isOpen) return; // Проверяем, что модальное окно все еще открыто
           setError('Ошибка загрузки капчи');
           setIsVerifying(false);
+          isProcessingRef.current = false;
+          // Пытаемся перезагрузить капчу при ошибке
+          if (widgetIdRef.current && window.turnstile) {
+            window.turnstile.remove(widgetIdRef.current);
+            widgetIdRef.current = null;
+            setTimeout(() => {
+              if (isOpen && isScriptLoaded && !isProcessingRef.current) {
+                loadCaptcha();
+              }
+            }, 1000);
+          }
         }
       });
 
@@ -125,6 +148,7 @@ export default function RateLimitCaptcha({ isOpen, onSuccess, onClose }: RateLim
     } catch (err) {
       console.error('Error rendering Turnstile:', err);
       setError('Ошибка инициализации капчи');
+      isProcessingRef.current = false;
     }
   };
 
