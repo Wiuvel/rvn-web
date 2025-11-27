@@ -72,23 +72,23 @@ export async function POST(request: NextRequest) {
     }
 
     // Устанавливаем временный иммунитет для текущего пользователя
-    // grantImmunity сам очищает счетчик и устанавливает иммунитет, не нужно вызывать clear()
-    await generalRateLimit.grantImmunity(request);
+    // grantImmunity возвращает время истечения для синхронизации с cookie
+    const immunityExpiry = await generalRateLimit.grantImmunity(request);
 
     logger.info('Rate limit cleared and immunity granted after CAPTCHA', {
-      ip: request.headers.get('x-forwarded-for')
+      ip: request.headers.get('x-forwarded-for'),
+      immunityExpiry
     });
 
-    // Устанавливаем иммунитет также через cookie для надежности
-    // Это гарантирует, что иммунитет будет работать даже если store очистится
-    const immunityExpiry = Date.now() + (15 * 60 * 1000); // 15 минут
+    // Создаем response с данными об иммунитете
     const response = NextResponse.json({
       success: true,
       immunityGranted: true,
       immunityExpiry
     });
 
-    // Устанавливаем cookie с иммунитетом
+    // Устанавливаем cookie с иммунитетом СРАЗУ после grantImmunity
+    // Это гарантирует синхронизацию между cookie и store
     response.cookies.set('rate_limit_immunity', immunityExpiry.toString(), {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',

@@ -127,18 +127,24 @@ export class RateLimiter {
    * Устанавливает временный иммунитет от rate limiting после прохождения капчи
    * @param request - Request объект
    * @param immunityDurationMs - Длительность иммунитета в миллисекундах (по умолчанию из константы)
+   * @returns Время истечения иммунитета для синхронизации с cookie
    */
-  async grantImmunity(request: Request, immunityDurationMs: number = RATE_LIMIT_IMMUNITY_DURATION): Promise<void> {
+  async grantImmunity(request: Request, immunityDurationMs: number = RATE_LIMIT_IMMUNITY_DURATION): Promise<number> {
     const key = this.getKey(request);
     const now = Date.now();
+    const immuneUntil = now + immunityDurationMs;
     
     // Очищаем rate limit и устанавливаем иммунитет
     // ВАЖНО: всегда создаем/обновляем запись, чтобы иммунитет точно применился
+    // Используем синхронную операцию для гарантии применения
     store[key] = {
       count: 0, // Сбрасываем счетчик
-      resetTime: now + immunityDurationMs, // Устанавливаем resetTime на время иммунитета
-      immuneUntil: now + immunityDurationMs // Устанавливаем иммунитет
+      resetTime: immuneUntil, // Устанавливаем resetTime на время иммунитета
+      immuneUntil: immuneUntil // Устанавливаем иммунитет
     };
+    
+    // Возвращаем время истечения для синхронизации с cookie
+    return immuneUntil;
   }
 
   static clearAll(): void {

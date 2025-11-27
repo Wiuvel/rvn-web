@@ -252,7 +252,9 @@ export default function SupportPanel() {
     }
   }, [rightPanelCollapsed]);
   const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
-  const pendingRequestRef = useRef<(() => Promise<void>) | null>(null);
+  // Очередь запросов вместо одного callback - исправляет race condition
+  const pendingRequestsQueueRef = useRef<Array<() => Promise<void>>>([]);
+  const isProcessingCaptchaRef = useRef(false); // Флаг обработки капчи - предотвращает повторные открытия
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const markReadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const currentTicketIdRef = useRef<string | null>(null);
@@ -281,12 +283,15 @@ export default function SupportPanel() {
     const response = await fetch(url, options);
     
     if (response.status === 429) {
-      // Сохраняем callback для повторного выполнения после прохождения капчи
+      // Добавляем callback в очередь вместо перезаписи - исправляет race condition
       if (retryCallback) {
-        pendingRequestRef.current = retryCallback;
+        pendingRequestsQueueRef.current.push(retryCallback);
       }
-      // Открываем модальное окно только если оно еще не открыто
-      if (!isCaptchaOpenRef.current) {
+      
+      // Открываем модальное окно только если:
+      // 1. Оно еще не открыто
+      // 2. Капча не обрабатывается (предотвращает повторные открытия)
+      if (!isCaptchaOpenRef.current && !isProcessingCaptchaRef.current) {
         isCaptchaOpenRef.current = true;
         setShowRateLimitCaptcha(true);
       }
@@ -297,28 +302,37 @@ export default function SupportPanel() {
   };
 
   const handleRateLimitSuccess = async () => {
-    // Закрываем модальное окно и сбрасываем флаг
+    // Устанавливаем флаг обработки капчи - предотвращает повторные открытия
+    isProcessingCaptchaRef.current = true;
+    
+    // Закрываем модальное окно
     isCaptchaOpenRef.current = false;
     setShowRateLimitCaptcha(false);
-    // Небольшая задержка для применения иммунитета на сервере
-    await new Promise(resolve => setTimeout(resolve, 500));
-    // Повторяем последний запрос после успешного прохождения капчи
-    if (pendingRequestRef.current) {
+    
+    // Увеличиваем задержку для гарантированного применения иммунитета на сервере
+    // Cookie устанавливается сразу, но store может обновиться с небольшой задержкой
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // Обрабатываем ВСЕ запросы из очереди последовательно
+    const queue = [...pendingRequestsQueueRef.current];
+    pendingRequestsQueueRef.current = []; // Очищаем очередь сразу
+    
+    for (const requestCallback of queue) {
       try {
-        await pendingRequestRef.current();
-        // Если запрос успешен, очищаем callback
-        pendingRequestRef.current = null;
+        await requestCallback();
       } catch (error) {
-        // Если снова получили rate limit после иммунитета - это ошибка
-        // Не показываем капчу снова, просто логируем и очищаем callback
+        // Если запрос снова получил rate limit после иммунитета - это критическая ошибка
+        // НЕ добавляем обратно в очередь и НЕ показываем капчу снова
         if (error instanceof Error && error.message === 'RATE_LIMIT_EXCEEDED') {
           console.error('Rate limit still active after CAPTCHA - immunity may not be working');
         } else {
           console.error('Error retrying request after rate limit clear:', error);
         }
-        pendingRequestRef.current = null;
       }
     }
+    
+    // Сбрасываем флаг обработки только после обработки всех запросов
+    isProcessingCaptchaRef.current = false;
   };
 
   useEffect(() => {
@@ -2003,9 +2017,11 @@ export default function SupportPanel() {
         isOpen={showRateLimitCaptcha}
         onSuccess={handleRateLimitSuccess}
         onClose={() => {
+          // При закрытии очищаем очередь и сбрасываем все флаги
           isCaptchaOpenRef.current = false;
+          isProcessingCaptchaRef.current = false;
           setShowRateLimitCaptcha(false);
-          pendingRequestRef.current = null;
+          pendingRequestsQueueRef.current = [];
         }}
       />
 
