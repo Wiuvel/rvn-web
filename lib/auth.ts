@@ -3,6 +3,7 @@ import { supabaseAdmin, Admin } from './supabase';
 import { logger } from './secure-logger';
 import { ServerValidator } from './server-validation';
 import { timingSafePasswordVerify, addRandomDelay } from './timing-safe';
+import { ERROR_DATABASE_NOT_CONFIGURED } from './constants';
 
 export async function hashPassword(password: string): Promise<string> {
   const saltRounds = 12;
@@ -16,7 +17,11 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
 export async function createAdmin(username: string, password: string): Promise<{ success: boolean; error?: string }> {
   try {
     if (!supabaseAdmin) {
-      return { success: false, error: 'База данных не настроена' };
+      logger.error('Database not configured - supabaseAdmin is null', {
+        hasSupabaseUrl: !!process.env.SUPABASE_URL || !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+        hasServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY
+      });
+      return { success: false, error: ERROR_DATABASE_NOT_CONFIGURED };
     }
 
     const { data: existingAdmin, error: checkError } = await supabaseAdmin
@@ -65,7 +70,11 @@ export async function createAdmin(username: string, password: string): Promise<{
 export async function authenticateAdmin(username: string, password: string): Promise<{ success: boolean; admin?: Admin; error?: string }> {
   try {
     if (!supabaseAdmin) {
-      return { success: false, error: 'Database not configured' };
+      logger.error('Database not configured - supabaseAdmin is null', {
+        hasSupabaseUrl: !!process.env.SUPABASE_URL || !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+        hasServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY
+      });
+      return { success: false, error: ERROR_DATABASE_NOT_CONFIGURED };
     }
 
     // Always perform the same operations to prevent timing attacks
@@ -177,7 +186,11 @@ export function generateUserId(): string {
 export async function createUser(username: string, password: string): Promise<{ success: boolean; user?: User; error?: string }> {
   try {
     if (!supabaseAdmin) {
-      return { success: false, error: 'База данных не настроена' };
+      logger.error('Database not configured - supabaseAdmin is null', {
+        hasSupabaseUrl: !!process.env.SUPABASE_URL || !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+        hasServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY
+      });
+      return { success: false, error: ERROR_DATABASE_NOT_CONFIGURED };
     }
 
     // Нормализуем username в lowercase для проверки
@@ -259,7 +272,11 @@ export async function createUser(username: string, password: string): Promise<{ 
 export async function authenticateUser(username: string, password: string): Promise<{ success: boolean; user?: User; error?: string }> {
   try {
     if (!supabaseAdmin) {
-      return { success: false, error: 'Database not configured' };
+      logger.error('Database not configured - supabaseAdmin is null', {
+        hasSupabaseUrl: !!process.env.SUPABASE_URL || !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+        hasServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY
+      });
+      return { success: false, error: ERROR_DATABASE_NOT_CONFIGURED };
     }
 
     // Нормализуем username в lowercase для поиска

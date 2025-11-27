@@ -37,6 +37,21 @@ export const supabaseAdmin = supabaseUrl && supabaseServiceKey
     })
   : null;
 
+// Log database configuration status (only in server environment)
+if (typeof window === 'undefined') {
+  if (!supabaseAdmin) {
+    console.error('⚠️ Supabase Admin client not initialized. Missing environment variables:');
+    if (!supabaseUrl) {
+      console.error('  - SUPABASE_URL or NEXT_PUBLIC_SUPABASE_URL');
+    }
+    if (!supabaseServiceKey) {
+      console.error('  - SUPABASE_SERVICE_ROLE_KEY');
+    }
+  } else {
+    console.log('✅ Supabase Admin client initialized successfully');
+  }
+}
+
 export interface Admin {
   id: string;
   username: string;
