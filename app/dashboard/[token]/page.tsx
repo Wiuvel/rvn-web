@@ -7,6 +7,7 @@ import Image from 'next/image';
 import { useFadeIn, useStaggeredFadeIn } from '@/hooks/useGSAP';
 import { gsap } from 'gsap';
 import LoadingSpinner from '@/components/LoadingSpinner';
+import { getGradientClasses } from '@/lib/avatar-gradients';
 
 interface UserData {
   id: string;
@@ -15,6 +16,7 @@ interface UserData {
   dashboard_token: string;
   created_at: string;
   last_login?: string;
+  avatar_gradient?: string | null;
 }
 
 interface Notification {
@@ -430,7 +432,7 @@ export default function DashboardPage() {
                 </div>
                 <button
                   onClick={() => setUserMenuOpen(!userMenuOpen)}
-                  className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold text-sm shadow-glow transition-transform duration-200 hover:scale-110 cursor-pointer"
+                  className={`w-10 h-10 rounded-full ${getGradientClasses(userData?.avatar_gradient)} flex items-center justify-center text-white font-semibold text-sm shadow-glow transition-transform duration-200 hover:scale-110 cursor-pointer`}
                   title={userData.username}
                   aria-label="Меню пользователя"
                   aria-expanded={userMenuOpen}
@@ -448,7 +450,7 @@ export default function DashboardPage() {
                       className="block p-4 border-b border-white/10 hover:bg-white/5 transition-colors duration-200 cursor-pointer mx-2 my-1 rounded-xl"
                     >
                       <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold text-base flex-shrink-0">
+                        <div className={`w-12 h-12 rounded-full ${getGradientClasses(userData?.avatar_gradient)} flex items-center justify-center text-white font-semibold text-base flex-shrink-0`}>
                           {getInitial(userData.username)}
                         </div>
                         <div className="min-w-0 flex-1">
@@ -531,7 +533,7 @@ export default function DashboardPage() {
                   className="block p-4 border-b border-white/10 hover:bg-white/5 transition-colors duration-200 cursor-pointer mx-2 my-1 rounded-xl"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold text-base flex-shrink-0">
+                    <div className={`w-12 h-12 rounded-full ${getGradientClasses(userData?.avatar_gradient)} flex items-center justify-center text-white font-semibold text-base flex-shrink-0`}>
                       {getInitial(userData.username)}
                     </div>
                     <div className="min-w-0 flex-1">
@@ -618,10 +620,8 @@ export default function DashboardPage() {
           {/* Profile section */}
           <section ref={profileRef} className="mt-6 rounded-2xl border border-neutral-800 bg-neutral-900 p-5">
             <div className="flex items-center gap-4">
-              <div className="shrink-0 h-14 w-14 rounded-full border border-neutral-800 bg-neutral-800/60 grid place-items-center overflow-hidden">
-                <svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true" className="text-neutral-400">
-                  <path fill="currentColor" d="M12 12c2.761 0 5-2.239 5-5s-2.239-5-5-5-5 2.239-5 5 2.239 5 5 5zm0 2c-4.418 0-8 2.239-8 5v1c0 .552.448 1 1 1h14c.552 0 1-.448 1-1v-1c0-2.761-3.582-5-8-5z"/>
-                </svg>
+              <div className={`shrink-0 h-14 w-14 rounded-full ${getGradientClasses(userData?.avatar_gradient)} flex items-center justify-center text-white font-semibold text-lg border border-white/10`}>
+                {userData?.username ? userData.username.charAt(0).toUpperCase() : '—'}
               </div>
               <div className="flex-1">
                 <div className="text-lg font-medium">{userData?.username || '—'}</div>

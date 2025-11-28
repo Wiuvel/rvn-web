@@ -1,243 +1,393 @@
-/* Legal pages styles */
+/* Legal pages styles - Updated to match project design */
 .legal-layout {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: var(--font-exo2), -apple-system, system-ui, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
   line-height: 1.7;
-  background: linear-gradient(135deg, #0c0c0c 0%, #1a1a1a 100%);
-  color: #e0e0e0;
+  background: 
+    radial-gradient(circle at 20% 30%, rgba(22, 163, 255, 0.05) 0%, transparent 50%),
+    radial-gradient(circle at 80% 70%, rgba(140, 102, 255, 0.04) 0%, transparent 50%),
+    linear-gradient(135deg, #0a0a0a 0%, #0f0f0f 50%, #0a0a0a 100%);
+  color: #e5e5e5;
   min-height: 100vh;
-  padding: 20px;
+  padding: 2rem 1rem;
+  position: relative;
+}
+
+.legal-layout::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: 
+    radial-gradient(circle at 10% 20%, rgba(22, 163, 255, 0.03) 0%, transparent 40%),
+    radial-gradient(circle at 90% 80%, rgba(140, 102, 255, 0.02) 0%, transparent 40%);
+  pointer-events: none;
+  z-index: 0;
 }
 
 .legal-page {
   width: 100%;
+  position: relative;
+  z-index: 1;
 }
 
 .legal-container {
-  max-width: 800px;
+  max-width: 900px;
   margin: 0 auto;
-  padding: 0 15px;
+  padding: 0 1rem;
 }
 
 .legal-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 25px 0;
-  margin-bottom: 30px;
-  border-bottom: 1px solid #2d2d2d;
+  padding: 1.5rem 0;
+  margin-bottom: 2rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
 }
 
 .back-btn {
   display: inline-flex;
   align-items: center;
-  padding: 12px 20px;
-  background: linear-gradient(135deg, #2d2d2d 0%, #1a1a1a 100%);
-  border: 1px solid #3d3d3d;
-  border-radius: 12px;
-  color: #fff;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  background: rgba(22, 163, 255, 0.1);
+  border: 1px solid rgba(22, 163, 255, 0.2);
+  border-radius: 0.75rem;
+  color: #ffffff;
   text-decoration: none;
-  transition: all 0.3s ease;
+  font-weight: 500;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  backdrop-filter: blur(10px);
 }
 
 .back-btn:hover {
-  transform: translateX(-5px);
-  border-color: #4f8cff;
+  transform: translateX(-4px);
+  border-color: rgba(22, 163, 255, 0.4);
+  background: rgba(22, 163, 255, 0.15);
+  box-shadow: 0 4px 12px rgba(22, 163, 255, 0.2);
 }
 
 .logo {
-  font-size: 1.2rem;
+  font-size: 1.25rem;
   font-weight: 600;
-  color: #4f8cff;
+  background: linear-gradient(135deg, #16a3ff 0%, #8c66ff 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: -0.02em;
 }
 
 .page-title {
   text-align: center;
-  margin-bottom: 35px;
+  margin-bottom: 3rem;
 }
 
 .page-title h1 {
-  font-size: 2.5rem;
+  font-size: clamp(2rem, 5vw, 3rem);
   font-weight: 700;
-  background: linear-gradient(135deg, #4f8cff 50%, #8c66ff 100%);
+  background: linear-gradient(135deg, #16a3ff 0%, #8c66ff 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  margin-bottom: 15px;
+  margin-bottom: 1rem;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
 }
 
 .subtitle {
-  color: #888;
-  font-size: 1.1rem;
-  max-width: 500px;
+  color: #a1a1aa;
+  font-size: 1.125rem;
+  max-width: 600px;
   margin: 0 auto;
+  line-height: 1.6;
 }
 
 .policy-card {
-  background: linear-gradient(135deg, #1a1a1a 0%, #151515 100%);
-  border: 1px solid #2d2d2d;
-  border-radius: 20px;
-  padding: 40px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-  backdrop-filter: blur(10px);
+  background: rgba(15, 15, 15, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 1.5rem;
+  padding: 3rem;
+  box-shadow: 
+    0 20px 60px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+  backdrop-filter: blur(20px);
+  position: relative;
+  overflow: hidden;
+}
+
+.policy-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(22, 163, 255, 0.3), transparent);
 }
 
 .policy-card h2 {
   font-size: 1.5rem;
-  margin: 40px 0 20px 0;
+  margin: 2.5rem 0 1.25rem 0;
+  font-weight: 600;
+  color: #ffffff;
+  line-height: 1.4;
+}
+
+.policy-card h2:first-of-type {
+  margin-top: 0;
 }
 
 .policy-card h3 {
-  font-size: 1.2rem;
-  margin: 30px 0 18px 0;
+  font-size: 1.25rem;
+  margin: 2rem 0 1rem 0;
+  font-weight: 600;
+  color: #e5e5e5;
+  line-height: 1.4;
+}
+
+.policy-card h4 {
+  font-size: 1.1rem;
+  margin: 1.5rem 0 0.75rem 0;
+  font-weight: 600;
+  color: #d4d4d4;
+  line-height: 1.4;
 }
 
 .policy-card p {
-  margin-bottom: 1.2em;
+  margin-bottom: 1.25em;
   font-size: 1rem;
-  line-height: 1.6;
-  color: #cccccc;
+  line-height: 1.7;
+  color: #d4d4d4;
 }
 
-.policy-card ul {
+.policy-card ul,
+.policy-card ol {
   list-style: none;
   padding: 0;
-  margin: 20px 0;
+  margin: 1.5rem 0;
 }
 
 .policy-card li {
-  margin-bottom: 12px;
-  padding-left: 24px;
+  margin-bottom: 0.875rem;
+  padding-left: 1.75rem;
   position: relative;
-  line-height: 1.5;
-  color: #cccccc;
-  font-size: 0.95rem;
+  line-height: 1.6;
+  color: #d4d4d4;
+  font-size: 1rem;
 }
 
-.policy-card li::before {
-  content: "•";
-  color: #4f8cff;
-  font-size: 1.2rem;
+.policy-card ul > li::before {
+  content: "▸";
+  color: #16a3ff;
+  font-size: 0.875rem;
   position: absolute;
-  left: 0;
-  top: -1px;
+  left: 0.5rem;
+  top: 0.125rem;
+  font-weight: 600;
 }
 
-.nested-list {
-  margin: 12px 0;
-  padding-left: 15px;
+.policy-card ol {
+  counter-reset: item;
 }
 
-.nested-list li::before {
-  content: "◦";
-  color: #888;
+.policy-card ol > li {
+  counter-increment: item;
+  padding-left: 2.5rem;
+}
+
+.policy-card ol > li::before {
+  content: counter(item) ".";
+  color: #16a3ff;
+  font-weight: 600;
+  position: absolute;
+  left: 0.5rem;
+  top: 0;
 }
 
 .policy-card a {
-  color: #4f8cff;
+  color: #16a3ff;
   text-decoration: none;
-  transition: color 0.2s ease;
-  border-bottom: 1px solid rgba(79, 140, 255, 0.3);
+  transition: all 0.2s ease;
+  border-bottom: 1px solid rgba(22, 163, 255, 0.3);
   padding-bottom: 1px;
+  font-weight: 500;
 }
 
 .policy-card a:hover {
-  color: #6ba0ff;
-  border-bottom-color: rgba(107, 160, 255, 0.6);
+  color: #45beff;
+  border-bottom-color: rgba(22, 163, 255, 0.6);
 }
 
 .highlight {
-  background: linear-gradient(135deg, rgba(79, 140, 255, 0.1) 0%, rgba(140, 102, 255, 0.1) 100%);
-  border-left: 4px solid #4f8cff;
-  padding: 25px;
-  margin: 30px 0;
-  border-radius: 0 12px 12px 0;
+  background: linear-gradient(135deg, rgba(22, 163, 255, 0.1) 0%, rgba(140, 102, 255, 0.08) 100%);
+  border-left: 3px solid #16a3ff;
+  padding: 1.5rem;
+  margin: 2rem 0;
+  border-radius: 0 0.75rem 0.75rem 0;
+  position: relative;
+  backdrop-filter: blur(10px);
+}
+
+.highlight::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, rgba(22, 163, 255, 0.05) 0%, transparent 100%);
+  border-radius: 0 0.75rem 0.75rem 0;
+  pointer-events: none;
 }
 
 .highlight strong {
-  color: #4f8cff;
+  color: #16a3ff;
   font-weight: 600;
+}
+
+.highlight p:last-child {
+  margin-bottom: 0;
 }
 
 .divider {
   height: 1px;
-  background: linear-gradient(90deg, transparent, #2d2d2d, transparent);
-  margin: 30px 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+  margin: 2.5rem 0;
 }
 
 .last-updated {
   text-align: center;
-  color: #888;
-  margin-top: 40px;
-  padding-top: 25px;
-  border-top: 1px solid #2d2d2d;
+  color: #71717a;
+  margin-top: 3rem;
+  padding-top: 2rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
   font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.legal-navigation {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin: 2rem 0;
+  padding: 1.5rem;
+  background: rgba(22, 163, 255, 0.05);
+  border: 1px solid rgba(22, 163, 255, 0.1);
+  border-radius: 0.75rem;
+  backdrop-filter: blur(10px);
+}
+
+.legal-navigation a {
+  display: inline-block;
+  padding: 0.5rem 1rem;
+  background: rgba(22, 163, 255, 0.1);
+  border: 1px solid rgba(22, 163, 255, 0.2);
+  border-radius: 0.5rem;
+  color: #16a3ff;
+  text-decoration: none;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.legal-navigation a:hover {
+  background: rgba(22, 163, 255, 0.15);
+  border-color: rgba(22, 163, 255, 0.3);
+  transform: translateY(-1px);
 }
 
 @media (max-width: 768px) {
+  .legal-layout {
+    padding: 1.5rem 0.75rem;
+  }
+  
   .legal-container {
-    padding: 0 10px;
+    padding: 0 0.75rem;
   }
   
   .policy-card {
-    padding: 25px 20px;
-    border-radius: 12px;
+    padding: 2rem 1.5rem;
+    border-radius: 1rem;
   }
   
   .page-title h1 {
-    font-size: 1.8rem;
-  }
-  
-  .policy-card h2 {
-    font-size: 1.2rem;
-    margin: 30px 0 18px 0;
-  }
-  
-  .policy-card h3 {
-    font-size: 1rem;
-    margin: 22px 0 14px 0;
+    font-size: 1.875rem;
   }
   
   .subtitle {
-    font-size: 0.95rem;
+    font-size: 1rem;
+  }
+  
+  .policy-card h2 {
+    font-size: 1.25rem;
+    margin: 2rem 0 1rem 0;
+  }
+  
+  .policy-card h3 {
+    font-size: 1.125rem;
+    margin: 1.5rem 0 0.875rem 0;
+  }
+  
+  .policy-card p,
+  .policy-card li {
+    font-size: 0.9375rem;
   }
   
   .legal-header {
-    padding: 20px 0;
-    margin-bottom: 25px;
+    padding: 1.25rem 0;
+    margin-bottom: 1.5rem;
+    flex-direction: column;
+    gap: 1rem;
+    align-items: flex-start;
   }
   
-  .policy-card li {
-    padding-left: 20px;
-    font-size: 0.9rem;
+  .back-btn {
+    padding: 0.625rem 1rem;
+    font-size: 0.875rem;
+  }
+  
+  .highlight {
+    padding: 1.25rem;
+    margin: 1.5rem 0;
+  }
+  
+  .legal-navigation {
+    flex-direction: column;
   }
 }
 
 @media (max-width: 480px) {
   .legal-layout {
-    padding: 15px 10px;
+    padding: 1rem 0.5rem;
   }
   
   .policy-card {
-    padding: 20px 16px;
-    border-radius: 10px;
+    padding: 1.5rem 1.25rem;
+    border-radius: 0.75rem;
   }
   
   .page-title h1 {
-    font-size: 1.6rem;
+    font-size: 1.625rem;
   }
   
   .policy-card h2 {
-    font-size: 1.1rem;
+    font-size: 1.125rem;
+  }
+  
+  .policy-card h3 {
+    font-size: 1rem;
   }
   
   .back-btn {
-    padding: 8px 14px;
-    font-size: 0.85rem;
+    padding: 0.5rem 0.875rem;
+    font-size: 0.8125rem;
   }
   
   .highlight {
-    padding: 15px;
-    margin: 20px 0;
+    padding: 1rem;
+    margin: 1.25rem 0;
   }
 }
-

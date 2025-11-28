@@ -82,8 +82,8 @@ export async function GET(
       .from('support_tickets')
       .select(`
         *,
-        user:users!support_tickets_user_id_fkey(id, username, user_id),
-        assigned_user:users!support_tickets_assigned_to_fkey(id, username, user_id)
+        user:users!support_tickets_user_id_fkey(id, username, user_id, avatar_gradient),
+        assigned_user:users!support_tickets_assigned_to_fkey(id, username, user_id, avatar_gradient)
       `)
       .eq('id', ticketId)
       .single();
@@ -114,7 +114,7 @@ export async function GET(
       .from('support_messages')
       .select(`
         *,
-        sender:users!support_messages_sender_id_fkey(id, username, user_id)
+        sender:users!support_messages_sender_id_fkey(id, username, user_id, avatar_gradient)
       `)
       .eq('ticket_id', ticketId)
       .order('created_at', { ascending: true });

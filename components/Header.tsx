@@ -10,6 +10,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { UserMenu } from '@/components/UserMenu';
 import { NotificationsMenu } from '@/components/NotificationsMenu';
 import { GSAP_DEFAULT_DURATION, GSAP_DEFAULT_EASE } from '@/lib/constants';
+import { getGradientClasses } from '@/lib/avatar-gradients';
 
 export default function Header() {
   const [open, setOpen] = useState(false);
@@ -259,7 +260,7 @@ export default function Header() {
                     e.stopPropagation();
                     setUserMenuOpen(!userMenuOpen);
                   }}
-                  className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold text-sm shadow-glow transition-transform duration-200 hover:scale-110 cursor-pointer"
+                  className={`w-10 h-10 rounded-full ${getGradientClasses(userData.avatar_gradient)} flex items-center justify-center text-white font-semibold text-sm shadow-glow transition-transform duration-200 hover:scale-110 cursor-pointer`}
                   title={userData.username}
                   aria-label="Меню пользователя"
                   aria-expanded={userMenuOpen}

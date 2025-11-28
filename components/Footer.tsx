@@ -38,16 +38,15 @@ export default function Footer() {
       <div className="footer-container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 md:py-10 text-sm text-neutral-400">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-6 md:gap-8">
           <div className="md:col-span-4">
-            <div className="flex items-center gap-2 text-neutral-200 drop-shadow-[0_0_8px_rgba(22,163,255,0.8)]">
+            <div className="flex items-center text-neutral-200">
               <Image 
-                src="/static/footer-logo.svg" 
+                src="/static/large-logo.svg" 
                 alt="Raven Private" 
-                width={20} 
-                height={20} 
-                className="w-7 h-7"
+                width={905} 
+                height={440} 
+                className="h-12 md:h-14 w-auto"
                 loading="lazy"
               />
-              <span className="text-base md:text-lg font-medium">Raven Private</span>
             </div>
             <p className="mt-3 md:mt-4 text-sm md:text-base">Приватность без компромиссов</p>
             <div className="mt-4 md:mt-5 flex items-center gap-4 flex-wrap">
@@ -74,21 +73,23 @@ export default function Footer() {
             </div>
           </div>
           <div className="md:col-span-2">
-            <div className="text-neutral-300 font-medium text-base mb-3 md:mb-4">Информация</div>
+            <div className="text-neutral-300 font-medium text-base mb-3 md:mb-4">ИНФО</div>
             <ul className="space-y-2 md:space-y-3">
-              <li><Link href="#" className="hover:text-neutral-200 transition-colors duration-200 block py-1">О проекте</Link></li>
+              <li><Link href="#" className="hover:text-neutral-200 transition-colors duration-200 block py-1">О проекте & Roadmap</Link></li>
+              <li><Link href="#" className="hover:text-neutral-200 transition-colors duration-200 block py-1">Контактная информация</Link></li>
               <li><Link href="/legal/cookies" prefetch={false} className="hover:text-neutral-200 transition-colors duration-200 block py-1">Cookie Policy</Link></li>
             </ul>
           </div>
           <div className="md:col-span-2">
-            <div className="text-neutral-300 font-medium text-base mb-3 md:mb-4">Поддержка</div>
+            <div className="text-neutral-300 font-medium text-base mb-3 md:mb-4">ПОМОЩЬ</div>
             <ul className="space-y-2 md:space-y-3">
-              <li><Link href="#" className="hover:text-neutral-200 transition-colors duration-200 block py-1">Центр помощи</Link></li>
+              <li><Link href="/support/" className="hover:text-neutral-200 transition-colors duration-200 block py-1">Служба поддержки</Link></li>
               <li><Link href="#" className="hover:text-neutral-200 transition-colors duration-200 block py-1">Информация о сайте</Link></li>
+              <li><Link href="#" className="hover:text-neutral-200 transition-colors duration-200 block py-1">Инструкции по настройке</Link></li>
             </ul>
           </div>
           <div className="md:col-span-4">
-            <div className="text-neutral-300 font-medium text-base mb-3 md:mb-4">Правовое</div>
+            <div className="text-neutral-300 font-medium text-base mb-3 md:mb-4">ПРАВОВОЕ</div>
             <ul className="space-y-2 md:space-y-3">
               <li><Link href="/legal/privacy" prefetch={false} className="hover:text-neutral-200 transition-colors duration-200 block py-1">Политика конфиденциальности</Link></li>
               <li><Link href="/legal/terms" prefetch={false} className="hover:text-neutral-200 transition-colors duration-200 block py-1">Пользовательское соглашение</Link></li>
@@ -105,7 +106,13 @@ export default function Footer() {
             <div className="text-center md:text-left order-2 md:order-1">
               © {currentYear} RVNPrivate. Все права защищены.
             </div>
-            <div className="hidden md:flex items-center gap-3 md:gap-4 flex-wrap justify-center lg:mr-20 order-1 md:order-2 select-none drop-shadow-[0_0_50px_rgba(22,163,255,0.8)]">
+            <div className="hidden md:flex items-center gap-3 md:gap-4 flex-wrap justify-center order-1 md:order-2 select-none drop-shadow-[0_0_50px_rgba(22,163,255,0.8)]">
+              <Link href="/payments" prefetch={false} className="flex items-center gap-1 text-neutral-300 hover:text-neutral-200 transition-colors duration-200">
+                <span>PAYMENT_PROVIDER</span>
+                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" className="w-5 h-5 flex shrink-0 items-center justify-center">
+                  <path d="M16.0037 9.41421L7.39712 18.0208L5.98291 16.6066L14.5895 8H7.00373V6H18.0037V17H16.0037V9.41421Z"></path>
+                </svg>
+              </Link>
               <Image src="/static/payments/merchant-spb.svg" alt="СПБ" width={70} height={70} className="h-8" loading="lazy" />
               <Image src="/static/payments/merchant-mir.svg" alt="МИР" width={70} height={70} className="h-5" loading="lazy" />
               <Image src="/static/payments/merchant-visa.svg" alt="Visa" width={40} height={40} className="h-10" loading="lazy" />

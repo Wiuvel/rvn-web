@@ -58,6 +58,7 @@ export async function GET(request: NextRequest) {
         dashboard_token: user.dashboard_token,
         created_at: user.created_at,
         last_login: user.last_login,
+        avatar_gradient: user.avatar_gradient,
         isSupport,
         isAdmin
       })

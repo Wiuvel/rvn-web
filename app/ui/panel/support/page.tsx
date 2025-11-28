@@ -8,6 +8,7 @@ import { translateError } from '@/lib/error-translations';
 import RateLimitCaptcha from '@/components/RateLimitCaptcha';
 import { GSAP_DEFAULT_DURATION, GSAP_DEFAULT_EASE } from '@/lib/constants';
 import LoadingSpinner from '@/components/LoadingSpinner';
+import { getGradientClasses } from '@/lib/avatar-gradients';
 
 interface AuthState {
   isAuthenticated: boolean;
@@ -30,12 +31,14 @@ interface Ticket {
     id: string;
     username: string;
     user_id: string;
+    avatar_gradient?: string | null;
   };
   assigned_to?: string | null;
   assigned_user?: {
     id: string;
     username: string;
     user_id: string;
+    avatar_gradient?: string | null;
   } | null;
 }
 
@@ -51,6 +54,7 @@ interface Message {
     id: string;
     username: string;
     user_id: string;
+    avatar_gradient?: string | null;
   };
 }
 
@@ -149,7 +153,7 @@ function MessageItem({
           <div className={`flex items-end gap-3 ${isSupport ? 'flex-row-reverse' : 'flex-row'} ${isSupport ? 'w-full' : 'w-full'}`}>
             {/* Аватарка для пользователя (слева) */}
             {isUser && message.sender && (
-              <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold text-sm flex-shrink-0 mb-1">
+              <div className={`w-10 h-10 rounded-full ${getGradientClasses(message.sender.avatar_gradient)} flex items-center justify-center text-white font-semibold text-sm flex-shrink-0 mb-1`}>
                 {getInitial(message.sender.username)}
               </div>
             )}
@@ -1956,7 +1960,7 @@ export default function SupportPanel() {
                 {activeTicket.user && (
                   <div className="border-b border-neutral-800 p-3 bg-neutral-900/50 flex-shrink-0">
                   <div className="flex items-center gap-3 mb-3">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold text-sm flex-shrink-0">
+                    <div className={`w-10 h-10 rounded-full ${getGradientClasses(activeTicket.user.avatar_gradient)} flex items-center justify-center text-white font-semibold text-sm flex-shrink-0`}>
                       {getInitial(activeTicket.user.username)}
                     </div>
                     <div>

@@ -4,6 +4,7 @@ import { logger } from './secure-logger';
 import { ServerValidator } from './server-validation';
 import { timingSafePasswordVerify, addRandomDelay } from './timing-safe';
 import { ERROR_DATABASE_NOT_CONFIGURED } from './constants';
+import { generateRandomGradient } from './avatar-gradients';
 
 export async function hashPassword(password: string): Promise<string> {
   const saltRounds = 12;
@@ -151,6 +152,7 @@ export interface User {
   user_id: string;
   username: string;
   password_hash: string;
+  avatar_gradient?: string | null;
   dashboard_token: string;
   is_active: boolean;
   last_login?: string;
@@ -240,6 +242,9 @@ export async function createUser(username: string, password: string): Promise<{ 
       retryCount++;
     }
 
+    // Генерируем случайный градиент для аватарки
+    const avatarGradient = generateRandomGradient();
+
     // Сохраняем username в оригинальном регистре, но проверяем по lowercase
     const { data: newUser, error: insertError } = await supabaseAdmin
       .from('users')
@@ -247,7 +252,8 @@ export async function createUser(username: string, password: string): Promise<{ 
         user_id: userId,
         username: username, // Сохраняем в оригинальном регистре для отображения
         password_hash: passwordHash,
-        dashboard_token: dashboardToken
+        dashboard_token: dashboardToken,
+        avatar_gradient: avatarGradient
       })
       .select()
       .single();

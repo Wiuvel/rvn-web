@@ -5,6 +5,7 @@ export interface UserData {
   dashboard_token: string;
   created_at: string;
   last_login?: string;
+  avatar_gradient?: string | null;
 }
 
 export interface Notification {

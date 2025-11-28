@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { UserData } from '@/types';
 import { useMenuAnimation } from '@/hooks/useMenuAnimation';
+import { getGradientClasses } from '@/lib/avatar-gradients';
 
 interface UserMenuProps {
   userData: UserData;
@@ -65,7 +66,7 @@ export function UserMenu({
           className="block p-4 border-b border-white/10 hover:bg-white/5 transition-colors duration-200 cursor-pointer mx-2 my-1 rounded-xl"
         >
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold text-base flex-shrink-0">
+            <div className={`w-12 h-12 rounded-full ${getGradientClasses(userData.avatar_gradient)} flex items-center justify-center text-white font-semibold text-base flex-shrink-0`}>
               {getInitial(userData.username)}
             </div>
             <div className="min-w-0 flex-1">

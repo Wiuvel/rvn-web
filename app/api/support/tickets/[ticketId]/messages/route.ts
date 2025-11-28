@@ -152,7 +152,7 @@ export async function POST(
       })
       .select(`
         *,
-        sender:users!support_messages_sender_id_fkey(id, username, user_id)
+        sender:users!support_messages_sender_id_fkey(id, username, user_id, avatar_gradient)
       `)
       .single();
 

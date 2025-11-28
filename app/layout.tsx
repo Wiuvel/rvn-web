@@ -3,6 +3,7 @@ import "./globals.css";
 import SmoothScroll from "@/components/SmoothScroll";
 import ConditionalLayout from "@/components/ConditionalLayout";
 import { pageMetadata } from "@/lib/seo";
+import { exo2 } from "./fonts";
 
 export const metadata: Metadata = {
   ...pageMetadata.home,
@@ -23,8 +24,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ru" className="h-full scroll-smooth" data-scroll-behavior="smooth">
-      <body className="h-full bg-neutral-950 text-neutral-100 antialiased relative">
+    <html lang="ru" className={`h-full scroll-smooth ${exo2.variable}`} data-scroll-behavior="smooth">
+      <body className={`h-full bg-neutral-950 text-neutral-100 antialiased relative ${exo2.className}`}>
         <SmoothScroll />
         <ConditionalLayout>
           {children}

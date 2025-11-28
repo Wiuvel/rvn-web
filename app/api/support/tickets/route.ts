@@ -77,8 +77,8 @@ export async function GET(request: NextRequest) {
       .from('support_tickets')
       .select(`
         *,
-        user:users!support_tickets_user_id_fkey(id, username, user_id),
-        assigned_user:users!support_tickets_assigned_to_fkey(id, username, user_id)
+        user:users!support_tickets_user_id_fkey(id, username, user_id, avatar_gradient),
+        assigned_user:users!support_tickets_assigned_to_fkey(id, username, user_id, avatar_gradient)
       `)
       .order('last_message_at', { ascending: false });
 
