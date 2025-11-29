@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
     const isSupport = await hasUserRole(user.id, 'support');
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status'); // open, closed, pending, all
-    const statuses = searchParams.get('statuses'); // open,pending или closed,resolved (через запятую)
+    const statuses = searchParams.get('statuses'); // open,pending или closed (через запятую)
     const forUser = searchParams.get('forUser') === 'true'; // Явно запрошены только тикеты пользователя
 
     if (!supabaseAdmin) {
@@ -73,6 +73,8 @@ export async function GET(request: NextRequest) {
     }
 
     // Строим запрос
+    // Для оптимизации запросов рекомендуется применить индексы из database_migration_add_support_indexes.sql
+    // См. DATABASE_INDEXES_README.md для инструкций по применению
     let query = supabaseAdmin
       .from('support_tickets')
       .select(`
@@ -90,11 +92,11 @@ export async function GET(request: NextRequest) {
     // Фильтр по статусу(ам)
     if (statuses) {
       // Поддержка множественных статусов через запятую
-      const statusArray = statuses.split(',').map(s => s.trim()).filter(s => ['open', 'closed', 'pending', 'resolved'].includes(s));
+      const statusArray = statuses.split(',').map(s => s.trim()).filter(s => ['open', 'closed', 'pending'].includes(s));
       if (statusArray.length > 0) {
         query = query.in('status', statusArray);
       }
-    } else if (status && status !== 'all' && ['open', 'closed', 'pending', 'resolved'].includes(status)) {
+    } else if (status && status !== 'all' && ['open', 'closed', 'pending'].includes(status)) {
       // Одиночный статус (обратная совместимость)
       query = query.eq('status', status);
     }
@@ -234,6 +236,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Проверяем лимит тикетов (оптимизированный запрос с count)
+    // Для оптимизации рекомендуется применить частичный индекс idx_support_tickets_user_active_status
+    // См. database_migration_add_support_indexes.sql
     const { count, error: countError } = await supabaseAdmin
       .from('support_tickets')
       .select('*', { count: 'exact', head: true })

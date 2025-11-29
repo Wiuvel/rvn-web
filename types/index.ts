@@ -31,7 +31,7 @@ export interface Ticket {
   id: string;
   user_id: string;
   subject: string;
-  status: 'open' | 'closed' | 'pending' | 'resolved';
+  status: 'open' | 'closed' | 'pending';
   created_at: string;
   updated_at: string;
   last_message_at: string | null;

@@ -1,14 +1,20 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { gsap } from 'gsap';
-import { MESSAGE_MAX_LENGTH, TICKET_SUBJECT_MAX_LENGTH, MAX_TICKETS_PER_USER, MESSAGE_TIMEOUT, AUTH_FETCH_TIMEOUT, GSAP_DEFAULT_DURATION, GSAP_DEFAULT_EASE } from '@/lib/constants';
+import { MESSAGE_MAX_LENGTH, TICKET_SUBJECT_MAX_LENGTH, MAX_TICKETS_PER_USER, MESSAGE_TIMEOUT, AUTH_FETCH_TIMEOUT, GSAP_DEFAULT_DURATION, GSAP_DEFAULT_EASE, MARK_AS_READ_DEBOUNCE } from '@/lib/constants';
 import { translateError } from '@/lib/error-translations';
-import RateLimitCaptcha from '@/components/RateLimitCaptcha';
 import { getGradientClasses } from '@/lib/avatar-gradients';
+
+// Lazy load RateLimitCaptcha для оптимизации bundle size
+const RateLimitCaptcha = dynamic(() => import('@/components/RateLimitCaptcha'), {
+  ssr: false,
+  loading: () => null
+});
 
 interface UserData {
   id: string;
@@ -168,20 +174,27 @@ export default function SupportPage() {
   const [messageText, setMessageText] = useState('');
   const [showNewTicketForm, setShowNewTicketForm] = useState(false);
   const [newTicketSubject, setNewTicketSubject] = useState('');
+  const [newTicketMessage, setNewTicketMessage] = useState(''); // Отдельное состояние для сообщения нового тикета
   const [ticketsLoading, setTicketsLoading] = useState(false);
   const [lastMessageTime, setLastMessageTime] = useState<number | null>(null);
   const [timeoutSeconds, setTimeoutSeconds] = useState<number>(0);
   const [isCreatingTicket, setIsCreatingTicket] = useState(false); // Флаг для блокировки кнопки создания тикета
+  const [isSendingMessage, setIsSendingMessage] = useState(false); // Флаг для блокировки повторной отправки сообщений
   const [messagesSentCount, setMessagesSentCount] = useState<number>(0);
   const [notification, setNotification] = useState<{ message: string; show: boolean }>({ message: '', show: false });
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
+  
+  // Подсчет активных тикетов (только open и pending)
+  const activeTicketsCount = tickets.filter(t => t.status === 'open' || t.status === 'pending').length;
   const userMenuRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const notificationRef = useRef<HTMLDivElement>(null);
   const messageInputRef = useRef<HTMLInputElement>(null);
-  const messageTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const messageTextareaRef = useRef<HTMLTextAreaElement>(null); // Для формы создания нового тикета
   const subjectInputRef = useRef<HTMLInputElement>(null);
+  const newTicketFormRef = useRef<HTMLDivElement>(null); // Ref для формы создания тикета (для анимаций)
+  const chatAreaRef = useRef<HTMLDivElement>(null); // Ref для области чата (для анимаций)
   const fetchingTicketIdRef = useRef<string | null>(null);
   const [showRateLimitCaptcha, setShowRateLimitCaptcha] = useState(false);
   const isCaptchaOpenRef = useRef(false);
@@ -393,6 +406,59 @@ export default function SupportPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userData]);
 
+  // Анимация появления/исчезновения формы создания тикета
+  useEffect(() => {
+    if (typeof window === 'undefined' || !newTicketFormRef.current) return;
+
+    if (showNewTicketForm) {
+      // Анимация появления
+      gsap.fromTo(newTicketFormRef.current,
+        { opacity: 0, y: -10, height: 0, marginBottom: 0 },
+        { 
+          opacity: 1, 
+          y: 0, 
+          height: 'auto',
+          marginBottom: '1rem',
+          duration: 0.3, 
+          ease: "power2.out" 
+        }
+      );
+    } else {
+      // Анимация исчезновения
+      gsap.to(newTicketFormRef.current, {
+        opacity: 0,
+        y: -10,
+        height: 0,
+        marginBottom: 0,
+        duration: 0.2,
+        ease: "power2.in",
+        onComplete: () => {
+          // Очищаем поля после анимации
+          setNewTicketSubject('');
+          setNewTicketMessage('');
+        }
+      });
+    }
+  }, [showNewTicketForm]);
+
+  // Анимация перехода между чатами
+  useEffect(() => {
+    if (typeof window === 'undefined' || !chatAreaRef.current) return;
+
+    if (activeTicket) {
+      // Анимация появления чата
+      gsap.fromTo(chatAreaRef.current,
+        { opacity: 0, x: 20 },
+        { 
+          opacity: 1, 
+          x: 0,
+          duration: 0.3, 
+          ease: "power2.out" 
+        }
+      );
+    }
+  }, [activeTicket?.id]); // Анимируем только при смене ID тикета
+
   // Загрузка сообщений при выборе тикета
   useEffect(() => {
     if (!activeTicket || !activeTicket.id) {
@@ -511,14 +577,20 @@ export default function SupportPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTicket?.id, userData, activeTicket?.status]);
 
-  // Отметка сообщений как прочитанных с debounce
-  const markMessagesAsRead = async (ticketId: string) => {
-    // Используем debounce для уменьшения количества запросов
+  // Отметка сообщений как прочитанных с улучшенным debounce
+  // Используем useCallback для мемоизации функции и предотвращения лишних пересозданий
+  const markMessagesAsRead = useCallback(async (ticketId: string) => {
+    // Очищаем предыдущий таймер, если он существует
     if (markReadTimeoutRef.current) {
       clearTimeout(markReadTimeoutRef.current);
+      markReadTimeoutRef.current = null;
     }
     
+    // Устанавливаем новый таймер с debounce
     markReadTimeoutRef.current = setTimeout(async () => {
+      // Очищаем ref после выполнения
+      markReadTimeoutRef.current = null;
+      
       try {
         await fetchWithRateLimit(
           `/api/support/tickets/${ticketId}/messages/read`,
@@ -534,8 +606,18 @@ export default function SupportPage() {
           console.error('Error marking messages as read:', error);
         }
       }
-    }, 2000);
-  };
+    }, MARK_AS_READ_DEBOUNCE);
+  }, []); // Пустой массив зависимостей, так как функция не зависит от состояния
+
+  // Очистка таймера при размонтировании компонента
+  useEffect(() => {
+    return () => {
+      if (markReadTimeoutRef.current) {
+        clearTimeout(markReadTimeoutRef.current);
+        markReadTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
   // Обработка открытия/закрытия меню профиля
   useEffect(() => {
@@ -644,7 +726,7 @@ export default function SupportPage() {
     if (!newTicketSubject.trim()) return;
     
     // Если есть текст сообщения, создаем тикет с первым сообщением
-    if (!messageText.trim()) {
+    if (!newTicketMessage.trim()) {
       showNotification('Введите сообщение для обращения');
       return;
     }
@@ -656,7 +738,7 @@ export default function SupportPage() {
       return;
     }
 
-    if (messageText.length > MESSAGE_MAX_LENGTH) {
+    if (newTicketMessage.length > MESSAGE_MAX_LENGTH) {
       showNotification(`Максимальная длина сообщения: ${MESSAGE_MAX_LENGTH} символов`);
       triggerShake('message');
       return;
@@ -676,7 +758,7 @@ export default function SupportPage() {
           credentials: 'include',
           body: JSON.stringify({
             subject: newTicketSubject.trim(),
-            message: messageText.trim()
+            message: newTicketMessage.trim()
           })
         },
         handleCreateTicket // Retry callback
@@ -749,11 +831,16 @@ export default function SupportPage() {
             }))
           });
           
+          // Сохраняем ID последнего открытого тикета
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('support_last_ticket_id', data.ticket.id);
+          }
+          
           // Отмечаем сообщения как прочитанные
           markMessagesAsRead(data.ticket.id);
         }
         setNewTicketSubject('');
-        setMessageText('');
+        setNewTicketMessage('');
         setShowNewTicketForm(false);
         showNotification('Обращение создано');
       } else {
@@ -780,6 +867,9 @@ export default function SupportPage() {
   const handleSendMessage = async () => {
     if (!messageText.trim() || !activeTicket) return;
     
+    // Защита от повторной отправки
+    if (isSendingMessage) return;
+    
     // Проверка лимита символов
     if (messageText.length > MESSAGE_MAX_LENGTH) {
       showNotification(`Максимальная длина сообщения: ${MESSAGE_MAX_LENGTH} символов`);
@@ -791,6 +881,9 @@ export default function SupportPage() {
     if (timeoutSeconds > 0) {
       return;
     }
+
+    // Устанавливаем флаг отправки
+    setIsSendingMessage(true);
 
     try {
       const response = await fetchWithRateLimit(
@@ -881,6 +974,9 @@ export default function SupportPage() {
       }
       console.error('Error sending message:', error);
       showNotification('Ошибка отправки сообщения');
+    } finally {
+      // Сбрасываем флаг отправки в любом случае
+      setIsSendingMessage(false);
     }
   };
 
@@ -897,13 +993,30 @@ export default function SupportPage() {
       const data = await response.json();
       
       if (response.ok) {
-        setTickets((data.tickets || []).map((t: { id: string; subject: string; status: string; created_at: string }) => ({
+        const mappedTickets = (data.tickets || []).map((t: { id: string; subject: string; status: string; created_at: string }) => ({
           id: t.id,
           subject: t.subject,
           status: t.status,
           createdAt: new Date(t.created_at),
           messages: []
-        })));
+        }));
+        setTickets(mappedTickets);
+        
+        // Восстанавливаем последний открытый тикет после загрузки списка
+        if (typeof window !== 'undefined' && !activeTicket) {
+          const lastTicketId = localStorage.getItem('support_last_ticket_id');
+          if (lastTicketId) {
+            const lastTicket = mappedTickets.find((t: Ticket) => t.id === lastTicketId);
+            if (lastTicket) {
+              // Небольшая задержка для корректного обновления state
+              setTimeout(() => {
+                setActiveTicket(lastTicket);
+                // Загружаем сообщения для восстановленного тикета
+                fetchTicketMessages(lastTicket.id);
+              }, 50);
+            }
+          }
+        }
       } else {
         const errorMessage = data.error || 'Ошибка загрузки обращений';
         showNotification(translateError(errorMessage));
@@ -948,7 +1061,7 @@ export default function SupportPage() {
             return prev;
           }
           
-          return {
+          const ticket = {
             id: data.ticket.id,
             subject: data.ticket.subject,
             status: data.ticket.status,
@@ -962,6 +1075,13 @@ export default function SupportPage() {
               senderData: m.sender // Добавляем данные отправителя
             }))
           };
+          
+          // Сохраняем ID последнего открытого тикета
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('support_last_ticket_id', ticket.id);
+          }
+          
+          return ticket;
         });
         
         // Отмечаем сообщения как прочитанные после загрузки
@@ -1252,7 +1372,7 @@ export default function SupportPage() {
       <main className="flex-1 pt-24 pb-4 overflow-hidden min-h-0">
         <div className="mx-auto max-w-7xl px-3 sm:px-4 lg:px-8 h-full flex flex-col overflow-hidden">
           <div className="mb-3 sm:mb-6 hidden sm:block">
-            <p className="text-xs sm:text-sm text-neutral-400">Обратитесь в службу поддержки. Создайте новый тикет или выберите существующий для продолжения диалога.</p>
+            <p className="text-xs sm:text-sm text-neutral-400">Обратитесь в службу поддержки. Создайте новое обращение или выберите существующее для продолжения диалога.</p>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-6 flex-1 min-h-0">
@@ -1263,13 +1383,13 @@ export default function SupportPage() {
                   <h2 className="text-base sm:text-lg font-semibold">Мои тикеты</h2>
                   <button
                     onClick={() => {
-                      if (tickets.length >= MAX_TICKETS_PER_USER) {
+                      if (activeTicketsCount >= MAX_TICKETS_PER_USER) {
                         alert('Вы можете создать максимум 2 активных обращения');
                         return;
                       }
                       setShowNewTicketForm(!showNewTicketForm);
                     }}
-                    disabled={tickets.length >= MAX_TICKETS_PER_USER || isSupport}
+                    disabled={activeTicketsCount >= MAX_TICKETS_PER_USER || isSupport}
                     className="px-3 py-1.5 bg-primary-500 hover:bg-primary-400 disabled:bg-neutral-700 disabled:text-neutral-500 text-white text-sm rounded-lg transition-colors"
                     title={isSupport ? 'Создание тикетов недоступно для сотрудников поддержки' : ''}
                   >
@@ -1277,8 +1397,12 @@ export default function SupportPage() {
                   </button>
                 </div>
 
-                {showNewTicketForm && !isSupport && (
-                  <div className="mb-4 p-3 bg-neutral-800/50 rounded-xl border border-white/10 flex-shrink-0 space-y-3">
+                {!isSupport && (
+                  <div 
+                    ref={newTicketFormRef} 
+                    className={`mb-4 p-3 bg-neutral-800/50 rounded-xl border border-white/10 flex-shrink-0 space-y-3 ${!showNewTicketForm ? 'hidden' : ''}`}
+                    style={!showNewTicketForm ? { height: 0, marginBottom: 0, opacity: 0, overflow: 'hidden' } : {}}
+                  >
                     <div>
                       <input
                         ref={subjectInputRef}
@@ -1309,12 +1433,11 @@ export default function SupportPage() {
                     </div>
                     <div>
                       <textarea
-                        ref={messageTextareaRef}
-                        value={messageText}
+                        value={newTicketMessage}
                         onChange={(e) => {
                           const value = e.target.value;
                           if (value.length <= MESSAGE_MAX_LENGTH) {
-                            setMessageText(value);
+                            setNewTicketMessage(value);
                           } else {
                             showNotification(`Максимальная длина сообщения: ${MESSAGE_MAX_LENGTH} символов`);
                             triggerShake('message');
@@ -1331,13 +1454,13 @@ export default function SupportPage() {
                         }}
                       />
                       <div className="text-xs text-neutral-500 mt-1 text-right">
-                        {messageText.length}/{MESSAGE_MAX_LENGTH}
+                        {newTicketMessage.length}/{MESSAGE_MAX_LENGTH}
                       </div>
                     </div>
                     <div className="flex gap-2">
                       <button
                         onClick={handleCreateTicket}
-                        disabled={!newTicketSubject.trim() || !messageText.trim() || isCreatingTicket}
+                        disabled={!newTicketSubject.trim() || !newTicketMessage.trim() || isCreatingTicket}
                         className="flex-1 px-3 py-1.5 bg-primary-500 hover:bg-primary-400 disabled:bg-neutral-700 disabled:text-neutral-500 text-white text-sm rounded-lg transition-colors"
                       >
                         {isCreatingTicket ? 'Создание...' : 'Создать'}
@@ -1345,8 +1468,7 @@ export default function SupportPage() {
                       <button
                         onClick={() => {
                           setShowNewTicketForm(false);
-                          setNewTicketSubject('');
-                          setMessageText('');
+                          // Поля очистятся автоматически после анимации
                         }}
                         className="px-3 py-1.5 bg-neutral-700 hover:bg-neutral-600 text-white text-sm rounded-lg transition-colors"
                       >
@@ -1380,6 +1502,10 @@ export default function SupportPage() {
                             messages: []
                           };
                           setActiveTicket(ticketData);
+                          // Сохраняем ID последнего открытого тикета
+                          if (typeof window !== 'undefined') {
+                            localStorage.setItem('support_last_ticket_id', ticket.id);
+                          }
                           // Сбрасываем счетчик сообщений при смене тикета
                           setMessagesSentCount(0);
                           setLastMessageTime(null);
@@ -1428,7 +1554,8 @@ export default function SupportPage() {
               <div className="bg-neutral-900 border border-white/10 rounded-2xl flex-1 flex flex-col overflow-hidden">
                 {activeTicket ? (
                   <>
-                    <div className="p-3 sm:p-4 border-b border-white/10 flex-shrink-0">
+                    <div ref={chatAreaRef} className="flex-1 flex flex-col min-h-0 overflow-hidden">
+                      <div className="p-3 sm:p-4 border-b border-white/10 flex-shrink-0">
                       <div className="flex items-center justify-between gap-2">
                         <div className="min-w-0 flex-1">
                           <h3 className="text-sm sm:text-lg font-semibold truncate">{activeTicket.subject}</h3>
@@ -1498,7 +1625,11 @@ export default function SupportPage() {
                                 triggerShake('message');
                               }
                             }}
-                            onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
+                            onKeyPress={(e) => {
+                              if (e.key === 'Enter' && !e.shiftKey && !isSendingMessage) {
+                                handleSendMessage();
+                              }
+                            }}
                             placeholder={timeoutSeconds > 0 ? "Ожидание.." : "Напишите сообщение..."}
                             disabled={timeoutSeconds > 0}
                             className="w-full min-w-0 px-3 py-2 sm:px-4 text-sm sm:text-base bg-neutral-800 border border-white/10 rounded-xl text-white focus:outline-none focus:border-primary-500 disabled:opacity-50 pr-10"
@@ -1519,12 +1650,13 @@ export default function SupportPage() {
                         </div>
                         <button
                           onClick={handleSendMessage}
-                          disabled={!messageText.trim() || timeoutSeconds > 0}
+                          disabled={!messageText.trim() || timeoutSeconds > 0 || isSendingMessage}
                           className="px-4 sm:px-6 py-2 bg-primary-500 hover:bg-primary-400 disabled:bg-neutral-700 text-white rounded-xl transition-colors text-sm sm:text-base"
                         >
-                          Отправить
+                          {isSendingMessage ? 'Отправка...' : 'Отправить'}
                         </button>
                       </div>
+                    </div>
                     </div>
                   </>
                 ) : (

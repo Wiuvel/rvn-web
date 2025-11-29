@@ -70,8 +70,8 @@ function handleAuth(request: NextRequest, pathname: string): NextResponse | null
     
     const urlToken = pathname.split('/dashboard/')[1];
     if (urlToken && urlToken !== dashboardToken) {
-      const retpatch = encodeURIComponent(pathname);
-      return NextResponse.redirect(new URL(`/auth?retpatch=${retpatch}`, request.url));
+      // Если токен в URL не совпадает с токеном пользователя, редиректим на правильный dashboard
+      return NextResponse.redirect(new URL(`/dashboard/${dashboardToken}`, request.url));
     }
     
     return NextResponse.next();

@@ -124,7 +124,7 @@ export async function POST(
     }
 
     // Проверяем, что тикет не закрыт (для пользователей)
-    if (!isSupport && (ticket.status === 'closed' || ticket.status === 'resolved')) {
+    if (!isSupport && ticket.status === 'closed') {
       return setCorsHeaders(
         NextResponse.json(
           { error: ERROR_CANNOT_SEND_TO_CLOSED_TICKET },
@@ -134,7 +134,7 @@ export async function POST(
     }
 
     // Если тикет был закрыт, но ответил поддержка - открываем его
-    if (isSupport && (ticket.status === 'closed' || ticket.status === 'resolved')) {
+    if (isSupport && ticket.status === 'closed') {
       await supabaseAdmin
         .from('support_tickets')
         .update({ status: 'open', closed_at: null })

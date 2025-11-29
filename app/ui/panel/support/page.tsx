@@ -21,7 +21,7 @@ interface AuthState {
 interface Ticket {
   id: string;
   subject: string;
-  status: 'open' | 'closed' | 'pending' | 'resolved';
+  status: 'open' | 'closed' | 'pending';
   priority: 'low' | 'normal' | 'high' | 'urgent';
   created_at: string;
   updated_at: string;
@@ -754,20 +754,16 @@ export default function SupportPanel() {
       }
       
       if (statusFilter === 'archive') {
-        // Для архива получаем закрытые и решенные тикеты
-        const [closedRes, resolvedRes] = await Promise.all([
-          fetchWithRateLimit('/api/support/tickets?status=closed', { credentials: 'include' }, fetchTickets),
-          fetchWithRateLimit('/api/support/tickets?status=resolved', { credentials: 'include' }, fetchTickets)
-        ]);
+        // Для архива получаем закрытые тикеты
+        const closedRes = await fetchWithRateLimit('/api/support/tickets?status=closed', { credentials: 'include' }, fetchTickets);
         
-        // Проверяем актуальность фильтра после запросов
+        // Проверяем актуальность фильтра после запроса
         if (currentFilterRef.current !== 'archive' || abortController.signal.aborted) {
           setTicketsLoading(false);
           return; // Фильтр изменился или запрос отменен
         }
         
         const closedData = await closedRes.json();
-        const resolvedData = await resolvedRes.json();
         
         // Еще раз проверяем актуальность перед обработкой данных
         if (currentFilterRef.current !== 'archive' || abortController.signal.aborted) {
@@ -775,13 +771,10 @@ export default function SupportPanel() {
           return;
         }
         
-        let tickets = [
-          ...(closedData.tickets || []),
-          ...(resolvedData.tickets || [])
-        ].map((t: {
+        let tickets = (closedData.tickets || []).map((t: {
           id: string;
           subject: string;
-          status: 'open' | 'closed' | 'pending' | 'resolved';
+          status: 'open' | 'closed' | 'pending';
           priority?: 'low' | 'normal' | 'high' | 'urgent';
           created_at: string;
           updated_at: string;
@@ -837,7 +830,7 @@ export default function SupportPanel() {
           if (!activeTicket && count > 0) {
             const lastTicketId = localStorage.getItem('support_panel_last_ticket_id');
             if (lastTicketId) {
-              const ticket = tickets.find(t => t.id === lastTicketId);
+              const ticket = tickets.find((t: Ticket) => t.id === lastTicketId);
               if (ticket) {
                 // Небольшая задержка для корректного обновления state
                 setTimeout(() => {
@@ -878,7 +871,7 @@ export default function SupportPanel() {
         ].map((t: {
           id: string;
           subject: string;
-          status: 'open' | 'closed' | 'pending' | 'resolved';
+          status: 'open' | 'closed' | 'pending';
           priority?: 'low' | 'normal' | 'high' | 'urgent';
           created_at: string;
           updated_at: string;
@@ -934,7 +927,7 @@ export default function SupportPanel() {
           if (!activeTicket && count > 0) {
             const lastTicketId = localStorage.getItem('support_panel_last_ticket_id');
             if (lastTicketId) {
-              const ticket = tickets.find(t => t.id === lastTicketId);
+              const ticket = tickets.find((t: Ticket) => t.id === lastTicketId);
               if (ticket) {
                 // Небольшая задержка для корректного обновления state
                 setTimeout(() => {
@@ -1165,8 +1158,8 @@ export default function SupportPanel() {
     try {
       const currentTicket = tickets.find(t => t.id === ticketId) || activeTicket;
       
-      // Архивные тикеты (closed, resolved) не могут быть закреплены/отвязаны
-      if (currentTicket && (currentTicket.status === 'closed' || currentTicket.status === 'resolved')) {
+      // Архивные тикеты (closed) не могут быть закреплены/отвязаны
+      if (currentTicket && currentTicket.status === 'closed') {
         showNotification('Архивные тикеты не могут быть закреплены или отвязаны', 'error');
         return;
       }
@@ -1296,7 +1289,7 @@ export default function SupportPanel() {
     try {
       // Проверяем, не является ли текущий тикет архивным
       const currentTicket = tickets.find(t => t.id === ticketId) || activeTicket;
-      if (currentTicket && (currentTicket.status === 'closed' || currentTicket.status === 'resolved')) {
+      if (currentTicket && currentTicket.status === 'closed') {
         showNotification('Статус архивных тикетов нельзя изменить', 'error');
         return;
       }
@@ -1317,7 +1310,7 @@ export default function SupportPanel() {
       const data = await response.json();
 
       if (response.ok && data.ticket) {
-        const newStatus = status as 'open' | 'pending' | 'resolved' | 'closed';
+        const newStatus = status as 'open' | 'pending' | 'closed';
         const wasActive = activeTicket?.status === 'open' || activeTicket?.status === 'pending';
         const isNowActive = newStatus === 'open' || newStatus === 'pending';
         const statusCategoryChanged = wasActive !== isNowActive;
@@ -1374,8 +1367,8 @@ export default function SupportPanel() {
             // Если фильтр уже правильный, просто обновляем список
             await fetchTickets();
           }
-        } else if (newStatus === 'closed' || newStatus === 'resolved') {
-          // Если тикет закрыт или решен, но мы уже в архиве - просто обновляем список
+        } else if (newStatus === 'closed') {
+          // Если тикет закрыт, но мы уже в архиве - просто обновляем список
           // чтобы новый тикет появился в архиве
           if (statusFilter === 'archive') {
             await fetchTickets();
@@ -1438,7 +1431,6 @@ export default function SupportPanel() {
       case 'pending':
         return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
       case 'closed':
-      case 'resolved':
         return 'bg-neutral-500/20 text-neutral-400 border-neutral-500/30';
       default:
         return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
@@ -1455,7 +1447,7 @@ export default function SupportPanel() {
   // Проверка, является ли тикет старым (37+ минут без ответа)
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const isTicketOld = (_ticket: Ticket): boolean => {
-    if (_ticket.status === 'closed' || _ticket.status === 'resolved') return false;
+    if (_ticket.status === 'closed') return false;
     
     const lastMessageTime = new Date(_ticket.last_message_at).getTime();
     const now = Date.now();
@@ -1467,7 +1459,7 @@ export default function SupportPanel() {
   // Получить цвет для надписи "UP" в зависимости от давности тикета
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const getUpLabelColor = (_ticket: Ticket): string => {
-    if (_ticket.status === 'closed' || _ticket.status === 'resolved') return '';
+    if (_ticket.status === 'closed') return '';
     
     const lastMessageTime = new Date(_ticket.last_message_at).getTime();
     const now = Date.now();
@@ -1489,7 +1481,7 @@ export default function SupportPanel() {
   // Получить текст индикатора давности
   const getTicketUrgencyText = (ticket: Ticket): string => {
     if (statusFilter === 'archive') return '';
-    if (ticket.status === 'closed' || ticket.status === 'resolved') return '';
+    if (ticket.status === 'closed') return '';
     
     const lastMessageTime = new Date(ticket.last_message_at).getTime();
     const now = Date.now();
@@ -1506,7 +1498,7 @@ export default function SupportPanel() {
   // Получить цвет текста индикатора
   const getTicketUrgencyTextColor = (ticket: Ticket): string => {
     if (statusFilter === 'archive') return '';
-    if (ticket.status === 'closed' || ticket.status === 'resolved') return '';
+    if (ticket.status === 'closed') return '';
     
     const lastMessageTime = new Date(ticket.last_message_at).getTime();
     const now = Date.now();
@@ -1780,8 +1772,8 @@ export default function SupportPanel() {
                   key={ticket.id}
                   onClick={() => {
                     if (ticketsLoading) return; // Блокируем только во время загрузки
-                    // Для архивных тикетов (closed, resolved) не проверяем привязку - они доступны всем саппортам
-                    const isArchived = ticket.status === 'closed' || ticket.status === 'resolved';
+                    // Для архивных тикетов (closed) не проверяем привязку - они доступны всем саппортам
+                    const isArchived = ticket.status === 'closed';
                     // Проверяем, не занят ли тикет другим саппортом (только для активных тикетов)
                     if (!isArchived && ticket.assigned_to && ticket.assigned_to !== authState.userId) {
                       showNotification('Данный тикет уже закреплен за другим саппортом', 'error');
@@ -1796,7 +1788,7 @@ export default function SupportPanel() {
                   }}
                   className={`p-4 rounded-lg border transition-all ${
                     // Для архивных тикетов не блокируем, для активных - только если назначен другому
-                    (ticket.status === 'closed' || ticket.status === 'resolved') || 
+                    ticket.status === 'closed' || 
                     !(ticket.assigned_to && ticket.assigned_to !== authState.userId)
                       ? 'cursor-pointer'
                       : ''
@@ -1808,7 +1800,7 @@ export default function SupportPanel() {
                 >
                   <div className={`flex items-start justify-between mb-2 ${
                     // Применяем opacity только к заголовку и статусу, если тикет назначен другому
-                    (ticket.status !== 'closed' && ticket.status !== 'resolved') && 
+                    ticket.status !== 'closed' && 
                     ticket.assigned_to && ticket.assigned_to !== authState.userId
                       ? 'opacity-50'
                       : ''
@@ -1819,13 +1811,13 @@ export default function SupportPanel() {
                     <span className={`ml-2 px-2 py-0.5 text-xs rounded border flex-shrink-0 ${getStatusColor(ticket.status)}`}>
                       {ticket.status === 'open' ? 'Открыт' :
                        ticket.status === 'pending' ? 'В работе' :
-                       ticket.status === 'resolved' ? 'Решен' : 'Закрыт'}
+                       'Закрыт'}
                     </span>
                   </div>
                   {ticket.user && (
                     <div className={`flex items-baseline gap-1 mb-1 ${
                       // Применяем opacity к информации о пользователе, если тикет назначен другому
-                      (ticket.status !== 'closed' && ticket.status !== 'resolved') && 
+                      ticket.status !== 'closed' && 
                       ticket.assigned_to && ticket.assigned_to !== authState.userId
                         ? 'opacity-50'
                         : ''
@@ -1837,7 +1829,7 @@ export default function SupportPanel() {
                   <div className="flex items-center justify-between">
                     <p className={`text-xs text-neutral-500 ${
                       // Применяем opacity к дате, если тикет назначен другому
-                      (ticket.status !== 'closed' && ticket.status !== 'resolved') && 
+                      ticket.status !== 'closed' && 
                       ticket.assigned_to && ticket.assigned_to !== authState.userId
                         ? 'opacity-50'
                         : ''
@@ -1937,12 +1929,11 @@ export default function SupportPanel() {
                   >
                     <option value="open">Открыт</option>
                     <option value="pending">В работе</option>
-                    <option value="resolved">Решен</option>
                     <option value="closed">Закрыт</option>
                   </select>
                 ) : (
                   <div className="w-full px-3 py-2 bg-neutral-700 border border-neutral-600 rounded-lg text-white text-sm">
-                    {activeTicket.status === 'closed' ? 'Закрыт' : 'Решен'}
+                    Закрыт
                   </div>
                 )}
               </div>
@@ -2061,7 +2052,7 @@ export default function SupportPanel() {
                 </div>
                 
                 {/* Input */}
-                {activeTicket.status !== 'closed' && activeTicket.status !== 'resolved' && (
+                {activeTicket.status !== 'closed' && (
                   <>
                     {/* Для активных тикетов проверяем привязку, для архивных - не проверяем */}
                     {activeTicket.assigned_to && activeTicket.assigned_to !== authState.userId ? (
@@ -2098,7 +2089,7 @@ export default function SupportPanel() {
                     )}
                   </>
                 )}
-                {(activeTicket.status === 'closed' || activeTicket.status === 'resolved') && (
+                {activeTicket.status === 'closed' && (
                   <div className="border-t border-neutral-800 p-3 bg-neutral-900/50 flex-shrink-0">
                     <div className="text-center py-2">
                       <p className="text-sm text-neutral-400">Тикет закрыт. Новые сообщения недоступны.</p>
@@ -2217,19 +2208,18 @@ export default function SupportPanel() {
                     >
                       <option value="open" className="bg-neutral-800 text-white">Открыт</option>
                       <option value="pending" className="bg-neutral-800 text-white">В работе</option>
-                      <option value="resolved" className="bg-neutral-800 text-white">Решен</option>
                       <option value="closed" className="bg-neutral-800 text-white">Закрыт</option>
                     </select>
                   </div>
                 )}
                 {/* Для архивных тикетов показываем только информацию о статусе */}
-                {(activeTicket.status === 'closed' || activeTicket.status === 'resolved') && (
+                {activeTicket.status === 'closed' && (
                   <div className="mt-3 bg-neutral-800 border border-neutral-700 rounded-lg overflow-hidden">
                     <div className="px-3 py-2 border-b border-neutral-700">
                       <span className="text-xs text-neutral-400">Статус:</span>
                     </div>
                     <div className="px-3 py-2 text-white text-sm">
-                      {activeTicket.status === 'closed' ? 'Закрыт' : 'Решен'}
+                      Закрыт
                     </div>
                   </div>
                 )}

@@ -13,6 +13,7 @@ export const RATE_LIMIT_IMMUNITY_DURATION = appConfig.rateLimit.immunityDuration
 export const REDIRECT_DELAY = appConfig.delays.redirect;
 export const ANIMATION_DELAY = appConfig.delays.animation;
 export const RESIZE_DEBOUNCE = appConfig.delays.resizeDebounce;
+export const MARK_AS_READ_DEBOUNCE = appConfig.delays.markAsReadDebounce;
 
 // Character limits
 export const TICKET_SUBJECT_MAX_LENGTH = appConfig.limits.ticketSubjectMaxLength;

@@ -110,6 +110,8 @@ export async function GET(
     }
 
     // Получаем сообщения
+    // Для оптимизации рекомендуется применить индекс idx_support_messages_ticket_created
+    // См. database_migration_add_support_indexes.sql
     const { data: messages, error: messagesError } = await supabaseAdmin
       .from('support_messages')
       .select(`
@@ -249,12 +251,16 @@ export async function PUT(
     const oldAssignedTo = currentTicket.assigned_to;
 
     // Валидация переходов статусов
+    // Если пытаются установить "resolved", автоматически заменяем на "closed"
+    if (status === 'resolved') {
+      status = 'closed';
+    }
+    
     if (status && oldStatus !== status) {
       // Определяем допустимые переходы статусов
       const allowedTransitions: Record<string, string[]> = {
         'open': ['pending'], // Открыт → только В работе (при взятии)
-        'pending': ['resolved', 'closed'], // В работе → Решен или Закрыт
-        'resolved': ['closed'], // Решен → только Закрыт
+        'pending': ['closed'], // В работе → Закрыт
         'closed': [] // Закрыт → нельзя менять (финальный статус)
       };
 
@@ -277,7 +283,7 @@ export async function PUT(
 
       // Проверка прав на изменение статуса
       // Для изменения статуса тикет должен быть назначен текущему саппорту
-      // Исключение: взятие тикета (open → pending) и закрытие (pending/resolved → closed)
+      // Исключение: взятие тикета (open → pending) и закрытие (pending → closed)
       if (status !== 'pending' || oldStatus !== 'open') {
         // Если это не взятие тикета, проверяем назначение
         if (oldAssignedTo !== user.id) {
@@ -321,15 +327,15 @@ export async function PUT(
       }
     }
 
-    const updateData: { status?: string; closed_at?: string; assigned_to?: string | null; priority?: string } = {};
-    if (status && ['open', 'closed', 'pending', 'resolved'].includes(status)) {
+    const updateData: { status?: string; closed_at?: string | null; assigned_to?: string | null; priority?: string } = {};
+    if (status && ['open', 'closed', 'pending'].includes(status)) {
       updateData.status = status;
-      if (status === 'closed' || status === 'resolved') {
+      if (status === 'closed') {
         updateData.closed_at = new Date().toISOString();
-      } else if ((oldStatus === 'closed' || oldStatus === 'resolved') && (status === 'open' || status === 'pending')) {
+      } else if (oldStatus === 'closed' && (status === 'open' || status === 'pending')) {
         // Если тикет открывается из закрытого состояния, очищаем closed_at
-        // Используем undefined, чтобы Supabase не устанавливал null явно
-        delete updateData.closed_at;
+        // Явно устанавливаем null для корректного обновления в БД
+        updateData.closed_at = null;
       }
     }
     if (assignedTo !== undefined) {
@@ -388,11 +394,10 @@ export async function PUT(
         const statusNames: Record<string, string> = {
           'open': 'Открыт',
           'pending': 'В работе',
-          'resolved': 'Решен',
           'closed': 'Закрыт'
         };
         const newStatusName = statusNames[status] || status;
-        messageText = `Статус обращение изменен на [${newStatusName}]`;
+        messageText = `Статус обращения изменен на [${newStatusName}]`;
       }
 
       // Создаем системное сообщение о смене статуса

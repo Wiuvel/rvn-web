@@ -46,7 +46,8 @@ export const appConfig = {
   delays: {
     redirect: 1000, // 1 секунда
     animation: 250, // 250ms
-    resizeDebounce: 100 // 100ms
+    resizeDebounce: 100, // 100ms
+    markAsReadDebounce: 2000 // 2 секунды - debounce для отметки сообщений как прочитанных
   },
 
   // Character limits

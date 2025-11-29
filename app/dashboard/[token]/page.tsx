@@ -88,7 +88,8 @@ export default function DashboardPage() {
             }
             // Проверяем что токен совпадает
             if (data.dashboard_token !== token) {
-              router.push('/auth');
+              // Если токен в URL не совпадает с токеном пользователя, редиректим на правильный dashboard
+              router.push(`/dashboard/${data.dashboard_token}`);
               return;
             }
             setUserData(data);
