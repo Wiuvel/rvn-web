@@ -7,18 +7,41 @@ interface RateLimitStore {
 }
 
 import { RATE_LIMIT_CLEANUP_INTERVAL, RATE_LIMIT_IMMUNITY_DURATION } from './constants';
+import { getClientIP } from './ip-validator';
 
 const store: RateLimitStore = {};
 
-// Периодическая очистка устаревших записей
-setInterval(() => {
-  const now = Date.now();
-  Object.keys(store).forEach(key => {
-    if (store[key].resetTime < now) {
+// Оптимизированная структура для отслеживания времени истечения
+// Используем Map для более эффективной очистки
+const expirationTimes = new Map<string, number>();
+
+// Периодическая очистка устаревших записей (оптимизированная версия)
+let cleanupInterval: NodeJS.Timeout | null = null;
+
+function startCleanupInterval() {
+  if (cleanupInterval) return;
+  
+  cleanupInterval = setInterval(() => {
+    const now = Date.now();
+    const keysToDelete: string[] = [];
+    
+    // Проходим только по ключам, которые точно истекли
+    expirationTimes.forEach((expirationTime, key) => {
+      if (expirationTime < now) {
+        keysToDelete.push(key);
+      }
+    });
+    
+    // Удаляем истекшие записи
+    keysToDelete.forEach(key => {
       delete store[key];
-    }
-  });
-}, RATE_LIMIT_CLEANUP_INTERVAL);
+      expirationTimes.delete(key);
+    });
+  }, RATE_LIMIT_CLEANUP_INTERVAL);
+}
+
+// Запускаем очистку при первом импорте
+startCleanupInterval();
 
 export interface RateLimitOptions {
   windowMs: number;
@@ -38,9 +61,8 @@ export class RateLimiter {
       return this.options.keyGenerator(request);
     }
     
-    const forwarded = request.headers.get('x-forwarded-for');
-    const ip = forwarded ? forwarded.split(',')[0] : 'unknown';
-    return ip;
+    // Используем валидированную функцию для получения IP
+    return getClientIP(request);
   }
 
   async check(request: Request): Promise<{
@@ -85,15 +107,17 @@ export class RateLimiter {
     }
     
     if (!store[key] || store[key].resetTime < windowStart) {
+      const resetTime = now + this.options.windowMs;
       store[key] = {
         count: 1,
-        resetTime: now + this.options.windowMs
+        resetTime
       };
+      expirationTimes.set(key, resetTime);
       
       return {
         allowed: true,
         remaining: this.options.maxRequests - 1,
-        resetTime: store[key].resetTime
+        resetTime
       };
     }
     
@@ -118,6 +142,7 @@ export class RateLimiter {
     const key = this.getKey(request);
     if (store[key]) {
       delete store[key];
+      expirationTimes.delete(key);
       return true;
     }
     return false;
@@ -142,6 +167,7 @@ export class RateLimiter {
       resetTime: immuneUntil, // Устанавливаем resetTime на время иммунитета
       immuneUntil: immuneUntil // Устанавливаем иммунитет
     };
+    expirationTimes.set(key, immuneUntil);
     
     // Возвращаем время истечения для синхронизации с cookie
     return immuneUntil;
@@ -151,6 +177,17 @@ export class RateLimiter {
     Object.keys(store).forEach(key => {
       delete store[key];
     });
+    expirationTimes.clear();
+  }
+  
+  /**
+   * Очищает интервал очистки (для тестирования или graceful shutdown)
+   */
+  static cleanup(): void {
+    if (cleanupInterval) {
+      clearInterval(cleanupInterval);
+      cleanupInterval = null;
+    }
   }
 }
 
@@ -158,8 +195,7 @@ export const authRateLimit = new RateLimiter({
   windowMs: 5 * 60 * 1000,
   maxRequests: 5,
   keyGenerator: (request) => {
-    const forwarded = request.headers.get('x-forwarded-for');
-    const ip = forwarded ? forwarded.split(',')[0] : 'unknown';
+    const ip = getClientIP(request);
     const userAgent = request.headers.get('user-agent') || '';
     return `${ip}-${userAgent.slice(0, 50)}`;
   }

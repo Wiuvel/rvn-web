@@ -205,8 +205,8 @@ export default function Header() {
             <Image 
               src="/static/logo.svg" 
               alt="RVNPrivate" 
-              width={24} 
-              height={24} 
+              width={256} 
+              height={256} 
               className="w-6 h-6"
               priority
             />
@@ -286,9 +286,9 @@ export default function Header() {
                 <Image 
                   src="/static/icons/accounts/log-in.svg" 
                   alt="Войти" 
-                  width={16} 
-                  height={16} 
-                  className="w-4 h-4"
+                  width={24} 
+                  height={24} 
+                  className="w-5 h-5"
                 />
                 <span>Войти</span>
               </Link>
@@ -343,8 +343,8 @@ export default function Header() {
                       <Image 
                         src="/static/icons/accounts/users.svg" 
                         alt="Профиль" 
-                        width={20} 
-                        height={20} 
+                        width={24} 
+                        height={24} 
                         className="w-5 h-5"
                       />
                       <span>Профиль</span>
@@ -357,8 +357,8 @@ export default function Header() {
                       <Image 
                         src="/static/icons/accounts/wallet.svg" 
                         alt="Мои тарифы" 
-                        width={20} 
-                        height={20} 
+                        width={24} 
+                        height={24} 
                         className="w-5 h-5"
                       />
                       <span>Мои тарифы</span>
@@ -371,8 +371,8 @@ export default function Header() {
                       <Image 
                         src="/static/icons/accounts/support.svg" 
                         alt="Поддержка" 
-                        width={20} 
-                        height={20} 
+                        width={24} 
+                        height={24} 
                         className="w-5 h-5"
                       />
                       <span>Поддержка</span>
@@ -397,8 +397,8 @@ export default function Header() {
                       <Image 
                         src="/static/icons/accounts/log-out.svg" 
                         alt="Выйти" 
-                        width={20} 
-                        height={20} 
+                        width={24} 
+                        height={24} 
                         className="w-5 h-5"
                       />
                       <span>Выйти</span>

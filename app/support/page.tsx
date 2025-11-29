@@ -8,6 +8,7 @@ import { gsap } from 'gsap';
 import { MESSAGE_MAX_LENGTH, TICKET_SUBJECT_MAX_LENGTH, MAX_TICKETS_PER_USER, MESSAGE_TIMEOUT, AUTH_FETCH_TIMEOUT, GSAP_DEFAULT_DURATION, GSAP_DEFAULT_EASE } from '@/lib/constants';
 import { translateError } from '@/lib/error-translations';
 import RateLimitCaptcha from '@/components/RateLimitCaptcha';
+import { getGradientClasses } from '@/lib/avatar-gradients';
 
 interface UserData {
   id: string;
@@ -16,6 +17,7 @@ interface UserData {
   dashboard_token: string;
   created_at: string;
   last_login?: string;
+  avatar_gradient?: string | null;
 }
 
 interface Message {
@@ -63,6 +65,11 @@ function MessageItem({
       );
     }
   }, [message.id]);
+
+  // Функция для получения инициалов
+  const getInitial = (username: string) => {
+    return username.charAt(0).toUpperCase();
+  };
 
   // Определяем, является ли сообщение системным
   const SYSTEM_MESSAGE_TEXT = 'Спасибо за ваше сообщение. Мы получили ваш запрос и ответим в ближайшее время.';
@@ -116,8 +123,8 @@ function MessageItem({
                 <Image 
                   src="/static/logo.svg" 
                   alt="Support" 
-                  width={36} 
-                  height={36} 
+                  width={256} 
+                  height={256} 
                   className="w-5 h-5 sm:w-9 sm:h-9"
                 />
               </div>
@@ -1065,7 +1072,7 @@ export default function SupportPage() {
         <div className="mx-auto max-w-6xl px-4">
           <div className="backdrop-blur-lg bg-neutral-900/40 border border-white/10 rounded-full px-6 py-3 flex items-center justify-between shadow-lg">
             <Link href="/" className="flex items-center gap-2">
-              <Image src="/static/logo.svg" alt="Raven Logo" width={24} height={24} className="w-6 h-6" priority/>
+              <Image src="/static/logo.svg" alt="Raven Logo" width={256} height={256} className="w-6 h-6" priority/>
               <span className="font-semibold text-white">Raven Private</span>
             </Link>
             <nav className="hidden lg:flex items-center gap-8 text-sm text-neutral-300">
@@ -1076,7 +1083,7 @@ export default function SupportPage() {
               <div className="hidden lg:flex items-center gap-2 relative" ref={userMenuRef}>
                 <button
                   onClick={() => setUserMenuOpen(!userMenuOpen)}
-                  className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold text-sm shadow-glow transition-transform duration-200 hover:scale-110 cursor-pointer"
+                  className={`w-10 h-10 rounded-full ${getGradientClasses(userData.avatar_gradient)} flex items-center justify-center text-white font-semibold text-sm shadow-glow transition-transform duration-200 hover:scale-110 cursor-pointer`}
                   title={userData.username}
                   aria-label="Меню пользователя"
                   aria-expanded={userMenuOpen}
@@ -1094,7 +1101,7 @@ export default function SupportPage() {
                       className="block p-4 border-b border-white/10 hover:bg-white/5 transition-colors duration-200 cursor-pointer mx-2 my-1 rounded-xl"
                     >
                       <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold text-base flex-shrink-0">
+                        <div className={`w-12 h-12 rounded-full ${getGradientClasses(userData.avatar_gradient)} flex items-center justify-center text-white font-semibold text-base flex-shrink-0`}>
                           {getInitial(userData.username)}
                         </div>
                         <div className="min-w-0 flex-1">
@@ -1180,7 +1187,7 @@ export default function SupportPage() {
                   className="block p-4 border-b border-white/10 hover:bg-white/5 transition-colors duration-200 cursor-pointer mx-2 my-1 rounded-xl"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold text-base flex-shrink-0">
+                    <div className={`w-12 h-12 rounded-full ${getGradientClasses(userData.avatar_gradient)} flex items-center justify-center text-white font-semibold text-base flex-shrink-0`}>
                       {getInitial(userData.username)}
                     </div>
                     <div className="min-w-0 flex-1">

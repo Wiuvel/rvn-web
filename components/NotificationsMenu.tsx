@@ -17,7 +17,7 @@ export function NotificationsMenu({
   notifications,
   readNotifications,
   isOpen,
-  onClose: _onClose, // Не используется, но нужен для совместимости с интерфейсом
+  onClose: _onClose, // eslint-disable-line @typescript-eslint/no-unused-vars
   onMarkAsRead,
   menuRef: externalMenuRef
 }: NotificationsMenuProps) {

@@ -2,17 +2,29 @@
 
 import Link from 'next/link';
 import { useFadeIn } from '@/hooks/useGSAP';
+import { useState, useEffect } from 'react';
+import LegalNavigation from '@/components/LegalNavigation';
+import PolicyCardSkeleton from '@/components/PolicyCardSkeleton';
 
 export default function PrivacyPolicyPage() {
   const titleRef = useFadeIn(0.1);
-  const contentRef = useFadeIn(0.2);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    // Симуляция загрузки контента
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, []);
 
   return (
     <div className="legal-page">
       <div className="legal-container">
         <header className="legal-header">
           <Link href="/" className="back-btn">
-            ← На главную
+            <span className="back-text">← На главную</span>
+            <span className="back-arrow">←</span>
           </Link>
           <div className="logo">Raven Private</div>
         </header>
@@ -25,14 +37,17 @@ export default function PrivacyPolicyPage() {
             </p>
           </div>
           
-          <div ref={contentRef} className="policy-card">
+          <div className="legal-content-wrapper">
+            <div className="legal-main-content">
+              <LegalNavigation />
+              {isLoading ? (
+                <PolicyCardSkeleton />
+              ) : (
+              <div className="policy-card">
             <h2><strong>1. Общие положения</strong></h2>
             <p>
               Настоящая Политика конфиденциальности (далее — «Политика») определяет порядок обработки и защиты 
               персональных данных пользователей сервиса Raven Private (далее — «Сервис», «Мы»). 
-              Политика разработана в соответствии с Федеральным законом от 27.07.2006 № 152-ФЗ 
-              «О персональных данных» и иными нормативными правовыми актами Российской Федерации, 
-              регулирующими вопросы обработки персональных данных.
             </p>
             <p>
               Raven Private предоставляет услуги прокси-соединений с использованием протокола VLESS. 
@@ -339,6 +354,9 @@ export default function PrivacyPolicyPage() {
             
             <div className="last-updated">
               Последнее обновление: {new Date().toLocaleDateString('ru-RU', { year: 'numeric', month: 'long', day: 'numeric' })}
+            </div>
+              </div>
+              )}
             </div>
           </div>
         </main>

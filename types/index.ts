@@ -15,4 +15,78 @@ export interface Notification {
   created_at: string;
 }
 
+/**
+ * Базовый тип для API ответов
+ */
+export interface ApiResponse<T = unknown> {
+  success?: boolean;
+  data?: T;
+  error?: string;
+}
+
+/**
+ * Типы для Support API
+ */
+export interface Ticket {
+  id: string;
+  user_id: string;
+  subject: string;
+  status: 'open' | 'closed' | 'pending' | 'resolved';
+  created_at: string;
+  updated_at: string;
+  last_message_at: string | null;
+  assigned_to: string | null;
+  user?: {
+    id: string;
+    username: string;
+    user_id: string;
+    avatar_gradient?: string | null;
+  };
+  assigned_user?: {
+    id: string;
+    username: string;
+    user_id: string;
+    avatar_gradient?: string | null;
+  } | null;
+}
+
+export interface SupportMessage {
+  id: string;
+  ticket_id: string;
+  sender_id: string;
+  sender_type: 'user' | 'support';
+  message_text: string;
+  created_at: string;
+  sender?: {
+    id: string;
+    username: string;
+    user_id: string;
+    avatar_gradient?: string | null;
+  };
+}
+
+export interface TicketsResponse extends ApiResponse {
+  tickets: Ticket[];
+}
+
+export interface TicketResponse extends ApiResponse {
+  ticket: Ticket;
+  messages: SupportMessage[];
+}
+
+/**
+ * Типы для Auth API
+ */
+export interface AuthResponse extends ApiResponse {
+  user?: UserData;
+  dashboardToken?: string;
+}
+
+/**
+ * Типы для Admin API
+ */
+export interface AdminUsersResponse extends ApiResponse {
+  users?: UserData[];
+  total?: number;
+}
 

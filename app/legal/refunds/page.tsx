@@ -2,17 +2,28 @@
 
 import Link from 'next/link';
 import { useFadeIn } from '@/hooks/useGSAP';
+import { useState, useEffect } from 'react';
+import LegalNavigation from '@/components/LegalNavigation';
+import PolicyCardSkeleton from '@/components/PolicyCardSkeleton';
 
 export default function RefundPolicyPage() {
   const titleRef = useFadeIn(0.1);
-  const contentRef = useFadeIn(0.2);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, []);
 
   return (
     <div className="legal-page">
       <div className="legal-container">
         <header className="legal-header">
           <Link href="/" className="back-btn">
-            ← На главную
+            <span className="back-text">← На главную</span>
+            <span className="back-arrow">←</span>
           </Link>
           <div className="logo">Raven Private</div>
         </header>
@@ -25,7 +36,13 @@ export default function RefundPolicyPage() {
             </p>
           </div>
           
-          <div ref={contentRef} className="policy-card">
+          <div className="legal-content-wrapper">
+            <div className="legal-main-content">
+              <LegalNavigation />
+              {isLoading ? (
+                <PolicyCardSkeleton />
+              ) : (
+              <div className="policy-card">
             <h2><strong>1. Общие положения</strong></h2>
             <p>
               Настоящая Политика возвратов (далее — «Политика») регулирует условия и порядок возврата 
@@ -305,6 +322,9 @@ export default function RefundPolicyPage() {
             
             <div className="last-updated">
               Последнее обновление: {new Date().toLocaleDateString('ru-RU', { year: 'numeric', month: 'long', day: 'numeric' })}
+            </div>
+              </div>
+              )}
             </div>
           </div>
         </main>

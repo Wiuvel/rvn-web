@@ -1,6 +1,6 @@
-import { randomBytes } from 'crypto';
 import { cookies } from 'next/headers';
 import { SESSION_TIMEOUT, SESSION_CLEANUP_INTERVAL } from './constants';
+import { generateSessionId as generateSessionIdUtil } from './utils';
 
 interface SessionData {
   id: string;
@@ -18,18 +18,43 @@ interface SessionStore {
 
 const sessions: SessionStore = {};
 
-setInterval(() => {
-  const now = Date.now();
-  Object.keys(sessions).forEach((sessionId) => {
-    if (now - sessions[sessionId].lastActivity > SESSION_TIMEOUT) {
+// Оптимизированная структура для отслеживания времени истечения
+const sessionExpirationTimes = new Map<string, number>();
+
+let sessionCleanupInterval: NodeJS.Timeout | null = null;
+
+function startSessionCleanup() {
+  if (sessionCleanupInterval) return;
+  
+  sessionCleanupInterval = setInterval(() => {
+    const now = Date.now();
+    const keysToDelete: string[] = [];
+    
+    // Проходим только по ключам, которые точно истекли
+    sessionExpirationTimes.forEach((expirationTime, sessionId) => {
+      if (expirationTime < now) {
+        keysToDelete.push(sessionId);
+      }
+    });
+    
+    // Удаляем истекшие записи
+    keysToDelete.forEach(sessionId => {
       delete sessions[sessionId];
-    }
-  });
-}, SESSION_CLEANUP_INTERVAL);
+      sessionExpirationTimes.delete(sessionId);
+    });
+  }, SESSION_CLEANUP_INTERVAL);
+}
+
+// Запускаем очистку при первом импорте
+startSessionCleanup();
 
 export class SessionManager {
+  /**
+   * Генерирует случайный session ID
+   * @deprecated Используйте generateSessionId из lib/utils напрямую
+   */
   static generateSessionId(): string {
-    return randomBytes(32).toString('hex');
+    return generateSessionIdUtil();
   }
 
   static createSession(
@@ -50,6 +75,8 @@ export class SessionManager {
       ipAddress,
       userAgent,
     };
+    
+    sessionExpirationTimes.set(sessionId, now + SESSION_TIMEOUT);
 
     return sessionId;
   }
@@ -59,12 +86,17 @@ export class SessionManager {
     if (!session) return null;
 
     const now = Date.now();
-    if (now - session.lastActivity > SESSION_TIMEOUT) {
+    const expirationTime = sessionExpirationTimes.get(sessionId);
+    
+    if (!expirationTime || expirationTime < now) {
       delete sessions[sessionId];
+      sessionExpirationTimes.delete(sessionId);
       return null;
     }
 
     session.lastActivity = now;
+    // Обновляем время истечения при активности
+    sessionExpirationTimes.set(sessionId, now + SESSION_TIMEOUT);
     return session;
   }
 
@@ -73,13 +105,17 @@ export class SessionManager {
     if (!session) return false;
 
     Object.assign(session, updates);
-    session.lastActivity = Date.now();
+    const now = Date.now();
+    session.lastActivity = now;
+    // Обновляем время истечения при активности
+    sessionExpirationTimes.set(sessionId, now + SESSION_TIMEOUT);
     return true;
   }
 
   static destroySession(sessionId: string): boolean {
     if (sessions[sessionId]) {
       delete sessions[sessionId];
+      sessionExpirationTimes.delete(sessionId);
       return true;
     }
     return false;
@@ -90,6 +126,7 @@ export class SessionManager {
     Object.keys(sessions).forEach((sessionId) => {
       if (sessions[sessionId].userId === userId) {
         delete sessions[sessionId];
+        sessionExpirationTimes.delete(sessionId);
         destroyed++;
       }
     });
@@ -126,5 +163,15 @@ export class SessionManager {
     }
 
     return true;
+  }
+
+  /**
+   * Очищает интервал очистки (для тестирования или graceful shutdown)
+   */
+  static cleanup(): void {
+    if (sessionCleanupInterval) {
+      clearInterval(sessionCleanupInterval);
+      sessionCleanupInterval = null;
+    }
   }
 }

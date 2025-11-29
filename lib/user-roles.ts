@@ -4,6 +4,7 @@
 
 import { supabaseAdmin } from './supabase';
 import { logger } from './secure-logger';
+import { cached } from './cache';
 
 export type UserRole = 'user' | 'support' | 'admin';
 
@@ -21,46 +22,51 @@ export interface UserRoleRecord {
 
 /**
  * Проверяет, имеет ли пользователь указанную роль
+ * Использует кэширование для оптимизации частых запросов
  */
 export async function hasUserRole(userId: string, role: UserRole): Promise<boolean> {
-  try {
-    if (!supabaseAdmin) {
-      return false;
-    }
-
-    const { data, error } = await supabaseAdmin
-      .from('user_roles')
-      .select('id')
-      .eq('user_id', userId)
-      .eq('role', role)
-      .eq('is_active', true)
-      .is('revoked_at', null)
-      .limit(1)
-      .maybeSingle();
-
-    if (error) {
-      // PGRST116 - no rows returned (это нормально, если роли нет)
-      // Другие ошибки логируем
-      if (error.code !== 'PGRST116') {
-        logger.error('Error checking user role', {
-          error: error.message,
-          code: error.code,
-          userId,
-          role
-        });
+  const cacheKey = `user_role:${userId}:${role}`;
+  
+  return cached(cacheKey, async () => {
+    try {
+      if (!supabaseAdmin) {
+        return false;
       }
+
+      const { data, error } = await supabaseAdmin
+        .from('user_roles')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('role', role)
+        .eq('is_active', true)
+        .is('revoked_at', null)
+        .limit(1)
+        .maybeSingle();
+
+      if (error) {
+        // PGRST116 - no rows returned (это нормально, если роли нет)
+        // Другие ошибки логируем
+        if (error.code !== 'PGRST116') {
+          logger.error('Error checking user role', {
+            error: error.message,
+            code: error.code,
+            userId,
+            role
+          });
+        }
+        return false;
+      }
+
+      return !!data;
+    } catch (error) {
+      logger.error('Unexpected error checking user role', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        userId,
+        role
+      });
       return false;
     }
-
-    return !!data;
-  } catch (error) {
-    logger.error('Unexpected error checking user role', {
-      error: error instanceof Error ? error.message : 'Unknown error',
-      userId,
-      role
-    });
-    return false;
-  }
+  }, 60); // Кэш на 60 секунд
 }
 
 /**

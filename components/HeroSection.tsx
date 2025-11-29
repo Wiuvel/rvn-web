@@ -64,7 +64,25 @@ export default function HeroSection() {
               Свобода и безопасность в <br className="hidden sm:block" />один <u>клик</u>
             </h1>
             <p ref={subtitleRef} className="mt-3 md:mt-4 text-neutral-300 text-base md:text-lg max-w-xl mx-auto lg:mx-0">
-              Быстрое и надежное решение с нулевыми логами, шифрованием и серверами в европейских странах — <span className="text-primary-400">Raven Private</span> (VLESS PROXY).
+              Быстрое и надежное решение с нулевыми логами и надежными серверами. Выбирайте тариф и начните использовать {' '}
+              <a 
+                href="https://rvn.market" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-primary-400 hover:text-primary-300 transition-colors duration-200"
+              >
+                rvn.market
+                <svg 
+                  xmlns="http://www.w3.org/2000/svg" 
+                  className="h-3.5 w-3.5 md:h-4 md:w-4 inline-block" 
+                  fill="none" 
+                  viewBox="0 0 24 24" 
+                  stroke="currentColor" 
+                  strokeWidth="2"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+              </a>
             </p>
             <div ref={buttonsRef} className="mt-6 md:mt-8 flex flex-col sm:flex-row gap-3 justify-center lg:justify-start">
               <Link 

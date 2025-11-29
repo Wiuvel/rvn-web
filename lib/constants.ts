@@ -1,22 +1,25 @@
-// Timeouts
-export const AUTH_FETCH_TIMEOUT = 10000; // 10 seconds
-export const MESSAGE_TIMEOUT = 10000; // 10 seconds
-export const RATE_LIMIT_CLEANUP_INTERVAL = 5 * 60 * 1000; // 5 minutes
-export const SESSION_CLEANUP_INTERVAL = 5 * 60 * 1000; // 5 minutes
-export const SESSION_TIMEOUT = 60 * 60 * 1000; // 1 hour
-export const RATE_LIMIT_IMMUNITY_DURATION = 15 * 60 * 1000; // 15 minutes - иммунитет после прохождения капчи
+// Импортируем конфигурацию из централизованного файла
+import { appConfig } from './config';
+
+// Реэкспорт для обратной совместимости
+export const AUTH_FETCH_TIMEOUT = appConfig.timeouts.authFetch;
+export const MESSAGE_TIMEOUT = appConfig.timeouts.message;
+export const RATE_LIMIT_CLEANUP_INTERVAL = appConfig.cache.cleanupInterval;
+export const SESSION_CLEANUP_INTERVAL = appConfig.session.cleanupInterval;
+export const SESSION_TIMEOUT = appConfig.session.timeout;
+export const RATE_LIMIT_IMMUNITY_DURATION = appConfig.rateLimit.immunityDuration;
 
 // Delays
-export const REDIRECT_DELAY = 1000; // 1 second
-export const ANIMATION_DELAY = 250; // 250ms
-export const RESIZE_DEBOUNCE = 100; // 100ms
+export const REDIRECT_DELAY = appConfig.delays.redirect;
+export const ANIMATION_DELAY = appConfig.delays.animation;
+export const RESIZE_DEBOUNCE = appConfig.delays.resizeDebounce;
 
 // Character limits
-export const TICKET_SUBJECT_MAX_LENGTH = 50;
-export const MESSAGE_MAX_LENGTH = 500;
+export const TICKET_SUBJECT_MAX_LENGTH = appConfig.limits.ticketSubjectMaxLength;
+export const MESSAGE_MAX_LENGTH = appConfig.limits.messageMaxLength;
 
 // Ticket limits
-export const MAX_TICKETS_PER_USER = 2;
+export const MAX_TICKETS_PER_USER = appConfig.limits.maxTicketsPerUser;
 
 // GSAP animation defaults
 export const GSAP_DEFAULT_DURATION = 0.5;

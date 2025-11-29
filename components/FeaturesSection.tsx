@@ -8,7 +8,7 @@ export default function FeaturesSection() {
   const features = [
     {
       title: "Молниеносная скорость",
-      description: "Протоколы VLESS® и Shadowsocks, оптимизированные маршруты и 25-Гбит сети"
+      description: "Протоколы VLESS и Hysteria, оптимизированные маршруты и 25-Гбит сети"
     },
     {
       title: "Нулевая политика логов",

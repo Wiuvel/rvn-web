@@ -29,7 +29,9 @@ import {
   ERROR_CANNOT_SEND_TO_CLOSED_TICKET,
   ERROR_MESSAGE_TOO_LONG,
   ERROR_SUBJECT_TOO_LONG,
-  ERROR_MAXIMUM_TICKET_LIMIT_REACHED
+  ERROR_MAXIMUM_TICKET_LIMIT_REACHED,
+  ERROR_INVALID_STATUS_TRANSITION,
+  ERROR_TICKET_NOT_ASSIGNED
 } from './constants';
 
 const errorTranslations: Record<string, string> = {
@@ -62,11 +64,37 @@ const errorTranslations: Record<string, string> = {
   [ERROR_MESSAGE_TOO_LONG]: 'Сообщение слишком длинное',
   [ERROR_SUBJECT_TOO_LONG]: 'Тема слишком длинная',
   [ERROR_MAXIMUM_TICKET_LIMIT_REACHED]: 'Достигнут лимит тикетов',
+  [ERROR_INVALID_STATUS_TRANSITION]: 'Недопустимый переход статуса',
+  [ERROR_TICKET_NOT_ASSIGNED]: 'Тикет должен быть назначен вам для изменения статуса',
+  
+  // Ошибки валидации (из validation-schema.ts)
+  'Username is required': 'Логин обязателен',
+  'Username must be a string': 'Логин должен быть строкой',
+  'Username must be at least 3 characters long': 'Логин должен содержать минимум 3 символа',
+  'Username must be no more than 20 characters long': 'Логин должен содержать максимум 20 символов',
+  'Username can only contain English letters and numbers': 'Логин может содержать только английские буквы и цифры',
+  'Username contains invalid characters': 'Логин содержит недопустимые символы',
+  'Password is required': 'Пароль обязателен',
+  'Password must be a string': 'Пароль должен быть строкой',
+  'Password must be at least 6 characters long': 'Пароль должен содержать минимум 6 символов',
+  'Password must be no more than 50 characters long': 'Пароль должен содержать максимум 50 символов',
+  'Password cannot contain spaces': 'Пароль не может содержать пробелы',
+  'Password can only contain English letters, numbers and special characters': 'Пароль может содержать только английские буквы, цифры и специальные символы',
+  // Примечание: 'Passwords do not match' уже переведен через ERROR_PASSWORDS_DO_NOT_MATCH выше
   
   // Ошибки из lib/auth.ts (уже на русском, но для полноты)
   'Пользователь с таким именем уже существует': 'Пользователь с таким именем уже существует',
   'Не удалось создать аккаунт': 'Не удалось создать аккаунт',
   'Непредвиденная ошибка': 'Непредвиденная ошибка',
+  
+  // Общие сообщения об ошибках
+  'Ошибка загрузки тикетов': 'Ошибка загрузки тикетов',
+  'Ошибка загрузки сообщений': 'Ошибка загрузки сообщений',
+  'Ошибка отправки сообщения': 'Ошибка отправки сообщения',
+  'Ошибка обновления статуса': 'Ошибка обновления статуса',
+  'An error occurred': 'Произошла ошибка',
+  'Ошибка регистрации': 'Ошибка регистрации',
+  'Ошибка входа': 'Ошибка входа',
 };
 
 /**
@@ -79,7 +107,7 @@ export function translateError(errorMessage: string | undefined | null): string 
     return ERROR_DEFAULT;
   }
 
-  // Убираем лишние пробелы и приводим к нижнему регистру для поиска
+  // Убираем лишние пробелы
   const normalizedError = errorMessage.trim();
   
   // Прямой поиск
@@ -97,5 +125,15 @@ export function translateError(errorMessage: string | undefined | null): string 
 
   // Если перевод не найден, возвращаем оригинальное сообщение
   return normalizedError;
+}
+
+/**
+ * Переводит ошибки валидации на русский язык
+ * @param error - Сообщение об ошибке валидации
+ * @returns Переведенное сообщение или оригинальное, если перевод не найден
+ * @deprecated Используйте translateError() вместо этой функции
+ */
+export function translateValidationError(error: string): string {
+  return translateError(error);
 }
 

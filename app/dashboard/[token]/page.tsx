@@ -348,7 +348,7 @@ export default function DashboardPage() {
         <div className="mx-auto max-w-6xl px-4">
           <div className="backdrop-blur-lg bg-neutral-900/40 border border-white/10 rounded-full px-6 py-3 flex items-center justify-between shadow-lg">
             <Link href="/" className="flex items-center gap-2">
-              <Image src="/static/logo.svg" alt="Raven Logo" width={24} height={24} className="w-6 h-6" priority/>
+              <Image src="/static/logo.svg" alt="Raven Logo" width={256} height={256} className="w-6 h-6" priority/>
               <span className="font-semibold text-white">Raven Private</span>
             </Link>
             <nav className="hidden lg:flex items-center gap-8 text-sm text-neutral-300">

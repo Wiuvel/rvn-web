@@ -1,4 +1,4 @@
-import { randomBytes, createHmac, timingSafeEqual } from 'crypto';
+import { createHmac, timingSafeEqual, randomBytes } from 'crypto';
 
 const CSRF_SECRET = process.env.CSRF_SECRET || 'default-csrf-secret-change-in-production';
 const CSRF_TOKEN_LIFETIME = 60 * 60 * 1000; // 1 hour
@@ -12,15 +12,36 @@ interface CSRFStore {
 
 const csrfStore: CSRFStore = {};
 
-// Cleanup expired tokens
-setInterval(() => {
-  const now = Date.now();
-  Object.keys(csrfStore).forEach(sessionId => {
-    if (now - csrfStore[sessionId].createdAt > CSRF_TOKEN_LIFETIME) {
+// Оптимизированная структура для отслеживания времени истечения
+const csrfExpirationTimes = new Map<string, number>();
+
+// Cleanup expired tokens (оптимизированная версия)
+let csrfCleanupInterval: NodeJS.Timeout | null = null;
+
+function startCSRFCleanup() {
+  if (csrfCleanupInterval) return;
+  
+  csrfCleanupInterval = setInterval(() => {
+    const now = Date.now();
+    const keysToDelete: string[] = [];
+    
+    // Проходим только по ключам, которые точно истекли
+    csrfExpirationTimes.forEach((expirationTime, sessionId) => {
+      if (expirationTime < now) {
+        keysToDelete.push(sessionId);
+      }
+    });
+    
+    // Удаляем истекшие записи
+    keysToDelete.forEach(sessionId => {
       delete csrfStore[sessionId];
-    }
-  });
-}, 5 * 60 * 1000); // Cleanup every 5 minutes
+      csrfExpirationTimes.delete(sessionId);
+    });
+  }, 5 * 60 * 1000); // Cleanup every 5 minutes
+}
+
+// Запускаем очистку при первом импорте
+startCSRFCleanup();
 
 export function generateCSRFToken(sessionId: string): string {
   const timestamp = Date.now().toString();
@@ -34,10 +55,12 @@ export function generateCSRFToken(sessionId: string): string {
   
   // Store token for validation
   // Если для этого sessionId уже есть токен, перезаписываем его
+  const createdAt = Date.now();
   csrfStore[sessionId] = {
     token,
-    createdAt: Date.now()
+    createdAt
   };
+  csrfExpirationTimes.set(sessionId, createdAt + CSRF_TOKEN_LIFETIME);
   
   return token;
 }
@@ -122,10 +145,12 @@ export function verifyCSRFToken(token: string, sessionId: string, detailed?: boo
         return false;
       }
       // Сохраняем токен в хранилище для предотвращения повторного использования
+      const createdAt = Date.now();
       csrfStore[sessionId] = {
         token,
-        createdAt: Date.now()
+        createdAt
       };
+      csrfExpirationTimes.set(sessionId, createdAt + CSRF_TOKEN_LIFETIME);
     }
     
     if (detailed) {
@@ -141,12 +166,25 @@ export function verifyCSRFToken(token: string, sessionId: string, detailed?: boo
   }
 }
 
-export function generateSessionId(): string {
-  return randomBytes(32).toString('hex');
-}
+/**
+ * Реэкспорт для обратной совместимости
+ * @deprecated Используйте generateSessionId из lib/utils напрямую
+ */
+export { generateSessionId } from './utils';
 
 export function revokeCSRFToken(sessionId: string): void {
   delete csrfStore[sessionId];
+  csrfExpirationTimes.delete(sessionId);
+}
+
+/**
+ * Очищает интервал очистки (для тестирования или graceful shutdown)
+ */
+export function cleanupCSRF(): void {
+  if (csrfCleanupInterval) {
+    clearInterval(csrfCleanupInterval);
+    csrfCleanupInterval = null;
+  }
 }
 
 // Экспортируем функцию для получения размера хранилища (для отладки)

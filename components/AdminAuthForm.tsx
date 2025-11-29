@@ -206,8 +206,8 @@ export default function AdminAuthForm({ onAuthSuccess }: AdminAuthFormProps) {
                 <Image
                   src="/static/logo.svg"
                   alt="Raven Private Logo"
-                  width={64}
-                  height={64}
+                  width={256}
+                  height={256}
                   className="w-full h-full object-contain"
                   priority
                   placeholder="empty"
@@ -317,8 +317,8 @@ export default function AdminAuthForm({ onAuthSuccess }: AdminAuthFormProps) {
               <Image 
                 src="/static/logo.svg" 
                 alt="Raven Private Logo" 
-                width={64}
-                height={64}
+                width={256}
+                height={256}
                 className="w-full h-full object-contain"
                 priority
                 placeholder="empty"

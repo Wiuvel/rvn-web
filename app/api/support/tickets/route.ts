@@ -233,10 +233,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Проверяем лимит тикетов
-    const { data: existingTickets, error: countError } = await supabaseAdmin
+    // Проверяем лимит тикетов (оптимизированный запрос с count)
+    const { count, error: countError } = await supabaseAdmin
       .from('support_tickets')
-      .select('id', { count: 'exact' })
+      .select('*', { count: 'exact', head: true })
       .eq('user_id', user.id)
       .in('status', ['open', 'pending']);
 
@@ -247,7 +247,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const ticketCount = existingTickets?.length || 0;
+    const ticketCount = count || 0;
     // Жесткая проверка: строго больше или равно 2 активных тикетов
     if (ticketCount >= MAX_TICKETS_PER_USER) {
       return setCorsHeaders(

@@ -4,6 +4,16 @@ import { verifyCSRFToken } from './csrf';
 import { ServerValidator } from './server-validation';
 import { logger } from './secure-logger';
 import { setCorsHeaders, handleCorsPreflight } from './cors';
+import { checkAuth } from './auth-helper';
+import { ERROR_NOT_AUTHENTICATED } from './constants';
+import type { User } from './auth';
+
+// Расширяем тип NextRequest для добавления user в контекст
+declare module 'next/server' {
+  interface NextRequest {
+    user?: User;
+  }
+}
 
 // Тип для данных запроса
 export type RequestData = Record<string, unknown> & {
@@ -77,15 +87,17 @@ export function withApiHandler(
 
       // Auth check
       if (requireAuth) {
-        const isAuthenticated = request.cookies.get('user_authenticated')?.value === 'true';
-        if (!isAuthenticated) {
+        const authResult = await checkAuth();
+        if (!authResult.isAuthenticated || !authResult.user) {
           return setCorsHeaders(
             NextResponse.json(
-              { error: 'Unauthorized' },
+              { error: authResult.error || ERROR_NOT_AUTHENTICATED },
               { status: 401 }
             )
           );
         }
+        // Добавляем user в request context для использования в handler
+        request.user = authResult.user;
       }
 
       // Parse request data

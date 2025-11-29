@@ -83,9 +83,9 @@ export default function AuthIsolatedClient() {
               <Image 
                 src="/static/logo.svg" 
                 alt="RVNPrivate" 
-                width={24} 
-                height={24} 
-                className="w-6 h-6" 
+                width={256} 
+                height={256} 
+                className="w-6 h-6"
                 loading="lazy"
               />
               <span className="font-semibold text-white">Raven Private</span>

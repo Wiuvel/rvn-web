@@ -137,7 +137,7 @@ export default function RateLimitCaptcha({ isOpen, onSuccess, onClose }: RateLim
                 }, 1000); // Увеличиваем задержку перед перезагрузкой
               }
             }
-          } catch (error) {
+          } catch {
             setIsVerifying(false);
             isProcessingRef.current = false;
             // Сбрасываем флаг для возможности повторной попытки

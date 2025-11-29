@@ -16,8 +16,8 @@ export default function PricingSection() {
       period: 'в месяц',
       features: [
         'До 3 устройств',
-        '1TB трафика в месяц',
-        'Оптимизированные сервера в Швеции'
+        '1ТБ трафика',
+        'Протоколы: VLESS'
       ],
       popular: false,
       available: true,
@@ -35,7 +35,7 @@ export default function PricingSection() {
       features: [
         'До 3 устройств',
         'Безлимитный трафик',
-        'Быстрые сервера в Германии'
+        'Протоколы: VLESS или Hysteria'
       ],
       popular: true,
       available: true,
@@ -54,10 +54,10 @@ export default function PricingSection() {
       features: [
         'До 5 устройств',
         'Безлимитный трафик',
-        'Цепочка из двух серверов (Multi-Hop)'
+        'Протоколы: VLESS, Hysteria'
       ],
       popular: false,
-      available: false,
+      available: true,
       icon: (
         <svg xmlns="http://www.w3.org/2000/svg" className="h-14 w-14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
           <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m2 0a8 8 0 11-16 0 8 8 0 0116 0z"/>
