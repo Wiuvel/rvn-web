@@ -1791,7 +1791,7 @@ export default function SupportPanel() {
                       localStorage.setItem('support_panel_last_ticket_id', ticket.id);
                     }
                   }}
-                  className={`p-4 rounded-lg border transition-all ${
+                  className={`p-4 rounded-lg border transition-all select-none ${
                     // Для архивных тикетов не блокируем, для активных - только если назначен другому
                     ticket.status === 'closed' || 
                     !(ticket.assigned_to && ticket.assigned_to !== authState.userId)

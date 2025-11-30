@@ -47,30 +47,43 @@ interface Ticket {
   messages: Message[];
 }
 
-// Компонент для анимированного сообщения
+// Компонент для сообщения
 function MessageItem({ 
   message, 
   showDate, 
   userData, 
   formatDate, 
-  formatTime 
+  formatTime,
+  isInitialLoad = false
 }: { 
   message: Message; 
   showDate: boolean; 
   userData: UserData | null;
   formatDate: (date: Date) => string;
   formatTime: (date: Date) => string;
+  isInitialLoad?: boolean;
 }) {
   const messageRef = useRef<HTMLDivElement>(null);
+  const hasAnimatedRef = useRef(false);
 
   useEffect(() => {
-    if (messageRef.current && typeof window !== 'undefined') {
+    // При первой загрузке не анимируем, чтобы избежать дергания
+    if (isInitialLoad) {
+      if (messageRef.current) {
+        gsap.set(messageRef.current, { opacity: 1, y: 0, scale: 1 });
+      }
+      return;
+    }
+    
+    // Анимируем только новые сообщения (не при первой загрузке)
+    if (messageRef.current && typeof window !== 'undefined' && !hasAnimatedRef.current) {
+      hasAnimatedRef.current = true;
       gsap.fromTo(messageRef.current,
         { opacity: 0, y: 10, scale: 0.95 },
         { opacity: 1, y: 0, scale: 1, duration: 0.3, ease: "power2.out" }
       );
     }
-  }, [message.id]);
+  }, [message.id, isInitialLoad]);
 
   // Определяем, является ли сообщение системным
   const SYSTEM_MESSAGE_TEXT = 'Спасибо за ваше сообщение. Мы получили ваш запрос и ответим в ближайшее время.';
@@ -191,6 +204,8 @@ export default function SupportPage() {
   const newTicketFormRef = useRef<HTMLDivElement>(null); // Ref для формы создания тикета (для анимаций)
   const chatAreaRef = useRef<HTMLDivElement>(null); // Ref для области чата (для анимаций)
   const fetchingTicketIdRef = useRef<string | null>(null);
+  const loadedMessagesRef = useRef<Set<string>>(new Set());
+  const initialLoadRef = useRef<boolean>(false);
   const [showRateLimitCaptcha, setShowRateLimitCaptcha] = useState(false);
   const isCaptchaOpenRef = useRef(false);
   // Очередь запросов вместо одного callback - исправляет race condition
@@ -437,22 +452,7 @@ export default function SupportPage() {
   }, [showNewTicketForm]);
 
   // Анимация перехода между чатами
-  useEffect(() => {
-    if (typeof window === 'undefined' || !chatAreaRef.current) return;
-
-    if (activeTicket) {
-      // Анимация появления чата
-      gsap.fromTo(chatAreaRef.current,
-        { opacity: 0, x: 20 },
-        { 
-          opacity: 1, 
-          x: 0,
-          duration: 0.3, 
-          ease: "power2.out" 
-        }
-      );
-    }
-  }, [activeTicket]); // Анимируем только при смене ID тикета
+  // Убрали GSAP анимацию для плавной смены тикетов без дерганий
 
   // Загрузка сообщений при выборе тикета
   useEffect(() => {
@@ -468,6 +468,9 @@ export default function SupportPage() {
     // Предотвращаем дублирующиеся запросы
     if (shouldFetch && fetchingTicketIdRef.current !== activeTicket.id) {
       fetchingTicketIdRef.current = activeTicket.id;
+      // Очищаем загруженные сообщения при смене тикета
+      loadedMessagesRef.current.clear();
+      initialLoadRef.current = true;
       fetchTicketMessages(activeTicket.id);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -528,6 +531,13 @@ export default function SupportPage() {
               isRead: m.is_read,
               senderData: m.sender
             }));
+
+            // Отмечаем новые сообщения (которые еще не были загружены)
+            mappedMessages.forEach((m: { id: string }) => {
+              if (!loadedMessagesRef.current.has(m.id)) {
+                loadedMessagesRef.current.add(m.id);
+              }
+            });
 
             setActiveTicket({
               ...activeTicket,
@@ -862,6 +872,12 @@ export default function SupportPage() {
   const handleSendMessage = async () => {
     if (!messageText.trim() || !activeTicket) return;
     
+    // Проверка статуса тикета - нельзя отправлять сообщения в закрытые тикеты
+    if (activeTicket.status === 'closed') {
+      showNotification('Нельзя отправлять сообщения в закрытый тикет');
+      return;
+    }
+    
     // Защита от повторной отправки
     if (isSendingMessage) return;
     
@@ -924,16 +940,25 @@ export default function SupportPage() {
             });
             const retryData = await retryResponse.json();
             if (retryResponse.ok) {
+              const mappedMessages = (retryData.messages || []).map((m: { id: string; message_text: string; sender_type: string; created_at: string; is_read: boolean; sender?: { id: string; username: string; user_id: string } }) => ({
+                id: m.id,
+                text: m.message_text,
+                sender: m.sender_type,
+                timestamp: new Date(m.created_at),
+                isRead: m.is_read,
+                senderData: m.sender
+              }));
+              
+              // Отмечаем новые сообщения
+              mappedMessages.forEach((m: { id: string }) => {
+                if (!loadedMessagesRef.current.has(m.id)) {
+                  loadedMessagesRef.current.add(m.id);
+                }
+              });
+              
               setActiveTicket({
                 ...activeTicket,
-                messages: (retryData.messages || []).map((m: { id: string; message_text: string; sender_type: string; created_at: string; is_read: boolean; sender?: { id: string; username: string; user_id: string } }) => ({
-                  id: m.id,
-                  text: m.message_text,
-                  sender: m.sender_type,
-                  timestamp: new Date(m.created_at),
-                  isRead: m.is_read,
-                  senderData: m.sender
-                }))
+                messages: mappedMessages
               });
               markMessagesAsRead(activeTicket.id);
             }
@@ -941,16 +966,25 @@ export default function SupportPage() {
         );
         const ticketData = await ticketResponse.json();
         if (ticketResponse.ok) {
+          const mappedMessages = (ticketData.messages || []).map((m: { id: string; message_text: string; sender_type: string; created_at: string; is_read: boolean; sender?: { id: string; username: string; user_id: string } }) => ({
+            id: m.id,
+            text: m.message_text,
+            sender: m.sender_type,
+            timestamp: new Date(m.created_at),
+            isRead: m.is_read,
+            senderData: m.sender
+          }));
+          
+          // Отмечаем новые сообщения (после отправки)
+          mappedMessages.forEach((m: { id: string }) => {
+            if (!loadedMessagesRef.current.has(m.id)) {
+              loadedMessagesRef.current.add(m.id);
+            }
+          });
+          
           setActiveTicket({
             ...activeTicket,
-            messages: (ticketData.messages || []).map((m: { id: string; message_text: string; sender_type: string; created_at: string; is_read: boolean; sender?: { id: string; username: string; user_id: string } }) => ({
-              id: m.id,
-              text: m.message_text,
-              sender: m.sender_type,
-              timestamp: new Date(m.created_at),
-              isRead: m.is_read,
-              senderData: m.sender
-            }))
+            messages: mappedMessages
           });
           
           // Отмечаем сообщения как прочитанные
@@ -1056,25 +1090,37 @@ export default function SupportPage() {
             return prev;
           }
           
+          const mappedMessages = (data.messages || []).map((m: { id: string; message_text: string; sender_type: string; created_at: string; is_read: boolean; sender?: { id: string; username: string; user_id: string } }) => ({
+            id: m.id,
+            text: m.message_text,
+            sender: m.sender_type,
+            timestamp: new Date(m.created_at),
+            isRead: m.is_read,
+            senderData: m.sender // Добавляем данные отправителя
+          }));
+          
+          // Отмечаем все загруженные сообщения как уже загруженные (первая загрузка тикета)
+          mappedMessages.forEach((m: { id: string }) => {
+            loadedMessagesRef.current.add(m.id);
+          });
+          
           const ticket = {
             id: data.ticket.id,
             subject: data.ticket.subject,
             status: data.ticket.status,
             createdAt: new Date(data.ticket.created_at),
-            messages: (data.messages || []).map((m: { id: string; message_text: string; sender_type: string; created_at: string; is_read: boolean; sender?: { id: string; username: string; user_id: string } }) => ({
-              id: m.id,
-              text: m.message_text,
-              sender: m.sender_type,
-              timestamp: new Date(m.created_at),
-              isRead: m.is_read,
-              senderData: m.sender // Добавляем данные отправителя
-            }))
+            messages: mappedMessages
           };
           
           // Сохраняем ID последнего открытого тикета
           if (typeof window !== 'undefined') {
             localStorage.setItem('support_last_ticket_id', ticket.id);
           }
+          
+          // Устанавливаем флаг первой загрузки после небольшой задержки, чтобы сообщения успели отрендериться
+          setTimeout(() => {
+            initialLoadRef.current = false;
+          }, 100);
           
           return ticket;
         });
@@ -1549,7 +1595,7 @@ export default function SupportPage() {
               <div className="bg-neutral-900 border border-white/10 rounded-2xl flex-1 flex flex-col overflow-hidden">
                 {activeTicket ? (
                   <>
-                    <div ref={chatAreaRef} className="flex-1 flex flex-col min-h-0 overflow-hidden">
+                    <div ref={chatAreaRef} className="flex-1 flex flex-col min-h-0 overflow-hidden transition-opacity duration-200">
                       <div className="p-3 sm:p-4 border-b border-white/10 flex-shrink-0">
                       <div className="flex items-center justify-between gap-2">
                         <div className="min-w-0 flex-1">
@@ -1571,86 +1617,100 @@ export default function SupportPage() {
                     </div>
 
                     <div className="support-chat-messages flex-1 overflow-y-auto min-h-0 relative">
-                      <div className="p-2 sm:p-4 flex flex-col gap-3 sm:gap-4 h-full">
-                        {ticketsLoading && (
-                          <div className="absolute top-4 right-4 flex items-center gap-2 text-neutral-400 text-sm z-10">
-                            <div className="w-4 h-4 border-2 border-neutral-400 border-t-transparent rounded-full animate-spin"></div>
-                            <span>Загрузка...</span>
-                          </div>
-                        )}
+                      {ticketsLoading && (
+                        <div className="absolute top-4 right-4 flex items-center gap-2 text-neutral-400 text-sm z-10">
+                          <div className="w-4 h-4 border-2 border-neutral-400 border-t-transparent rounded-full animate-spin"></div>
+                          <span>Загрузка...</span>
+                        </div>
+                      )}
+                      <div key={`messages-${activeTicket.id}`} className="p-2 sm:p-4 flex flex-col gap-3 sm:gap-4 min-h-full">
                         {activeTicket.messages && Array.isArray(activeTicket.messages) && activeTicket.messages.length > 0 ? (
-                          activeTicket.messages.map((message, index) => {
-                            const showDate = index === 0 || 
-                              new Date(message.timestamp).getDate() !== 
-                              new Date(activeTicket.messages[index - 1].timestamp).getDate();
-                            
-                            return (
-                              <MessageItem 
-                                key={message.id}
-                                message={message}
-                                showDate={showDate}
-                                userData={userData}
-                                formatDate={formatDate}
-                                formatTime={formatTime}
-                              />
-                            );
-                          })
+                          <>
+                            {activeTicket.messages.map((message, index) => {
+                              const showDate = index === 0 || 
+                                new Date(message.timestamp).getDate() !== 
+                                new Date(activeTicket.messages[index - 1].timestamp).getDate();
+                              
+                              // Определяем, является ли это первой загрузкой тикета
+                              // Если это первая загрузка, все сообщения должны быть без анимации
+                              const isInitialLoad = initialLoadRef.current && 
+                                                   loadedMessagesRef.current.has(message.id);
+                              
+                              return (
+                                <MessageItem 
+                                  key={message.id}
+                                  message={message}
+                                  showDate={showDate}
+                                  userData={userData}
+                                  formatDate={formatDate}
+                                  formatTime={formatTime}
+                                  isInitialLoad={isInitialLoad}
+                                />
+                              );
+                            })}
+                            <div ref={messagesEndRef} />
+                          </>
                         ) : (
                           <div className="flex-1 flex items-center justify-center">
                             <p className="text-neutral-500 text-sm">Опишите свою проблему</p>
                           </div>
                         )}
-                        <div ref={messagesEndRef} />
                       </div>
                     </div>
 
                     <div className="p-2 sm:p-4 border-t border-white/10 flex-shrink-0">
-                      <div className="flex gap-2">
-                        <div className="flex-1 relative">
-                          <input
-                            ref={messageInputRef}
-                            type="text"
-                            value={messageText}
-                            onChange={(e) => {
-                              const value = e.target.value;
-                              if (value.length <= MESSAGE_MAX_LENGTH) {
-                                setMessageText(value);
-                              } else {
-                                showNotification(`Максимальная длина сообщения: ${MESSAGE_MAX_LENGTH} символов`);
-                                triggerShake('message');
-                              }
-                            }}
-                            onKeyPress={(e) => {
-                              if (e.key === 'Enter' && !e.shiftKey && !isSendingMessage) {
-                                handleSendMessage();
-                              }
-                            }}
-                            placeholder={timeoutSeconds > 0 ? "Ожидание.." : "Напишите сообщение..."}
-                            disabled={timeoutSeconds > 0}
-                            className="w-full min-w-0 px-3 py-2 sm:px-4 text-sm sm:text-base bg-neutral-800 border border-white/10 rounded-xl text-white focus:outline-none focus:border-primary-500 disabled:opacity-50 pr-10"
-                          />
-                          {timeoutSeconds === 0 && (
-                            <div className="absolute bottom-1 right-3 text-[10px] text-neutral-500">
-                              {messageText.length}/{MESSAGE_MAX_LENGTH}
-                            </div>
-                          )}
-                          {timeoutSeconds > 0 && (
-                            <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 text-neutral-400">
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                              </svg>
-                              <span className="text-xs font-medium">{timeoutSeconds}с</span>
-                            </div>
-                          )}
+                      {activeTicket.status === 'closed' ? (
+                        <div className="text-center py-4 px-4 bg-neutral-800/50 border border-neutral-700 rounded-xl">
+                          <p className="text-neutral-400 text-sm">Этот тикет закрыт. Вы не можете отправлять сообщения в закрытые тикеты.</p>
                         </div>
-                        <button
-                          onClick={handleSendMessage}
-                          disabled={!messageText.trim() || timeoutSeconds > 0 || isSendingMessage}
-                          className="px-4 sm:px-6 py-2 bg-primary-500 hover:bg-primary-400 disabled:bg-neutral-700 text-white rounded-xl transition-colors text-sm sm:text-base"
-                        >
-                          {isSendingMessage ? 'Отправка...' : 'Отправить'}
-                        </button>
-                      </div>
+                      ) : (
+                        <div className="flex gap-2">
+                          <div className="flex-1 relative">
+                            <input
+                              ref={messageInputRef}
+                              type="text"
+                              value={messageText}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                if (value.length <= MESSAGE_MAX_LENGTH) {
+                                  setMessageText(value);
+                                } else {
+                                  showNotification(`Максимальная длина сообщения: ${MESSAGE_MAX_LENGTH} символов`);
+                                  triggerShake('message');
+                                }
+                              }}
+                              onKeyPress={(e) => {
+                                if (e.key === 'Enter' && !e.shiftKey && !isSendingMessage) {
+                                  handleSendMessage();
+                                }
+                              }}
+                              placeholder={timeoutSeconds > 0 ? "Ожидание.." : "Напишите сообщение..."}
+                              disabled={timeoutSeconds > 0}
+                              className="w-full min-w-0 px-3 py-2 sm:px-4 text-sm sm:text-base bg-neutral-800 border border-white/10 rounded-xl text-white focus:outline-none focus:border-primary-500 disabled:opacity-50 pr-10"
+                            />
+                            {timeoutSeconds === 0 && (
+                              <div className="absolute bottom-1 right-3 text-[10px] text-neutral-500">
+                                {messageText.length}/{MESSAGE_MAX_LENGTH}
+                              </div>
+                            )}
+                            {timeoutSeconds > 0 && (
+                              <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 text-neutral-400">
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <span className="text-xs font-medium">{timeoutSeconds}с</span>
+                              </div>
+                            )}
+                          </div>
+                          <button
+                            onClick={handleSendMessage}
+                            disabled={!messageText.trim() || timeoutSeconds > 0 || isSendingMessage}
+                            className="px-4 sm:px-6 py-2 bg-primary-500 hover:bg-primary-400 disabled:bg-neutral-700 text-white rounded-xl transition-colors text-sm sm:text-base"
+                          >
+                            {isSendingMessage ? 'Отправка...' : 'Отправить'}
+                          </button>
+                        </div>
+                      )}
                     </div>
                     </div>
                   </>

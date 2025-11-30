@@ -54,38 +54,6 @@ button, a {
     touch-action: manipulation; 
 }
 
-.home-loading-overlay {
-    position: fixed;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(4, 7, 15, 0.85);
-    backdrop-filter: blur(18px);
-    -webkit-backdrop-filter: blur(18px);
-    z-index: 2000;
-    animation: overlay-soft-fade 0.3s ease forwards;
-}
-
-.home-spinner {
-    width: 48px;
-    height: 48px;
-    border-radius: 50%;
-    border: 3px solid rgba(255, 255, 255, 0.2);
-    border-top-color: #16a3ff;
-    animation: home-spin 0.9s linear infinite;
-}
-
-@keyframes home-spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
-}
-
-@keyframes overlay-soft-fade {
-    from { opacity: 0; }
-    to { opacity: 1; }
-}
-
 @layer base {
   :root {
     --background: 0 0% 100%;
@@ -504,6 +472,10 @@ button, a {
     background: rgba(255, 255, 255, 0.08);
     backdrop-filter: blur(12px);
     transition: all 0.3s ease;
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
 }
 
 .glass-btn:hover {
@@ -513,8 +485,17 @@ button, a {
 }
 
 .glass-btn:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
+    background: rgba(38, 38, 38, 0.6);
+    border-color: rgba(255, 255, 255, 0.1);
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.glass-btn:disabled:hover {
+    background: rgba(38, 38, 38, 0.6);
+    border-color: rgba(255, 255, 255, 0.1);
+    box-shadow: none;
+    transform: none;
 }
 
 .glass-btn .spinner {
@@ -545,6 +526,10 @@ button, a {
     background: rgba(255, 255, 255, 0.05);
     backdrop-filter: blur(12px);
     transition: all 0.3s ease;
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
     cursor: pointer;
 }
 
@@ -556,8 +541,17 @@ button, a {
 }
 
 .oauth-btn:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
+    background: rgba(38, 38, 38, 0.6);
+    border-color: rgba(255, 255, 255, 0.08);
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.oauth-btn:disabled:hover {
+    background: rgba(38, 38, 38, 0.6);
+    border-color: rgba(255, 255, 255, 0.08);
+    transform: none;
+    box-shadow: none;
 }
 
 .oauth-btn svg,
@@ -791,15 +785,32 @@ button, a {
   }
 }
 
-.skeleton-shimmer {
+.skeleton-line {
+  height: 1.25rem;
   background: linear-gradient(
     90deg,
-    rgba(38, 38, 38, 0.5) 0%,
-    rgba(64, 64, 64, 0.7) 50%,
-    rgba(38, 38, 38, 0.5) 100%
+    rgba(255, 255, 255, 0.05) 0%,
+    rgba(255, 255, 255, 0.1) 50%,
+    rgba(255, 255, 255, 0.05) 100%
   );
   background-size: 200% 100%;
+  border-radius: 0.25rem;
+  margin-bottom: 1rem;
   animation: shimmer 2s infinite;
+}
+
+.skeleton-title {
+  height: 1.75rem;
+  width: 60%;
+  margin-bottom: 1.5rem;
+}
+
+.skeleton-text {
+  width: 100%;
+}
+
+.skeleton-text-short {
+  width: 80%;
 }
 
 

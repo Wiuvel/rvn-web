@@ -4,7 +4,6 @@ import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useFadeIn } from '@/hooks/useGSAP';
-import { gsap } from 'gsap';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -17,8 +16,6 @@ export default function HeroSection() {
   const subtitleRef = useFadeIn(0.2);
   const buttonsRef = useFadeIn(0.3);
   const dashboardRef = useRef<HTMLDivElement>(null);
-  const cardRef = useRef<HTMLDivElement>(null);
-  const glowRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const servers = [
@@ -53,39 +50,6 @@ export default function HeroSection() {
     return () => clearInterval(interval);
   }, [connected]);
 
-  useEffect(() => {
-    if (!glowRef.current || !cardRef.current) return;
-
-    // Анимация свечения - появляется сразу
-    gsap.fromTo(glowRef.current,
-      {
-        opacity: 0,
-        scale: 0.8
-      },
-      {
-        opacity: 1,
-        scale: 1,
-        duration: 0.5,
-        ease: "power2.out",
-        delay: 0
-      }
-    );
-
-    // Анимация карточки - появляется через 0.5 секунды после свечения
-    gsap.fromTo(cardRef.current,
-      {
-        opacity: 0,
-        x: 30
-      },
-      {
-        opacity: 1,
-        x: 0,
-        duration: 0.5,
-        ease: "power2.out",
-        delay: 0.5
-      }
-    );
-  }, []);
 
   const getPingColor = (pingValue: number) => {
     if (pingValue <= 65) return "text-green-400";
@@ -141,8 +105,8 @@ export default function HeroSection() {
           </div>
           <div className="hidden sm:flex order-2 lg:order-1 w-full max-w-md mx-auto lg:mx-0 lg:ml-auto flex justify-center lg:justify-end">
             <div ref={dashboardRef} className="relative w-full">
-              <div ref={glowRef} className="absolute -inset-4 md:-inset-8 rounded-full bg-gradient-to-br from-primary-500/20 to-transparent blur-2xl md:blur-3xl opacity-0"></div>
-              <Card ref={cardRef} className="relative border-neutral-800/50 bg-neutral-900/50 backdrop-blur-sm shadow-soft opacity-0">
+              <div className="absolute -inset-4 md:-inset-8 rounded-full bg-gradient-to-br from-primary-500/20 to-transparent blur-2xl md:blur-3xl"></div>
+              <Card className="relative border-neutral-800/50 bg-neutral-900/50 backdrop-blur-sm shadow-soft">
                 <CardHeader className="p-4 md:p-6">
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-white">
