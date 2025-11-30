@@ -24,7 +24,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ru" className={`h-full scroll-smooth ${exo2.variable}`} data-scroll-behavior="smooth">
+    <html lang="ru" className={`h-full scroll-smooth dark ${exo2.variable}`} data-scroll-behavior="smooth">
       <body className={`h-full bg-neutral-950 text-neutral-100 antialiased relative ${exo2.className}`}>
         <SmoothScroll />
         <ConditionalLayout>

@@ -1,76 +1,74 @@
 'use client';
 
-import { useState } from 'react';
 import { useFadeIn, useStaggeredFadeIn } from '@/hooks/useGSAP';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { Badge } from "@/components/ui/badge";
 
 export default function FAQSection() {
-  const [openItem, setOpenItem] = useState<number | null>(null);
-  
   // GSAP refs
-  const titleRef = useFadeIn(0.1);
+  const leftRef = useFadeIn(0.1);
   const faqItemsRef = useStaggeredFadeIn(0.2, 0.05);
 
   const faqs = [
     {
-      question: "Как оформить покупку?",
-      answer: "Просто выберите подходящий тариф в разделе «Тарифы» и нажмите «Купить». После оплаты вы получите доступ к панели с инструкциями и профилем для подключения."
+      question: "Как начать пользоваться сервисом?",
+      answer: "Зарегистрируйтесь на сайте, после чего вы получите доступ к личному кабинету. В личном кабинете вы сможете выбрать и оплатить подходящий тариф. После оплаты вы получите готовые профили для подключения и подробные инструкции по настройке для всех поддерживаемых платформ."
     },
     {
-      question: "Почему именно VLESS?",
-      answer: "В последнее время в РФ значительно усилились ограничения сети и контроль над легко отслеживаемыми подключениями. VLESS — современный и гибкий протокол, который умело маскируется под обычный интернет-трафик и не зависит от стандартных сигнатур, обеспечивая стабильный и защищённый доступ."
+      question: "Какие протоколы и технологии используются?",
+      answer: "Мы используем современные протоколы VLESS и Hysteria с шифрованием AES-256 и TLS. Эти технологии обеспечивают высокую скорость, стабильность соединения и эффективную маскировку трафика под обычный интернет-трафик. Мы придерживаемся политики нулевых логов и не собираем данные о вашей активности."
     },
     {
-      question: "Какие есть способы оплаты?",
-      answer: "Сайт в разработке."
-    },
-    {
-      question: "Существует ли гарантия?",
-      answer: "Да. У нас действует 7-дневная гарантия возврата средств в случае, если сервис вам не подошел."
+      question: "Как работает гарантия возврата средств?",
+      answer: "Мы предоставляем 7-дневную гарантию возврата средств. Если сервис не подошел по любой причине, вы можете вернуть полную стоимость подписки в течение недели после покупки."
     }
   ];
 
-  const toggleItem = (index: number) => {
-    setOpenItem(openItem === index ? null : index);
-  };
 
   return (
     <section id="faq" className="fade-in isolate">
-      <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8 py-20">
-        <h2 ref={titleRef} className="text-3xl font-semibold text-center">Частые вопросы</h2>
-        <div ref={faqItemsRef} className="mt-8 divide-y divide-neutral-800/70">
-          {faqs.map((faq, index) => (
-            <div key={index} className="py-4">
-              <button 
-                className="w-full flex justify-between items-center text-left faq-question" 
-                onClick={() => toggleItem(index)}
-                aria-expanded={openItem === index}
-                aria-controls={`faq${index + 1}`}
-                tabIndex={0}
-              >
-                <span className="font-medium">{faq.question}</span>
-                <svg 
-                  width="18" 
-                  height="18" 
-                  viewBox="0 0 24 24" 
-                  fill="none" 
-                  className={`faq-icon transition-transform duration-300 ${openItem === index ? 'faq-open' : ''}`}
+      <div className="mx-auto max-w-7xl px-6 sm:px-8 lg:px-12 xl:px-16 py-12 md:py-16">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-start relative">
+          {/* Левая часть */}
+          <div ref={leftRef} className="space-y-6">
+            <Badge variant="outline" className="bg-neutral-800/50 border-neutral-700/50 text-neutral-400 hover:bg-neutral-800/50">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
+              </svg>
+              FAQ
+            </Badge>
+            <h2 className="text-2xl md:text-3xl lg:text-4xl font-semibold text-white leading-tight">
+              Ответы на частые вопросы
+            </h2>
+            <p className="text-base md:text-lg text-neutral-300 mt-4">
+              Сборник самых популярных вопросов о нашем сервисе.
+            </p>
+          </div>
+
+          {/* Правая часть - вопросы */}
+          <div ref={faqItemsRef}>
+            <Accordion type="single" collapsible className="w-full space-y-3">
+              {faqs.map((faq, index) => (
+                <AccordionItem 
+                  key={index} 
+                  value={`item-${index}`}
+                  className="rounded-xl border border-neutral-800 bg-neutral-900/50 px-4 transition-colors duration-200 hover:border-neutral-700 data-[state=open]:border-neutral-700"
                 >
-                  <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="1.6"/>
-                </svg>
-              </button>
-              {openItem === index && (
-                <div 
-                  id={`faq${index + 1}`}
-                  className="mt-2 text-neutral-400"
-                  style={{
-                    animation: 'fadeIn 0.3s ease-out'
-                  }}
-                >
-                  {faq.answer}
-                </div>
-              )}
-            </div>
-          ))}
+                  <AccordionTrigger className="text-left font-medium text-white hover:no-underline py-4">
+                    {faq.question}
+                  </AccordionTrigger>
+                  <AccordionContent className="text-neutral-400 text-sm leading-relaxed pb-4">
+                    {faq.answer}
+                  </AccordionContent>
+                </AccordionItem>
+              ))}
+            </Accordion>
+          </div>
         </div>
       </div>
     </section>

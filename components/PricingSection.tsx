@@ -1,13 +1,14 @@
 'use client';
 
 import Link from 'next/link';
-import DashboardPreviewSection from './DashboardPreviewSection';
-import { useFadeIn, useStaggeredFadeIn, useSlideInUp } from '@/hooks/useGSAP';
+import { useFadeIn, useStaggeredFadeIn } from '@/hooks/useGSAP';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 export default function PricingSection() {
   const titleRef = useFadeIn(0.1);
   const cardsRef = useStaggeredFadeIn(0.2, 0.1);
-  const dashboardRef = useSlideInUp(0.4);
   const plans = [
     {
       id: 'safe-1',
@@ -67,7 +68,13 @@ export default function PricingSection() {
   ];
 
   return (
-    <section id="pricing" className="relative border-t border-neutral-800/70 bg-neutral-950 overflow-hidden fade-in">
+    <section id="pricing" className="relative bg-neutral-950 overflow-hidden fade-in">
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl px-6 sm:px-8 lg:px-12 xl:px-16 h-px z-10" style={{
+        backgroundImage: 'radial-gradient(circle, rgb(115 115 115 / 0.4) 1.5px, transparent 1.5px)',
+        backgroundSize: '12px 1px',
+        backgroundRepeat: 'repeat-x',
+        backgroundPosition: '0 0'
+      }}></div>
       <svg className="absolute inset-0 w-full h-full opacity-20" xmlns="https://www.w3.org/2000/svg" preserveAspectRatio="none">
         <defs>
           <radialGradient id="grad" cx="50%" cy="50%" r="75%" fx="50%" fy="50%">
@@ -83,72 +90,94 @@ export default function PricingSection() {
           <line x1="0" y1="80%" x2="100%" y2="80%"/>
         </g>
       </svg>
-      <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-20">
+      <div className="relative mx-auto max-w-7xl px-6 sm:px-8 lg:px-12 xl:px-16 py-12 md:py-16">
         <div ref={titleRef} className="text-center">
           <h2 className="text-3xl sm:text-4xl font-semibold">Простые тарифы</h2>
           <p className="mt-2 text-neutral-400">Разные уровни защиты — один сервис. Найдите свой идеальный тариф.</p>
         </div>
         <div ref={cardsRef} className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-8">
           {plans.map((plan) => (
-            <div 
+            <Card 
               key={plan.id}
-              className={`relative group rounded-3xl border p-6 flex flex-col text-center transition ${
+              className={`relative group border transition ${
                 plan.popular 
                   ? 'border-primary-500/30 bg-neutral-900 shadow-soft hover:border-primary-500 hover:scale-[1.05]' 
                   : 'border-neutral-800 bg-neutral-900 hover:border-primary-500/60 hover:scale-[1.03]'
               }`}
             >
               {plan.popular && (
-                <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-primary-500 px-3 py-1 text-xs font-medium text-neutral-900">
+                <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary-500 text-neutral-900 hover:bg-primary-500">
                   Популярно
-                </span>
+                </Badge>
               )}
-              <div className="flex justify-center mb-4 text-primary-400">
-                {plan.icon}
-              </div>
-              <div className="text-sm text-neutral-400">{plan.name}</div>
-              <div className="mt-2 text-4xl font-semibold">
-                {plan.price}<span className="ml-1 text-2xl align-top font-light text-neutral-400">₽</span>
-              </div>
-              <div className="text-sm text-neutral-400">{plan.period}</div>
-              <ul className="mt-6 space-y-2 text-sm text-neutral-300 text-left mx-auto w-max">
-                {plan.features.map((feature, index) => (
-                  <li key={index}>{feature}</li>
-                ))}
-              </ul>
-              {plan.available ? (
-                <Link 
-                  href="#" 
-                  className={`mt-6 rounded-xl text-center py-3 font-medium transition ${
-                    plan.popular 
-                      ? 'bg-primary-500 text-white hover:bg-primary-400 shadow-lg transform duration-300 hover:shadow-blue-500/50' 
-                      : 'bg-white text-neutral-900 hover:opacity-90'
-                  }`}
-                >
-                  Купить
-                </Link>
-              ) : (
-                <button 
-                  className="mt-6 rounded-xl bg-gray-300 text-neutral-500 text-center py-3 font-medium select-none pointer-events-none"
-                  disabled
-                >
-                  Скоро
-                </button>
-              )}
+              <CardHeader className="text-center">
+                <div className="flex justify-center mb-4 text-primary-400">
+                  {plan.icon}
+                </div>
+                <CardDescription className="text-sm">{plan.name}</CardDescription>
+                <div className="mt-2 text-4xl font-semibold">
+                  {plan.price}<span className="ml-1 text-2xl align-top font-light text-neutral-400">₽</span>
+                </div>
+                <CardDescription className="text-sm">{plan.period}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-2 text-sm text-neutral-300 text-left mx-auto w-max">
+                  {plan.features.map((feature, index) => {
+                    // Обрабатываем строки с протоколами для добавления blur эффекта
+                    if (feature.includes('VLESS') || feature.includes('Hysteria')) {
+                      const parts = feature.split(/(VLESS|Hysteria)/);
+                      return (
+                        <li key={index}>
+                          {parts.map((part, i) => {
+                            if (part === 'VLESS' || part === 'Hysteria') {
+                              return (
+                                <span key={i} className="blur-sm group-hover:blur-none transition cursor-pointer select-none">
+                                  {part}
+                                </span>
+                              );
+                            }
+                            return <span key={i}>{part}</span>;
+                          })}
+                        </li>
+                      );
+                    }
+                    return <li key={index}>{feature}</li>;
+                  })}
+                </ul>
+              </CardContent>
+              <CardFooter className="flex justify-center">
+                {plan.available ? (
+                  <Button 
+                    asChild
+                    className={`w-full ${
+                      plan.popular 
+                        ? 'bg-primary-500 hover:bg-primary-400 shadow-lg transform duration-300 hover:shadow-blue-500/50' 
+                        : '!bg-white !text-neutral-900 hover:!bg-neutral-200 hover:!text-neutral-900 !border-0'
+                    }`}
+                  >
+                    <Link href="#">Купить</Link>
+                  </Button>
+                ) : (
+                  <Button 
+                    disabled
+                    variant="secondary"
+                    className="w-full bg-gray-300 text-neutral-500"
+                  >
+                    Скоро
+                  </Button>
+                )}
+              </CardFooter>
               <div className={`absolute -inset-2 rounded-3xl blur-2xl opacity-60 group-hover:opacity-100 -z-10 transition ${
                 plan.popular 
                   ? 'bg-gradient-to-tr from-primary-500/20 to-transparent' 
                   : 'bg-gradient-to-tr from-primary-500/10 to-transparent'
               }`}></div>
-            </div>
+            </Card>
           ))}
         </div>
         <p className="mt-10 text-center text-xs text-neutral-500">
-          * Цены указаны с НДС (если применимо). Возврат средств осуществляется в соответствии с политикой возвратов.
+          * Некоторая информация скрыта для безопасности сервиса. Подробности о каждом тарифе откроются после регистрации.
         </p>
-      </div>
-      <div ref={dashboardRef}>
-        <DashboardPreviewSection />
       </div>
     </section>
   );

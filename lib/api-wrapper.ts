@@ -8,7 +8,6 @@ import { checkAuth } from './auth-helper';
 import { ERROR_NOT_AUTHENTICATED } from './constants';
 import type { User } from './auth';
 
-// Расширяем тип NextRequest для добавления user в контекст
 declare module 'next/server' {
   interface NextRequest {
     user?: User;
@@ -96,7 +95,6 @@ export function withApiHandler(
             )
           );
         }
-        // Добавляем user в request context для использования в handler
         request.user = authResult.user;
       }
 
@@ -115,7 +113,7 @@ export function withApiHandler(
         }
       }
 
-      // CSRF check
+      // CSRF CHECK
       if (requireCSRF) {
         const sessionId = request.cookies.get('session_id')?.value;
         const csrfToken = data.csrfToken;
@@ -135,7 +133,7 @@ export function withApiHandler(
         }
       }
 
-      // Data validation
+      // Data Validation
       if (validateData) {
         const validation = validateData(data);
         if (!validation.isValid) {
@@ -148,7 +146,7 @@ export function withApiHandler(
         }
       }
 
-      // Username validation
+      // Username Validation
       if (validateUsername && data.username) {
         const validation = ServerValidator.validateUsername(data.username);
         if (!validation.isValid) {
@@ -161,7 +159,7 @@ export function withApiHandler(
         }
       }
 
-      // Password validation
+      // Password Validation
       if (validatePassword && data.password) {
         const validation = ServerValidator.validatePassword(data.password);
         if (!validation.isValid) {
@@ -190,7 +188,7 @@ export function withApiHandler(
         }
       }
 
-      // Custom validation
+      // Custom Validation
       if (customValidation) {
         const validation = await customValidation(data);
         if (!validation.isValid) {

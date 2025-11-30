@@ -7,7 +7,7 @@ import { gsap } from 'gsap';
 import AdminAuthForm from '@/components/AdminAuthForm';
 import MagicBentoGrid from '@/components/ui/MagicBentoGrid';
 import LoadingSpinner from '@/components/LoadingSpinner';
-import { GSAP_DEFAULT_DURATION, GSAP_DEFAULT_EASE } from '@/lib/constants';
+import { GSAP_DEFAULT_DURATION, GSAP_DEFAULT_EASE, APP_VERSION } from '@/lib/constants';
 
 interface AuthState {
   isAuthenticated: boolean;
@@ -562,7 +562,7 @@ export default function AdminPanel() {
         {/* Footer */}
         <div className="p-4 border-t border-neutral-800">
           <div className="text-xs text-neutral-500">
-            <p>Версия: 1.0.0</p>
+            <p>Версия: {APP_VERSION}</p>
           </div>
         </div>
       </div>

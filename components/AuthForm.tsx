@@ -48,6 +48,85 @@ export default function AuthForm({ retpatch = '/dashboard/' }: AuthFormProps) {
     register: false,
     login: false
   });
+  
+  // Функция для расчета силы пароля
+  const calculatePasswordStrength = (password: string): {
+    score: number; // 0-4
+    label: string;
+    color: string;
+    requirements: {
+      minLength: boolean;
+      hasUpperCase: boolean;
+      hasLowerCase: boolean;
+      hasNumber: boolean;
+      hasSpecialChar: boolean;
+    };
+  } => {
+    if (!password) {
+      return {
+        score: 0,
+        label: '',
+        color: '',
+        requirements: {
+          minLength: false,
+          hasUpperCase: false,
+          hasLowerCase: false,
+          hasNumber: false,
+          hasSpecialChar: false
+        }
+      };
+    }
+
+    const requirements = {
+      minLength: password.length >= 6,
+      hasUpperCase: /[A-Z]/.test(password),
+      hasLowerCase: /[a-z]/.test(password),
+      hasNumber: /[0-9]/.test(password),
+      hasSpecialChar: /[!@#$%^&*()_+.\-=\[\]{};':"\\|,<>\/?]/.test(password)
+    };
+
+    let score = 0;
+    if (requirements.minLength) score++;
+    if (requirements.hasUpperCase) score++;
+    if (requirements.hasLowerCase) score++;
+    if (requirements.hasNumber) score++;
+    if (requirements.hasSpecialChar) score++;
+
+    // Нормализуем score до 0-4 для визуализации
+    let normalizedScore = 0;
+    let label = '';
+    let color = '';
+
+    if (score === 0) {
+      normalizedScore = 0;
+      label = '';
+      color = '';
+    } else if (score <= 2) {
+      normalizedScore = 1;
+      label = 'Слабый';
+      color = 'bg-red-500';
+    } else if (score === 3) {
+      normalizedScore = 2;
+      label = 'Средний';
+      color = 'bg-yellow-500';
+    } else if (score === 4) {
+      normalizedScore = 3;
+      label = 'Хороший';
+      color = 'bg-blue-500';
+    } else {
+      normalizedScore = 4;
+      label = 'Отличный';
+      color = 'bg-green-500';
+    }
+
+    return {
+      score: normalizedScore,
+      label,
+      color,
+      requirements
+    };
+  };
+  
   const [showPassword, setShowPassword] = useState({
     register: false,
     login: false
@@ -474,22 +553,41 @@ export default function AuthForm({ retpatch = '/dashboard/' }: AuthFormProps) {
               </button>
             </div>
 
-            {/* Password Strength */}
-            {showPasswordStrength.register && registerData.password.length > 0 && !registerData.confirmPassword && (
-              <div className="password-strength">
-                <div className="password-strength-bar">
-                  <div 
-                    className={`h-1 rounded transition-all ${
-                      registerData.password.length > 0 && registerData.password.length < 7
-                        ? 'bg-red-500 w-1/4'
-                        : registerData.password.length >= 7 && registerData.password.length < 9
-                        ? 'bg-yellow-500 w-2/4'
-                        : 'bg-green-500 w-full'
-                    }`}
-                  />
+            {/* Password Strength Indicator */}
+            {showPasswordStrength.register && registerData.password.length > 0 && !registerData.confirmPassword && (() => {
+              const strength = calculatePasswordStrength(registerData.password);
+              const widthPercent = strength.score === 0 ? 0 : (strength.score / 4) * 100;
+              
+              return (
+                <div className="mt-2 space-y-2 animate-fadeIn">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs text-neutral-400">Надёжность пароля:</span>
+                    {strength.label && (
+                      <span className={`text-xs font-medium ${
+                        strength.score === 1 ? 'text-red-400' :
+                        strength.score === 2 ? 'text-yellow-400' :
+                        strength.score === 3 ? 'text-blue-400' :
+                        'text-green-400'
+                      }`}>
+                        {strength.label}
+                      </span>
+                    )}
+                  </div>
+                  <div className="h-2 bg-neutral-800 rounded-full overflow-hidden">
+                    <div 
+                      className={`h-full rounded-full transition-all duration-300 ${
+                        strength.score === 0 ? 'bg-neutral-700' :
+                        strength.score === 1 ? 'bg-red-500' :
+                        strength.score === 2 ? 'bg-yellow-500' :
+                        strength.score === 3 ? 'bg-blue-500' :
+                        'bg-green-500'
+                      }`}
+                      style={{ width: `${widthPercent}%` }}
+                    />
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {errors.register.password && (
               <p className="text-red-400 text-xs mt-1" role="alert">
@@ -729,4 +827,3 @@ export default function AuthForm({ retpatch = '/dashboard/' }: AuthFormProps) {
     </div>
   );
 }
-

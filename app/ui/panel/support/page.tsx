@@ -1521,13 +1521,18 @@ export default function SupportPanel() {
     
     const query = searchQuery.trim().toLowerCase();
     return tickets.filter((ticket) => {
-      // Поиск по ID тикета
-      const matchesId = ticket.id.toLowerCase().includes(query);
-      // Поиск по логину пользователя
-      const matchesUsername = ticket.user?.username?.toLowerCase().includes(query) || false;
-      // Поиск по user_id пользователя
-      const matchesUserId = ticket.user?.user_id?.toLowerCase().includes(query) || false;
-      return matchesId || matchesUsername || matchesUserId;
+      if (statusFilter === 'archive') {
+        // Для архива: поиск по логину и теме тикета
+        const matchesUsername = ticket.user?.username?.toLowerCase().includes(query) || false;
+        const matchesSubject = ticket.subject?.toLowerCase().includes(query) || false;
+        return matchesUsername || matchesSubject;
+      } else {
+        // Для активных: поиск по ID тикета, логину и user_id
+        const matchesId = ticket.id.toLowerCase().includes(query);
+        const matchesUsername = ticket.user?.username?.toLowerCase().includes(query) || false;
+        const matchesUserId = ticket.user?.user_id?.toLowerCase().includes(query) || false;
+        return matchesId || matchesUsername || matchesUserId;
+      }
     });
   })();
 
@@ -1670,7 +1675,7 @@ export default function SupportPanel() {
                 type="text"
                 value={archiveSearchQuery}
                 onChange={(e) => setArchiveSearchQuery(e.target.value)}
-                placeholder="Поиск по логину или ID"
+                placeholder="Поиск по логину или теме"
                 className="w-full px-3 py-2 pl-10 bg-neutral-800 border border-neutral-700 rounded-lg text-sm text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
               <svg 
@@ -1951,7 +1956,7 @@ export default function SupportPanel() {
                 {activeTicket.user && (
                   <div className="border-b border-neutral-800 p-3 bg-neutral-900/50 flex-shrink-0">
                   <div className="flex items-center gap-3 mb-3">
-                    <div className={`w-10 h-10 rounded-full ${getGradientClasses(activeTicket.user.avatar_gradient)} flex items-center justify-center text-white font-semibold text-sm flex-shrink-0`}>
+                    <div className={`w-10 h-10 rounded-full ${getGradientClasses(activeTicket.user.avatar_gradient)} flex items-center justify-center text-white font-semibold text-sm flex-shrink-0 shadow-glow`}>
                       {getInitial(activeTicket.user.username)}
                     </div>
                     <div>

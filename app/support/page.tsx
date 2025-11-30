@@ -72,11 +72,6 @@ function MessageItem({
     }
   }, [message.id]);
 
-  // Функция для получения инициалов
-  const getInitial = (username: string) => {
-    return username.charAt(0).toUpperCase();
-  };
-
   // Определяем, является ли сообщение системным
   const SYSTEM_MESSAGE_TEXT = 'Спасибо за ваше сообщение. Мы получили ваш запрос и ответим в ближайшее время.';
   const isStatusChangeMessage = message.text.includes('Статус тикета изменен') || 
@@ -457,7 +452,7 @@ export default function SupportPage() {
         }
       );
     }
-  }, [activeTicket?.id]); // Анимируем только при смене ID тикета
+  }, [activeTicket]); // Анимируем только при смене ID тикета
 
   // Загрузка сообщений при выборе тикета
   useEffect(() => {

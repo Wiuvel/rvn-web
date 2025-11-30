@@ -8,6 +8,7 @@ import { useFadeIn, useStaggeredFadeIn } from '@/hooks/useGSAP';
 import { gsap } from 'gsap';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import { getGradientClasses } from '@/lib/avatar-gradients';
+import { APP_VERSION } from '@/lib/constants';
 
 interface UserData {
   id: string;
@@ -558,7 +559,7 @@ export default function DashboardPage() {
                     <span>Мои тарифы</span>
                   </Link>
                   <Link
-                    href="/contacts"
+                    href="/support"
                     onClick={() => setOpen(false)}
                     className="flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-xl text-white/80 hover:text-white hover:bg-white/5 transition-colors duration-200"
                   >
@@ -705,7 +706,7 @@ export default function DashboardPage() {
               © {currentYear} RVNPrivate. Все права защищены.
             </p>
             <div className="flex items-center gap-6 text-xs text-neutral-500">
-              <span>v1.0.0</span>
+              <span>v{APP_VERSION}</span>
             </div>
           </div>
         </div>

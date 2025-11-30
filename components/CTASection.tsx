@@ -11,11 +11,18 @@ export default function CTASection() {
   const containerRef = useBounceIn(0.05);
 
   return (
-    <section className="border-t border-neutral-800/70 fade-in">
+    <section className="fade-in relative">
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-5xl px-4 sm:px-6 lg:px-8 h-px" style={{
+        backgroundImage: 'radial-gradient(circle, rgb(115 115 115 / 0.4) 1.5px, transparent 1.5px)',
+        backgroundSize: '12px 1px',
+        backgroundRepeat: 'repeat-x',
+        backgroundPosition: '0 0'
+      }}></div>
+      <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-full max-w-5xl px-4 sm:px-6 lg:px-8 h-px border-b border-neutral-800/70"></div>
       <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 py-16">
         <div ref={containerRef} className="rounded-3xl border border-neutral-800 bg-gradient-to-br from-neutral-900 to-neutral-950 p-8 text-center">
           <h3 ref={titleRef} className="text-2xl font-semibold">Готовы начать?</h3>
-          <p ref={descriptionRef} className="mt-2 text-neutral-400">Оформите подписку и получите мгновенный доступ ко всему интернету.</p>
+          <p ref={descriptionRef} className="mt-2 text-neutral-400">Оформите подписку и получите мгновенный доступ к сервису.</p>
           <div ref={buttonRef}>
             <Link 
               href="/auth" 

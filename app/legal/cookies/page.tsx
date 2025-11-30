@@ -30,7 +30,7 @@ export default function CookiePolicyPage() {
         
         <main>
           <div ref={titleRef} className="page-title">
-            <h1>Политика использования Cookie</h1>
+            <h1>Политика использования Cookies</h1>
             <p className="subtitle">
               Узнайте, как мы используем файлы Cookie и технологии локального хранилища для обеспечения безопасности и работы сервиса.
             </p>
@@ -45,7 +45,7 @@ export default function CookiePolicyPage() {
               <div className="policy-card">
             <h2><strong>1. Общие положения</strong></h2>
             <p>
-              Настоящая Политика использования Cookie (далее — «Политика») определяет порядок использования 
+              Настоящая Политика использования Cookies (далее — «Политика») определяет порядок использования 
               файлов Cookie и технологий локального хранилища на веб-сайте сервиса Raven Private 
               (далее — «Сайт», «Сервис»).
             </p>

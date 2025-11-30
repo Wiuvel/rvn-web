@@ -120,7 +120,7 @@ export async function getUserRoles(userId: string): Promise<UserRole[]> {
 export async function grantUserRole(
   userId: string,
   role: UserRole,
-  grantedBy: string // ID админа, который выдает роль
+  grantedBy: string // Admin ID
 ): Promise<{ success: boolean; error?: string }> {
   try {
     if (!supabaseAdmin) {
