@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 export default function PricingSection() {
   const titleRef = useFadeIn(0.1);
   const cardsRef = useStaggeredFadeIn(0.2, 0.1);
+  const footnoteRef = useFadeIn(0.5);
   const plans = [
     {
       id: 'safe-1',
@@ -175,7 +176,7 @@ export default function PricingSection() {
             </Card>
           ))}
         </div>
-        <p className="mt-10 text-center text-xs text-neutral-500">
+        <p ref={footnoteRef} className="mt-10 text-center text-xs text-neutral-500">
           * Некоторая информация скрыта для безопасности сервиса. Подробности о каждом тарифе откроются после регистрации.
         </p>
       </div>

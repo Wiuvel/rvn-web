@@ -62,7 +62,7 @@ export default function DashboardPreviewSection() {
                 <div className="grid grid-cols-2 gap-3">
                   <div className="rounded-xl border border-neutral-800 bg-neutral-900 p-3">
                   <div className="text-neutral-400 text-xs">Подписка</div>
-                  <div className="mt-1 text-lg font-semibold">SAFE-2</div>
+                  <div className="mt-1 text-lg font-semibold">SAFE-1</div>
                 </div>
                 <div className="rounded-xl border border-neutral-800 bg-neutral-900 p-3">
                   <div className="text-neutral-400 text-xs">Действует до</div>
