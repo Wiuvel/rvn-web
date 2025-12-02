@@ -356,3 +356,121 @@ export async function hasRole(userId: string, role: UserRole): Promise<boolean> 
   return roles.includes(role);
 }
 
+// ============================================================================
+// OAuth User Management
+// ============================================================================
+
+/**
+ * Извлекает username из email (убирает @gmail.com и домен)
+ * Например: user@gmail.com -> user
+ */
+export function extractUsernameFromEmail(email: string): string {
+  const normalizedEmail = email.toLowerCase().trim();
+  const atIndex = normalizedEmail.indexOf('@');
+  if (atIndex === -1) {
+    // Если нет @, возвращаем как есть (но это не должно происходить)
+    return normalizedEmail;
+  }
+  return normalizedEmail.substring(0, atIndex);
+}
+
+interface CreateOrGetUserByEmailResult {
+  success: true;
+  user: User;
+  isNewUser: boolean;
+}
+
+interface CreateOrGetUserByEmailError {
+  success: false;
+  error: string;
+}
+
+/**
+ * Создает или получает пользователя по email (для OAuth)
+ * Username генерируется из email (без домена)
+ */
+export async function createOrGetUserByEmail(
+  email: string
+): Promise<CreateOrGetUserByEmailResult | CreateOrGetUserByEmailError> {
+  if (!supabaseAdmin) {
+    return { success: false, error: 'Database not configured' };
+  }
+
+  try {
+    const username = extractUsernameFromEmail(email);
+    const normalizedUsername = username.toLowerCase();
+
+    // Ищем существующего пользователя по username
+    const { data: existingUsers, error: checkError } = await supabaseAdmin
+      .from('users')
+      .select('*')
+      .ilike('username', normalizedUsername);
+
+    if (checkError) {
+      return { success: false, error: 'Database error' };
+    }
+
+    const existingUser = existingUsers?.find(
+      (u) => u.username.toLowerCase() === normalizedUsername
+    ) as User | undefined;
+
+    if (existingUser) {
+      // Пользователь существует - обновляем last_login
+      await supabaseAdmin
+        .from('users')
+        .update({ last_login: new Date().toISOString() })
+        .eq('id', existingUser.id);
+
+      return { success: true, user: existingUser, isNewUser: false };
+    }
+
+    // Пользователь не существует - создаем нового
+    // Генерируем уникальный user_id
+    let userId = generateUserId();
+    let retries = 0;
+    while (retries < 10) {
+      const { data: existing } = await supabaseAdmin
+        .from('users')
+        .select('id')
+        .eq('user_id', userId)
+        .single();
+
+      if (!existing) break;
+      userId = generateUserId();
+      retries++;
+    }
+
+    // Генерируем случайный пароль (для OAuth пользователей пароль не используется)
+    // Но поле password_hash обязательное, поэтому создаем случайный хеш
+    const randomPassword = Math.random().toString(36).slice(-16) + Date.now().toString(36);
+    const passwordHash = await hashPassword(randomPassword);
+    const dashboardToken = generateDashboardToken();
+    const avatarGradient = generateRandomGradient();
+
+    const { data: newUser, error: insertError } = await supabaseAdmin
+      .from('users')
+      .insert({
+        user_id: userId,
+        username, // Сохраняем username без домена
+        password_hash: passwordHash, // Случайный пароль (не используется для OAuth)
+        dashboard_token: dashboardToken,
+        avatar_gradient: avatarGradient,
+        token_version: 1,
+        last_login: new Date().toISOString(),
+      })
+      .select()
+      .single();
+
+    if (insertError) {
+      return { success: false, error: 'Failed to create user' };
+    }
+
+    return { success: true, user: newUser as User, isNewUser: true };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+}
+

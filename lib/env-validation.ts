@@ -30,6 +30,10 @@ const envSchema = z.object({
   TURNSTILE_SECRET_KEY: z.string().optional(),
   ALLOWED_ORIGINS: z.string().optional(),
   
+  // Google OAuth
+  GOOGLE_CLIENT_ID: z.string().optional(),
+  GOOGLE_CLIENT_SECRET: z.string().optional(),
+  
   // Node environment
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
 });
@@ -60,6 +64,8 @@ export function validateEnv(): Env {
       CSRF_SECRET: process.env.CSRF_SECRET,
       TURNSTILE_SECRET_KEY: process.env.TURNSTILE_SECRET_KEY,
       ALLOWED_ORIGINS: process.env.ALLOWED_ORIGINS,
+      GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
+      GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
       NODE_ENV: process.env.NODE_ENV || 'development',
     });
     

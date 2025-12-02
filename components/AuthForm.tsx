@@ -403,7 +403,8 @@ export default function AuthForm({ retpatch = '/dashboard/' }: AuthFormProps) {
   const oauthLogin = async (provider: string) => {
     setIsLoading(true);
     try {
-      window.location.href = `/auth/${provider}`;
+      // Перенаправляем на API route для инициации OAuth
+      window.location.href = `/api/auth/oauth/${provider}`;
     } catch {
       setErrors(prev => ({ ...prev, global: 'Ошибка подключения к провайдеру' }));
       setIsLoading(false);
