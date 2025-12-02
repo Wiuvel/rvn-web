@@ -69,8 +69,9 @@ export default function DashboardPage() {
         timeoutId = setTimeout(() => controller!.abort(), 10000);
 
         try {
-          const response = await fetch('/api/auth/me', {
-            signal: controller.signal
+          let response = await fetch('/api/auth/me', {
+            signal: controller.signal,
+            cache: 'no-store'
           });
           
           if (timeoutId) {
@@ -79,6 +80,33 @@ export default function DashboardPage() {
           }
 
           if (!isMounted) return;
+
+          // Если получили 401, пытаемся обновить токен через refresh
+          if (response.status === 401) {
+            try {
+              const refreshResponse = await fetch('/api/auth/refresh', {
+                method: 'POST',
+                credentials: 'include',
+                signal: controller.signal,
+              });
+
+              if (refreshResponse.ok) {
+                // Токен обновлен, повторяем запрос
+                response = await fetch('/api/auth/me', {
+                  signal: controller.signal,
+                  cache: 'no-store',
+                });
+              } else {
+                // Refresh не удался, пользователь не авторизован
+                router.push('/auth');
+                return;
+              }
+            } catch (refreshError) {
+              // Ошибка при обновлении токена
+              router.push('/auth');
+              return;
+            }
+          }
 
           if (response.ok) {
             const data = await response.json();

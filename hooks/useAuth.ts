@@ -214,4 +214,3 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
 
   return { userData, loading, error };
 }
-

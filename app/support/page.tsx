@@ -345,8 +345,9 @@ export default function SupportPage() {
         timeoutId = setTimeout(() => controller!.abort(), AUTH_FETCH_TIMEOUT);
 
         try {
-          const response = await fetch('/api/auth/me', {
-            signal: controller.signal
+          let response = await fetch('/api/auth/me', {
+            signal: controller.signal,
+            cache: 'no-store'
           });
           
           if (timeoutId) {
@@ -355,6 +356,35 @@ export default function SupportPage() {
           }
 
           if (!isMounted) return;
+
+          // Если получили 401, пытаемся обновить токен через refresh
+          if (response.status === 401) {
+            try {
+              const refreshResponse = await fetch('/api/auth/refresh', {
+                method: 'POST',
+                credentials: 'include',
+                signal: controller.signal,
+              });
+
+              if (refreshResponse.ok) {
+                // Токен обновлен, повторяем запрос
+                response = await fetch('/api/auth/me', {
+                  signal: controller.signal,
+                  cache: 'no-store',
+                });
+              } else {
+                // Refresh не удался, пользователь не авторизован
+                setUserData(null);
+                setIsSupport(false);
+                return;
+              }
+            } catch (refreshError) {
+              // Ошибка при обновлении токена
+              setUserData(null);
+              setIsSupport(false);
+              return;
+            }
+          }
 
           if (response.ok) {
             const data = await response.json();

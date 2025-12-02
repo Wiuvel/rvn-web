@@ -126,7 +126,7 @@ async function handleAuth(request: NextRequest, pathname: string): Promise<NextR
       if (retpatch) {
         return NextResponse.redirect(new URL(retpatch, request.url));
       }
-      // Редиректим на /dashboard, компонент сам определит правильный токен
+      // Редиректим на /dashboard, компонент сам определит правильный токен через API
       return NextResponse.redirect(new URL('/dashboard', request.url));
     }
     return NextResponse.next();
@@ -140,6 +140,8 @@ async function handleAuth(request: NextRequest, pathname: string): Promise<NextR
       return NextResponse.redirect(new URL(`/auth?retpatch=${retpatch}`, request.url));
     }
     
+    // Если пользователь заходит на /dashboard без токена, разрешаем доступ
+    // Компонент /dashboard/page.tsx сам получит токен через API и редиректит на правильный URL
     return NextResponse.next();
   }
 
