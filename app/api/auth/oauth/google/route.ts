@@ -11,6 +11,22 @@ export async function OPTIONS() {
 
 export async function GET(request: NextRequest) {
   try {
+    // Получаем PUBLIC_DOMAIN в начале для редиректов
+    const env = getEnv();
+    if (!env.PUBLIC_DOMAIN) {
+      logger.error('PUBLIC_DOMAIN NOT CONFIGURED');
+      return setCorsHeaders(
+        NextResponse.json(
+          { error: 'OAuth SERVICE NOT CONFIGURED' },
+          { status: 503 }
+        )
+      );
+    }
+
+    const origin = env.PUBLIC_DOMAIN.endsWith('/') 
+      ? env.PUBLIC_DOMAIN.slice(0, -1) 
+      : env.PUBLIC_DOMAIN;
+
     // Rate limiting
     const rateLimitResult = await authRateLimit.check(request);
     if (!rateLimitResult.allowed) {
@@ -18,15 +34,13 @@ export async function GET(request: NextRequest) {
         ip: request.headers.get('x-forwarded-for'),
       });
       return setCorsHeaders(
-        NextResponse.json(
-          { error: 'Too many requests. Please try again later.' },
-          { status: 429 }
+        NextResponse.redirect(
+          new URL('/auth?error=rate_limit', origin)
         )
       );
     }
 
     // Проверяем наличие Google OAuth credentials
-    const env = getEnv();
     if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) {
       logger.error('Google OAuth not configured', {
         hasClientId: !!env.GOOGLE_CLIENT_ID,
@@ -42,22 +56,6 @@ export async function GET(request: NextRequest) {
 
     // Генерируем state токен для CSRF защиты
     const state = randomBytes(32).toString('hex');
-    
-    // Используем PUBLIC_DOMAIN из переменных окружения
-    if (!env.PUBLIC_DOMAIN) {
-      logger.error('PUBLIC_DOMAIN NOT CONFIGURED');
-      return setCorsHeaders(
-        NextResponse.json(
-          { error: 'OAuth SERVICE NOT CONFIGURED' },
-          { status: 503 }
-        )
-      );
-    }
-    
-    // Убираем trailing slash если есть
-    const origin = env.PUBLIC_DOMAIN.endsWith('/') 
-      ? env.PUBLIC_DOMAIN.slice(0, -1) 
-      : env.PUBLIC_DOMAIN;
     
     const redirectUri = `${origin}/api/auth/oauth/google/callback`;
 

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { translateError } from '@/lib/error-translations';
@@ -483,6 +484,65 @@ export default function AuthForm({ retpatch = '/dashboard/' }: AuthFormProps) {
   useEffect(() => {
     fetchCsrfToken();
   }, []);
+
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    const errorParam = searchParams.get('error');
+    if (errorParam) {
+      let errorMessage = '';
+      switch (errorParam) {
+        case 'rate_limit':
+          errorMessage = 'Too many login attempts. Please try again later.';
+          break;
+        case 'oauth_denied':
+          errorMessage = 'OAuth authorization was denied';
+          break;
+        case 'invalid_request':
+          errorMessage = 'Invalid request';
+          break;
+        case 'invalid_state':
+          errorMessage = 'Invalid state token';
+          break;
+        case 'oauth_not_configured':
+          errorMessage = 'OAuth service is not configured';
+          break;
+        case 'token_exchange_failed':
+          errorMessage = 'Failed to exchange OAuth token';
+          break;
+        case 'no_access_token':
+          errorMessage = 'No access token received';
+          break;
+        case 'user_info_failed':
+          errorMessage = 'Failed to fetch user information';
+          break;
+        case 'no_email':
+          errorMessage = 'No email provided';
+          break;
+        case 'email_not_verified':
+          errorMessage = 'Email is not verified';
+          break;
+        case 'user_creation_failed':
+          errorMessage = 'Failed to create user account';
+          break;
+        case 'account_disabled':
+          errorMessage = 'Account is disabled';
+          break;
+        case 'internal_error':
+          errorMessage = 'Internal server error';
+          break;
+        default:
+          errorMessage = 'An error occurred';
+      }
+      const translatedError = translateError(errorMessage);
+      setErrors(prev => ({ ...prev, global: escapeHtml(translatedError) }));
+      setLoginAttemptState('error');
+      
+      // Очищаем параметр из URL
+      const url = new URL(window.location.href);
+      url.searchParams.delete('error');
+      window.history.replaceState({}, '', url.toString());
+    }
+  }, [searchParams]);
 
   return (
     <div className="w-full max-w-md mx-auto">
