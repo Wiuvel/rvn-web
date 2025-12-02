@@ -399,8 +399,8 @@ export default function Header() {
                             }
                             router.push('/auth');
                           }
-                        } catch (error) {
-                          console.error('Logout error:', error);
+                        } catch {
+                          // Тихий режим - ошибка logout не критична
                         }
                       }}
                       className="w-full flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-xl text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors duration-200"

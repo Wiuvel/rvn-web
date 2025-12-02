@@ -261,14 +261,10 @@ export default function SupportPage() {
     for (const requestCallback of queue) {
       try {
         await requestCallback();
-      } catch (error) {
+      } catch {
         // Если запрос снова получил rate limit после иммунитета - это критическая ошибка
         // НЕ добавляем обратно в очередь и НЕ показываем капчу снова
-        if (error instanceof Error && error.message === 'RATE_LIMIT_EXCEEDED') {
-          console.error('Rate limit still active after CAPTCHA - immunity may not be working');
-        } else {
-          console.error('Error retrying request after rate limit clear:', error);
-        }
+        // Тихий режим - ошибка обрабатывается через UI
       }
     }
     
@@ -414,9 +410,9 @@ export default function SupportPage() {
           }
           setUserData(null);
         }
-      } catch (error) {
+      } catch {
         if (!isMounted) return;
-        console.error('Failed to fetch user data:', error);
+        // Тихий режим - ошибка обрабатывается через UI
         setUserData(null);
       } finally {
         if (isMounted) {
@@ -587,8 +583,8 @@ export default function SupportPage() {
             markMessagesAsRead(activeTicket.id);
           }
         }
-      } catch (error) {
-        console.error('Error checking for new messages:', error);
+      } catch {
+        // Тихий режим - ошибка проверки сообщений не критична
       }
     };
 
@@ -635,11 +631,8 @@ export default function SupportPage() {
           },
           () => markMessagesAsRead(ticketId) // Retry callback
         );
-      } catch (error) {
-        // Не логируем RATE_LIMIT_EXCEEDED, так как это обрабатывается через капчу
-        if (error instanceof Error && error.message !== 'RATE_LIMIT_EXCEEDED') {
-          console.error('Error marking messages as read:', error);
-        }
+      } catch {
+        // Тихий режим - ошибка пометки сообщений не критична
       }
     }, MARK_AS_READ_DEBOUNCE);
   }, []); // Пустой массив зависимостей, так как функция не зависит от состояния
@@ -723,8 +716,8 @@ export default function SupportPage() {
         }
         router.push('/auth');
       }
-    } catch (error) {
-      console.error('Logout error:', error);
+    } catch {
+      // Тихий режим - ошибка logout не критична
     }
   };
 
@@ -896,7 +889,7 @@ export default function SupportPage() {
         // НЕ сбрасываем флаг, так как после капчи запрос повторится
         return;
       }
-      console.error('Error creating ticket:', error);
+      // Тихий режим - ошибка обрабатывается через UI
       showNotification('Ошибка создания обращения');
     } finally {
       // Сбрасываем флаг создания тикета в любом случае
@@ -1036,7 +1029,7 @@ export default function SupportPage() {
         // Rate limit обрабатывается через капчу, не показываем ошибку
         return;
       }
-      console.error('Error sending message:', error);
+      // Тихий режим - ошибка обрабатывается через UI
       showNotification('Ошибка отправки сообщения');
     } finally {
       // Сбрасываем флаг отправки в любом случае
@@ -1091,7 +1084,7 @@ export default function SupportPage() {
         setTicketsLoading(false);
         return;
       }
-      console.error('Error fetching tickets:', error);
+      // Тихий режим - ошибка обрабатывается через UI
       showNotification('Ошибка загрузки обращений');
     } finally {
       setTicketsLoading(false);
@@ -1167,8 +1160,8 @@ export default function SupportPage() {
         const errorMessage = data.error || 'Ошибка загрузки сообщений';
         showNotification(translateError(errorMessage));
       }
-    } catch (error) {
-      console.error('Error fetching ticket messages:', error);
+    } catch {
+      // Тихий режим - ошибка обрабатывается через UI
       showNotification('Ошибка загрузки сообщений');
     }
   };

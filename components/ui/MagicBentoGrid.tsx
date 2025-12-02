@@ -108,8 +108,8 @@ export default function AdvancedBentoGrid() {
         } else {
           setTeamCount(0);
         }
-      } catch (error) {
-        console.error('Error fetching team count:', error);
+      } catch {
+        // Тихий режим - ошибка не критична
         setTeamCount(0);
       } finally {
         setTeamLoading(false);

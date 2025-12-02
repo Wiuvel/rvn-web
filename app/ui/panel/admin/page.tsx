@@ -152,8 +152,8 @@ export default function AdminPanel() {
       const response = await fetch('/api/admin/check');
       const data = await response.json();
       setAuthState(data);
-    } catch (error) {
-      console.error('Error checking auth status:', error);
+    } catch {
+      // Тихий режим - ошибка auth обрабатывается через UI
     } finally {
       setLoading(false);
     }
@@ -168,8 +168,8 @@ export default function AdminPanel() {
         username: null,
       }));
       checkAuthStatus();
-    } catch (error) {
-      console.error('Logout error:', error);
+    } catch {
+      // Тихий режим - ошибка logout не критична
     }
   };
 
@@ -240,8 +240,8 @@ export default function AdminPanel() {
         }
         
         setUsers(sortedUsers);
-      } catch (error) {
-        console.error('Failed to load users:', error);
+      } catch {
+        // Тихий режим - ошибка обрабатывается через UI
         setUsers([]);
         setUsersError('Ошибка загрузки списка пользователей');
       } finally {
@@ -316,8 +316,8 @@ export default function AdminPanel() {
       setBanUser(null);
       setBanReason('');
       setBanDuration(1);
-    } catch (error) {
-      console.error('Error banning user:', error);
+    } catch {
+      // Тихий режим - ошибка обрабатывается через UI
       setUserActionMessage('Ошибка при бане пользователя');
       setTimeout(() => setUserActionMessage(''), 3000);
     } finally {
@@ -418,8 +418,8 @@ export default function AdminPanel() {
         // Откатываем оптимистичное обновление при ошибке
         refreshUserRoles(selectedUser);
       }
-    } catch (error) {
-      console.error('Error granting role:', error);
+    } catch {
+      // Тихий режим - ошибка обрабатывается через UI
       setUserActionMessage('Ошибка выдачи роли');
       setTimeout(() => setUserActionMessage(''), 2500);
       // Откатываем оптимистичное обновление при ошибке
@@ -463,8 +463,8 @@ export default function AdminPanel() {
         // Откатываем оптимистичное обновление при ошибке
         refreshUserRoles(selectedUser);
       }
-    } catch (error) {
-      console.error('Error revoking role:', error);
+    } catch {
+      // Тихий режим - ошибка обрабатывается через UI
       setUserActionMessage('Ошибка отзыва роли');
       setTimeout(() => setUserActionMessage(''), 2500);
       // Откатываем оптимистичное обновление при ошибке

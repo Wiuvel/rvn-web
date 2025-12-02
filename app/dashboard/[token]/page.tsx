@@ -144,8 +144,7 @@ export default function DashboardPage() {
         }
       } catch (error) {
         if (!isMounted) return;
-
-        console.error('Failed to fetch user data:', error);
+        // Тихий режим - ошибка обрабатывается через редирект
         // Проверяем, не является ли это таймаутом
         if (error instanceof Error && error.name === 'AbortError') {
           router.push('/error/500');
@@ -186,8 +185,8 @@ export default function DashboardPage() {
         }
         router.push('/auth');
       }
-    } catch (error) {
-      console.error('Logout error:', error);
+    } catch {
+      // Тихий режим - ошибка logout не критична
     }
   };
 

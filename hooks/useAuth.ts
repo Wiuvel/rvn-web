@@ -161,9 +161,8 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
             
             if (onError) {
               onError(timeoutError);
-            } else if (!silent) {
-              console.error('Auth check timeout');
             }
+            // Тихий режим - таймауты обрабатываются через onError
             return;
           }
 
@@ -173,9 +172,8 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
           
           if (onError) {
             onError(err);
-          } else if (!silent) {
-            console.error('Failed to fetch user data:', err);
           }
+          // Тихий режим - ошибки обрабатываются через onError
 
           if (requireAuth && redirectOnFail) {
             router.push(redirectOnFail);
@@ -192,9 +190,8 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
 
         if (onError) {
           onError(err);
-        } else if (!silent) {
-          console.error('Failed to check auth:', err);
         }
+        // Тихий режим - ошибки обрабатываются через onError
 
         if (requireAuth && redirectOnFail) {
           router.push(redirectOnFail);
@@ -210,14 +207,21 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
     fetchUserData();
 
     // Слушаем событие обновления токена для перезапуска проверки
+    // Используем debounce чтобы избежать множественных вызовов
+    let refreshTimeout: NodeJS.Timeout | null = null;
     const handleTokenRefreshed = () => {
       if (isMounted) {
-        // Небольшая задержка чтобы дать время cookie обновиться
-        setTimeout(() => {
+        // Отменяем предыдущий запрос если он еще не выполнился
+        if (refreshTimeout) {
+          clearTimeout(refreshTimeout);
+        }
+        // Небольшая задержка чтобы дать время cookie обновиться и избежать дублирования
+        refreshTimeout = setTimeout(() => {
           if (isMounted) {
             fetchUserData();
           }
-        }, 100);
+          refreshTimeout = null;
+        }, 200);
       }
     };
 
@@ -229,6 +233,9 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
       isMounted = false;
       if (timeoutId) {
         clearTimeout(timeoutId);
+      }
+      if (refreshTimeout) {
+        clearTimeout(refreshTimeout);
       }
       if (controller) {
         controller.abort();

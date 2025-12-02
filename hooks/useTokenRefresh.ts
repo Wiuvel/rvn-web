@@ -37,16 +37,15 @@ export function useTokenRefresh() {
         }
         return false;
       } catch (error) {
-        if (process.env.NODE_ENV === 'development') {
-          console.error('Error refreshing token:', error);
-        }
+        // Тихий режим - ошибки обновления токена не критичны
         return false;
       } finally {
         isRefreshingRef.current = false;
       }
     };
 
-    // Функция для проверки и обновления токена через API
+    // Функция для проактивного обновления токена по таймеру
+    // НЕ делает проверку через API - это делает useAuth
     const checkAndRefreshToken = async () => {
       // Пропускаем проверку, если уже обновляется
       if (isRefreshingRef.current) {
@@ -55,10 +54,12 @@ export function useTokenRefresh() {
 
       const now = Date.now();
       
-      // Проверяем не чаще чем раз в 10 секунд (уменьшили для более быстрой реакции)
-      if (now - lastCheckRef.current < 10 * 1000) {
+      // Проверяем не чаще чем раз в 30 секунд
+      if (now - lastCheckRef.current < 30 * 1000) {
         return;
       }
+
+      lastCheckRef.current = now;
 
       // Проверяем, прошло ли 8 минут с последнего обновления
       // Обновляем токен проактивно за 2 минуты до истечения (10 минут - 8 минут = 2 минуты)
@@ -66,34 +67,6 @@ export function useTokenRefresh() {
       if (timeSinceLastRefresh > 8 * 60 * 1000) {
         // Обновляем токен проактивно
         await refreshToken();
-        lastCheckRef.current = now;
-        return;
-      }
-
-      try {
-        // Делаем запрос к /api/auth/me для проверки токена
-        const response = await fetch('/api/auth/me', {
-          method: 'GET',
-          credentials: 'include',
-          cache: 'no-store',
-        });
-
-        lastCheckRef.current = now;
-
-        // Если получили 401, токен истек - обновляем НЕМЕДЛЕННО
-        if (response.status === 401) {
-          await refreshToken();
-          // После обновления токена, повторяем проверку через небольшую задержку
-          // чтобы убедиться что токен обновился
-          setTimeout(() => {
-            checkAndRefreshToken();
-          }, 500);
-        }
-      } catch (error) {
-        // Игнорируем ошибки сети, но логируем для отладки
-        if (process.env.NODE_ENV === 'development') {
-          console.error('Error checking token:', error);
-        }
       }
     };
 
@@ -104,15 +77,15 @@ export function useTokenRefresh() {
       lastRefreshRef.current = Date.now() - 9 * 60 * 1000; // 9 минут назад, чтобы сразу проверить
     }
 
-    // Проверяем токен каждые 30 секунд для более частых проверок
-    // Это позволяет быстрее обнаружить истекший токен
-    intervalRef.current = setInterval(checkAndRefreshToken, 30 * 1000);
+    // Проверяем токен каждые 2 минуты для проактивного обновления
+    // Не делаем проверку через API - это делает useAuth
+    intervalRef.current = setInterval(checkAndRefreshToken, 2 * 60 * 1000);
 
-    // Проверяем СРАЗУ при монтировании (с минимальной задержкой) - критично для работы после долгого отсутствия
-    // Используем небольшую задержку только чтобы не блокировать первый рендер
+    // Проверяем СРАЗУ при монтировании (с задержкой чтобы не конфликтовать с useAuth)
+    // Используем задержку чтобы дать время useAuth сделать первый запрос
     const immediateCheck = setTimeout(() => {
       checkAndRefreshToken();
-    }, 100);
+    }, 2000);
 
     return () => {
       clearTimeout(immediateCheck);

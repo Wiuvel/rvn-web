@@ -66,31 +66,32 @@ export function validateEnv(): Env {
     return validatedEnv;
   } catch (error) {
     if (error instanceof z.ZodError) {
-      // Улучшенные сообщения об ошибках с информацией о фактических значениях
-      const errorMessage = `❌ Invalid environment variables:\n${error.issues.map((issue) => {
-        const path = issue.path.join('.');
-        const value = issue.path.length > 0 
-          ? (issue.path[0] === 'SUPABASE_URL' ? supabaseUrl 
-             : issue.path[0] === 'SUPABASE_ANON_KEY' ? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-             : issue.path[0] === 'SUPABASE_SERVICE_ROLE_KEY' ? process.env.SUPABASE_SERVICE_ROLE_KEY
-             : issue.path[0] === 'JWT_SECRET' ? process.env.JWT_SECRET
-             : issue.path[0] === 'CSRF_SECRET' ? process.env.CSRF_SECRET
-             : undefined)
-          : undefined;
-        
-        const valueInfo = value === undefined 
-          ? ' (not set)' 
-          : value === '' 
-            ? ' (empty string)'
-            : ` (value: ${value.length > 50 ? value.substring(0, 50) + '...' : value})`;
-        
-        return `  - ${path}: ${issue.message}${valueInfo}`;
-      }).join('\n')}\n\n💡 Please check your .env file and ensure all required variables are set.\n\nAvailable env vars:\n  - SUPABASE_URL: ${supabaseUrl ? 'set' : 'NOT SET'}\n  - NEXT_PUBLIC_SUPABASE_URL: ${process.env.NEXT_PUBLIC_SUPABASE_URL ? 'set' : 'NOT SET'}\n  - NEXT_PUBLIC_SUPABASE_ANON_KEY: ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? 'set' : 'NOT SET'}\n  - SUPABASE_SERVICE_ROLE_KEY: ${process.env.SUPABASE_SERVICE_ROLE_KEY ? 'set' : 'NOT SET'}\n  - JWT_SECRET: ${process.env.JWT_SECRET ? 'set' : 'NOT SET'}\n  - CSRF_SECRET: ${process.env.CSRF_SECRET ? 'set' : 'NOT SET'}`;
+      // Краткие сообщения об ошибках
+      const missingVars = error.issues
+        .filter(issue => issue.code === 'invalid_type' && (issue as { received?: string }).received === 'undefined')
+        .map(issue => issue.path.join('.'));
       
-      console.error(errorMessage);
+      const invalidVars = error.issues
+        .filter(issue => issue.code !== 'invalid_type' || (issue as { received?: string }).received !== 'undefined')
+        .map(issue => `${issue.path.join('.')}: ${issue.message}`);
       
-      // Всегда выбрасываем ошибку, обработка на уровне выше
-      // В Edge Runtime используется fallback, на сервере - завершение процесса через startup-validation
+      const errorParts: string[] = [];
+      if (missingVars.length > 0) {
+        errorParts.push(`Missing: ${missingVars.join(', ')}`);
+      }
+      if (invalidVars.length > 0) {
+        errorParts.push(`Invalid: ${invalidVars.join('; ')}`);
+      }
+      
+      const errorMessage = `Env validation failed: ${errorParts.join(' | ')}`;
+      
+      // В development показываем подробности, в production - кратко
+      if (process.env.NODE_ENV === 'development') {
+        console.error(`❌ ${errorMessage}`);
+      } else {
+        console.error(errorMessage);
+      }
+      
       const envError = new Error(errorMessage) as Error & { isEnvValidationError: boolean };
       envError.isEnvValidationError = true;
       throw envError;
@@ -127,7 +128,7 @@ if (canValidateOnImport && !isBuildTime) {
   } catch (error: unknown) {
     // В development режиме можем продолжить с предупреждением
     if (process.env?.NODE_ENV === 'development') {
-      console.warn('⚠️ Environment validation failed, but continuing in development mode');
+      // Тихий режим - не логируем, так как ошибка уже была выведена выше
     } else {
       // Просто выбрасываем ошибку - завершение процесса будет на уровне выше
       // (например, в startup-validation.ts, который не импортируется в Edge Runtime)

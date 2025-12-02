@@ -20,11 +20,7 @@ function getValidatedEnv() {
       
       // В Edge Runtime или во время сборки используем fallback значения
       if (isEdgeRuntime || isBuildTime) {
-        if (isBuildTime) {
-          console.warn('⚠️ Environment validation skipped during build, will validate at runtime');
-        } else {
-          console.error('⚠️ Environment validation failed in Edge Runtime:', error);
-        }
+        // Тихий режим - валидация произойдет в runtime
         // Используем значения из process.env напрямую (с предупреждением)
         env = {
           SUPABASE_URL: process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '',

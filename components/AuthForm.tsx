@@ -280,8 +280,8 @@ export default function AuthForm({ retpatch = '/dashboard/' }: AuthFormProps) {
       const token = data?.csrfToken || '';
       setCsrfToken(token);
       return token;
-    } catch (error) {
-      console.error('CSRF token fetch error:', error);
+    } catch {
+      // Тихий режим - ошибка обрабатывается через UI
       setCsrfToken('');
       setErrors(prev => ({
         ...prev,

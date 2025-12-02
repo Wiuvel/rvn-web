@@ -397,14 +397,10 @@ export default function SupportPanel() {
     for (const requestCallback of queue) {
       try {
         await requestCallback();
-      } catch (error) {
+      } catch {
         // Если запрос снова получил rate limit после иммунитета - это критическая ошибка
         // НЕ добавляем обратно в очередь и НЕ показываем капчу снова
-        if (error instanceof Error && error.message === 'RATE_LIMIT_EXCEEDED') {
-          console.error('Rate limit still active after CAPTCHA - immunity may not be working');
-        } else {
-          console.error('Error retrying request after rate limit clear:', error);
-        }
+        // Тихий режим - ошибка обрабатывается через UI
       }
     }
     
@@ -561,7 +557,7 @@ export default function SupportPanel() {
           // Rate limit обрабатывается через капчу, не показываем ошибку
           return;
         }
-        console.error('Error checking for new messages:', error);
+        // Тихий режим - ошибка проверки сообщений не критична
       }
     };
 
@@ -610,11 +606,8 @@ export default function SupportPanel() {
           },
           () => markMessagesAsRead(ticketId) // Retry callback
         );
-      } catch (error) {
-        // Не логируем RATE_LIMIT_EXCEEDED, так как это обрабатывается через капчу
-        if (error instanceof Error && error.message !== 'RATE_LIMIT_EXCEEDED') {
-          console.error('Error marking messages as read:', error);
-        }
+      } catch {
+        // Тихий режим - ошибка пометки сообщений не критична
       }
     }, 2000);
   };
@@ -719,7 +712,7 @@ export default function SupportPanel() {
         setLoading(false);
         return;
       }
-      console.error('Error checking auth status:', error);
+      // Тихий режим - ошибка auth обрабатывается через UI
       // При ошибке сети тоже показываем сообщение, а не редиректим
       setAuthState({
         isAuthenticated: true,
@@ -956,7 +949,7 @@ export default function SupportPanel() {
         setTicketsLoading(false);
         return;
       }
-      console.error('Error fetching tickets:', error);
+      // Тихий режим - ошибка обрабатывается через UI
       setTicketsLoading(false);
       // Устанавливаем пустой список и сбрасываем скелетон
       setTickets([]);
@@ -1069,7 +1062,7 @@ export default function SupportPanel() {
         setMessagesLoading(false);
         return;
       }
-      console.error('Error fetching messages:', error);
+      // Тихий режим - ошибка обрабатывается через UI
       showNotification(translateError('Ошибка загрузки сообщений'), 'error');
     } finally {
       setMessagesLoading(false);
@@ -1139,7 +1132,7 @@ export default function SupportPanel() {
         // Rate limit обрабатывается через капчу, не показываем ошибку
         return;
       }
-      console.error('Error sending message:', error);
+      // Тихий режим - ошибка обрабатывается через UI
       showNotification(translateError('Ошибка отправки сообщения'), 'error');
     }
   };
@@ -1262,7 +1255,7 @@ export default function SupportPanel() {
       if (error instanceof Error && error.message === 'RATE_LIMIT_EXCEEDED') {
         return;
       }
-      console.error('Error assigning ticket:', error);
+      // Тихий режим - ошибка обрабатывается через UI
       showNotification('Ошибка при взятии тикета', 'error');
     }
   };
@@ -1405,7 +1398,7 @@ export default function SupportPanel() {
         // Rate limit обрабатывается через капчу, не показываем ошибку
         return;
       }
-      console.error('Error updating ticket status:', error);
+      // Тихий режим - ошибка обрабатывается через UI
       showNotification(translateError('Ошибка обновления статуса'), 'error');
     }
   };

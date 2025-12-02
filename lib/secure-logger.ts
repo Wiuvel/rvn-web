@@ -86,12 +86,17 @@ class SecureLogger {
                        entry.level === 'info' ? console.info :
                        console.log;
       
-      logMethod(
-        `[${entry.timestamp}] ${entry.level.toUpperCase()}: ${entry.message}`,
-        entry.context ? entry.context : ''
-      );
+      // Краткий формат: [LEVEL] message | context
+      const contextStr = entry.context 
+        ? ` | ${Object.keys(entry.context).length} fields`
+        : '';
+      
+      logMethod(`[${entry.level.toUpperCase()}] ${entry.message}${contextStr}`, entry.context || '');
     } else {
-      console.log(JSON.stringify(entry));
+      // Production: JSON без timestamp (добавится на уровне системы логирования)
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { timestamp: _, ...logData } = entry;
+      console.log(JSON.stringify(logData));
     }
   }
 

@@ -52,8 +52,8 @@ export function UserMenu({
         onClose();
         router.push('/auth');
       }
-    } catch (error) {
-      console.error('Logout error:', error);
+    } catch {
+      // Тихий режим - ошибка logout не критична
     }
   };
 

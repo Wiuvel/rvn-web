@@ -17,11 +17,7 @@ function getValidatedEnv() {
       
       // В Edge Runtime или во время сборки используем fallback значения
       if (isEdgeRuntime || isBuildTime) {
-        if (isBuildTime) {
-          console.warn('⚠️ Environment validation skipped during build, will validate at runtime');
-        } else {
-          console.error('⚠️ Environment validation failed in Edge Runtime:', error);
-        }
+        // Тихий режим - валидация произойдет в runtime
         // Используем значения из process.env напрямую
         env = {
           SUPABASE_URL: process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '',
@@ -52,7 +48,6 @@ export const supabase = (() => {
   });
 })();
 
-// Server-side Supabase (использует только server-only переменные)
 export const supabaseAdmin = (() => {
   const env = getValidatedEnv();
   return createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
