@@ -29,7 +29,7 @@ function isBotOrStaticFile(pathname: string, userAgent: string): boolean {
 // Protection Middleware
 // ============================================================================
 
-function handleProtection(request: NextRequest, pathname: string): NextResponse | null {
+async function handleProtection(request: NextRequest, pathname: string): Promise<NextResponse | null> {
   const accessGranted = request.cookies.get('access_granted')?.value === 'true';
   const accessHash = request.cookies.get('access_hash')?.value;
 
@@ -43,6 +43,25 @@ function handleProtection(request: NextRequest, pathname: string): NextResponse 
 
   // Has access - continue
   if (accessGranted && accessHash) {
+    return null;
+  }
+
+  // Skip protection check for authenticated users (they have JWT tokens)
+  // This prevents redirecting to /protection/ after OAuth login
+  // Check for JWT tokens first (access_token or refresh_token)
+  const hasAccessToken = !!request.cookies.get('access_token')?.value;
+  const hasRefreshToken = !!request.cookies.get('refresh_token')?.value;
+  
+  // If user has JWT tokens, skip protection check
+  // This handles the case when cookies are set but not yet verified
+  if (hasAccessToken || hasRefreshToken) {
+    // Verify auth to be sure
+    const authResult = await verifyAuthForMiddleware(request);
+    if (authResult.isAuthenticated) {
+      return null;
+    }
+    // Even if verification fails, if tokens exist, allow access
+    // The page will handle token refresh if needed
     return null;
   }
 
@@ -134,7 +153,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // Protection check
-  const protectionResponse = handleProtection(request, pathname);
+  const protectionResponse = await handleProtection(request, pathname);
   if (protectionResponse) {
     return protectionResponse;
   }

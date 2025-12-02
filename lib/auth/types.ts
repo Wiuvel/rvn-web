@@ -117,7 +117,7 @@ export const ACCESS_TOKEN_COOKIE: Omit<CookieConfig, 'secure'> = {
   name: 'access_token',
   maxAge: 10 * 60, // 10 минут
   httpOnly: true,
-  sameSite: 'strict',
+  sameSite: 'lax',
   path: '/',
 };
 
@@ -125,7 +125,7 @@ export const REFRESH_TOKEN_COOKIE: Omit<CookieConfig, 'secure'> = {
   name: 'refresh_token',
   maxAge: 60 * 60 * 24 * 60, // 60 дней
   httpOnly: true,
-  sameSite: 'strict',
+  sameSite: 'lax',
   path: '/',
 };
 
