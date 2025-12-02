@@ -85,16 +85,27 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Определяем origin для production (учитываем прокси и заголовки)
-    const forwardedHost = request.headers.get('x-forwarded-host') || request.headers.get('host');
-    const origin = forwardedHost ? `https://${forwardedHost}` : request.nextUrl.origin;
+    // Используем PUBLIC_DOMAIN из переменных окружения
+    if (!env.PUBLIC_DOMAIN) {
+      logger.error('PUBLIC_DOMAIN not configured');
+      return setCorsHeaders(
+        NextResponse.redirect(
+          new URL('/auth?error=oauth_not_configured', request.nextUrl.origin)
+        )
+      );
+    }
+    
+    // Убираем trailing slash если есть
+    const origin = env.PUBLIC_DOMAIN.endsWith('/') 
+      ? env.PUBLIC_DOMAIN.slice(0, -1) 
+      : env.PUBLIC_DOMAIN;
+    
     const redirectUri = `${origin}/api/auth/oauth/google/callback`;
 
     // Логируем для отладки
     logger.info('OAuth callback - exchanging code', {
       redirectUri,
       origin,
-      forwardedHost,
       ip: request.headers.get('x-forwarded-for'),
     });
 
@@ -246,8 +257,8 @@ export async function GET(request: NextRequest) {
       // Продолжаем - access token все равно будет работать
     }
 
-    // Создаем redirect response
-    const redirectUrl = new URL('/dashboard', request.nextUrl.origin);
+    // Создаем redirect response (используем тот же origin, что и для OAuth)
+    const redirectUrl = new URL('/dashboard', origin);
     const response = NextResponse.redirect(redirectUrl);
 
     // Устанавливаем токены в cookies

@@ -32,6 +32,7 @@ function getValidatedEnv() {
           ALLOWED_ORIGINS: process.env.ALLOWED_ORIGINS,
           GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
           GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
+          PUBLIC_DOMAIN: process.env.PUBLIC_DOMAIN,
           NODE_ENV: (process.env.NODE_ENV as 'development' | 'production' | 'test') || 'development',
         } as ReturnType<typeof getEnv>;
       } else {

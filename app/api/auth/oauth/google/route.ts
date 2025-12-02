@@ -43,9 +43,22 @@ export async function GET(request: NextRequest) {
     // Генерируем state токен для CSRF защиты
     const state = randomBytes(32).toString('hex');
     
-    // Определяем origin для production (учитываем прокси и заголовки)
-    const forwardedHost = request.headers.get('x-forwarded-host') || request.headers.get('host');
-    const origin = forwardedHost ? `https://${forwardedHost}` : request.nextUrl.origin;
+    // Используем PUBLIC_DOMAIN из переменных окружения
+    if (!env.PUBLIC_DOMAIN) {
+      logger.error('PUBLIC_DOMAIN NOT CONFIGURED');
+      return setCorsHeaders(
+        NextResponse.json(
+          { error: 'OAuth SERVICE NOT CONFIGURED' },
+          { status: 503 }
+        )
+      );
+    }
+    
+    // Убираем trailing slash если есть
+    const origin = env.PUBLIC_DOMAIN.endsWith('/') 
+      ? env.PUBLIC_DOMAIN.slice(0, -1) 
+      : env.PUBLIC_DOMAIN;
+    
     const redirectUri = `${origin}/api/auth/oauth/google/callback`;
 
     // Логируем для отладки
@@ -53,7 +66,6 @@ export async function GET(request: NextRequest) {
       provider: 'google',
       redirectUri,
       origin,
-      forwardedHost,
       ip: request.headers.get('x-forwarded-for'),
     });
 
@@ -69,11 +81,10 @@ export async function GET(request: NextRequest) {
       }).toString()}`
     );
 
-    // Сохраняем state в cookie
     response.cookies.set('oauth_state', state, {
-      maxAge: 10 * 60, // 10 минут
+      maxAge: 10 * 60,
       httpOnly: true,
-      secure: true, // Всегда secure для production
+      secure: true,
       sameSite: 'lax',
       path: '/',
     });
