@@ -14,6 +14,23 @@ export async function OPTIONS() {
 
 export async function GET(request: NextRequest) {
   try {
+    // Получаем PUBLIC_DOMAIN в начале функции для всех редиректов
+    const env = getEnv();
+    if (!env.PUBLIC_DOMAIN) {
+      logger.error('PUBLIC_DOMAIN NOT CONFIGURED');
+      return setCorsHeaders(
+        NextResponse.json(
+          { error: 'OAuth SERVICE NOT CONFIGURED' },
+          { status: 503 }
+        )
+      );
+    }
+
+    // Убираем trailing slash если есть
+    const origin = env.PUBLIC_DOMAIN.endsWith('/') 
+      ? env.PUBLIC_DOMAIN.slice(0, -1) 
+      : env.PUBLIC_DOMAIN;
+
     // Rate limiting
     const rateLimitResult = await authRateLimit.check(request);
     if (!rateLimitResult.allowed) {
@@ -22,18 +39,17 @@ export async function GET(request: NextRequest) {
       });
       return setCorsHeaders(
         NextResponse.redirect(
-          new URL('/auth?error=rate_limit', request.nextUrl.origin)
+          new URL('/auth?error=rate_limit', origin)
         )
       );
     }
 
     // Проверяем наличие Google OAuth credentials
-    const env = getEnv();
     if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) {
       logger.error('Google OAuth not configured');
       return setCorsHeaders(
         NextResponse.redirect(
-          new URL('/auth?error=oauth_not_configured', request.nextUrl.origin)
+          new URL('/auth?error=oauth_not_configured', origin)
         )
       );
     }
@@ -52,7 +68,7 @@ export async function GET(request: NextRequest) {
       });
       return setCorsHeaders(
         NextResponse.redirect(
-          new URL('/auth?error=oauth_denied', request.nextUrl.origin)
+          new URL('/auth?error=oauth_denied', origin)
         )
       );
     }
@@ -66,7 +82,7 @@ export async function GET(request: NextRequest) {
       });
       return setCorsHeaders(
         NextResponse.redirect(
-          new URL('/auth?error=invalid_request', request.nextUrl.origin)
+          new URL('/auth?error=invalid_request', origin)
         )
       );
     }
@@ -80,25 +96,10 @@ export async function GET(request: NextRequest) {
       });
       return setCorsHeaders(
         NextResponse.redirect(
-          new URL('/auth?error=invalid_state', request.nextUrl.origin)
+          new URL('/auth?error=invalid_state', origin)
         )
       );
     }
-
-    // Используем PUBLIC_DOMAIN из переменных окружения
-    if (!env.PUBLIC_DOMAIN) {
-      logger.error('PUBLIC_DOMAIN not configured');
-      return setCorsHeaders(
-        NextResponse.redirect(
-          new URL('/auth?error=oauth_not_configured', request.nextUrl.origin)
-        )
-      );
-    }
-    
-    // Убираем trailing slash если есть
-    const origin = env.PUBLIC_DOMAIN.endsWith('/') 
-      ? env.PUBLIC_DOMAIN.slice(0, -1) 
-      : env.PUBLIC_DOMAIN;
     
     const redirectUri = `${origin}/api/auth/oauth/google/callback`;
 
@@ -133,7 +134,7 @@ export async function GET(request: NextRequest) {
       });
       return setCorsHeaders(
         NextResponse.redirect(
-          new URL('/auth?error=token_exchange_failed', request.nextUrl.origin)
+          new URL('/auth?error=token_exchange_failed', origin)
         )
       );
     }
@@ -145,7 +146,7 @@ export async function GET(request: NextRequest) {
       logger.error('No access_token in OAuth response');
       return setCorsHeaders(
         NextResponse.redirect(
-          new URL('/auth?error=no_access_token', request.nextUrl.origin)
+          new URL('/auth?error=no_access_token', origin)
         )
       );
     }
@@ -167,7 +168,7 @@ export async function GET(request: NextRequest) {
       });
       return setCorsHeaders(
         NextResponse.redirect(
-          new URL('/auth?error=user_info_failed', request.nextUrl.origin)
+          new URL('/auth?error=user_info_failed', origin)
         )
       );
     }
@@ -179,7 +180,7 @@ export async function GET(request: NextRequest) {
       logger.error('No email in Google user info');
       return setCorsHeaders(
         NextResponse.redirect(
-          new URL('/auth?error=no_email', request.nextUrl.origin)
+          new URL('/auth?error=no_email', origin)
         )
       );
     }
@@ -191,7 +192,7 @@ export async function GET(request: NextRequest) {
       });
       return setCorsHeaders(
         NextResponse.redirect(
-          new URL('/auth?error=email_not_verified', request.nextUrl.origin)
+          new URL('/auth?error=email_not_verified', origin)
         )
       );
     }
@@ -207,7 +208,7 @@ export async function GET(request: NextRequest) {
       });
       return setCorsHeaders(
         NextResponse.redirect(
-          new URL('/auth?error=user_creation_failed', request.nextUrl.origin)
+          new URL('/auth?error=user_creation_failed', origin)
         )
       );
     }
@@ -222,7 +223,7 @@ export async function GET(request: NextRequest) {
       });
       return setCorsHeaders(
         NextResponse.redirect(
-          new URL('/auth?error=account_disabled', request.nextUrl.origin)
+          new URL('/auth?error=account_disabled', origin)
         )
       );
     }
@@ -282,9 +283,28 @@ export async function GET(request: NextRequest) {
       error: error instanceof Error ? error.message : 'Unknown error',
       ip: request.headers.get('x-forwarded-for'),
     });
+    
+    // Получаем origin для редиректа на ошибку
+    try {
+      const env = getEnv();
+      if (env.PUBLIC_DOMAIN) {
+        const origin = env.PUBLIC_DOMAIN.endsWith('/') 
+          ? env.PUBLIC_DOMAIN.slice(0, -1) 
+          : env.PUBLIC_DOMAIN;
+        return setCorsHeaders(
+          NextResponse.redirect(
+            new URL('/auth?error=internal_error', origin)
+          )
+        );
+      }
+    } catch {
+      // Если не удалось получить env, возвращаем JSON ошибку
+    }
+    
     return setCorsHeaders(
-      NextResponse.redirect(
-        new URL('/auth?error=internal_error', request.nextUrl.origin)
+      NextResponse.json(
+        { error: 'Internal server error' },
+        { status: 500 }
       )
     );
   }
