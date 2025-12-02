@@ -43,15 +43,24 @@ export async function GET(request: NextRequest) {
     // Генерируем state токен для CSRF защиты
     const state = randomBytes(32).toString('hex');
     
-    // Сохраняем state в cookie (10 минут)
-    const hostname = request.nextUrl.hostname;
-    const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
-    const secure = process.env.NODE_ENV === 'production' && !isLocalhost;
+    // Определяем origin для production (учитываем прокси и заголовки)
+    const forwardedHost = request.headers.get('x-forwarded-host') || request.headers.get('host');
+    const origin = forwardedHost ? `https://${forwardedHost}` : request.nextUrl.origin;
+    const redirectUri = `${origin}/api/auth/oauth/google/callback`;
+
+    // Логируем для отладки
+    logger.info('OAuth initiation', {
+      provider: 'google',
+      redirectUri,
+      origin,
+      forwardedHost,
+      ip: request.headers.get('x-forwarded-for'),
+    });
 
     const response = NextResponse.redirect(
       `https://accounts.google.com/o/oauth2/v2/auth?${new URLSearchParams({
         client_id: env.GOOGLE_CLIENT_ID,
-        redirect_uri: `${request.nextUrl.origin}/api/auth/oauth/google/callback`,
+        redirect_uri: redirectUri,
         response_type: 'code',
         scope: 'openid email profile',
         access_type: 'offline',
@@ -64,14 +73,9 @@ export async function GET(request: NextRequest) {
     response.cookies.set('oauth_state', state, {
       maxAge: 10 * 60, // 10 минут
       httpOnly: true,
-      secure,
+      secure: true, // Всегда secure для production
       sameSite: 'lax',
       path: '/',
-    });
-
-    logger.info('OAuth initiation', {
-      provider: 'google',
-      ip: request.headers.get('x-forwarded-for'),
     });
 
     return setCorsHeaders(response);

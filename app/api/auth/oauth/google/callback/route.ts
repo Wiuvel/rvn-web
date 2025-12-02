@@ -85,6 +85,19 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Определяем origin для production (учитываем прокси и заголовки)
+    const forwardedHost = request.headers.get('x-forwarded-host') || request.headers.get('host');
+    const origin = forwardedHost ? `https://${forwardedHost}` : request.nextUrl.origin;
+    const redirectUri = `${origin}/api/auth/oauth/google/callback`;
+
+    // Логируем для отладки
+    logger.info('OAuth callback - exchanging code', {
+      redirectUri,
+      origin,
+      forwardedHost,
+      ip: request.headers.get('x-forwarded-for'),
+    });
+
     // Обмениваем code на access_token
     const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
@@ -96,7 +109,7 @@ export async function GET(request: NextRequest) {
         client_secret: env.GOOGLE_CLIENT_SECRET,
         code,
         grant_type: 'authorization_code',
-        redirect_uri: `${request.nextUrl.origin}/api/auth/oauth/google/callback`,
+        redirect_uri: redirectUri,
       }),
     });
 
