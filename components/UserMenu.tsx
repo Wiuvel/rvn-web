@@ -41,9 +41,14 @@ export function UserMenu({
   const handleLogout = async () => {
     try {
       const response = await fetch('/api/auth/logout', {
-        method: 'POST'
+        method: 'POST',
+        credentials: 'include'
       });
       if (response.ok) {
+        // Очищаем localStorage от access_token
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('access_token');
+        }
         onClose();
         router.push('/auth');
       }

@@ -4,7 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { verifyAccessToken, extractTokenFromHeader, extractTokenFromCookies, type AccessTokenPayload } from './jwt';
-import { getUserByToken } from './auth';
+import { getUserById } from './auth';
 import { logger } from './secure-logger';
 
 /**
@@ -65,8 +65,8 @@ export async function verifyJwtAuth(request: NextRequest): Promise<JwtAuthResult
       };
     }
 
-    // Получаем данные пользователя
-    const user = await getUserByToken(payload.userId);
+    // Получаем данные пользователя по ID
+    const user = await getUserById(payload.userId);
     if (!user) {
       logger.warn('User not found for JWT token', {
         userId: payload.userId,

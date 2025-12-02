@@ -60,9 +60,6 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Строим запрос
-    // Для оптимизации запросов рекомендуется применить индексы из database_migration_add_support_indexes.sql
-    // См. DATABASE_INDEXES_README.md для инструкций по применению
     let query = supabaseAdmin
       .from('support_tickets')
       .select(`

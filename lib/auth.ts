@@ -341,6 +341,33 @@ export async function authenticateUser(username: string, password: string): Prom
   }
 }
 
+export async function getUserById(userId: string): Promise<User | null> {
+  try {
+    if (!supabaseAdmin) {
+      return null;
+    }
+
+    const { data: user, error } = await supabaseAdmin
+      .from('users')
+      .select('*')
+      .eq('id', userId)
+      .eq('is_active', true)
+      .single();
+
+    if (error || !user) {
+      return null;
+    }
+
+    return user as User;
+  } catch (error) {
+    logger.error('Error fetching user by ID', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      userId
+    });
+    return null;
+  }
+}
+
 export async function getUserByToken(dashboardToken: string): Promise<User | null> {
   try {
     if (!supabaseAdmin) {

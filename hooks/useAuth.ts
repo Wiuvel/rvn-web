@@ -99,7 +99,8 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
             const data = await response.json();
 
             // Проверяем, что пользователь авторизован
-            if (data.authenticated === false || !data.dashboard_token) {
+            // Если есть поле authenticated: false, значит пользователь не авторизован
+            if (data.authenticated === false || !data.dashboard_token || !data.id) {
               if (requireAuth && redirectOnFail) {
                 router.push(redirectOnFail);
                 return;

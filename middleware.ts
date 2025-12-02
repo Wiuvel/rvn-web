@@ -128,12 +128,14 @@ async function handleAuth(request: NextRequest, pathname: string): Promise<NextR
   // Dashboard Middleware
   if (pathname.startsWith('/dashboard')) {
     if (!isAuthenticated) {
+      // Если пользователь не авторизован, редиректим на /auth
       const retpatch = encodeURIComponent(pathname);
       return NextResponse.redirect(new URL(`/auth?retpatch=${retpatch}`, request.url));
     }
     
+    // Если пользователь авторизован, но находится на /dashboard без токена,
+    // разрешаем доступ - компонент /dashboard/page.tsx сам редиректит на правильный URL
     // Проверка правильности dashboard_token будет в компоненте через API
-    // Здесь просто проверяем наличие авторизации
     return NextResponse.next();
   }
 

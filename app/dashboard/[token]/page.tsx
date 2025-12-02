@@ -83,7 +83,8 @@ export default function DashboardPage() {
           if (response.ok) {
             const data = await response.json();
             // Проверяем, что пользователь авторизован
-            if (data.authenticated === false || !data.dashboard_token) {
+            // Если есть поле authenticated: false, значит пользователь не авторизован
+            if (data.authenticated === false || !data.dashboard_token || !data.id) {
               router.push('/auth');
               return;
             }
@@ -147,9 +148,14 @@ export default function DashboardPage() {
   const handleLogout = async () => {
     try {
       const response = await fetch('/api/auth/logout', {
-        method: 'POST'
+        method: 'POST',
+        credentials: 'include'
       });
       if (response.ok) {
+        // Очищаем localStorage от access_token
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('access_token');
+        }
         router.push('/auth');
       }
     } catch (error) {

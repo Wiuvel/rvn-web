@@ -385,9 +385,14 @@ export default function Header() {
                         setOpen(false);
                         try {
                           const response = await fetch('/api/auth/logout', {
-                            method: 'POST'
+                            method: 'POST',
+                            credentials: 'include'
                           });
                           if (response.ok) {
+                            // Очищаем localStorage от access_token
+                            if (typeof window !== 'undefined') {
+                              localStorage.removeItem('access_token');
+                            }
                             router.push('/auth');
                           }
                         } catch (error) {

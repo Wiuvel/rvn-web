@@ -457,7 +457,7 @@ export default function AuthForm({ retpatch = '/dashboard/' }: AuthFormProps) {
 
     if (typeof window !== 'undefined' && window.turnstile) {
       const widgetId = window.turnstile.render('#' + containerId, {
-        sitekey: '0x4AAAAAACDQkGbAxIWAKp08',
+        sitekey: '3x00000000000000000000FF',
         theme: 'dark',
         callback: (token: string) => {
           setCaptchaResponse(prev => ({ ...prev, [formType]: token }));

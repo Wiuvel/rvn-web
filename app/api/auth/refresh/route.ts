@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { verifyRefreshToken, generateAccessToken, generateRefreshToken } from '@/lib/jwt';
-import { getUserByToken } from '@/lib/auth';
+import { getUserById } from '@/lib/auth';
 import { logger } from '@/lib/secure-logger';
 import { setCorsHeaders, handleCorsPreflight } from '@/lib/cors';
 import { ERROR_NOT_AUTHENTICATED, ERROR_INTERNAL_SERVER_ERROR } from '@/lib/constants';
@@ -77,8 +77,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Получаем данные пользователя
-    const user = await getUserByToken(payload.userId);
+    // Получаем данные пользователя по ID
+    const user = await getUserById(payload.userId);
     if (!user) {
       logger.warn('User not found for refresh token', {
         userId: payload.userId,
