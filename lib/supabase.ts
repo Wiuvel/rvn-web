@@ -10,14 +10,21 @@ function getValidatedEnv() {
     try {
       env = getEnv();
     } catch (error) {
-      // В Edge Runtime используем fallback значения
-      // Проверяем Edge Runtime через отсутствие process или его свойств
+      // Проверяем, происходит ли сборка или это Edge Runtime
+      const isBuildTime = process.env.NEXT_PHASE === 'phase-production-build' || 
+                          process.env.NEXT_PHASE === 'phase-development-build';
       const isEdgeRuntime = typeof process === 'undefined' || !('exit' in process);
-      if (isEdgeRuntime) {
-        console.error('⚠️ Environment validation failed in Edge Runtime:', error);
+      
+      // В Edge Runtime или во время сборки используем fallback значения
+      if (isEdgeRuntime || isBuildTime) {
+        if (isBuildTime) {
+          console.warn('⚠️ Environment validation skipped during build, will validate at runtime');
+        } else {
+          console.error('⚠️ Environment validation failed in Edge Runtime:', error);
+        }
         // Используем значения из process.env напрямую
         env = {
-          SUPABASE_URL: process.env.SUPABASE_URL || '',
+          SUPABASE_URL: process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '',
           SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
           SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
           JWT_SECRET: process.env.JWT_SECRET || 'change-me-in-production',

@@ -49,7 +49,8 @@ export function validateEnv(): Env {
 
   try {
     validatedEnv = envSchema.parse({
-      SUPABASE_URL: process.env.SUPABASE_URL,
+      // Поддержка NEXT_PUBLIC_SUPABASE_URL для обратной совместимости с dockerfile
+      SUPABASE_URL: process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL,
       SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
       SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
       JWT_SECRET: process.env.JWT_SECRET,
@@ -95,7 +96,13 @@ export function getEnv(): Env {
 // Проверяем, что мы не в Edge Runtime через проверку доступности process (без process.exit)
 const canValidateOnImport = typeof window === 'undefined' && typeof process !== 'undefined';
 
-if (canValidateOnImport) {
+// Проверяем, происходит ли сборка (build-time)
+// Во время сборки Next.js переменные окружения могут быть недоступны (например, в CapRover)
+// В этом случае валидация будет отложена до runtime
+const isBuildTime = process.env.NEXT_PHASE === 'phase-production-build' || 
+                    process.env.NEXT_PHASE === 'phase-development-build';
+
+if (canValidateOnImport && !isBuildTime) {
   try {
     validateEnv();
   } catch (error: unknown) {
