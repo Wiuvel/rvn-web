@@ -101,7 +101,7 @@ export default function DashboardPage() {
                 router.push('/auth');
                 return;
               }
-            } catch (refreshError) {
+            } catch {
               // Ошибка при обновлении токена
               router.push('/auth');
               return;

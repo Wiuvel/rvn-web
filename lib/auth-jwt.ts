@@ -6,6 +6,7 @@ import { cookies } from 'next/headers';
 import { verifyAccessToken, extractTokenFromHeader, extractTokenFromCookies, type AccessTokenPayload } from './jwt';
 import { getUserById } from './auth';
 import { logger } from './secure-logger';
+import { AuthErrorCode, isExpectedAuthError } from './auth-errors';
 
 /**
  * Результат проверки авторизации через JWT
@@ -23,6 +24,7 @@ export interface JwtAuthResult {
   };
   payload?: AccessTokenPayload;
   error?: string;
+  errorCode?: AuthErrorCode;
 }
 
 /**
@@ -45,7 +47,8 @@ export async function verifyJwtAuth(request: NextRequest): Promise<JwtAuthResult
     if (!token) {
       return {
         isAuthenticated: false,
-        error: 'No token provided'
+        error: 'No token provided',
+        errorCode: AuthErrorCode.NOT_AUTHENTICATED
       };
     }
 
@@ -53,25 +56,34 @@ export async function verifyJwtAuth(request: NextRequest): Promise<JwtAuthResult
     let payload: AccessTokenPayload;
     try {
       payload = await verifyAccessToken(token);
-    } catch (error) {
-      // Не логируем истекшие токены или отсутствие токена - это нормальная ситуация
-      // Логируем только неожиданные ошибки (не связанные с истечением или форматом токена)
-      const errorMessage = error instanceof Error ? error.message : 'Invalid token';
-      const isExpectedError = errorMessage.includes('expired') || 
-                              errorMessage.includes('invalid') || 
-                              errorMessage.includes('malformed') ||
-                              errorMessage.includes('signature');
       
-      if (!isExpectedError) {
+      // Дополнительная проверка: убеждаемся что пользователь активен
+      // (getUserById уже проверяет is_active, но лучше проверить заранее)
+    } catch (error) {
+      // Определяем тип ошибки
+      const errorMessage = error instanceof Error ? error.message : 'Invalid token';
+      let errorCode = AuthErrorCode.TOKEN_INVALID;
+      
+      if (errorMessage.includes('expired')) {
+        errorCode = AuthErrorCode.TOKEN_EXPIRED;
+      } else if (errorMessage.includes('version')) {
+        errorCode = AuthErrorCode.TOKEN_VERSION_MISMATCH;
+      }
+      
+      // Не логируем истекшие токены или отсутствие токена - это нормальная ситуация
+      // Логируем только неожиданные ошибки
+      if (!isExpectedAuthError(error)) {
         logger.warn('Unexpected JWT verification error', {
           error: errorMessage,
+          errorCode,
           ip: request.headers.get('x-forwarded-for')
         });
       }
       
       return {
         isAuthenticated: false,
-        error: errorMessage
+        error: errorMessage,
+        errorCode
       };
     }
 
@@ -86,7 +98,21 @@ export async function verifyJwtAuth(request: NextRequest): Promise<JwtAuthResult
       });
       return {
         isAuthenticated: false,
-        error: 'User not found'
+        error: 'User not found',
+        errorCode: AuthErrorCode.USER_NOT_FOUND
+      };
+    }
+    
+    // Проверяем активность пользователя (getUserById уже проверяет, но для ясности)
+    if (!user.is_active) {
+      logger.warn('Inactive user attempted access', {
+        userId: user.id,
+        ip: request.headers.get('x-forwarded-for')
+      });
+      return {
+        isAuthenticated: false,
+        error: 'Account is disabled',
+        errorCode: AuthErrorCode.USER_INACTIVE
       };
     }
 
@@ -110,7 +136,8 @@ export async function verifyJwtAuth(request: NextRequest): Promise<JwtAuthResult
     });
     return {
       isAuthenticated: false,
-      error: 'Internal error'
+      error: 'Internal error',
+      errorCode: AuthErrorCode.INTERNAL_ERROR
     };
   }
 }

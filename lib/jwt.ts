@@ -6,8 +6,16 @@
  * Refresh токены хранятся в базе данных для возможности отзыва
  */
 import { SignJWT, jwtVerify, type JWTPayload } from 'jose';
+import { randomBytes } from 'crypto';
 import { appConfig } from './config';
 import { logger } from './secure-logger';
+
+/**
+ * Генерация уникального ID (совместимо с Edge Runtime)
+ */
+function generateJti(): string {
+  return randomBytes(16).toString('hex');
+}
 
 // Секретный ключ для подписи токенов
 const getSecretKey = () => {
@@ -26,6 +34,8 @@ export interface AccessTokenPayload extends JWTPayload {
   username: string;
   user_id: string; // Публичный ID пользователя
   type: 'access';
+  jti?: string; // JWT ID для предотвращения replay атак
+  tokenVersion?: number; // Версия токена для инвалидации при смене пароля
 }
 
 /**
@@ -35,24 +45,34 @@ export interface RefreshTokenPayload extends JWTPayload {
   userId: string;
   tokenVersion?: number; // Для инвалидации токенов при смене пароля
   type: 'refresh';
+  jti?: string; // JWT ID для связи с записью в БД
 }
 
 /**
  * Генерация Access Token
  */
-export async function generateAccessToken(payload: Omit<AccessTokenPayload, 'type' | 'iat' | 'exp' | 'iss' | 'aud'>): Promise<string> {
+export async function generateAccessToken(
+  payload: Omit<AccessTokenPayload, 'type' | 'iat' | 'exp' | 'iss' | 'aud' | 'jti'>,
+  options?: { jti?: string; tokenVersion?: number }
+): Promise<string> {
   try {
     const secretKey = getSecretKey();
     
+    // Генерируем уникальный JWT ID если не передан
+    const jti = options?.jti || generateJti();
+    
     const token = await new SignJWT({
       ...payload,
-      type: 'access'
+      type: 'access',
+      jti,
+      tokenVersion: options?.tokenVersion || 1
     } as AccessTokenPayload)
       .setProtectedHeader({ alg: appConfig.jwt.accessToken.algorithm })
       .setIssuedAt()
       .setExpirationTime(appConfig.jwt.accessToken.expiresIn)
       .setIssuer(appConfig.jwt.issuer)
       .setAudience(appConfig.jwt.audience)
+      .setJti(jti)
       .sign(secretKey);
 
     return token;
@@ -68,19 +88,28 @@ export async function generateAccessToken(payload: Omit<AccessTokenPayload, 'typ
 /**
  * Генерация Refresh Token
  */
-export async function generateRefreshToken(payload: Omit<RefreshTokenPayload, 'type' | 'iat' | 'exp' | 'iss' | 'aud'>): Promise<string> {
+export async function generateRefreshToken(
+  payload: Omit<RefreshTokenPayload, 'type' | 'iat' | 'exp' | 'iss' | 'aud' | 'jti'>,
+  options?: { jti?: string; tokenVersion?: number }
+): Promise<string> {
   try {
     const secretKey = getSecretKey();
     
+    // Генерируем уникальный JWT ID если не передан (для связи с записью в БД)
+    const jti = options?.jti || generateJti();
+    
     const token = await new SignJWT({
       ...payload,
-      type: 'refresh'
+      type: 'refresh',
+      jti,
+      tokenVersion: options?.tokenVersion || 1
     } as RefreshTokenPayload)
       .setProtectedHeader({ alg: appConfig.jwt.refreshToken.algorithm })
       .setIssuedAt()
       .setExpirationTime(appConfig.jwt.refreshToken.expiresIn)
       .setIssuer(appConfig.jwt.issuer)
       .setAudience(appConfig.jwt.audience)
+      .setJti(jti)
       .sign(secretKey);
 
     return token;
@@ -96,7 +125,10 @@ export async function generateRefreshToken(payload: Omit<RefreshTokenPayload, 't
 /**
  * Верификация Access Token
  */
-export async function verifyAccessToken(token: string): Promise<AccessTokenPayload> {
+export async function verifyAccessToken(
+  token: string,
+  options?: { checkTokenVersion?: number }
+): Promise<AccessTokenPayload> {
   try {
     const secretKey = getSecretKey();
     
@@ -110,10 +142,30 @@ export async function verifyAccessToken(token: string): Promise<AccessTokenPaylo
       throw new Error('Invalid token type');
     }
 
-    return payload as AccessTokenPayload;
+    // Проверяем версию токена если указана
+    if (options?.checkTokenVersion !== undefined) {
+      const tokenVersion = (payload as AccessTokenPayload).tokenVersion || 1;
+      if (tokenVersion !== options.checkTokenVersion) {
+        throw new Error('Token version mismatch');
+      }
+    }
+
+    // Проверяем наличие обязательных полей
+    const accessPayload = payload as AccessTokenPayload;
+    if (!accessPayload.userId || !accessPayload.username || !accessPayload.user_id) {
+      throw new Error('Invalid token payload');
+    }
+
+    return accessPayload;
   } catch (error) {
-    if (error instanceof Error && error.message.includes('expired')) {
-      throw new Error('Token expired');
+    if (error instanceof Error) {
+      if (error.message.includes('expired')) {
+        throw new Error('Token expired');
+      }
+      if (error.message.includes('version')) {
+        throw new Error('Token version mismatch');
+      }
+      throw new Error(`Invalid token: ${error.message}`);
     }
     throw new Error('Invalid token');
   }
@@ -122,7 +174,10 @@ export async function verifyAccessToken(token: string): Promise<AccessTokenPaylo
 /**
  * Верификация Refresh Token
  */
-export async function verifyRefreshToken(token: string): Promise<RefreshTokenPayload> {
+export async function verifyRefreshToken(
+  token: string,
+  options?: { checkTokenVersion?: number }
+): Promise<RefreshTokenPayload> {
   try {
     const secretKey = getSecretKey();
     
@@ -136,10 +191,30 @@ export async function verifyRefreshToken(token: string): Promise<RefreshTokenPay
       throw new Error('Invalid token type');
     }
 
-    return payload as RefreshTokenPayload;
+    // Проверяем версию токена если указана
+    if (options?.checkTokenVersion !== undefined) {
+      const tokenVersion = (payload as RefreshTokenPayload).tokenVersion || 1;
+      if (tokenVersion !== options.checkTokenVersion) {
+        throw new Error('Token version mismatch');
+      }
+    }
+
+    // Проверяем наличие обязательных полей
+    const refreshPayload = payload as RefreshTokenPayload;
+    if (!refreshPayload.userId) {
+      throw new Error('Invalid token payload');
+    }
+
+    return refreshPayload;
   } catch (error) {
-    if (error instanceof Error && error.message.includes('expired')) {
-      throw new Error('Token expired');
+    if (error instanceof Error) {
+      if (error.message.includes('expired')) {
+        throw new Error('Token expired');
+      }
+      if (error.message.includes('version')) {
+        throw new Error('Token version mismatch');
+      }
+      throw new Error(`Invalid token: ${error.message}`);
     }
     throw new Error('Invalid token');
   }
@@ -165,7 +240,7 @@ export function decodeJwtWithoutVerification(token: string): { payload: JWTPaylo
       payload,
       exp: payload.exp
     };
-  } catch (error) {
+  } catch {
     return null;
   }
 }

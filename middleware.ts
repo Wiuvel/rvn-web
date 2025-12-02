@@ -50,7 +50,12 @@ function handleProtection(request: NextRequest, pathname: string): NextResponse 
 }
 
 // Упрощенная проверка JWT для middleware (Edge Runtime compatible)
-async function verifyJwtInMiddleware(request: NextRequest): Promise<{ isAuthenticated: boolean; dashboardToken?: string; hasRefreshToken?: boolean }> {
+async function verifyJwtInMiddleware(request: NextRequest): Promise<{ 
+  isAuthenticated: boolean; 
+  dashboardToken?: string; 
+  hasRefreshToken?: boolean;
+  tokenExpired?: boolean;
+}> {
   try {
     // Получаем токены из cookies
     const accessToken = request.cookies.get('access_token')?.value;
@@ -64,7 +69,7 @@ async function verifyJwtInMiddleware(request: NextRequest): Promise<{ isAuthenti
     // Если есть refresh token, но нет access token - разрешаем доступ
     // Страница сама обновит access token через API
     if (!accessToken && refreshToken) {
-      return { isAuthenticated: true, hasRefreshToken: true };
+      return { isAuthenticated: true, hasRefreshToken: true, tokenExpired: true };
     }
 
     // Если есть access token, проверяем его валидность
@@ -72,6 +77,15 @@ async function verifyJwtInMiddleware(request: NextRequest): Promise<{ isAuthenti
       try {
         // Получаем секретный ключ
         const secret = process.env.JWT_SECRET || 'change-me-in-production';
+        if (secret === 'change-me-in-production') {
+          // В production это недопустимо, но в middleware мы не можем логировать
+          // Просто отклоняем запрос
+          if (refreshToken) {
+            return { isAuthenticated: true, hasRefreshToken: true, tokenExpired: true };
+          }
+          return { isAuthenticated: false };
+        }
+        
         const secretKey = new TextEncoder().encode(secret);
 
         // Проверяем токен
@@ -81,20 +95,42 @@ async function verifyJwtInMiddleware(request: NextRequest): Promise<{ isAuthenti
         });
 
         // Проверяем, что это access token
-        if (payload.type === 'access') {
-          return { 
-            isAuthenticated: true,
-            // dashboard_token будет получен через API в компонентах
-          };
+        if (payload.type !== 'access') {
+          // Неправильный тип токена
+          if (refreshToken) {
+            return { isAuthenticated: true, hasRefreshToken: true, tokenExpired: true };
+          }
+          return { isAuthenticated: false };
         }
+
+        // Проверяем наличие обязательных полей
+        if (!payload.userId || !payload.username || !payload.user_id) {
+          // Неполный payload
+          if (refreshToken) {
+            return { isAuthenticated: true, hasRefreshToken: true, tokenExpired: true };
+          }
+          return { isAuthenticated: false };
+        }
+
+        return { 
+          isAuthenticated: true,
+          // dashboard_token будет получен через API в компонентах
+        };
       } catch (error) {
         // Access token истек или невалиден
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        const isExpired = errorMessage.includes('expired') || errorMessage.includes('ExpirationTime');
+        
         // Если есть refresh token, разрешаем доступ (страница обновит токен)
         if (refreshToken) {
-          return { isAuthenticated: true, hasRefreshToken: true };
+          return { 
+            isAuthenticated: true, 
+            hasRefreshToken: true,
+            tokenExpired: isExpired
+          };
         }
         // Если нет refresh token, пользователь не авторизован
-        return { isAuthenticated: false };
+        return { isAuthenticated: false, tokenExpired: isExpired };
       }
     }
 
@@ -103,7 +139,7 @@ async function verifyJwtInMiddleware(request: NextRequest): Promise<{ isAuthenti
     // В случае ошибки проверяем наличие refresh token
     const refreshToken = request.cookies.get('refresh_token')?.value;
     if (refreshToken) {
-      return { isAuthenticated: true, hasRefreshToken: true };
+      return { isAuthenticated: true, hasRefreshToken: true, tokenExpired: true };
     }
     return { isAuthenticated: false };
   }

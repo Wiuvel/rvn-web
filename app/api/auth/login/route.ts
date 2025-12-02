@@ -158,15 +158,19 @@ export async function POST(request: NextRequest) {
     });
 
     // Generate JWT tokens
+    const tokenVersion = 1; // Можно использовать для инвалидации токенов при смене пароля
     const accessToken = await generateAccessToken({
       userId: result.user!.id,
       username: result.user!.username,
       user_id: result.user!.user_id,
+    }, {
+      tokenVersion
     });
 
     const refreshToken = await generateRefreshToken({
       userId: result.user!.id,
-      tokenVersion: 1, // Можно использовать для инвалидации токенов
+    }, {
+      tokenVersion
     });
 
     // Сохраняем refresh token в БД

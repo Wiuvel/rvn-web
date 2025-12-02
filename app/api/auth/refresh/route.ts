@@ -5,7 +5,7 @@ import { getUserById } from '@/lib/auth';
 import { logger } from '@/lib/secure-logger';
 import { setCorsHeaders, handleCorsPreflight } from '@/lib/cors';
 import { ERROR_NOT_AUTHENTICATED, ERROR_INTERNAL_SERVER_ERROR } from '@/lib/constants';
-import { generalRateLimit } from '@/lib/rate-limit';
+import { refreshRateLimit } from '@/lib/rate-limit';
 import { verifyRefreshTokenInDB, storeRefreshToken, revokeRefreshToken } from '@/lib/jwt-storage';
 
 export async function OPTIONS() {
@@ -18,7 +18,7 @@ export async function OPTIONS() {
  */
 export async function POST(request: NextRequest) {
   try {
-    const rateLimitResult = await generalRateLimit.check(request);
+    const rateLimitResult = await refreshRateLimit.check(request);
     if (!rateLimitResult.allowed) {
       logger.warn('Rate limit exceeded for refresh token request', {
         ip: request.headers.get('x-forwarded-for'),
@@ -84,6 +84,8 @@ export async function POST(request: NextRequest) {
         userId: payload.userId,
         ip: request.headers.get('x-forwarded-for')
       });
+      // Отзываем токен, если пользователь не найден
+      await revokeRefreshToken(refreshToken, 'User not found');
       return setCorsHeaders(
         NextResponse.json(
           { error: ERROR_NOT_AUTHENTICATED },
@@ -92,11 +94,40 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Генерируем новые токены
+    // Проверяем подозрительную активность: изменение IP или User-Agent
+    const currentIp = request.headers.get('x-forwarded-for') || 'unknown';
+    const currentUserAgent = request.headers.get('user-agent') || 'unknown';
+    const dbRecord = dbVerification.record;
+    
+    if (dbRecord) {
+      // Если IP или User-Agent изменились, логируем для безопасности
+      if (dbRecord.ip_address && dbRecord.ip_address !== currentIp) {
+        logger.warn('Refresh token used from different IP', {
+          userId: user.id,
+          oldIp: dbRecord.ip_address,
+          newIp: currentIp,
+          tokenId: payload.jti
+        });
+      }
+      
+      if (dbRecord.user_agent && dbRecord.user_agent !== currentUserAgent) {
+        logger.warn('Refresh token used with different User-Agent', {
+          userId: user.id,
+          oldUserAgent: dbRecord.user_agent,
+          newUserAgent: currentUserAgent,
+          tokenId: payload.jti
+        });
+      }
+    }
+
+    // Генерируем новые токены с той же версией
+    const tokenVersion = payload.tokenVersion || 1;
     const newAccessToken = await generateAccessToken({
       userId: user.id,
       username: user.username,
       user_id: user.user_id,
+    }, {
+      tokenVersion
     });
 
     // Отзываем старый refresh token (rotation)
@@ -105,10 +136,14 @@ export async function POST(request: NextRequest) {
     // Генерируем новый refresh token
     const newRefreshToken = await generateRefreshToken({
       userId: user.id,
-      tokenVersion: payload.tokenVersion || 1,
+    }, {
+      tokenVersion
     });
 
     // Сохраняем новый refresh token в БД
+    // Декодируем новый токен для получения jti (без верификации, так как мы его только что создали)
+    const { decodeJwtWithoutVerification } = await import('@/lib/jwt');
+    const decodedNewToken = decodeJwtWithoutVerification(newRefreshToken);
     const ipAddress = request.headers.get('x-forwarded-for') || 'unknown';
     const userAgent = request.headers.get('user-agent') || 'unknown';
     const storeResult = await storeRefreshToken(
@@ -116,7 +151,8 @@ export async function POST(request: NextRequest) {
       newRefreshToken,
       {
         ipAddress,
-        userAgent
+        userAgent,
+        fingerprint: decodedNewToken?.payload.jti || undefined // Используем jti как fingerprint
       }
     );
 

@@ -378,7 +378,7 @@ export default function SupportPage() {
                 setIsSupport(false);
                 return;
               }
-            } catch (refreshError) {
+            } catch {
               // Ошибка при обновлении токена
               setUserData(null);
               setIsSupport(false);

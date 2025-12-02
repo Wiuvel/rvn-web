@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyAuth } from '@/lib/auth-unified';
+import { AuthService } from '@/lib/auth-service';
 import { logger } from '@/lib/secure-logger';
 import { setCorsHeaders, handleCorsPreflight } from '@/lib/cors';
-import { hasUserRole } from '@/lib/user-roles';
 
 export async function OPTIONS() {
   return handleCorsPreflight();
@@ -10,7 +9,11 @@ export async function OPTIONS() {
 
 export async function GET(request: NextRequest) {
   try {
-    const authResult = await verifyAuth(request);
+    // Используем централизованный AuthService
+    const { result: authResult } = await AuthService.checkAuth(request, {
+      requireAuth: false,
+      checkActive: true
+    });
 
     if (!authResult.isAuthenticated || !authResult.user) {
       // Возвращаем 200 вместо 401, чтобы не выводить ошибку в консоль браузера
@@ -22,19 +25,6 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Проверяем роли пользователя
-    let isSupport = false;
-    let isAdmin = false;
-    try {
-      isSupport = await hasUserRole(authResult.user.id, 'support');
-      isAdmin = await hasUserRole(authResult.user.id, 'admin');
-    } catch (error) {
-      logger.warn('Error checking user roles', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-        userId: authResult.user.id
-      });
-    }
-
     return setCorsHeaders(
       NextResponse.json({
         id: authResult.user.id,
@@ -44,8 +34,8 @@ export async function GET(request: NextRequest) {
         created_at: authResult.user.created_at,
         last_login: authResult.user.last_login,
         avatar_gradient: authResult.user.avatar_gradient,
-        isSupport,
-        isAdmin
+        isSupport: authResult.isSupport || false,
+        isAdmin: authResult.isAdmin || false
       })
     );
   } catch (error) {

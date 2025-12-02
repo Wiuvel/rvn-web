@@ -205,3 +205,14 @@ export const generalRateLimit = new RateLimiter({
   windowMs: 5 * 60 * 1000,
   maxRequests: 100,
 });
+
+// Rate limiter для refresh token endpoint (более строгий)
+export const refreshRateLimit = new RateLimiter({
+  windowMs: 5 * 60 * 1000, // 5 минут
+  maxRequests: 10, // Максимум 10 обновлений токена за 5 минут
+  keyGenerator: (request) => {
+    const ip = getClientIP(request);
+    const userAgent = request.headers.get('user-agent') || '';
+    return `refresh:${ip}:${userAgent.slice(0, 50)}`;
+  }
+});
