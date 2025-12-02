@@ -49,10 +49,20 @@ export async function GET(request: NextRequest) {
       })
     );
   } catch (error) {
-    logger.error('Get user error', {
-      error: error instanceof Error ? error.message : 'Unknown error',
-      ip: request.headers.get('x-forwarded-for')
-    });
+    // Логируем только реальные ошибки сервера, а не нормальные случаи отсутствия авторизации
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const isExpectedError = errorMessage.includes('Not authenticated') || 
+                            errorMessage.includes('No token') ||
+                            errorMessage.includes('expired') ||
+                            errorMessage.includes('invalid');
+    
+    if (!isExpectedError) {
+      logger.error('Unexpected error in /api/auth/me', {
+        error: errorMessage,
+        ip: request.headers.get('x-forwarded-for')
+      });
+    }
+    
     return setCorsHeaders(
       NextResponse.json(
         { error: 'Internal server error' },

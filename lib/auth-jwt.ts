@@ -54,11 +54,21 @@ export async function verifyJwtAuth(request: NextRequest): Promise<JwtAuthResult
     try {
       payload = await verifyAccessToken(token);
     } catch (error) {
+      // Не логируем истекшие токены или отсутствие токена - это нормальная ситуация
+      // Логируем только неожиданные ошибки (не связанные с истечением или форматом токена)
       const errorMessage = error instanceof Error ? error.message : 'Invalid token';
-      logger.warn('JWT verification failed', {
-        error: errorMessage,
-        ip: request.headers.get('x-forwarded-for')
-      });
+      const isExpectedError = errorMessage.includes('expired') || 
+                              errorMessage.includes('invalid') || 
+                              errorMessage.includes('malformed') ||
+                              errorMessage.includes('signature');
+      
+      if (!isExpectedError) {
+        logger.warn('Unexpected JWT verification error', {
+          error: errorMessage,
+          ip: request.headers.get('x-forwarded-for')
+        });
+      }
+      
       return {
         isAuthenticated: false,
         error: errorMessage
@@ -68,7 +78,9 @@ export async function verifyJwtAuth(request: NextRequest): Promise<JwtAuthResult
     // Получаем данные пользователя по ID
     const user = await getUserById(payload.userId);
     if (!user) {
-      logger.warn('User not found for JWT token', {
+      // Логируем только если это неожиданная ситуация (пользователь был удален)
+      // Не логируем для нормальных случаев (пользователь вышел, токен отозван)
+      logger.warn('User not found for valid JWT token', {
         userId: payload.userId,
         ip: request.headers.get('x-forwarded-for')
       });

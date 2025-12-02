@@ -77,10 +77,20 @@ export async function verifyAuth(request: NextRequest): Promise<UnifiedAuthResul
       method: 'cookie'
     };
   } catch (error) {
-    logger.error('Error verifying auth', {
-      error: error instanceof Error ? error.message : 'Unknown error',
-      ip: request.headers.get('x-forwarded-for')
-    });
+    // Логируем только реальные ошибки (БД, сеть и т.д.), а не нормальные случаи отсутствия авторизации
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const isExpectedError = errorMessage.includes('Not authenticated') || 
+                            errorMessage.includes('No token') ||
+                            errorMessage.includes('expired') ||
+                            errorMessage.includes('invalid');
+    
+    if (!isExpectedError) {
+      logger.error('Unexpected error verifying auth', {
+        error: errorMessage,
+        ip: request.headers.get('x-forwarded-for')
+      });
+    }
+    
     return {
       isAuthenticated: false,
       method: null,

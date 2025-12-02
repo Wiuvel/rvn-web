@@ -2,10 +2,19 @@ import { NextRequest, NextResponse } from 'next/server';
 import { jwtVerify } from 'jose';
 
 function isBotOrSpecialFile(pathname: string, userAgent: string): boolean {
-  if (pathname === '/robots.txt' || pathname === '/sitemap.xml' || pathname === '/favicon.ico' || pathname.startsWith('/api/')) {
+  if (
+    pathname === '/robots.txt' || 
+    pathname === '/sitemap.xml' || 
+    pathname === '/favicon.ico' || 
+    pathname.startsWith('/favicon') ||
+    pathname.startsWith('/api/') ||
+    pathname.startsWith('/_next/static/') ||
+    pathname.startsWith('/static/')
+  ) {
     return true;
   }
-  return /googlebot|bingbot|yandex|duckduckbot|twitterbot|whatsapp|telegrambot|discordbot|applebot|redditbot/i.test(userAgent);
+  
+  return /googlebot|googlebot-image|googlebot-video|googlebot-news|google-site-verification|google-inspectiontool|bingbot|yandex|duckduckbot|baiduspider|slurp|twitterbot|linkedinbot|applebot|whatsapp|telegrambot|vkshare/i.test(userAgent);
 }
 
 // Protection Middleware - works on all pages (except exceptions)
@@ -13,9 +22,7 @@ function handleProtection(request: NextRequest, pathname: string): NextResponse 
   const accessGranted = request.cookies.get('access_granted')?.value === 'true';
   const accessHash = request.cookies.get('access_hash')?.value;
   
-  // Exceptions for protection
   if (pathname === '/protection' || pathname.startsWith('/protection/')) {
-    // If cookies are already set, redirect only to home
     if (accessGranted && accessHash) {
       return NextResponse.redirect(new URL('/', request.url));
     }
@@ -133,9 +140,6 @@ async function handleAuth(request: NextRequest, pathname: string): Promise<NextR
       return NextResponse.redirect(new URL(`/auth?retpatch=${retpatch}`, request.url));
     }
     
-    // Если пользователь авторизован, но находится на /dashboard без токена,
-    // разрешаем доступ - компонент /dashboard/page.tsx сам редиректит на правильный URL
-    // Проверка правильности dashboard_token будет в компоненте через API
     return NextResponse.next();
   }
 
@@ -189,6 +193,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!api|_next/static|_next/image|favicon.ico|public|static|robots.txt|sitemap.xml).*)',
+    '/((?!api|_next/static|_next/image|favicon.ico|favicon|public|static|robots.txt|sitemap.xml|.*\\.ico|.*\\.png|.*\\.jpg|.*\\.jpeg|.*\\.gif|.*\\.svg|.*\\.webp|.*\\.woff|.*\\.woff2|.*\\.ttf|.*\\.eot).*)',
   ],
 };
