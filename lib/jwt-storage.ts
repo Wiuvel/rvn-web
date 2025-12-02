@@ -169,6 +169,87 @@ export async function verifyRefreshTokenInDB(
 }
 
 /**
+ * Проверка refresh token с одновременным получением данных пользователя
+ * Оптимизированная версия для уменьшения количества запросов к БД
+ */
+export async function verifyRefreshTokenWithUser(
+  token: string,
+  userId?: string
+): Promise<{ 
+  valid: boolean; 
+  record?: RefreshTokenRecord; 
+  user?: {
+    id: string;
+    username: string;
+    user_id: string;
+    dashboard_token: string;
+    is_active: boolean;
+  };
+  error?: string 
+}> {
+  try {
+    if (!supabaseAdmin) {
+      return { valid: false, error: 'Database not configured' };
+    }
+
+    const tokenHash = hashToken(token);
+
+    // Один запрос вместо двух - получаем токен и данные пользователя через JOIN
+    let query = supabaseAdmin
+      .from('refresh_tokens')
+      .select(`
+        *,
+        users:user_id (
+          id,
+          username,
+          user_id,
+          dashboard_token,
+          is_active
+        )
+      `)
+      .eq('token_hash', tokenHash)
+      .eq('is_revoked', false)
+      .gt('expires_at', new Date().toISOString());
+
+    if (userId) {
+      query = query.eq('user_id', userId);
+    }
+
+    const { data, error } = await query.single();
+
+    if (error || !data) {
+      return { valid: false, error: 'Token not found or invalid' };
+    }
+
+    // Обновляем last_used_at
+    await supabaseAdmin
+      .from('refresh_tokens')
+      .update({ last_used_at: new Date().toISOString() })
+      .eq('id', data.id);
+
+    // Извлекаем данные пользователя из результата
+    const user = Array.isArray(data.users) ? data.users[0] : data.users;
+
+    return { 
+      valid: true, 
+      record: data as RefreshTokenRecord,
+      user: user ? {
+        id: user.id,
+        username: user.username,
+        user_id: user.user_id,
+        dashboard_token: user.dashboard_token,
+        is_active: user.is_active
+      } : undefined
+    };
+  } catch (error) {
+    logger.error('Error verifying refresh token with user', {
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+    return { valid: false, error: 'Unexpected error' };
+  }
+}
+
+/**
  * Отзыв refresh токена
  */
 export async function revokeRefreshToken(

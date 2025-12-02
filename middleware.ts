@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { jwtVerify } from 'jose';
 
+// Валидация env переменных происходит лениво при первом использовании getEnv()
+// В Edge Runtime process.exit не поддерживается, поэтому валидация происходит без завершения процесса
+
 function isBotOrSpecialFile(pathname: string, userAgent: string): boolean {
   if (
     pathname === '/robots.txt' || 
@@ -75,23 +78,17 @@ async function verifyJwtInMiddleware(request: NextRequest): Promise<{
     // Если есть access token, проверяем его валидность
     if (accessToken) {
       try {
-        // Получаем секретный ключ
-        const secret = process.env.JWT_SECRET || 'change-me-in-production';
-        if (secret === 'change-me-in-production') {
-          // В production это недопустимо, но в middleware мы не можем логировать
-          // Просто отклоняем запрос
-          if (refreshToken) {
-            return { isAuthenticated: true, hasRefreshToken: true, tokenExpired: true };
-          }
-          return { isAuthenticated: false };
-        }
+        // Получаем секретный ключ из валидированной конфигурации
+        // Валидация происходит при старте приложения через env-validation
+        const { appConfig } = await import('@/lib/config');
+        const secret = appConfig.jwt.secret;
         
         const secretKey = new TextEncoder().encode(secret);
 
         // Проверяем токен
         const { payload } = await jwtVerify(accessToken, secretKey, {
-          issuer: process.env.JWT_ISSUER || 'rvn.market',
-          audience: process.env.JWT_AUDIENCE || 'rvn.market',
+          issuer: appConfig.jwt.issuer,
+          audience: appConfig.jwt.audience,
         });
 
         // Проверяем, что это access token

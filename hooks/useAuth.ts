@@ -63,18 +63,29 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
           // Если получили 401, пытаемся обновить токен через refresh
           if (response.status === 401) {
             try {
+              // Создаем новый controller для refresh запроса, чтобы избежать конфликтов
+              const refreshController = new AbortController();
+              const refreshTimeout = setTimeout(() => refreshController.abort(), 10000);
+              
               const refreshResponse = await fetch('/api/auth/refresh', {
                 method: 'POST',
                 credentials: 'include',
-                signal: controller.signal,
+                signal: refreshController.signal,
               });
 
+              clearTimeout(refreshTimeout);
+
               if (refreshResponse.ok) {
-                // Токен обновлен, повторяем запрос
+                // Токен обновлен, повторяем запрос с новым controller
+                const retryController = new AbortController();
+                const retryTimeout = setTimeout(() => retryController.abort(), 10000);
+                
                 response = await fetch('/api/auth/me', {
-                  signal: controller.signal,
+                  signal: retryController.signal,
                   cache: 'no-store',
                 });
+                
+                clearTimeout(retryTimeout);
               } else {
                 // Refresh не удался, пользователь не авторизован
                 if (requireAuth && redirectOnFail) {
@@ -84,7 +95,7 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
                 setUserData(null);
                 return;
               }
-            } catch (refreshError) {
+            } catch {
               // Ошибка при обновлении токена
               if (requireAuth && redirectOnFail) {
                 router.push(redirectOnFail);
@@ -198,6 +209,22 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
 
     fetchUserData();
 
+    // Слушаем событие обновления токена для перезапуска проверки
+    const handleTokenRefreshed = () => {
+      if (isMounted) {
+        // Небольшая задержка чтобы дать время cookie обновиться
+        setTimeout(() => {
+          if (isMounted) {
+            fetchUserData();
+          }
+        }, 100);
+      }
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('tokenRefreshed', handleTokenRefreshed);
+    }
+
     return () => {
       isMounted = false;
       if (timeoutId) {
@@ -205,6 +232,9 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
       }
       if (controller) {
         controller.abort();
+      }
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('tokenRefreshed', handleTokenRefreshed);
       }
     };
     // onSuccess и onError не должны быть в зависимостях, так как это функции,

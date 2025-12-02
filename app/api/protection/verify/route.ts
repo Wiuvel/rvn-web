@@ -22,7 +22,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const secretKey = process.env.TURNSTILE_SECRET_KEY;
+    const { getEnv } = await import('@/lib/env-validation');
+    const env = getEnv();
+    const secretKey = env.TURNSTILE_SECRET_KEY;
     if (!secretKey || secretKey === '1x0000000000000000000000000000000AA') {
       logger.error('Turnstile secret key not configured for protection', {
         ip: request.headers.get('x-forwarded-for'),

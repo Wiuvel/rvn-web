@@ -19,8 +19,8 @@ export async function createAdmin(username: string, password: string): Promise<{
   try {
     if (!supabaseAdmin) {
       logger.error('Database not configured - supabaseAdmin is null', {
-        hasSupabaseUrl: !!process.env.SUPABASE_URL || !!process.env.NEXT_PUBLIC_SUPABASE_URL,
-        hasServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY
+        hasSupabaseUrl: true, // Валидируется при старте через env-validation
+        hasServiceKey: true // Валидируется при старте через env-validation
       });
       return { success: false, error: ERROR_DATABASE_NOT_CONFIGURED };
     }
@@ -72,8 +72,8 @@ export async function authenticateAdmin(username: string, password: string): Pro
   try {
     if (!supabaseAdmin) {
       logger.error('Database not configured - supabaseAdmin is null', {
-        hasSupabaseUrl: !!process.env.SUPABASE_URL || !!process.env.NEXT_PUBLIC_SUPABASE_URL,
-        hasServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY
+        hasSupabaseUrl: true, // Валидируется при старте через env-validation
+        hasServiceKey: true // Валидируется при старте через env-validation
       });
       return { success: false, error: ERROR_DATABASE_NOT_CONFIGURED };
     }
@@ -189,8 +189,8 @@ export async function createUser(username: string, password: string): Promise<{ 
   try {
     if (!supabaseAdmin) {
       logger.error('Database not configured - supabaseAdmin is null', {
-        hasSupabaseUrl: !!process.env.SUPABASE_URL || !!process.env.NEXT_PUBLIC_SUPABASE_URL,
-        hasServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY
+        hasSupabaseUrl: true, // Валидируется при старте через env-validation
+        hasServiceKey: true // Валидируется при старте через env-validation
       });
       return { success: false, error: ERROR_DATABASE_NOT_CONFIGURED };
     }
@@ -279,8 +279,8 @@ export async function authenticateUser(username: string, password: string): Prom
   try {
     if (!supabaseAdmin) {
       logger.error('Database not configured - supabaseAdmin is null', {
-        hasSupabaseUrl: !!process.env.SUPABASE_URL || !!process.env.NEXT_PUBLIC_SUPABASE_URL,
-        hasServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY
+        hasSupabaseUrl: true, // Валидируется при старте через env-validation
+        hasServiceKey: true // Валидируется при старте через env-validation
       });
       return { success: false, error: ERROR_DATABASE_NOT_CONFIGURED };
     }

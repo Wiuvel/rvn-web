@@ -18,11 +18,9 @@ function generateJti(): string {
 }
 
 // Секретный ключ для подписи токенов
+// Секрет уже валидирован через env-validation при старте приложения
 const getSecretKey = () => {
   const secret = appConfig.jwt.secret;
-  if (!secret || secret === 'change-me-in-production') {
-    logger.warn('JWT_SECRET not set or using default value. This is insecure in production!');
-  }
   return new TextEncoder().encode(secret);
 };
 

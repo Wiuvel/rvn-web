@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { verifyRefreshToken, generateAccessToken, generateRefreshToken } from '@/lib/jwt';
-import { getUserById } from '@/lib/auth';
 import { logger } from '@/lib/secure-logger';
 import { setCorsHeaders, handleCorsPreflight } from '@/lib/cors';
 import { ERROR_NOT_AUTHENTICATED, ERROR_INTERNAL_SERVER_ERROR } from '@/lib/constants';
 import { refreshRateLimit } from '@/lib/rate-limit';
-import { verifyRefreshTokenInDB, storeRefreshToken, revokeRefreshToken } from '@/lib/jwt-storage';
+import { verifyRefreshTokenWithUser, storeRefreshToken, revokeRefreshToken } from '@/lib/jwt-storage';
 
 export async function OPTIONS() {
   return handleCorsPreflight();
@@ -61,9 +60,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Проверяем токен в БД
-    const dbVerification = await verifyRefreshTokenInDB(refreshToken, payload.userId);
-    if (!dbVerification.valid) {
+    // Проверяем токен в БД и получаем данные пользователя в одном запросе (оптимизация)
+    const dbVerification = await verifyRefreshTokenWithUser(refreshToken, payload.userId);
+    if (!dbVerification.valid || !dbVerification.user) {
       logger.warn('Invalid refresh token (not found in DB or revoked)', {
         userId: payload.userId,
         error: dbVerification.error,
@@ -77,15 +76,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Получаем данные пользователя по ID
-    const user = await getUserById(payload.userId);
-    if (!user) {
-      logger.warn('User not found for refresh token', {
+    // Проверяем активность пользователя
+    if (!dbVerification.user.is_active) {
+      logger.warn('Inactive user attempted token refresh', {
         userId: payload.userId,
         ip: request.headers.get('x-forwarded-for')
       });
-      // Отзываем токен, если пользователь не найден
-      await revokeRefreshToken(refreshToken, 'User not found');
+      // Отзываем токен, если пользователь неактивен
+      await revokeRefreshToken(refreshToken, 'User inactive');
       return setCorsHeaders(
         NextResponse.json(
           { error: ERROR_NOT_AUTHENTICATED },
@@ -93,6 +91,15 @@ export async function POST(request: NextRequest) {
         )
       );
     }
+
+    // Используем данные пользователя из оптимизированного запроса
+    const user = {
+      id: dbVerification.user.id,
+      username: dbVerification.user.username,
+      user_id: dbVerification.user.user_id,
+      dashboard_token: dbVerification.user.dashboard_token,
+      is_active: dbVerification.user.is_active
+    };
 
     // Проверяем подозрительную активность: изменение IP или User-Agent
     const currentIp = request.headers.get('x-forwarded-for') || 'unknown';
@@ -130,9 +137,6 @@ export async function POST(request: NextRequest) {
       tokenVersion
     });
 
-    // Отзываем старый refresh token (rotation)
-    await revokeRefreshToken(refreshToken, 'Token rotation');
-
     // Генерируем новый refresh token
     const newRefreshToken = await generateRefreshToken({
       userId: user.id,
@@ -140,7 +144,7 @@ export async function POST(request: NextRequest) {
       tokenVersion
     });
 
-    // Сохраняем новый refresh token в БД
+    // Сохраняем новый refresh token в БД ПЕРЕД отзывом старого
     // Декодируем новый токен для получения jti (без верификации, так как мы его только что создали)
     const { decodeJwtWithoutVerification } = await import('@/lib/jwt');
     const decodedNewToken = decodeJwtWithoutVerification(newRefreshToken);
@@ -156,12 +160,32 @@ export async function POST(request: NextRequest) {
       }
     );
 
+    // Если не удалось сохранить новый токен, НЕ отзываем старый и возвращаем ошибку
     if (!storeResult.success) {
-      logger.warn('Failed to store new refresh token in DB', {
+      logger.error('Failed to store new refresh token - aborting rotation', {
         userId: user.id,
-        error: storeResult.error
+        error: storeResult.error,
+        ip: ipAddress
       });
-      // Продолжаем, даже если не удалось сохранить
+      
+      return setCorsHeaders(
+        NextResponse.json(
+          { error: 'Failed to refresh tokens. Please try again.' },
+          { status: 500 }
+        )
+      );
+    }
+
+    // Только после успешного сохранения нового токена отзываем старый (rotation)
+    const revokeResult = await revokeRefreshToken(refreshToken, 'Token rotation');
+    
+    if (!revokeResult.success) {
+      // Логируем, но не блокируем - новый токен уже сохранен
+      logger.warn('Failed to revoke old refresh token', {
+        userId: user.id,
+        error: revokeResult.error,
+        ip: ipAddress
+      });
     }
 
     const hostname = request.nextUrl.hostname;

@@ -24,15 +24,22 @@ export function useTokenRefresh() {
         const response = await fetch('/api/auth/refresh', {
           method: 'POST',
           credentials: 'include',
+          cache: 'no-store',
         });
 
         if (response.ok) {
           lastRefreshRef.current = Date.now();
+          // После успешного обновления, триггерим событие для других компонентов
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('tokenRefreshed'));
+          }
           return true;
         }
         return false;
       } catch (error) {
-        console.error('Error refreshing token:', error);
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Error refreshing token:', error);
+        }
         return false;
       } finally {
         isRefreshingRef.current = false;
@@ -48,8 +55,8 @@ export function useTokenRefresh() {
 
       const now = Date.now();
       
-      // Проверяем не чаще чем раз в 30 секунд
-      if (now - lastCheckRef.current < 30 * 1000) {
+      // Проверяем не чаще чем раз в 10 секунд (уменьшили для более быстрой реакции)
+      if (now - lastCheckRef.current < 10 * 1000) {
         return;
       }
 
@@ -73,36 +80,46 @@ export function useTokenRefresh() {
 
         lastCheckRef.current = now;
 
-        // Если получили 401, токен истек - обновляем
+        // Если получили 401, токен истек - обновляем НЕМЕДЛЕННО
         if (response.status === 401) {
           await refreshToken();
+          // После обновления токена, повторяем проверку через небольшую задержку
+          // чтобы убедиться что токен обновился
+          setTimeout(() => {
+            checkAndRefreshToken();
+          }, 500);
         }
       } catch (error) {
-        // Игнорируем ошибки сети
-        console.error('Error checking token:', error);
+        // Игнорируем ошибки сети, но логируем для отладки
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Error checking token:', error);
+        }
       }
     };
 
-    // Инициализируем время последнего обновления (текущее время минус 1 минута, чтобы не обновлять сразу)
+    // Инициализируем время последнего обновления
+    // Если это первый запуск, устанавливаем время так, чтобы проверить токен сразу
     if (lastRefreshRef.current === 0) {
-      lastRefreshRef.current = Date.now() - 60 * 1000;
+      // Устанавливаем время так, чтобы проверка сработала сразу
+      lastRefreshRef.current = Date.now() - 9 * 60 * 1000; // 9 минут назад, чтобы сразу проверить
     }
 
-    // Проверяем токен каждые 2 минуты (120 секунд)
-    // Это позволяет обновить токен за 2 минуты до истечения (10 минут - 8 минут = 2 минуты)
-    intervalRef.current = setInterval(checkAndRefreshToken, 2 * 60 * 1000);
+    // Проверяем токен каждые 30 секунд для более частых проверок
+    // Это позволяет быстрее обнаружить истекший токен
+    intervalRef.current = setInterval(checkAndRefreshToken, 30 * 1000);
 
-    // Проверяем сразу при монтировании (с небольшой задержкой, чтобы не блокировать рендер)
-    const initialTimeout = setTimeout(() => {
+    // Проверяем СРАЗУ при монтировании (с минимальной задержкой) - критично для работы после долгого отсутствия
+    // Используем небольшую задержку только чтобы не блокировать первый рендер
+    const immediateCheck = setTimeout(() => {
       checkAndRefreshToken();
-    }, 1000);
+    }, 100);
 
     return () => {
+      clearTimeout(immediateCheck);
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
         intervalRef.current = null;
       }
-      clearTimeout(initialTimeout);
     };
   }, []);
 }
