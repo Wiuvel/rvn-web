@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { generalRateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/secure-logger';
 import { setCorsHeaders, handleCorsPreflight } from '@/lib/cors';
-import { verifyAuth } from '@/lib/auth-unified';
+import { verifyAuth } from '@/lib/auth/verify';
 import { hasUserRole } from '@/lib/user-roles';
 import { ERROR_INTERNAL_SERVER_ERROR, ERROR_TOO_MANY_REQUESTS } from '@/lib/constants';
 
@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
     // Проверка авторизации пользователя
     const authResult = await verifyAuth(request);
 
-    if (!authResult.isAuthenticated || !authResult.user) {
+    if (!authResult.success) {
       return setCorsHeaders(
         NextResponse.json({
           isAuthenticated: false,
@@ -81,16 +81,16 @@ export async function GET(request: NextRequest) {
     });
     
     // При ошибке БД возвращаем 200 с информацией об ошибке, а не 500
-    const authResult = await verifyAuth(request);
+    const retryAuthResult = await verifyAuth(request);
     
-    if (authResult.isAuthenticated && authResult.user) {
+    if (retryAuthResult.success) {
       return setCorsHeaders(
         NextResponse.json({
           isAuthenticated: true,
           hasSupportAccess: false,
-          username: authResult.user.username,
-          userId: authResult.user.id,
-          user_id: authResult.user.user_id,
+          username: retryAuthResult.user.username,
+          userId: retryAuthResult.user.id,
+          user_id: retryAuthResult.user.user_id,
           error: 'Database not configured'
         })
       );

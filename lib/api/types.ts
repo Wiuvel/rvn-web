@@ -62,7 +62,7 @@ export interface UserData {
   username: string;
   dashboard_token: string;
   created_at: string;
-  last_login?: string;
+  last_login?: string | null;
   avatar_gradient?: string | null;
   isSupport?: boolean;
   isAdmin?: boolean;

@@ -6,9 +6,6 @@ import { setCorsHeaders, handleCorsPreflight } from '@/lib/cors';
 import { supabaseAdmin } from '@/lib/supabase';
 import { grantUserRole, revokeUserRole, getUserRoles, getUsersByRole, UserRole } from '@/lib/user-roles';
 import { ERROR_INTERNAL_SERVER_ERROR, ERROR_NOT_AUTHENTICATED, ERROR_INVALID_REQUEST_DATA } from '@/lib/constants';
-import { SessionManager } from '@/lib/session-manager';
-
-const ADMIN_SESSION_COOKIE = 'admin_session_id';
 
 export async function OPTIONS() {
   return handleCorsPreflight();
@@ -34,15 +31,7 @@ export async function GET(request: NextRequest) {
     // Проверка авторизации админа
     const cookieStore = await cookies();
     const isAuthenticated = cookieStore.get('admin_authenticated')?.value === 'true';
-    const sessionId = cookieStore.get(ADMIN_SESSION_COOKIE)?.value;
-    
-    let adminUsername: string | null = null;
-    if (isAuthenticated && sessionId) {
-      const session = SessionManager.getSession(sessionId);
-      if (session) {
-        adminUsername = session.username;
-      }
-    }
+    const adminUsername = cookieStore.get('admin_username')?.value || null;
 
     if (!isAuthenticated || !adminUsername) {
       return setCorsHeaders(
@@ -113,15 +102,7 @@ export async function POST(request: NextRequest) {
     // Проверка авторизации админа
     const cookieStore = await cookies();
     const isAuthenticated = cookieStore.get('admin_authenticated')?.value === 'true';
-    const sessionId = cookieStore.get(ADMIN_SESSION_COOKIE)?.value;
-    
-    let adminUsername: string | null = null;
-    if (isAuthenticated && sessionId) {
-      const session = SessionManager.getSession(sessionId);
-      if (session) {
-        adminUsername = session.username;
-      }
-    }
+    const adminUsername = cookieStore.get('admin_username')?.value || null;
 
     if (!isAuthenticated || !adminUsername) {
       return setCorsHeaders(
@@ -225,15 +206,7 @@ export async function DELETE(request: NextRequest) {
     // Проверка авторизации админа
     const cookieStore = await cookies();
     const isAuthenticated = cookieStore.get('admin_authenticated')?.value === 'true';
-    const sessionId = cookieStore.get(ADMIN_SESSION_COOKIE)?.value;
-    
-    let adminUsername: string | null = null;
-    if (isAuthenticated && sessionId) {
-      const session = SessionManager.getSession(sessionId);
-      if (session) {
-        adminUsername = session.username;
-      }
-    }
+    const adminUsername = cookieStore.get('admin_username')?.value || null;
 
     if (!isAuthenticated || !adminUsername) {
       return setCorsHeaders(

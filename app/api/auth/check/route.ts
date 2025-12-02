@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { generalRateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/secure-logger';
 import { setCorsHeaders, handleCorsPreflight } from '@/lib/cors';
-import { verifyAuth } from '@/lib/auth-unified';
+import { verifyAuth } from '@/lib/auth/verify';
 
 export async function OPTIONS() {
   return handleCorsPreflight();
@@ -29,10 +29,9 @@ export async function GET(request: NextRequest) {
 
     return setCorsHeaders(
       NextResponse.json({
-        authenticated: authResult.isAuthenticated,
-        userId: authResult.user?.id || null,
-        dashboardToken: authResult.user?.dashboard_token || null,
-        method: authResult.method
+        authenticated: authResult.success,
+        userId: authResult.success ? authResult.user.id : null,
+        dashboardToken: authResult.success ? authResult.user.dashboard_token : null,
       })
     );
   } catch (error) {

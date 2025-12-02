@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { generalRateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/secure-logger';
 import { setCorsHeaders, handleCorsPreflight } from '@/lib/cors';
-import { verifyAuth } from '@/lib/auth-unified';
+import { verifyAuth } from '@/lib/auth/verify';
 import {
   ERROR_INTERNAL_SERVER_ERROR,
   ERROR_INVALID_REQUEST_DATA,
@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
     // Проверка авторизации (только для авторизованных пользователей)
     const authResult = await verifyAuth(request);
 
-    if (!authResult.isAuthenticated) {
+    if (!authResult.success) {
       return setCorsHeaders(
         NextResponse.json(
           { error: ERROR_NOT_AUTHENTICATED },

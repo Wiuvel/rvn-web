@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { generalRateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/secure-logger';
 import { setCorsHeaders, handleCorsPreflight } from '@/lib/cors';
-import { verifyAuth } from '@/lib/auth-unified';
+import { verifyAuth } from '@/lib/auth/verify';
 import { hasUserRole } from '@/lib/user-roles';
 import { supabaseAdmin } from '@/lib/supabase';
 import { ERROR_INTERNAL_SERVER_ERROR, ERROR_NOT_AUTHENTICATED, ERROR_INVALID_REQUEST_DATA, ERROR_TICKET_NOT_FOUND, ERROR_ACCESS_DENIED, ERROR_TOO_MANY_REQUESTS, ERROR_INVALID_STATUS_TRANSITION, ERROR_TICKET_NOT_ASSIGNED } from '@/lib/constants';
@@ -32,7 +32,7 @@ export async function GET(
     // Проверка авторизации
     const authResult = await verifyAuth(request);
     
-    if (!authResult.isAuthenticated || !authResult.user) {
+    if (!authResult.success) {
       return setCorsHeaders(
         NextResponse.json(
           { error: ERROR_NOT_AUTHENTICATED },
@@ -164,7 +164,7 @@ export async function PUT(
     // Проверка авторизации и прав поддержки
     const authResult = await verifyAuth(request);
     
-    if (!authResult.isAuthenticated || !authResult.user) {
+    if (!authResult.success) {
       return setCorsHeaders(
         NextResponse.json(
           { error: ERROR_NOT_AUTHENTICATED },

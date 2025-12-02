@@ -1,173 +1,91 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { verifyRefreshToken, generateAccessToken, generateRefreshToken } from '@/lib/jwt';
-import { logger } from '@/lib/secure-logger';
-import { setCorsHeaders, handleCorsPreflight } from '@/lib/cors';
-import { ERROR_NOT_AUTHENTICATED, ERROR_INTERNAL_SERVER_ERROR } from '@/lib/constants';
+import { verifyRefreshAuth } from '@/lib/auth/verify';
+import { generateAccessToken, generateRefreshToken } from '@/lib/auth/jwt';
+import { storeRefreshToken, revokeTokenByJti } from '@/lib/auth/tokens';
+import { setTokenCookies, extractTokensFromRequest } from '@/lib/auth/cookies';
+import { getActiveUserById, toPublicUser } from '@/lib/auth/users';
 import { refreshRateLimit } from '@/lib/rate-limit';
-import { verifyRefreshTokenWithUser, storeRefreshToken, revokeRefreshToken } from '@/lib/jwt-storage';
+import { setCorsHeaders, handleCorsPreflight } from '@/lib/cors';
+import { logger } from '@/lib/secure-logger';
 
 export async function OPTIONS() {
   return handleCorsPreflight();
 }
 
-/**
- * POST /api/auth/refresh
- * Обновление Access Token с помощью Refresh Token
- */
 export async function POST(request: NextRequest) {
   try {
+    // Rate limiting
     const rateLimitResult = await refreshRateLimit.check(request);
     if (!rateLimitResult.allowed) {
-      logger.warn('Rate limit exceeded for refresh token request', {
+      logger.warn('Rate limit exceeded for token refresh', {
         ip: request.headers.get('x-forwarded-for'),
-        userAgent: request.headers.get('user-agent')
       });
       return setCorsHeaders(
-        NextResponse.json(
-          { error: 'Too many requests' },
-          { status: 429 }
-        )
+        NextResponse.json({ error: 'Too many requests' }, { status: 429 })
       );
     }
 
-    const cookieStore = await cookies();
-    const refreshToken = cookieStore.get('refresh_token')?.value;
-
-    if (!refreshToken) {
+    // Check if refresh token exists
+    const { refreshToken: oldRefreshToken } = extractTokensFromRequest(request);
+    if (!oldRefreshToken) {
       return setCorsHeaders(
-        NextResponse.json(
-          { error: ERROR_NOT_AUTHENTICATED },
-          { status: 401 }
-        )
+        NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
       );
     }
 
-    // Верифицируем refresh token (JWT)
-    let payload;
-    try {
-      payload = await verifyRefreshToken(refreshToken);
-    } catch (error) {
-      logger.warn('Invalid refresh token (JWT verification failed)', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-        ip: request.headers.get('x-forwarded-for')
-      });
-      return setCorsHeaders(
-        NextResponse.json(
-          { error: ERROR_NOT_AUTHENTICATED },
-          { status: 401 }
-        )
-      );
-    }
+    // Verify refresh token
+    const authResult = await verifyRefreshAuth(request);
 
-    // Проверяем токен в БД и получаем данные пользователя в одном запросе (оптимизация)
-    const dbVerification = await verifyRefreshTokenWithUser(refreshToken, payload.userId);
-    if (!dbVerification.valid || !dbVerification.user) {
-      logger.warn('Invalid refresh token (not found in DB or revoked)', {
-        userId: payload.userId,
-        error: dbVerification.error,
-        ip: request.headers.get('x-forwarded-for')
-      });
-      return setCorsHeaders(
-        NextResponse.json(
-          { error: ERROR_NOT_AUTHENTICATED },
-          { status: 401 }
-        )
-      );
-    }
-
-    // Проверяем активность пользователя
-    if (!dbVerification.user.is_active) {
-      logger.warn('Inactive user attempted token refresh', {
-        userId: payload.userId,
-        ip: request.headers.get('x-forwarded-for')
-      });
-      // Отзываем токен, если пользователь неактивен
-      await revokeRefreshToken(refreshToken, 'User inactive');
-      return setCorsHeaders(
-        NextResponse.json(
-          { error: ERROR_NOT_AUTHENTICATED },
-          { status: 401 }
-        )
-      );
-    }
-
-    // Используем данные пользователя из оптимизированного запроса
-    const user = {
-      id: dbVerification.user.id,
-      username: dbVerification.user.username,
-      user_id: dbVerification.user.user_id,
-      dashboard_token: dbVerification.user.dashboard_token,
-      is_active: dbVerification.user.is_active
-    };
-
-    // Проверяем подозрительную активность: изменение IP или User-Agent
-    const currentIp = request.headers.get('x-forwarded-for') || 'unknown';
-    const currentUserAgent = request.headers.get('user-agent') || 'unknown';
-    const dbRecord = dbVerification.record;
-    
-    if (dbRecord) {
-      // Если IP или User-Agent изменились, логируем для безопасности
-      if (dbRecord.ip_address && dbRecord.ip_address !== currentIp) {
-        logger.warn('Refresh token used from different IP', {
-          userId: user.id,
-          oldIp: dbRecord.ip_address,
-          newIp: currentIp,
-          tokenId: payload.jti
+    if (!authResult.success) {
+      // Don't log expected errors (no token, expired token)
+      if (authResult.code !== 'NO_TOKEN' && authResult.code !== 'TOKEN_EXPIRED') {
+        logger.warn('Invalid refresh token', {
+          code: authResult.code,
+          ip: request.headers.get('x-forwarded-for'),
         });
       }
-      
-      if (dbRecord.user_agent && dbRecord.user_agent !== currentUserAgent) {
-        logger.warn('Refresh token used with different User-Agent', {
-          userId: user.id,
-          oldUserAgent: dbRecord.user_agent,
-          newUserAgent: currentUserAgent,
-          tokenId: payload.jti
-        });
-      }
+      return setCorsHeaders(
+        NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+      );
     }
 
-    // Генерируем новые токены с той же версией
-    const tokenVersion = payload.tokenVersion || 1;
-    const newAccessToken = await generateAccessToken({
-      userId: user.id,
-      username: user.username,
-      user_id: user.user_id,
-    }, {
-      tokenVersion
-    });
-
-    // Генерируем новый refresh token
-    const newRefreshToken = await generateRefreshToken({
-      userId: user.id,
-    }, {
-      tokenVersion
-    });
-
-    // Сохраняем новый refresh token в БД ПЕРЕД отзывом старого
-    // Декодируем новый токен для получения jti (без верификации, так как мы его только что создали)
-    const { decodeJwtWithoutVerification } = await import('@/lib/jwt');
-    const decodedNewToken = decodeJwtWithoutVerification(newRefreshToken);
+    const { userId, tokenVersion, jti: oldJti } = authResult;
     const ipAddress = request.headers.get('x-forwarded-for') || 'unknown';
     const userAgent = request.headers.get('user-agent') || 'unknown';
-    const storeResult = await storeRefreshToken(
-      user.id,
-      newRefreshToken,
-      {
-        ipAddress,
-        userAgent,
-        fingerprint: decodedNewToken?.payload.jti || undefined // Используем jti как fingerprint
-      }
+
+    // Get user data
+    const user = await getActiveUserById(userId);
+    if (!user) {
+      return setCorsHeaders(
+        NextResponse.json({ error: 'User not found' }, { status: 401 })
+      );
+    }
+
+    // Generate new tokens
+    const newAccessToken = await generateAccessToken(
+      { id: user.id, username: user.username, user_id: user.user_id },
+      tokenVersion
     );
 
-    // Если не удалось сохранить новый токен, НЕ отзываем старый и возвращаем ошибку
+    const { token: newRefreshToken, jti: newJti } = await generateRefreshToken(
+      userId,
+      tokenVersion
+    );
+
+    // Store new refresh token BEFORE revoking old one
+    const storeResult = await storeRefreshToken(
+      userId,
+      newRefreshToken,
+      newJti,
+      ipAddress,
+      userAgent
+    );
+
     if (!storeResult.success) {
-      logger.error('Failed to store new refresh token - aborting rotation', {
-        userId: user.id,
+      logger.error('Failed to store new refresh token', {
+        userId,
         error: storeResult.error,
-        ip: ipAddress
       });
-      
       return setCorsHeaders(
         NextResponse.json(
           { error: 'Failed to refresh tokens. Please try again.' },
@@ -176,63 +94,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Только после успешного сохранения нового токена отзываем старый (rotation)
-    const revokeResult = await revokeRefreshToken(refreshToken, 'Token rotation');
-    
-    if (!revokeResult.success) {
-      // Логируем, но не блокируем - новый токен уже сохранен
-      logger.warn('Failed to revoke old refresh token', {
-        userId: user.id,
-        error: revokeResult.error,
-        ip: ipAddress
-      });
-    }
+    // Revoke old token (token rotation)
+    await revokeTokenByJti(oldJti, 'rotation');
 
-    const hostname = request.nextUrl.hostname;
-    const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
-
+    // Create response
     const response = NextResponse.json(
       {
         message: 'Tokens refreshed',
-        access_token: newAccessToken,
+        user: toPublicUser(user),
       },
       { status: 200 }
     );
 
-    // Устанавливаем новые токены в cookies
-    response.cookies.set('access_token', newAccessToken, {
-      maxAge: 10 * 60, // 10 минут
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production' && !isLocalhost,
-      sameSite: 'strict',
-      path: '/'
-    });
-
-    response.cookies.set('refresh_token', newRefreshToken, {
-      maxAge: 60 * 60 * 24 * 60, // 60 дней
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production' && !isLocalhost,
-      sameSite: 'strict',
-      path: '/'
-    });
-
-    logger.info('Tokens refreshed successfully', {
-      userId: user.id,
-      ip: request.headers.get('x-forwarded-for')
-    });
+    // Set new cookies
+    const hostname = request.nextUrl.hostname;
+    setTokenCookies(response, newAccessToken, newRefreshToken, hostname);
 
     return setCorsHeaders(response);
   } catch (error) {
-    logger.error('Error refreshing tokens', {
+    logger.error('Token refresh error', {
       error: error instanceof Error ? error.message : 'Unknown error',
-      ip: request.headers.get('x-forwarded-for')
+      ip: request.headers.get('x-forwarded-for'),
     });
     return setCorsHeaders(
-      NextResponse.json(
-        { error: ERROR_INTERNAL_SERVER_ERROR },
-        { status: 500 }
-      )
+      NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     );
   }
 }
-

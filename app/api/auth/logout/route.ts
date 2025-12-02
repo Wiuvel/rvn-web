@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { logger } from '@/lib/secure-logger';
+import { verifyAuth } from '@/lib/auth/verify';
+import { revokeAllUserTokens, revokeRefreshToken } from '@/lib/auth/tokens';
+import { clearTokenCookies, extractTokensFromRequest } from '@/lib/auth/cookies';
 import { setCorsHeaders, handleCorsPreflight } from '@/lib/cors';
-import { SessionManager } from '@/lib/session-manager';
-import { revokeCSRFToken } from '@/lib/csrf';
-import { revokeRefreshToken, revokeAllUserRefreshTokens } from '@/lib/jwt-storage';
-import { verifyAuth } from '@/lib/auth-unified';
+import { logger } from '@/lib/secure-logger';
 
 export async function OPTIONS() {
   return handleCorsPreflight();
@@ -13,92 +11,53 @@ export async function OPTIONS() {
 
 export async function POST(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const sessionId = cookieStore.get('session_id')?.value;
-    const refreshToken = cookieStore.get('refresh_token')?.value;
-    
-    // Получаем user_id из JWT токена
-    let userId: string | null = null;
+    const hostname = request.nextUrl.hostname;
+    const { refreshToken } = extractTokensFromRequest(request);
+
+    // Try to get user ID from access token (optional - logout should work even with invalid token)
     const authResult = await verifyAuth(request);
-    if (authResult.isAuthenticated && authResult.user) {
-      userId = authResult.user.id;
-    }
-    
-    // Отзываем refresh токен из БД
+    const userId = authResult.success ? authResult.user.id : null;
+
+    // Revoke current refresh token
     if (refreshToken) {
-      await revokeRefreshToken(refreshToken, 'User logout');
+      await revokeRefreshToken(refreshToken, 'logout');
     }
 
-    // Отзываем все refresh токены пользователя (для безопасности)
+    // Revoke all user tokens if we have userId
     if (userId) {
-      const revokeResult = await revokeAllUserRefreshTokens(userId, 'User logout');
-      if (revokeResult.success && revokeResult.revokedCount) {
-        logger.info('Revoked all user refresh tokens', {
+      const revokeResult = await revokeAllUserTokens(userId, 'logout');
+      if (revokeResult.success && revokeResult.count) {
+        logger.info('User logged out', {
           userId,
-          revokedCount: revokeResult.revokedCount
+          revokedTokens: revokeResult.count,
+          ip: request.headers.get('x-forwarded-for'),
         });
       }
     }
-    
-    // Destroy session if exists
-    if (sessionId) {
-      SessionManager.destroySession(sessionId);
-      revokeCSRFToken(sessionId);
-    }
-    
-    const hostname = request.nextUrl.hostname;
-    const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
 
-    // Secure cookie deletion
-    await SessionManager.clearSessionCookie();
-
-    // Log successful logout
-    if (userId) {
-      logger.info('User logout', {
-        userId: userId,
-        sessionId: sessionId ? sessionId.substring(0, 8) + '...' : 'none',
-        ip: request.headers.get('x-forwarded-for')
-      });
-    }
-
-    // Очищаем JWT токены
+    // Create response and clear cookies
     const response = NextResponse.json(
       { message: 'Logout successful' },
       { status: 200 }
     );
 
-    // Удаляем JWT токены из cookies
-    response.cookies.delete('access_token');
-    response.cookies.delete('refresh_token');
-
-    // Также устанавливаем пустые значения с истекшим временем для надежности
-    response.cookies.set('access_token', '', {
-      maxAge: 0,
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production' && !isLocalhost,
-      sameSite: 'strict',
-      path: '/'
-    });
-
-    response.cookies.set('refresh_token', '', {
-      maxAge: 0,
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production' && !isLocalhost,
-      sameSite: 'strict',
-      path: '/'
-    });
+    clearTokenCookies(response, hostname);
 
     return setCorsHeaders(response);
   } catch (error) {
     logger.error('Logout error', {
       error: error instanceof Error ? error.message : 'Unknown error',
-      ip: request.headers.get('x-forwarded-for')
+      ip: request.headers.get('x-forwarded-for'),
     });
-    return setCorsHeaders(
-      NextResponse.json(
-        { error: 'Internal server error' },
-        { status: 500 }
-      )
+
+    // Even on error, try to clear cookies
+    const response = NextResponse.json(
+      { message: 'Logout completed' },
+      { status: 200 }
     );
+
+    clearTokenCookies(response, request.nextUrl.hostname);
+
+    return setCorsHeaders(response);
   }
 }

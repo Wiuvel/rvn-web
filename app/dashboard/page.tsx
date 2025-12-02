@@ -13,7 +13,6 @@ export default function DashboardPage() {
   const { userData, loading } = useAuth({
     requireAuth: true,
     redirectOnFail: '/auth',
-    redirectOnTimeout: '/error/500',
     onSuccess: (data) => {
       // Редиректим на правильный URL с токеном
       if (data.dashboard_token && !hasRedirectedRef.current) {

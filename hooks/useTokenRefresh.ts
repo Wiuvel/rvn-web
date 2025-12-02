@@ -1,164 +1,111 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+// Refresh token 2 minutes before expiry (access token = 10 min)
+const REFRESH_THRESHOLD_MS = 8 * 60 * 1000; // 8 minutes
+const CHECK_INTERVAL_MS = 2 * 60 * 1000; // Check every 2 minutes
+const INITIAL_DELAY_MS = 5000; // Wait 5 seconds before first check
+
+// ============================================================================
+// Hook Implementation
+// ============================================================================
 
 /**
- * Хук для автоматического обновления access token перед истечением
- * Обновляет токен проактивно только если пользователь авторизован
+ * Hook for automatic proactive token refresh
+ * Only refreshes when user is authenticated and token is about to expire
  */
 export function useTokenRefresh() {
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const isRefreshingRef = useRef(false);
-  const lastRefreshRef = useRef<number>(0);
-  const lastCheckRef = useRef<number>(0);
-  const isAuthenticatedRef = useRef<boolean>(false);
-  const consecutiveFailuresRef = useRef<number>(0);
+  const isAuthenticatedRef = useRef(false);
+  const lastRefreshTimeRef = useRef(0);
+  const failureCountRef = useRef(0);
 
-  useEffect(() => {
-    // Проверяем авторизацию через /api/auth/me перед обновлением
-    const checkAuthentication = async (): Promise<boolean> => {
-      try {
-        const response = await fetch('/api/auth/me', {
-          method: 'GET',
-          credentials: 'include',
-          cache: 'no-store',
-        });
+  // Refresh the token
+  const refreshToken = useCallback(async (): Promise<boolean> => {
+    if (isRefreshingRef.current) return false;
 
-        // Если получили 200, пользователь авторизован
-        if (response.ok) {
-          isAuthenticatedRef.current = true;
-          consecutiveFailuresRef.current = 0;
-          return true;
+    try {
+      isRefreshingRef.current = true;
+
+      const response = await fetch('/api/auth/refresh', {
+        method: 'POST',
+        credentials: 'include',
+      });
+
+      if (response.ok) {
+        lastRefreshTimeRef.current = Date.now();
+        failureCountRef.current = 0;
+        isAuthenticatedRef.current = true;
+
+        // Notify other components
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('tokenRefreshed'));
         }
 
-        // Если получили 401, проверяем есть ли refresh token
-        // Делаем это через попытку refresh, но только если не было много неудач
-        if (response.status === 401) {
-          // Если было много неудач подряд, не проверяем refresh token
-          if (consecutiveFailuresRef.current >= 2) {
-            isAuthenticatedRef.current = false;
-            return false;
-          }
-          // Пытаемся обновить токен - если получим 401, значит нет refresh token
-          return false; // Вернем false, но refreshToken сам проверит
-        }
+        return true;
+      }
 
+      // 401 means no valid refresh token
+      if (response.status === 401) {
+        failureCountRef.current++;
         isAuthenticatedRef.current = false;
-        return false;
-      } catch {
-        isAuthenticatedRef.current = false;
-        return false;
-      }
-    };
 
-    // Функция для обновления токена
-    const refreshToken = async (): Promise<boolean> => {
-      if (isRefreshingRef.current) {
-        return false; // Уже обновляется
-      }
-
-      // Если пользователь не авторизован и было много неудач, не делаем запрос
-      if (!isAuthenticatedRef.current && consecutiveFailuresRef.current >= 2) {
-        return false;
-      }
-
-      try {
-        isRefreshingRef.current = true;
-        const response = await fetch('/api/auth/refresh', {
-          method: 'POST',
-          credentials: 'include',
-          cache: 'no-store',
-        });
-
-        if (response.ok) {
-          lastRefreshRef.current = Date.now();
-          consecutiveFailuresRef.current = 0;
-          isAuthenticatedRef.current = true;
-          // После успешного обновления, триггерим событие для других компонентов
-          if (typeof window !== 'undefined') {
-            window.dispatchEvent(new CustomEvent('tokenRefreshed'));
-          }
-          return true;
-        }
-
-        // Если получили 401, значит нет валидного refresh token
-        if (response.status === 401) {
-          consecutiveFailuresRef.current += 1;
-          isAuthenticatedRef.current = false;
-          // Останавливаем интервал если пользователь не авторизован
-          if (consecutiveFailuresRef.current >= 2 && intervalRef.current) {
-            clearInterval(intervalRef.current);
-            intervalRef.current = null;
-          }
-        }
-
-        return false;
-      } catch (error) {
-        consecutiveFailuresRef.current += 1;
-        // Останавливаем интервал если было много ошибок
-        if (consecutiveFailuresRef.current >= 3 && intervalRef.current) {
+        // Stop checking if not authenticated
+        if (failureCountRef.current >= 2 && intervalRef.current) {
           clearInterval(intervalRef.current);
           intervalRef.current = null;
         }
-        return false;
-      } finally {
-        isRefreshingRef.current = false;
-      }
-    };
-
-    // Функция для проактивного обновления токена по таймеру
-    const checkAndRefreshToken = async () => {
-      // Пропускаем проверку, если уже обновляется
-      if (isRefreshingRef.current) {
-        return;
       }
 
-      const now = Date.now();
-      
-      // Проверяем не чаще чем раз в 30 секунд
-      if (now - lastCheckRef.current < 30 * 1000) {
-        return;
-      }
+      return false;
+    } catch {
+      failureCountRef.current++;
+      return false;
+    } finally {
+      isRefreshingRef.current = false;
+    }
+  }, []);
 
-      lastCheckRef.current = now;
-
-      // Если было много неудач, проверяем авторизацию перед обновлением
-      if (consecutiveFailuresRef.current >= 2) {
-        const isAuth = await checkAuthentication();
-        if (!isAuth) {
-          return; // Пользователь не авторизован, не обновляем
-        }
-      }
-
-      // Проверяем, прошло ли 8 минут с последнего обновления
-      // Обновляем токен проактивно за 2 минуты до истечения (10 минут - 8 минут = 2 минуты)
-      const timeSinceLastRefresh = now - lastRefreshRef.current;
-      if (timeSinceLastRefresh > 8 * 60 * 1000) {
-        // Обновляем токен проактивно
-        await refreshToken();
-      }
-    };
-
-    // Инициализируем время последнего обновления
-    if (lastRefreshRef.current === 0) {
-      lastRefreshRef.current = Date.now() - 9 * 60 * 1000; // 9 минут назад
+  // Check if we should refresh
+  const checkAndRefresh = useCallback(async () => {
+    // Skip if already refreshing or too many failures
+    if (isRefreshingRef.current || failureCountRef.current >= 2) {
+      return;
     }
 
-    // Слушаем событие успешной авторизации от useAuth
+    const now = Date.now();
+    const timeSinceLastRefresh = now - lastRefreshTimeRef.current;
+
+    // Refresh if threshold exceeded
+    if (timeSinceLastRefresh >= REFRESH_THRESHOLD_MS) {
+      await refreshToken();
+    }
+  }, [refreshToken]);
+
+  useEffect(() => {
+    // Handle auth success event (from useAuth)
     const handleAuthSuccess = () => {
       isAuthenticatedRef.current = true;
-      consecutiveFailuresRef.current = 0;
-      // Перезапускаем интервал если он был остановлен
+      failureCountRef.current = 0;
+      lastRefreshTimeRef.current = Date.now();
+
+      // Restart interval if stopped
       if (!intervalRef.current) {
-        intervalRef.current = setInterval(checkAndRefreshToken, 2 * 60 * 1000);
+        intervalRef.current = setInterval(checkAndRefresh, CHECK_INTERVAL_MS);
       }
     };
 
-    // Слушаем событие обновления токена (от других компонентов)
+    // Handle token refreshed event
     const handleTokenRefreshed = () => {
       isAuthenticatedRef.current = true;
-      consecutiveFailuresRef.current = 0;
-      lastRefreshRef.current = Date.now();
+      failureCountRef.current = 0;
+      lastRefreshTimeRef.current = Date.now();
     };
 
     if (typeof window !== 'undefined') {
@@ -166,16 +113,16 @@ export function useTokenRefresh() {
       window.addEventListener('tokenRefreshed', handleTokenRefreshed);
     }
 
-    // Проверяем токен каждые 2 минуты для проактивного обновления
-    intervalRef.current = setInterval(checkAndRefreshToken, 2 * 60 * 1000);
+    // Initial check after delay
+    const initialTimer = setTimeout(() => {
+      checkAndRefresh();
+    }, INITIAL_DELAY_MS);
 
-    // Проверяем СРАЗУ при монтировании (с задержкой чтобы не конфликтовать с useAuth)
-    const immediateCheck = setTimeout(() => {
-      checkAndRefreshToken();
-    }, 3000);
+    // Regular interval
+    intervalRef.current = setInterval(checkAndRefresh, CHECK_INTERVAL_MS);
 
     return () => {
-      clearTimeout(immediateCheck);
+      clearTimeout(initialTimer);
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
         intervalRef.current = null;
@@ -185,6 +132,5 @@ export function useTokenRefresh() {
         window.removeEventListener('tokenRefreshed', handleTokenRefreshed);
       }
     };
-  }, []);
+  }, [checkAndRefresh]);
 }
-

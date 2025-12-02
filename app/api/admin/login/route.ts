@@ -1,13 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateAdmin } from '@/lib/auth';
 import { authRateLimit } from '@/lib/rate-limit';
-import { verifyCSRFToken, revokeCSRFToken } from '@/lib/csrf';
 import { ServerValidator } from '@/lib/server-validation';
 import { logger } from '@/lib/secure-logger';
 import { setCorsHeaders, handleCorsPreflight } from '@/lib/cors';
-import { SessionManager } from '@/lib/session-manager';
-
-const ADMIN_SESSION_COOKIE = 'admin_session_id';
 
 export async function OPTIONS() {
   return handleCorsPreflight();
@@ -29,7 +25,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { username, password, csrfToken } = await request.json();
+    const { username, password } = await request.json();
 
     const dataValidation = ServerValidator.validateRequestData({ username, password });
     if (!dataValidation.isValid) {
@@ -52,18 +48,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const currentSessionId = request.cookies.get(ADMIN_SESSION_COOKIE)?.value;
-    if (currentSessionId && csrfToken && !verifyCSRFToken(csrfToken, currentSessionId)) {
-      logger.warn('Invalid CSRF token for admin login attempt', {
-        ip: request.headers.get('x-forwarded-for'),
-        hasSessionId: !!currentSessionId,
-        hasCsrfToken: !!csrfToken,
-      });
-      return setCorsHeaders(
-        NextResponse.json({ error: 'Invalid request' }, { status: 403 }),
-      );
-    }
-
     const result = await authenticateAdmin(username, password);
 
     if (!result.success || !result.admin) {
@@ -76,19 +60,8 @@ export async function POST(request: NextRequest) {
     }
 
     const ipAddress = request.headers.get('x-forwarded-for') || 'unknown';
-    const userAgent = request.headers.get('user-agent') || 'unknown';
     const hostname = request.nextUrl.hostname;
     const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
-
-    const sessionId = SessionManager.createSession(
-      result.admin.id,
-      ServerValidator.sanitizeInput(username),
-      ipAddress,
-      userAgent,
-    );
-
-    revokeCSRFToken(sessionId);
-    await SessionManager.setSessionCookie(sessionId, isLocalhost, ADMIN_SESSION_COOKIE);
 
     const response = NextResponse.json(
       {
@@ -106,9 +79,16 @@ export async function POST(request: NextRequest) {
       path: '/',
     });
 
+    response.cookies.set('admin_username', ServerValidator.sanitizeInput(username), {
+      maxAge: 60 * 60 * 6,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production' && !isLocalhost,
+      sameSite: 'strict',
+      path: '/',
+    });
+
     logger.info('Admin login success', {
       username: ServerValidator.sanitizeInput(username),
-      sessionId: sessionId.substring(0, 8) + '...',
       ip: ipAddress,
     });
 

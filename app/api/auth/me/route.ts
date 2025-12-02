@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { AuthService } from '@/lib/auth-service';
-import { logger } from '@/lib/secure-logger';
+import { verifyAuth } from '@/lib/auth/verify';
 import { setCorsHeaders, handleCorsPreflight } from '@/lib/cors';
 
 export async function OPTIONS() {
@@ -9,56 +8,54 @@ export async function OPTIONS() {
 
 export async function GET(request: NextRequest) {
   try {
-    // Используем централизованный AuthService
-    const { result: authResult } = await AuthService.checkAuth(request, {
-      requireAuth: false,
-      checkActive: true
-    });
+    const authResult = await verifyAuth(request);
 
-    if (!authResult.isAuthenticated || !authResult.user) {
-      // Возвращаем 200 вместо 401, чтобы не выводить ошибку в консоль браузера
-      // Это нормальная ситуация для неавторизованных пользователей
+    // Not authenticated - return 200 with authenticated: false
+    // This prevents console errors on client side
+    if (!authResult.success) {
+      // Only return 401 for truly invalid tokens, not for missing tokens
+      if (authResult.code === 'NO_TOKEN') {
+        return setCorsHeaders(
+          NextResponse.json({ authenticated: false }, { status: 200 })
+        );
+      }
+
+      // Token expired - client should try to refresh
+      if (authResult.code === 'TOKEN_EXPIRED') {
+        return setCorsHeaders(
+          NextResponse.json(
+            { authenticated: false, expired: true },
+            { status: 401 }
+          )
+        );
+      }
+
+      // Other errors
       return setCorsHeaders(
         NextResponse.json(
-          { authenticated: false }
+          { authenticated: false, error: authResult.message },
+          { status: 401 }
         )
       );
     }
 
+    // Check for support/admin roles
+    const roles = authResult.roles;
+    const isSupport = roles.includes('support');
+    const isAdmin = roles.includes('admin');
+
     return setCorsHeaders(
       NextResponse.json({
-        id: authResult.user.id,
-        user_id: authResult.user.user_id,
-        username: authResult.user.username,
-        dashboard_token: authResult.user.dashboard_token,
-        created_at: authResult.user.created_at,
-        last_login: authResult.user.last_login,
-        avatar_gradient: authResult.user.avatar_gradient,
-        isSupport: authResult.isSupport || false,
-        isAdmin: authResult.isAdmin || false
+        authenticated: true,
+        ...authResult.user,
+        isSupport,
+        isAdmin,
       })
     );
-  } catch (error) {
-    // Логируем только реальные ошибки сервера, а не нормальные случаи отсутствия авторизации
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    const isExpectedError = errorMessage.includes('Not authenticated') || 
-                            errorMessage.includes('No token') ||
-                            errorMessage.includes('expired') ||
-                            errorMessage.includes('invalid');
-    
-    if (!isExpectedError) {
-      logger.error('Unexpected error in /api/auth/me', {
-        error: errorMessage,
-        ip: request.headers.get('x-forwarded-for')
-      });
-    }
-    
+  } catch {
+    // Internal error - return 500
     return setCorsHeaders(
-      NextResponse.json(
-        { error: 'Internal server error' },
-        { status: 500 }
-      )
+      NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     );
   }
 }
-
