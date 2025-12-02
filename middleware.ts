@@ -43,38 +43,61 @@ function handleProtection(request: NextRequest, pathname: string): NextResponse 
 }
 
 // Упрощенная проверка JWT для middleware (Edge Runtime compatible)
-async function verifyJwtInMiddleware(request: NextRequest): Promise<{ isAuthenticated: boolean; dashboardToken?: string }> {
+async function verifyJwtInMiddleware(request: NextRequest): Promise<{ isAuthenticated: boolean; dashboardToken?: string; hasRefreshToken?: boolean }> {
   try {
-    // Получаем токен из cookies
+    // Получаем токены из cookies
     const accessToken = request.cookies.get('access_token')?.value;
+    const refreshToken = request.cookies.get('refresh_token')?.value;
     
-    if (!accessToken) {
+    // Если нет ни access, ни refresh токена - пользователь не авторизован
+    if (!accessToken && !refreshToken) {
       return { isAuthenticated: false };
     }
 
-    // Получаем секретный ключ
-    const secret = process.env.JWT_SECRET || 'change-me-in-production';
-    const secretKey = new TextEncoder().encode(secret);
-
-    // Проверяем токен
-    const { payload } = await jwtVerify(accessToken, secretKey, {
-      issuer: process.env.JWT_ISSUER || 'rvn.market',
-      audience: process.env.JWT_AUDIENCE || 'rvn.market',
-    });
-
-    // Проверяем, что это access token
-    if (payload.type !== 'access') {
-      return { isAuthenticated: false };
+    // Если есть refresh token, но нет access token - разрешаем доступ
+    // Страница сама обновит access token через API
+    if (!accessToken && refreshToken) {
+      return { isAuthenticated: true, hasRefreshToken: true };
     }
 
-    // Извлекаем dashboard_token из payload (он должен быть там, но если нет - вернем undefined)
-    // В реальности dashboard_token не в payload, нужно будет получать из БД, но для middleware
-    // мы можем просто проверить наличие токена и позволить API роутам делать полную проверку
-    return { 
-      isAuthenticated: true,
-      // dashboard_token будет получен через API в компонентах
-    };
+    // Если есть access token, проверяем его валидность
+    if (accessToken) {
+      try {
+        // Получаем секретный ключ
+        const secret = process.env.JWT_SECRET || 'change-me-in-production';
+        const secretKey = new TextEncoder().encode(secret);
+
+        // Проверяем токен
+        const { payload } = await jwtVerify(accessToken, secretKey, {
+          issuer: process.env.JWT_ISSUER || 'rvn.market',
+          audience: process.env.JWT_AUDIENCE || 'rvn.market',
+        });
+
+        // Проверяем, что это access token
+        if (payload.type === 'access') {
+          return { 
+            isAuthenticated: true,
+            // dashboard_token будет получен через API в компонентах
+          };
+        }
+      } catch (error) {
+        // Access token истек или невалиден
+        // Если есть refresh token, разрешаем доступ (страница обновит токен)
+        if (refreshToken) {
+          return { isAuthenticated: true, hasRefreshToken: true };
+        }
+        // Если нет refresh token, пользователь не авторизован
+        return { isAuthenticated: false };
+      }
+    }
+
+    return { isAuthenticated: false };
   } catch (error) {
+    // В случае ошибки проверяем наличие refresh token
+    const refreshToken = request.cookies.get('refresh_token')?.value;
+    if (refreshToken) {
+      return { isAuthenticated: true, hasRefreshToken: true };
+    }
     return { isAuthenticated: false };
   }
 }

@@ -12,3 +12,5 @@ powershell -ExecutionPolicy Bypass -File "%~dp0generate-jwt-secret.ps1"
 
 pause
 
+
+

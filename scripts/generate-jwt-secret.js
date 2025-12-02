@@ -14,3 +14,5 @@ console.log(`JWT_SECRET=${secret}\n`);
 console.log('⚠️  ВАЖНО: Храните этот секрет в безопасности!\n');
 console.log('Не коммитьте его в Git!\n');
 
+
+

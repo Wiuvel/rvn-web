@@ -48,7 +48,7 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
         timeoutId = setTimeout(() => controller!.abort(), AUTH_FETCH_TIMEOUT);
 
         try {
-          const response = await fetch('/api/auth/me', {
+          let response = await fetch('/api/auth/me', {
             signal: controller.signal,
             cache: 'no-store' // Ensure fresh data
           });
@@ -59,6 +59,41 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
           }
 
           if (!isMounted) return;
+
+          // Если получили 401, пытаемся обновить токен через refresh
+          if (response.status === 401) {
+            try {
+              const refreshResponse = await fetch('/api/auth/refresh', {
+                method: 'POST',
+                credentials: 'include',
+                signal: controller.signal,
+              });
+
+              if (refreshResponse.ok) {
+                // Токен обновлен, повторяем запрос
+                response = await fetch('/api/auth/me', {
+                  signal: controller.signal,
+                  cache: 'no-store',
+                });
+              } else {
+                // Refresh не удался, пользователь не авторизован
+                if (requireAuth && redirectOnFail) {
+                  router.push(redirectOnFail);
+                  return;
+                }
+                setUserData(null);
+                return;
+              }
+            } catch (refreshError) {
+              // Ошибка при обновлении токена
+              if (requireAuth && redirectOnFail) {
+                router.push(redirectOnFail);
+                return;
+              }
+              setUserData(null);
+              return;
+            }
+          }
 
           if (response.ok) {
             const data = await response.json();

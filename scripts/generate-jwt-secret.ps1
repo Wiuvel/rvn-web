@@ -18,3 +18,5 @@ Write-Host ""
 Write-Host "Не коммитьте его в Git!" -ForegroundColor Red
 Write-Host ""
 
+
+
