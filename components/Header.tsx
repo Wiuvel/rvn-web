@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { gsap } from 'gsap';
 import { Notification } from '@/types';
 import { useAuth } from '@/hooks/useAuth';
+import { useTokenRefresh } from '@/hooks/useTokenRefresh';
 import { UserMenu } from '@/components/UserMenu';
 import { NotificationsMenu } from '@/components/NotificationsMenu';
 import { GSAP_DEFAULT_DURATION, GSAP_DEFAULT_EASE } from '@/lib/constants';
@@ -28,6 +29,9 @@ export default function Header() {
   
   // Используем новый хук useAuth
   const { userData, loading } = useAuth({ silent: true });
+  
+  // Автоматическое обновление токенов перед истечением
+  useTokenRefresh();
 
   useEffect(() => {
     if (typeof window === 'undefined') return;

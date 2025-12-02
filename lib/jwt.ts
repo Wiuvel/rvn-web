@@ -146,6 +146,47 @@ export async function verifyRefreshToken(token: string): Promise<RefreshTokenPay
 }
 
 /**
+ * Декодирование JWT без верификации (для проверки времени истечения на клиенте)
+ * ВНИМАНИЕ: Не используйте для проверки валидности токена, только для чтения payload
+ */
+export function decodeJwtWithoutVerification(token: string): { payload: JWTPayload; exp?: number } | null {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) {
+      return null;
+    }
+
+    // Декодируем payload (вторая часть токена)
+    const payload = JSON.parse(
+      Buffer.from(parts[1], 'base64url').toString('utf-8')
+    ) as JWTPayload;
+
+    return {
+      payload,
+      exp: payload.exp
+    };
+  } catch (error) {
+    return null;
+  }
+}
+
+/**
+ * Проверка времени до истечения токена (в секундах)
+ * Возвращает количество секунд до истечения или null если токен истек/невалиден
+ */
+export function getTokenExpirationTime(token: string): number | null {
+  const decoded = decodeJwtWithoutVerification(token);
+  if (!decoded || !decoded.exp) {
+    return null;
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  const expiresIn = decoded.exp - now;
+
+  return expiresIn > 0 ? expiresIn : null;
+}
+
+/**
  * Извлечение токена из заголовка Authorization
  */
 export function extractTokenFromHeader(authHeader: string | null): string | null {
