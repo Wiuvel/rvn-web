@@ -213,9 +213,9 @@ export default function Header() {
             <span className="font-semibold text-white">Raven Private</span>
           </Link>
           <nav className="hidden lg:flex items-center gap-8 text-sm text-neutral-300">
-            <Link href="#pricing" className="hover:text-white transition">Тарифы</Link>
+            <Link href="#pricing" prefetch={false} className="hover:text-white transition">Тарифы</Link>
             <Link href="/support" prefetch={false} className="hover:text-white transition">Поддержка</Link>
-            <Link href="#faq" className="hover:text-white transition">FAQ</Link>
+            <Link href="#faq" prefetch={false} className="hover:text-white transition">FAQ</Link>
           </nav>
           <div className="hidden lg:flex items-center gap-2 relative" ref={userMenuRef}>
             {loading ? (
@@ -281,6 +281,7 @@ export default function Header() {
             ) : (
               <Link 
                 href="/auth" 
+                prefetch={false}
                 className="rounded-xl bg-primary-500 hover:bg-primary-400 px-4 py-2 text-sm font-medium text-white shadow-glow transition flex items-center gap-2"
               >
                 <Image 
@@ -410,6 +411,7 @@ export default function Header() {
                 <>
                   <Link 
                     href="#pricing" 
+                    prefetch={false}
                     onClick={() => setOpen(false)} 
                     className="block text-white/80 hover:text-white transition-colors duration-300 py-2"
                   >
@@ -425,6 +427,7 @@ export default function Header() {
                   </Link>
                   <Link 
                     href="#faq" 
+                    prefetch={false}
                     onClick={() => setOpen(false)} 
                     className="block text-white/80 hover:text-white transition-colors duration-300 py-2"
                   >
@@ -433,6 +436,7 @@ export default function Header() {
                   <div className="pt-4 border-t border-white/10">
                     <Link 
                       href="/auth" 
+                      prefetch={false}
                       className="block text-white/80 hover:text-white transition-colors duration-300 py-2"
                     >
                       Войти

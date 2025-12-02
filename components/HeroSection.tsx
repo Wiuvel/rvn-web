@@ -88,10 +88,10 @@ export default function HeroSection() {
             </p>
             <div ref={buttonsRef} className="mt-6 md:mt-8 flex flex-col sm:flex-row gap-3 justify-center lg:justify-start">
               <Button asChild size="lg" className="bg-primary-400 text-black hover:bg-primary-500 shadow-lg hover:shadow-blue-500/50 hover:scale-105 disabled:bg-neutral-800 disabled:text-neutral-500 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:scale-100 disabled:hover:shadow-lg">
-                <Link href="#pricing">Выбрать тариф</Link>
+                <Link href="#pricing" prefetch={false}>Выбрать тариф</Link>
               </Button>
               <Button asChild variant="ghost" size="lg" className="border-2 border-neutral-800/50 bg-transparent hover:bg-neutral-900/50 hover:border-neutral-700">
-                <Link href="#apps">Подробнее</Link>
+                <Link href="#apps" prefetch={false}>Подробнее</Link>
               </Button>
             </div>
             <div className="mt-4 md:mt-6 flex flex-wrap justify-center lg:justify-start gap-3 md:gap-4 text-xs text-neutral-400 animate-fadeIn">

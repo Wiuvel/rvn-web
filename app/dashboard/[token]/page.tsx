@@ -349,13 +349,13 @@ export default function DashboardPage() {
       <header className="fixed top-0 left-0 right-0 pt-4 z-[999]">
         <div className="mx-auto max-w-6xl px-4">
           <div className="backdrop-blur-lg bg-neutral-900/40 border border-white/10 rounded-full px-6 py-3 flex items-center justify-between shadow-lg">
-            <Link href="/" className="flex items-center gap-2">
+            <Link href="/" prefetch={false} className="flex items-center gap-2">
               <Image src="/static/logo.svg" alt="Raven Logo" width={256} height={256} className="w-6 h-6" priority/>
               <span className="font-semibold text-white">Raven Private</span>
             </Link>
             <nav className="hidden lg:flex items-center gap-8 text-sm text-neutral-300">
-              <Link href="/" className="hover:text-white transition">Главная</Link>
-              <Link href="/auth/" className="hover:text-white transition">Профиль</Link>
+              <Link href="/" prefetch={false} className="hover:text-white transition">Главная</Link>
+              <Link href="/auth/" prefetch={false} className="hover:text-white transition">Профиль</Link>
             </nav>
             {userData && (
               <div className="hidden lg:flex items-center gap-2 relative" ref={userMenuRef}>
@@ -478,6 +478,7 @@ export default function DashboardPage() {
                       </Link>
                       <Link
                         href="/support"
+                        prefetch={false}
                         onClick={() => setUserMenuOpen(false)}
                         className="flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-xl text-white/80 hover:text-white hover:bg-white/5 transition-colors duration-200"
                       >
@@ -560,6 +561,7 @@ export default function DashboardPage() {
                   </Link>
                   <Link
                     href="/support"
+                    prefetch={false}
                     onClick={() => setOpen(false)}
                     className="flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-xl text-white/80 hover:text-white hover:bg-white/5 transition-colors duration-200"
                   >
@@ -646,7 +648,7 @@ export default function DashboardPage() {
             </section>
             <section className="rounded-2xl border border-neutral-800 bg-neutral-900 p-5">
               <div className="text-sm text-neutral-400">Поддержка</div>
-              <Link href="/support" className="mt-2 inline-block text-primary-400 hover:underline hover:text-primary-300 transition-colors">
+              <Link href="/support" prefetch={false} className="mt-2 inline-block text-primary-400 hover:underline hover:text-primary-300 transition-colors">
                 Связаться с нами
               </Link>
             </section>

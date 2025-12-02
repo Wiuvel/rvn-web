@@ -156,7 +156,7 @@ export default function PricingSection() {
                         : '!bg-white !text-neutral-900 hover:!bg-neutral-200 hover:!text-neutral-900 !border-0'
                     }`}
                   >
-                    <Link href="#">Купить</Link>
+                    <Link href="#" prefetch={false}>Купить</Link>
                   </Button>
                 ) : (
                   <Button 

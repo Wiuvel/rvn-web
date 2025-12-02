@@ -1209,6 +1209,7 @@ export default function SupportPage() {
             </a>
             <Link
               href={`/auth?retpatch=${encodeURIComponent('/support/')}`}
+              prefetch={false}
               className="flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3 bg-primary-500 hover:bg-primary-400 rounded-xl text-white transition-colors text-sm sm:text-base"
             >
               <Image 
@@ -1237,8 +1238,8 @@ export default function SupportPage() {
               <span className="font-semibold text-white">Raven Private</span>
             </Link>
             <nav className="hidden lg:flex items-center gap-8 text-sm text-neutral-300">
-              <Link href="/" className="hover:text-white transition">Главная</Link>
-              <Link href="/auth" className="hover:text-white transition">Профиль</Link>
+              <Link href="/" prefetch={false} className="hover:text-white transition">Главная</Link>
+              <Link href="/auth" prefetch={false} className="hover:text-white transition">Профиль</Link>
             </nav>
             {userData && (
               <div className="hidden lg:flex items-center gap-2 relative" ref={userMenuRef}>

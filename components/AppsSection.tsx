@@ -139,7 +139,7 @@ export default function AppsSection() {
                 variant="ghost"
                 className="!transition-all !transform border-2 border-neutral-800/50 bg-transparent hover:bg-neutral-900/50 hover:scale-105 hover:border-neutral-700"
               >
-                <Link href="/apps/windows">
+                <Link href="/apps/windows" prefetch={false}>
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M0 0h11.377v11.372H0zm12.623 0H24v11.372H12.623zM0 12.628h11.377V24H0zm12.623 0H24V24H12.623z"/>
                   </svg>
