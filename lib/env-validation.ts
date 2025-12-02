@@ -47,10 +47,13 @@ export function validateEnv(): Env {
     return validatedEnv;
   }
 
+  // Получаем значения с fallback
+  const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+  
   try {
     validatedEnv = envSchema.parse({
       // Поддержка NEXT_PUBLIC_SUPABASE_URL для обратной совместимости с dockerfile
-      SUPABASE_URL: process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL,
+      SUPABASE_URL: supabaseUrl,
       SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
       SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
       JWT_SECRET: process.env.JWT_SECRET,
@@ -63,10 +66,26 @@ export function validateEnv(): Env {
     return validatedEnv;
   } catch (error) {
     if (error instanceof z.ZodError) {
+      // Улучшенные сообщения об ошибках с информацией о фактических значениях
       const errorMessage = `❌ Invalid environment variables:\n${error.issues.map((issue) => {
         const path = issue.path.join('.');
-        return `  - ${path}: ${issue.message}`;
-      }).join('\n')}\n\n💡 Please check your .env file and ensure all required variables are set.`;
+        const value = issue.path.length > 0 
+          ? (issue.path[0] === 'SUPABASE_URL' ? supabaseUrl 
+             : issue.path[0] === 'SUPABASE_ANON_KEY' ? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+             : issue.path[0] === 'SUPABASE_SERVICE_ROLE_KEY' ? process.env.SUPABASE_SERVICE_ROLE_KEY
+             : issue.path[0] === 'JWT_SECRET' ? process.env.JWT_SECRET
+             : issue.path[0] === 'CSRF_SECRET' ? process.env.CSRF_SECRET
+             : undefined)
+          : undefined;
+        
+        const valueInfo = value === undefined 
+          ? ' (not set)' 
+          : value === '' 
+            ? ' (empty string)'
+            : ` (value: ${value.length > 50 ? value.substring(0, 50) + '...' : value})`;
+        
+        return `  - ${path}: ${issue.message}${valueInfo}`;
+      }).join('\n')}\n\n💡 Please check your .env file and ensure all required variables are set.\n\nAvailable env vars:\n  - SUPABASE_URL: ${supabaseUrl ? 'set' : 'NOT SET'}\n  - NEXT_PUBLIC_SUPABASE_URL: ${process.env.NEXT_PUBLIC_SUPABASE_URL ? 'set' : 'NOT SET'}\n  - NEXT_PUBLIC_SUPABASE_ANON_KEY: ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? 'set' : 'NOT SET'}\n  - SUPABASE_SERVICE_ROLE_KEY: ${process.env.SUPABASE_SERVICE_ROLE_KEY ? 'set' : 'NOT SET'}\n  - JWT_SECRET: ${process.env.JWT_SECRET ? 'set' : 'NOT SET'}\n  - CSRF_SECRET: ${process.env.CSRF_SECRET ? 'set' : 'NOT SET'}`;
       
       console.error(errorMessage);
       
