@@ -106,14 +106,6 @@ export async function POST(request: NextRequest) {
       path: '/',
     });
 
-    response.cookies.set('admin_username', ServerValidator.sanitizeInput(username), {
-      maxAge: 60 * 60 * 6,
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production' && !isLocalhost,
-      sameSite: 'strict',
-      path: '/',
-    });
-
     logger.info('Admin login success', {
       username: ServerValidator.sanitizeInput(username),
       sessionId: sessionId.substring(0, 8) + '...',

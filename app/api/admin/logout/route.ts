@@ -15,16 +15,20 @@ export async function POST(request: NextRequest) {
   try {
     const cookieStore = await cookies();
     const sessionId = cookieStore.get(ADMIN_SESSION_COOKIE)?.value;
-    const username = cookieStore.get('admin_username')?.value;
-
+    
+    // Получаем username из сессии перед её уничтожением
+    let username: string | null = null;
     if (sessionId) {
+      const session = SessionManager.getSession(sessionId);
+      if (session) {
+        username = session.username;
+      }
       SessionManager.destroySession(sessionId);
       revokeCSRFToken(sessionId);
     }
 
     await SessionManager.clearSessionCookie(ADMIN_SESSION_COOKIE);
     cookieStore.delete('admin_authenticated');
-    cookieStore.delete('admin_username');
 
     if (username) {
       logger.info('Admin logout', {

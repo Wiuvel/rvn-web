@@ -214,7 +214,7 @@ export default function Header() {
           </Link>
           <nav className="hidden lg:flex items-center gap-8 text-sm text-neutral-300">
             <Link href="#pricing" className="hover:text-white transition">Тарифы</Link>
-            <Link href="/support" className="hover:text-white transition">Поддержка</Link>
+            <Link href="/support" prefetch={false} className="hover:text-white transition">Поддержка</Link>
             <Link href="#faq" className="hover:text-white transition">FAQ</Link>
           </nav>
           <div className="hidden lg:flex items-center gap-2 relative" ref={userMenuRef}>
@@ -365,6 +365,7 @@ export default function Header() {
                     </Link>
                     <Link
                       href="/support"
+                      prefetch={false}
                       onClick={() => setOpen(false)}
                       className="flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-xl text-white/80 hover:text-white hover:bg-white/5 transition-colors duration-200"
                     >
@@ -416,6 +417,7 @@ export default function Header() {
                   </Link>
                   <Link 
                     href="/support" 
+                    prefetch={false}
                     onClick={() => setOpen(false)} 
                     className="block text-white/80 hover:text-white transition-colors duration-300 py-2"
                   >

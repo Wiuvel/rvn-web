@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { generalRateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/secure-logger';
 import { setCorsHeaders, handleCorsPreflight } from '@/lib/cors';
-import { getUserByToken } from '@/lib/auth';
+import { verifyAuth } from '@/lib/auth-unified';
 import { hasUserRole } from '@/lib/user-roles';
 import { ERROR_INTERNAL_SERVER_ERROR, ERROR_TOO_MANY_REQUESTS } from '@/lib/constants';
 
@@ -31,11 +30,9 @@ export async function GET(request: NextRequest) {
     }
 
     // Проверка авторизации пользователя
-    const cookieStore = await cookies();
-    const isAuthenticated = cookieStore.get('user_authenticated')?.value === 'true';
-    const dashboardToken = cookieStore.get('dashboard_token')?.value;
+    const authResult = await verifyAuth(request);
 
-    if (!isAuthenticated || !dashboardToken) {
+    if (!authResult.isAuthenticated || !authResult.user) {
       return setCorsHeaders(
         NextResponse.json({
           isAuthenticated: false,
@@ -44,16 +41,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Получаем пользователя по токену
-    const user = await getUserByToken(dashboardToken);
-    if (!user) {
-      return setCorsHeaders(
-        NextResponse.json({
-          isAuthenticated: false,
-          hasSupportAccess: false
-        })
-      );
-    }
+    const user = authResult.user;
 
     // Проверяем роль поддержки (может выбросить ошибку если БД не настроена)
     let hasSupportAccess = false;
@@ -93,24 +81,19 @@ export async function GET(request: NextRequest) {
     });
     
     // При ошибке БД возвращаем 200 с информацией об ошибке, а не 500
-    const cookieStore = await cookies();
-    const isAuthenticated = cookieStore.get('user_authenticated')?.value === 'true';
-    const dashboardToken = cookieStore.get('dashboard_token')?.value;
+    const authResult = await verifyAuth(request);
     
-    if (isAuthenticated && dashboardToken) {
-      const user = await getUserByToken(dashboardToken);
-      if (user) {
-        return setCorsHeaders(
-          NextResponse.json({
-            isAuthenticated: true,
-            hasSupportAccess: false,
-            username: user.username,
-            userId: user.id,
-            user_id: user.user_id,
-            error: 'Database not configured'
-          })
-        );
-      }
+    if (authResult.isAuthenticated && authResult.user) {
+      return setCorsHeaders(
+        NextResponse.json({
+          isAuthenticated: true,
+          hasSupportAccess: false,
+          username: authResult.user.username,
+          userId: authResult.user.id,
+          user_id: authResult.user.user_id,
+          error: 'Database not configured'
+        })
+      );
     }
     
     return setCorsHeaders(

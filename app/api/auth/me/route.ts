@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { getUserByToken } from '@/lib/auth';
+import { verifyAuth } from '@/lib/auth-unified';
 import { logger } from '@/lib/secure-logger';
 import { setCorsHeaders, handleCorsPreflight } from '@/lib/cors';
 import { hasUserRole } from '@/lib/user-roles';
@@ -11,11 +10,9 @@ export async function OPTIONS() {
 
 export async function GET(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const dashboardToken = cookieStore.get('dashboard_token')?.value;
-    const isAuthenticated = cookieStore.get('user_authenticated')?.value === 'true';
+    const authResult = await verifyAuth(request);
 
-    if (!isAuthenticated || !dashboardToken) {
+    if (!authResult.isAuthenticated || !authResult.user) {
       // Возвращаем 200 вместо 401, чтобы не выводить ошибку в консоль браузера
       // Это нормальная ситуация для неавторизованных пользователей
       return setCorsHeaders(
@@ -25,40 +22,28 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const user = await getUserByToken(dashboardToken);
-    
-    if (!user) {
-      return setCorsHeaders(
-        NextResponse.json(
-          { error: 'User not found' },
-          { status: 404 }
-        )
-      );
-    }
-
     // Проверяем роли пользователя
     let isSupport = false;
     let isAdmin = false;
     try {
-      isSupport = await hasUserRole(user.id, 'support');
-      isAdmin = await hasUserRole(user.id, 'admin');
+      isSupport = await hasUserRole(authResult.user.id, 'support');
+      isAdmin = await hasUserRole(authResult.user.id, 'admin');
     } catch (error) {
-      // Игнорируем ошибки проверки ролей, просто не устанавливаем флаги
       logger.warn('Error checking user roles', {
         error: error instanceof Error ? error.message : 'Unknown error',
-        userId: user.id
+        userId: authResult.user.id
       });
     }
 
     return setCorsHeaders(
       NextResponse.json({
-        id: user.id,
-        user_id: user.user_id,
-        username: user.username,
-        dashboard_token: user.dashboard_token,
-        created_at: user.created_at,
-        last_login: user.last_login,
-        avatar_gradient: user.avatar_gradient,
+        id: authResult.user.id,
+        user_id: authResult.user.user_id,
+        username: authResult.user.username,
+        dashboard_token: authResult.user.dashboard_token,
+        created_at: authResult.user.created_at,
+        last_login: authResult.user.last_login,
+        avatar_gradient: authResult.user.avatar_gradient,
         isSupport,
         isAdmin
       })

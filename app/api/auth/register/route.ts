@@ -122,33 +122,52 @@ export async function POST(request: NextRequest) {
 
     await SessionManager.setSessionCookie(sessionId, isLocalhost);
 
+    // Generate JWT tokens for new user
+    const { generateAccessToken, generateRefreshToken } = await import('@/lib/jwt');
+    const { storeRefreshToken } = await import('@/lib/jwt-storage');
+
+    const accessToken = await generateAccessToken({
+      userId: result.user!.id,
+      username: result.user!.username,
+      user_id: result.user!.user_id,
+    });
+
+    const refreshToken = await generateRefreshToken({
+      userId: result.user!.id,
+      tokenVersion: 1,
+    });
+
+    // Сохраняем refresh token в БД
+    await storeRefreshToken(
+      result.user!.id,
+      refreshToken,
+      {
+        ipAddress,
+        userAgent
+      }
+    );
+
     // Set authentication cookies
     const response = NextResponse.json(
       { 
         message: 'User created successfully',
-        dashboard_token: result.user!.dashboard_token
+        dashboard_token: result.user!.dashboard_token,
+        access_token: accessToken
       },
       { status: 201 }
     );
 
-    response.cookies.set('user_authenticated', 'true', {
-      maxAge: 60 * 60 * 24 * 7,
+    // JWT токены в cookies (httpOnly для безопасности)
+    response.cookies.set('access_token', accessToken, {
+      maxAge: 10 * 60, // 10 минут
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production' && !isLocalhost,
       sameSite: 'strict',
       path: '/'
     });
 
-    response.cookies.set('user_id', result.user!.id, {
-      maxAge: 60 * 60 * 24 * 7,
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production' && !isLocalhost,
-      sameSite: 'strict',
-      path: '/'
-    });
-
-    response.cookies.set('dashboard_token', result.user!.dashboard_token, {
-      maxAge: 60 * 60 * 24 * 7,
+    response.cookies.set('refresh_token', refreshToken, {
+      maxAge: 60 * 60 * 24 * 60, // 60 дней
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production' && !isLocalhost,
       sameSite: 'strict',

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { jwtVerify } from 'jose';
 
 function isBotOrSpecialFile(pathname: string, userAgent: string): boolean {
   if (pathname === '/robots.txt' || pathname === '/sitemap.xml' || pathname === '/favicon.ico' || pathname.startsWith('/api/')) {
@@ -41,52 +42,86 @@ function handleProtection(request: NextRequest, pathname: string): NextResponse 
   return response;
 }
 
-// Auth Middleware
-function handleAuth(request: NextRequest, pathname: string): NextResponse | null {
-  const isAuthenticated = request.cookies.get('user_authenticated')?.value === 'true';
-  const dashboardToken = request.cookies.get('dashboard_token')?.value;
+// Упрощенная проверка JWT для middleware (Edge Runtime compatible)
+async function verifyJwtInMiddleware(request: NextRequest): Promise<{ isAuthenticated: boolean; dashboardToken?: string }> {
+  try {
+    // Получаем токен из cookies
+    const accessToken = request.cookies.get('access_token')?.value;
+    
+    if (!accessToken) {
+      return { isAuthenticated: false };
+    }
+
+    // Получаем секретный ключ
+    const secret = process.env.JWT_SECRET || 'change-me-in-production';
+    const secretKey = new TextEncoder().encode(secret);
+
+    // Проверяем токен
+    const { payload } = await jwtVerify(accessToken, secretKey, {
+      issuer: process.env.JWT_ISSUER || 'rvn.market',
+      audience: process.env.JWT_AUDIENCE || 'rvn.market',
+    });
+
+    // Проверяем, что это access token
+    if (payload.type !== 'access') {
+      return { isAuthenticated: false };
+    }
+
+    // Извлекаем dashboard_token из payload (он должен быть там, но если нет - вернем undefined)
+    // В реальности dashboard_token не в payload, нужно будет получать из БД, но для middleware
+    // мы можем просто проверить наличие токена и позволить API роутам делать полную проверку
+    return { 
+      isAuthenticated: true,
+      // dashboard_token будет получен через API в компонентах
+    };
+  } catch (error) {
+    return { isAuthenticated: false };
+  }
+}
+
+// Auth Middleware - использует упрощенную проверку JWT для Edge Runtime
+async function handleAuth(request: NextRequest, pathname: string): Promise<NextResponse | null> {
+  // Проверяем JWT авторизацию (упрощенная версия для Edge Runtime)
+  const authResult = await verifyJwtInMiddleware(request);
+  const isAuthenticated = authResult.isAuthenticated;
+  // Для dashboard_token в middleware мы не можем получить его из JWT payload,
+  // поэтому полагаемся на проверку в API роутах
+  // Вместо этого просто проверяем наличие токена
 
   if (pathname === '/auth' || pathname.startsWith('/auth/')) {
-    if (isAuthenticated && dashboardToken) {
+    // Если пользователь авторизован, редиректим на dashboard
+    // Точный dashboard_token будет определен в компоненте через API
+    if (isAuthenticated) {
       const retpatch = request.nextUrl.searchParams.get('retpatch');
       if (retpatch) {
         return NextResponse.redirect(new URL(retpatch, request.url));
       }
-      return NextResponse.redirect(new URL(`/dashboard/${dashboardToken}`, request.url));
+      // Редиректим на /dashboard, компонент сам определит правильный токен
+      return NextResponse.redirect(new URL('/dashboard', request.url));
     }
     return NextResponse.next();
   }
   
   // Dashboard Middleware
   if (pathname.startsWith('/dashboard')) {
-    if (!isAuthenticated || !dashboardToken) {
+    if (!isAuthenticated) {
       const retpatch = encodeURIComponent(pathname);
       return NextResponse.redirect(new URL(`/auth?retpatch=${retpatch}`, request.url));
     }
     
-    if (pathname === '/dashboard' || pathname === '/dashboard/') {
-      return NextResponse.redirect(new URL(`/dashboard/${dashboardToken}`, request.url));
-    }
-    
-    const urlToken = pathname.split('/dashboard/')[1];
-    if (urlToken && urlToken !== dashboardToken) {
-      // Если токен в URL не совпадает с токеном пользователя, редиректим на правильный dashboard
-      return NextResponse.redirect(new URL(`/dashboard/${dashboardToken}`, request.url));
-    }
-    
+    // Проверка правильности dashboard_token будет в компоненте через API
+    // Здесь просто проверяем наличие авторизации
     return NextResponse.next();
   }
 
   // Support Middleware
   if (pathname === '/support' || pathname.startsWith('/support/')) {
-    if (!isAuthenticated || !dashboardToken) {
-      return NextResponse.next();
-    }
+    // Support доступен всем, но авторизованные пользователи видят больше
     return NextResponse.next();
   }
 
   if (pathname.startsWith('/ui/panel/support')) {
-    if (!isAuthenticated || !dashboardToken) {
+    if (!isAuthenticated) {
       const retpatch = encodeURIComponent(pathname);
       return NextResponse.redirect(new URL(`/auth?retpatch=${retpatch}`, request.url));
     }
@@ -104,7 +139,7 @@ function handleAuth(request: NextRequest, pathname: string): NextResponse | null
   return null;
 }
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const userAgent = request.headers.get('user-agent') || '';
   
@@ -119,7 +154,7 @@ export function middleware(request: NextRequest) {
   }
   
   // 3. Auth Middleware
-  const authResponse = handleAuth(request, pathname);
+  const authResponse = await handleAuth(request, pathname);
   if (authResponse) {
     return authResponse;
   }

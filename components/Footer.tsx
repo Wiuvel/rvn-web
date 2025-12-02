@@ -85,7 +85,7 @@ export default function Footer() {
           <div className="md:col-span-2">
             <div className="text-neutral-300 font-medium text-base mb-3 md:mb-4">ПОМОЩЬ</div>
             <ul className="space-y-2 md:space-y-3">
-              <li><Link href="/support/" className="hover:text-neutral-200 transition-colors duration-200 block py-1">Служба поддержки</Link></li>
+              <li><Link href="/support/" prefetch={false} className="hover:text-neutral-200 transition-colors duration-200 block py-1">Служба поддержки</Link></li>
               <li><Link href="#" className="hover:text-neutral-200 transition-colors duration-200 block py-1">Информация о сайте</Link></li>
               <li><Link href="#" className="hover:text-neutral-200 transition-colors duration-200 block py-1">Инструкции по настройке</Link></li>
             </ul>

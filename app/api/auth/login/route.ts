@@ -6,6 +6,8 @@ import { ServerValidator } from '@/lib/server-validation';
 import { logger } from '@/lib/secure-logger';
 import { setCorsHeaders, handleCorsPreflight } from '@/lib/cors';
 import { SessionManager } from '@/lib/session-manager';
+import { generateAccessToken, generateRefreshToken } from '@/lib/jwt';
+import { storeRefreshToken } from '@/lib/jwt-storage';
 
 export async function OPTIONS() {
   return handleCorsPreflight();
@@ -155,33 +157,57 @@ export async function POST(request: NextRequest) {
       ip: ipAddress
     });
 
+    // Generate JWT tokens
+    const accessToken = await generateAccessToken({
+      userId: result.user!.id,
+      username: result.user!.username,
+      user_id: result.user!.user_id,
+    });
+
+    const refreshToken = await generateRefreshToken({
+      userId: result.user!.id,
+      tokenVersion: 1, // Можно использовать для инвалидации токенов
+    });
+
+    // Сохраняем refresh token в БД
+    const storeResult = await storeRefreshToken(
+      result.user!.id,
+      refreshToken,
+      {
+        ipAddress,
+        userAgent
+      }
+    );
+
+    if (!storeResult.success) {
+      logger.warn('Failed to store refresh token in DB', {
+        userId: result.user!.id,
+        error: storeResult.error
+      });
+      // Продолжаем, даже если не удалось сохранить в БД
+    }
+
     // Set authentication cookies
     const response = NextResponse.json(
       { 
         message: 'Login successful',
-        dashboard_token: result.user!.dashboard_token
+        dashboard_token: result.user!.dashboard_token,
+        access_token: accessToken, // Также возвращаем в body для клиента
       },
       { status: 200 }
     );
 
-    response.cookies.set('user_authenticated', 'true', {
-      maxAge: 60 * 60 * 24 * 7,
+    // JWT токены в cookies (httpOnly для безопасности)
+    response.cookies.set('access_token', accessToken, {
+      maxAge: 10 * 60, // 10 минут
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production' && !isLocalhost,
       sameSite: 'strict',
       path: '/'
     });
 
-    response.cookies.set('user_id', result.user!.id, {
-      maxAge: 60 * 60 * 24 * 7,
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production' && !isLocalhost,
-      sameSite: 'strict',
-      path: '/'
-    });
-
-    response.cookies.set('dashboard_token', result.user!.dashboard_token, {
-      maxAge: 60 * 60 * 24 * 7,
+    response.cookies.set('refresh_token', refreshToken, {
+      maxAge: 60 * 60 * 24 * 60, // 60 дней
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production' && !isLocalhost,
       sameSite: 'strict',

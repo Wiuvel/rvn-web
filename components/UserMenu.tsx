@@ -110,6 +110,7 @@ export function UserMenu({
           </Link>
           <Link
             href="/support"
+            prefetch={false}
             onClick={onClose}
             className="flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-xl text-white/80 hover:text-white hover:bg-white/5 transition-colors duration-200"
           >

@@ -68,6 +68,30 @@ export const appConfig = {
   scrollTrigger: {
     start: 'top 85%',
     end: 'bottom 15%'
+  },
+
+  // JWT Configuration
+  jwt: {
+    // Access Token - короткоживущий токен для авторизации запросов
+    accessToken: {
+      expiresIn: '10m', // 10 минут (можно настроить 10-15 минут)
+      algorithm: 'HS256' as const
+    },
+    // Refresh Token - долгоживущий токен для обновления access token
+    refreshToken: {
+      expiresIn: '60d', // 60 дней (можно настроить 30-60 дней)
+      algorithm: 'HS256' as const
+    },
+    // Секретный ключ для подписи токенов (должен быть в .env)
+    secret: process.env.JWT_SECRET || process.env.NEXT_PUBLIC_JWT_SECRET || 'change-me-in-production',
+    // Дополнительные опции
+    issuer: 'rvn.market',
+    audience: 'rvn.market',
+    // Настройки для хранения refresh токенов в БД
+    refreshTokenStorage: {
+      cleanupInterval: 24 * 60 * 60 * 1000, // 24 часа - интервал очистки истекших токенов
+      maxTokensPerUser: 5 // Максимальное количество активных refresh токенов на пользователя
+    }
   }
 } as const;
 
