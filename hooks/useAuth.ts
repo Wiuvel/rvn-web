@@ -131,6 +131,10 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
             }
 
             setUserData(data);
+            // Триггерим событие успешной авторизации для useTokenRefresh
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new CustomEvent('authSuccess'));
+            }
             if (onSuccess) {
               onSuccess(data);
             }
