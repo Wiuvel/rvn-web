@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyRefreshAuth } from '@/lib/auth/verify';
 import { generateAccessToken, generateRefreshToken } from '@/lib/auth/jwt';
 import { storeRefreshToken, revokeTokenByJti } from '@/lib/auth/tokens';
-import { setTokenCookies, extractTokensFromRequest } from '@/lib/auth/cookies';
+import { setTokenCookies, clearTokenCookies, extractTokensFromRequest } from '@/lib/auth/cookies';
 import { getActiveUserById, toPublicUser } from '@/lib/auth/users';
 import { refreshRateLimit } from '@/lib/rate-limit';
 import { setCorsHeaders, handleCorsPreflight } from '@/lib/cors';
@@ -44,9 +44,16 @@ export async function POST(request: NextRequest) {
           ip: request.headers.get('x-forwarded-for'),
         });
       }
-      return setCorsHeaders(
-        NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+      
+      // Clear cookies if refresh token is invalid/revoked
+      const hostname = request.nextUrl.hostname;
+      const errorResponse = NextResponse.json(
+        { error: 'Not authenticated' },
+        { status: 401 }
       );
+      clearTokenCookies(errorResponse, hostname);
+      
+      return setCorsHeaders(errorResponse);
     }
 
     const { userId, tokenVersion, jti: oldJti } = authResult;
@@ -56,9 +63,15 @@ export async function POST(request: NextRequest) {
     // Get user data
     const user = await getActiveUserById(userId);
     if (!user) {
-      return setCorsHeaders(
-        NextResponse.json({ error: 'User not found' }, { status: 401 })
+      // Clear cookies if user not found
+      const hostname = request.nextUrl.hostname;
+      const errorResponse = NextResponse.json(
+        { error: 'User not found' },
+        { status: 401 }
       );
+      clearTokenCookies(errorResponse, hostname);
+      
+      return setCorsHeaders(errorResponse);
     }
 
     // Generate new tokens

@@ -193,6 +193,15 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
         return true;
       }
 
+      // If refresh failed (401), cookies are cleared by server
+      // Clear user data and redirect if needed
+      if (response.status === 401) {
+        setUserData(null);
+        if (requireAuth && redirectOnFail) {
+          router.push(redirectOnFail);
+        }
+      }
+
       return false;
     } catch {
       return false;
