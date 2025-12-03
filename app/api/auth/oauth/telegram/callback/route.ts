@@ -168,14 +168,25 @@ export async function POST(request: NextRequest) {
     });
 
     if (!user) {
-      // Create username from Telegram username or ID
-      const telegramUsername = username || `telegram_${id}`;
+      // For Telegram, we need to use the exact username that matches the email
+      // Email format: telegram_{id}@telegram.local
+      // Username should be: telegram_{id} to match getUserByEmail logic
+      // But we can also use Telegram username if available (sanitized)
+      const telegramUsernameFromEmail = `telegram_${id}`;
+      const telegramUsername = username || telegramUsernameFromEmail;
       // Ensure username is valid (only alphanumeric and underscore)
-      const sanitizedUsername = telegramUsername.replace(/[^a-zA-Z0-9_]/g, '_').substring(0, 30);
+      let sanitizedUsername = telegramUsername.replace(/[^a-zA-Z0-9_]/g, '_').substring(0, 30);
+      
+      // If sanitized username is different from email-based username, prefer email-based
+      // This ensures getUserByEmail can find the user later
+      if (sanitizedUsername !== telegramUsernameFromEmail && !username) {
+        sanitizedUsername = telegramUsernameFromEmail;
+      }
       
       logger.info('CREATING NEW USER FROM TELEGRAM OAUTH', {
         telegramEmail: telegramEmail.substring(0, 10) + '***',
         sanitizedUsername,
+        telegramUsernameFromEmail,
         telegramId: id,
         ip: request.headers.get('x-forwarded-for'),
       });

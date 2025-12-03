@@ -149,7 +149,7 @@ function OAuthHandlerContent() {
         router.push('/auth?error=unknown_provider');
       }
     }
-  }, [provider, router]);
+  }, [searchParams, router, provider]);
 
   // Handle Telegram callback (when returning from Telegram OAuth)
   useEffect(() => {

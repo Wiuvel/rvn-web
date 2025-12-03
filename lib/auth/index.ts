@@ -378,28 +378,56 @@ export async function getUserByToken(dashboardToken: string): Promise<User | nul
 }
 
 // Get user by email (for OAuth)
+// Note: Since we don't have an email field in the database, we use email as a unique identifier
+// by extracting the username part and matching it. For Telegram: telegram_{id}@telegram.local -> telegram_{id}
+// For Google: user@gmail.com -> user
 export async function getUserByEmail(email: string): Promise<User | null> {
   try {
     if (!supabaseAdmin) {
+      logger.warn('SUPABASEADMIN IS NULL IN getUserByEmail');
       return null;
     }
 
     // Extract username from email (before @)
     const username = email.split('@')[0];
     
+    logger.info('SEARCHING USER BY EMAIL', {
+      email: email.substring(0, 3) + '***',
+      extractedUsername: username
+    });
+    
     const { data: users, error } = await supabaseAdmin
       .from('users')
       .select('*')
       .ilike('username', username);
 
-    if (error || !users || users.length === 0) {
+    if (error) {
+      logger.error('ERROR FETCHING USER BY EMAIL', {
+        error: error.message,
+        code: error.code,
+        email: email.substring(0, 3) + '***',
+        extractedUsername: username
+      });
+      return null;
+    }
+
+    if (!users || users.length === 0) {
+      logger.info('NO USER FOUND BY EMAIL', {
+        email: email.substring(0, 3) + '***',
+        extractedUsername: username
+      });
       return null;
     }
 
     // Return first match (should be unique)
+    logger.info('USER FOUND BY EMAIL', {
+      email: email.substring(0, 3) + '***',
+      userId: users[0].id,
+      username: users[0].username
+    });
     return users[0] as User;
   } catch (error) {
-    logger.error('ERROR FETCHING USER BY EMAIL', {
+    logger.error('EXCEPTION IN getUserByEmail', {
       error: error instanceof Error ? error.message : 'Unknown error',
       email: email.substring(0, 3) + '***'
     });
@@ -416,11 +444,25 @@ export async function createUserFromOAuth(email: string, preferredUsername?: str
     }
 
     // First check if user exists by email (for OAuth, email is the primary identifier)
+    logger.info('CHECKING EXISTING USER BY EMAIL', {
+      email: email.substring(0, 3) + '***',
+      preferredUsername: preferredUsername || 'none'
+    });
+    
     const existingUserByEmail = await getUserByEmail(email);
     if (existingUserByEmail) {
       // User already exists, return it
+      logger.info('EXISTING USER FOUND BY EMAIL', {
+        email: email.substring(0, 3) + '***',
+        userId: existingUserByEmail.id,
+        username: existingUserByEmail.username
+      });
       return { success: true, user: existingUserByEmail };
     }
+    
+    logger.info('NO EXISTING USER FOUND, PROCEEDING WITH CREATION', {
+      email: email.substring(0, 3) + '***'
+    });
 
     // Use preferred username or extract from email
     let username = preferredUsername || email.split('@')[0];
@@ -509,6 +551,13 @@ export async function createUserFromOAuth(email: string, preferredUsername?: str
     // OAuth users don't need password - set password_hash to null
     // This distinguishes OAuth users from password-based users
 
+    logger.info('ATTEMPTING TO CREATE OAUTH USER', {
+      email: email.substring(0, 3) + '***',
+      username: username,
+      userId: userId,
+      dashboardToken: dashboardToken.substring(0, 3) + '***'
+    });
+
     const { data: newUser, error: insertError } = await supabaseAdmin
       .from('users')
       .insert({
@@ -530,10 +579,26 @@ export async function createUserFromOAuth(email: string, preferredUsername?: str
         hint: insertError.hint,
         email: email.substring(0, 3) + '***',
         username: username,
-        userId: userId
+        userId: userId,
+        dashboardToken: dashboardToken.substring(0, 3) + '***'
       });
       return { success: false, error: `Failed to create account: ${insertError.message}` };
     }
+
+    if (!newUser) {
+      logger.error('USER CREATION RETURNED NULL', {
+        email: email.substring(0, 3) + '***',
+        username: username,
+        userId: userId
+      });
+      return { success: false, error: 'User creation returned null' };
+    }
+
+    logger.info('OAUTH USER CREATED SUCCESSFULLY', {
+      userId: newUser.id,
+      username: newUser.username,
+      email: email.substring(0, 3) + '***'
+    });
 
     return { success: true, user: newUser as User };
   } catch (error) {
@@ -543,3 +608,4 @@ export async function createUserFromOAuth(email: string, preferredUsername?: str
     return { success: false, error: 'Unexpected error' };
   }
 }
+
