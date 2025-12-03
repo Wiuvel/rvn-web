@@ -18,7 +18,10 @@ function OAuthHandlerContent() {
 
   useEffect(() => {
     // Check if we're in a popup window
-    const isPopup = window.opener !== null;
+    // Check both window.opener and URL parameter (for cases where redirect loses opener reference)
+    const isPopupFromUrl = searchParams.get('popup') === 'true';
+    const isPopupFromOpener = window.opener !== null;
+    const isPopup = isPopupFromUrl || isPopupFromOpener;
 
     // Handle success callback from OAuth provider
     const success = searchParams.get('success');
@@ -28,28 +31,47 @@ function OAuthHandlerContent() {
       setStatus('processing');
       // OAuth was successful - send message to parent and close
       // Always check if we're in a popup first - if so, never redirect, just send message
-      if (isPopup && window.opener) {
-        window.opener.postMessage(
-          {
-            type: 'OAUTH_SUCCESS',
-            dashboard_token: dashboardToken,
-            redirect: `/dashboard/${dashboardToken}`
-          },
-          window.location.origin
-        );
+      if (isPopup) {
+        // Send message to parent window
+        // Try multiple times in case opener is temporarily unavailable after redirect
+        const sendMessage = () => {
+          if (window.opener) {
+            try {
+              window.opener.postMessage(
+                {
+                  type: 'OAUTH_SUCCESS',
+                  dashboard_token: dashboardToken,
+                  redirect: `/dashboard/${dashboardToken}`
+                },
+                window.location.origin
+              );
+              return true;
+            } catch (error) {
+              console.error('Failed to send message to parent:', error);
+              return false;
+            }
+          }
+          return false;
+        };
+        
+        // Try immediately
+        if (!sendMessage()) {
+          // If failed, try again after a short delay
+          setTimeout(() => {
+            sendMessage();
+          }, 50);
+        }
+        
+        // Close popup after ensuring message is sent
         setTimeout(() => {
           window.close();
-        }, 100);
+        }, 150);
         return;
-      } else if (!isPopup) {
+      } else {
         // Not in popup - redirect normally
         window.location.href = `/dashboard/${dashboardToken}`;
         return;
       }
-      // If we're here, isPopup is true but window.opener is null
-      // This shouldn't happen, but fallback to redirect
-      window.location.href = `/dashboard/${dashboardToken}`;
-      return;
     }
 
     // Handle error callback
@@ -71,13 +93,17 @@ function OAuthHandlerContent() {
       };
       
       if (isPopup) {
-        window.opener?.postMessage(
-          {
-            type: 'OAUTH_ERROR',
-            error: errorMessages[error] || 'Ошибка авторизации'
-          },
-          window.location.origin
-        );
+        // Try to send message to parent window
+        if (window.opener) {
+          window.opener.postMessage(
+            {
+              type: 'OAUTH_ERROR',
+              error: errorMessages[error] || 'Ошибка авторизации'
+            },
+            window.location.origin
+          );
+        }
+        // Close popup (even if opener is null, we still want to close)
         setTimeout(() => {
           window.close();
         }, 100);
