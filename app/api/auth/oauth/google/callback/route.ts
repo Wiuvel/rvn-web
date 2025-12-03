@@ -285,11 +285,12 @@ export async function GET(request: NextRequest) {
 
     if (accessGranted && accessHash) {
       // Preserve existing protection cookies
+      // Use sameSite: 'lax' to ensure cookies work in cross-site OAuth scenarios
       response.cookies.set('access_granted', accessGranted, {
         maxAge: 60 * 60 * 2, // 2 hours
         httpOnly: false, // Must match client-side setting
         secure: process.env.NODE_ENV === 'production' && !isLocalhost,
-        sameSite: 'strict',
+        sameSite: 'lax', // Changed from 'strict' to 'lax' for OAuth redirects
         path: '/',
         ...(cookieDomain && { domain: cookieDomain })
       });
@@ -298,7 +299,7 @@ export async function GET(request: NextRequest) {
         maxAge: 60 * 60 * 2, // 2 hours
         httpOnly: false, // Must match client-side setting
         secure: process.env.NODE_ENV === 'production' && !isLocalhost,
-        sameSite: 'strict',
+        sameSite: 'lax', // Changed from 'strict' to 'lax' for OAuth redirects
         path: '/',
         ...(cookieDomain && { domain: cookieDomain })
       });
@@ -308,7 +309,7 @@ export async function GET(request: NextRequest) {
           maxAge: 60 * 60 * 2, // 2 hours
           httpOnly: false, // Must match client-side setting
           secure: process.env.NODE_ENV === 'production' && !isLocalhost,
-          sameSite: 'strict',
+          sameSite: 'lax', // Changed from 'strict' to 'lax' for OAuth redirects
           path: '/',
           ...(cookieDomain && { domain: cookieDomain })
         });

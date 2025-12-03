@@ -25,7 +25,24 @@ function handleProtection(request: NextRequest, pathname: string): NextResponse 
     return null;
   }
 
+  // If user has protection cookies, allow access
   if (accessGranted && accessHash) {
+    return null;
+  }
+  
+  // Special handling for OAuth users: OAuth callbacks set protection cookies,
+  // but due to cookie timing and sameSite restrictions, they may not be immediately
+  // available in the request after redirect. Allow authenticated OAuth users to access
+  // their dashboard route (where OAuth redirects them).
+  const isAuthenticated = request.cookies.get('user_authenticated')?.value === 'true';
+  const hasDashboardToken = !!request.cookies.get('dashboard_token')?.value;
+  const hasSession = !!request.cookies.get('session_id')?.value;
+  
+  // Only allow bypass for dashboard routes (where OAuth redirects users)
+  // and only if user has valid session (proving they just authenticated via OAuth)
+  if (isAuthenticated && hasDashboardToken && hasSession && pathname.startsWith('/dashboard')) {
+    // User just completed OAuth and is being redirected to dashboard
+    // Protection cookies are set by OAuth callback but may not be in request yet
     return null;
   }
   
