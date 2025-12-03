@@ -10,14 +10,6 @@ const envSchema = z.object({
   SUPABASE_ANON_KEY: z.string().min(20, 'SUPABASE_ANON_KEY must be at least 20 characters'),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(20, 'SUPABASE_SERVICE_ROLE_KEY must be at least 20 characters'),
   
-  // JWT
-  JWT_SECRET: z.string()
-    .min(32, 'JWT_SECRET must be at least 32 characters')
-    .refine(
-      (val) => val !== 'change-me-in-production',
-      { message: 'JWT_SECRET must be changed from default value' }
-    ),
-  
   // CSRF
   CSRF_SECRET: z.string()
     .min(32, 'CSRF_SECRET must be at least 32 characters')
@@ -63,7 +55,6 @@ export function validateEnv(): Env {
       SUPABASE_URL: supabaseUrl,
       SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
       SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
-      JWT_SECRET: process.env.JWT_SECRET,
       CSRF_SECRET: process.env.CSRF_SECRET,
       TURNSTILE_SECRET_KEY: process.env.TURNSTILE_SECRET_KEY,
       ALLOWED_ORIGINS: process.env.ALLOWED_ORIGINS,

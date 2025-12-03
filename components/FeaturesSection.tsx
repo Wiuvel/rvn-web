@@ -1,6 +1,6 @@
 'use client';
 
-import { useRotateIn, useStaggeredFadeIn } from '@/hooks/useGSAP';
+import { useStaggeredFadeIn } from '@/hooks/useGSAP';
 
 export default function FeaturesSection() {
   const cardsRef = useStaggeredFadeIn(0.2, 0.05);
