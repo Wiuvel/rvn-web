@@ -32,9 +32,21 @@ export async function GET(request: NextRequest) {
     // Get state early to determine if this is a popup request
     const { searchParams } = request.nextUrl;
     const state = searchParams.get('state');
+    // Check stored state cookie to determine if this is a popup request
+    // This is more reliable than checking the state parameter from URL
+    const storedState = request.cookies.get('oauth_state')?.value;
+    const referer = request.headers.get('referer') || '';
     let isPopup = false;
-    if (state) {
-      isPopup = state.includes(':popup');
+    if (storedState) {
+      isPopup = storedState.includes(':popup');
+    }
+    // Fallback: check referer if cookie check didn't work
+    if (!isPopup && referer.includes('/auth/oauth-handler')) {
+      isPopup = true;
+    }
+    // Additional fallback: check if state parameter contains popup flag
+    if (!isPopup && state && state.includes(':popup')) {
+      isPopup = true;
     }
 
     // Rate limiting
@@ -79,9 +91,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Verify CSRF state token
-    const storedState = request.cookies.get('oauth_state')?.value;
-    // Check if state includes popup flag
-    isPopup = state.includes(':popup');
+    // storedState already retrieved above for isPopup determination
     const cleanState = isPopup ? state.split(':')[0] : state;
     const cleanStoredState = storedState?.includes(':popup') ? storedState.split(':')[0] : storedState;
     

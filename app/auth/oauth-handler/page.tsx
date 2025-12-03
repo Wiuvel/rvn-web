@@ -27,8 +27,9 @@ function OAuthHandlerContent() {
     if (success && dashboardToken) {
       setStatus('processing');
       // OAuth was successful - send message to parent and close
-      if (isPopup) {
-        window.opener?.postMessage(
+      // Always check if we're in a popup first - if so, never redirect, just send message
+      if (isPopup && window.opener) {
+        window.opener.postMessage(
           {
             type: 'OAUTH_SUCCESS',
             dashboard_token: dashboardToken,
@@ -39,10 +40,15 @@ function OAuthHandlerContent() {
         setTimeout(() => {
           window.close();
         }, 100);
-      } else {
+        return;
+      } else if (!isPopup) {
         // Not in popup - redirect normally
         window.location.href = `/dashboard/${dashboardToken}`;
+        return;
       }
+      // If we're here, isPopup is true but window.opener is null
+      // This shouldn't happen, but fallback to redirect
+      window.location.href = `/dashboard/${dashboardToken}`;
       return;
     }
 
@@ -184,13 +190,18 @@ function OAuthHandlerContent() {
         // Decode and parse Telegram data
         const decodedData = JSON.parse(atob(tgAuthResult));
         
+        // Validate required fields
+        if (!decodedData.id || !decodedData.hash || !decodedData.auth_date) {
+          throw new Error('Missing required Telegram auth fields');
+        }
+        
         const telegramData: Record<string, string> = {
-          id: decodedData.id?.toString(),
+          id: decodedData.id.toString(),
           first_name: decodedData.first_name || '',
           last_name: decodedData.last_name || '',
           username: decodedData.username || '',
           photo_url: decodedData.photo_url || '',
-          auth_date: decodedData.auth_date?.toString(),
+          auth_date: decodedData.auth_date.toString(),
           hash: decodedData.hash,
         };
         
@@ -208,11 +219,13 @@ function OAuthHandlerContent() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(telegramData),
         })
-        .then(response => {
+        .then(async response => {
+          const data = await response.json();
           if (response.ok) {
-            return response.json();
+            return data;
           } else {
-            return response.json().then(err => Promise.reject(err));
+            // Server returned error
+            return Promise.reject(data);
           }
         })
         .then((result: TelegramOAuthResult) => {
@@ -220,9 +233,17 @@ function OAuthHandlerContent() {
           return new Promise<TelegramOAuthResult>(resolve => setTimeout(() => resolve(result), 100));
         })
         .then((result: TelegramOAuthResult) => {
-          if (isPopup) {
+          // Validate result
+          if (!result) {
+            throw new Error('Empty response from server');
+          }
+          if (!result.dashboard_token && !result.redirect) {
+            throw new Error('Missing dashboard_token and redirect in response');
+          }
+
+          if (isPopup && window.opener) {
             // Send success to parent window
-            window.opener?.postMessage(
+            window.opener.postMessage(
               {
                 type: 'OAUTH_SUCCESS',
                 dashboard_token: result.dashboard_token,
@@ -234,8 +255,15 @@ function OAuthHandlerContent() {
             setTimeout(() => {
               window.close();
             }, 100);
-          } else {
+          } else if (!isPopup) {
             // Not in popup - redirect normally
+            if (result.redirect) {
+              window.location.href = result.redirect;
+            } else if (result.dashboard_token) {
+              window.location.href = `/dashboard/${result.dashboard_token}`;
+            }
+          } else {
+            // isPopup is true but window.opener is null - fallback to redirect
             if (result.redirect) {
               window.location.href = result.redirect;
             } else if (result.dashboard_token) {
@@ -243,14 +271,17 @@ function OAuthHandlerContent() {
             }
           }
         })
-        .catch((error: { error?: string }) => {
+        .catch((error: { error?: string; message?: string }) => {
           console.error('Telegram OAuth callback error:', error);
           const errorMessage = error.error === 'user_creation_failed' ? 'Не удалось создать аккаунт' :
                                error.error === 'account_disabled' ? 'Аккаунт отключен' :
-                               'Ошибка авторизации';
+                               error.error === 'rate_limit' ? 'Превышен лимит запросов' :
+                               error.error === 'invalid_state' ? 'Ошибка безопасности' :
+                               error.error === 'oauth_not_configured' ? 'OAuth не настроен' :
+                               error.message || 'Ошибка авторизации';
           
-          if (isPopup) {
-            window.opener?.postMessage(
+          if (isPopup && window.opener) {
+            window.opener.postMessage(
               {
                 type: 'OAUTH_ERROR',
                 error: errorMessage
@@ -260,37 +291,53 @@ function OAuthHandlerContent() {
             setTimeout(() => {
               window.close();
             }, 100);
+          } else if (!isPopup) {
+            router.push(`/auth?error=${encodeURIComponent(error.error || 'telegram_auth_failed')}`);
           } else {
+            // isPopup is true but window.opener is null - fallback to error page
             router.push(`/auth?error=${encodeURIComponent(error.error || 'telegram_auth_failed')}`);
           }
         });
       } catch (error) {
         console.error('Telegram OAuth processing error:', error);
-        if (isPopup) {
-          window.opener?.postMessage(
+        const errorMessage = error instanceof Error ? error.message : 'Ошибка обработки данных Telegram';
+        if (isPopup && window.opener) {
+          window.opener.postMessage(
             {
               type: 'OAUTH_ERROR',
-              error: 'Ошибка обработки данных Telegram'
+              error: errorMessage === 'Missing required Telegram auth fields' 
+                ? 'Неполные данные авторизации Telegram'
+                : 'Ошибка обработки данных Telegram'
             },
             window.location.origin
           );
-          window.close();
+          setTimeout(() => {
+            window.close();
+          }, 100);
+        } else if (!isPopup) {
+          router.push('/auth?error=telegram_processing_failed');
         } else {
+          // isPopup is true but window.opener is null - fallback to error page
           router.push('/auth?error=telegram_processing_failed');
         }
       }
     } else {
       // No Telegram auth result
-      if (isPopup) {
-        window.opener?.postMessage(
+      if (isPopup && window.opener) {
+        window.opener.postMessage(
           {
             type: 'OAUTH_ERROR',
             error: 'Данные авторизации не получены'
           },
           window.location.origin
         );
-        window.close();
+        setTimeout(() => {
+          window.close();
+        }, 100);
+      } else if (!isPopup) {
+        router.push('/auth?error=telegram_no_data');
       } else {
+        // isPopup is true but window.opener is null - fallback to error page
         router.push('/auth?error=telegram_no_data');
       }
     }
