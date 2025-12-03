@@ -160,13 +160,37 @@ export async function POST(request: NextRequest) {
     let user = await getUserByEmail(telegramEmail);
     let isNewUser = false;
 
+    logger.info('TELEGRAM OAUTH USER LOOKUP', {
+      telegramEmail: telegramEmail.substring(0, 10) + '***',
+      userFound: !!user,
+      telegramId: id,
+      ip: request.headers.get('x-forwarded-for'),
+    });
+
     if (!user) {
       // Create username from Telegram username or ID
       const telegramUsername = username || `telegram_${id}`;
       // Ensure username is valid (only alphanumeric and underscore)
       const sanitizedUsername = telegramUsername.replace(/[^a-zA-Z0-9_]/g, '_').substring(0, 30);
       
+      logger.info('CREATING NEW USER FROM TELEGRAM OAUTH', {
+        telegramEmail: telegramEmail.substring(0, 10) + '***',
+        sanitizedUsername,
+        telegramId: id,
+        ip: request.headers.get('x-forwarded-for'),
+      });
+      
       const createResult = await createUserFromOAuth(telegramEmail, sanitizedUsername);
+      
+      logger.info('TELEGRAM OAUTH USER CREATION RESULT', {
+        success: createResult.success,
+        error: createResult.error,
+        hasUser: !!createResult.user,
+        telegramEmail: telegramEmail.substring(0, 10) + '***',
+        telegramId: id,
+        ip: request.headers.get('x-forwarded-for'),
+      });
+      
       if (!createResult.success || !createResult.user) {
         logger.error('FAILED TO CREATE USER FROM TELEGRAM OAUTH', {
           error: createResult.error,
@@ -279,11 +303,12 @@ export async function POST(request: NextRequest) {
         .update(`${user.id}-${Date.now()}-oauth-temp`)
         .digest('hex');
       
+      // Set cookies with sameSite: 'lax' to ensure they're sent on redirect
       response.cookies.set('access_granted', 'true', {
         maxAge: 60 * 60 * 2,
         httpOnly: false,
         secure: process.env.NODE_ENV === 'production' && !isLocalhost,
-        sameSite: 'strict',
+        sameSite: 'lax', // Changed from 'strict' to 'lax' for OAuth redirects
         path: '/',
         ...(cookieDomain && { domain: cookieDomain })
       });
@@ -292,7 +317,7 @@ export async function POST(request: NextRequest) {
         maxAge: 60 * 60 * 2,
         httpOnly: false,
         secure: process.env.NODE_ENV === 'production' && !isLocalhost,
-        sameSite: 'strict',
+        sameSite: 'lax', // Changed from 'strict' to 'lax' for OAuth redirects
         path: '/',
         ...(cookieDomain && { domain: cookieDomain })
       });
@@ -301,7 +326,7 @@ export async function POST(request: NextRequest) {
         maxAge: 60 * 60 * 2,
         httpOnly: false,
         secure: process.env.NODE_ENV === 'production' && !isLocalhost,
-        sameSite: 'strict',
+        sameSite: 'lax', // Changed from 'strict' to 'lax' for OAuth redirects
         path: '/',
         ...(cookieDomain && { domain: cookieDomain })
       });

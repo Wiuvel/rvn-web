@@ -192,8 +192,28 @@ export async function GET(request: NextRequest) {
     let user = await getUserByEmail(email);
     let isNewUser = false;
 
+    logger.info('GOOGLE OAUTH USER LOOKUP', {
+      email: email.substring(0, 3) + '***',
+      userFound: !!user,
+      ip: request.headers.get('x-forwarded-for'),
+    });
+
     if (!user) {
+      logger.info('CREATING NEW USER FROM GOOGLE OAUTH', {
+        email: email.substring(0, 3) + '***',
+        ip: request.headers.get('x-forwarded-for'),
+      });
+      
       const createResult = await createUserFromOAuth(email);
+      
+      logger.info('GOOGLE OAUTH USER CREATION RESULT', {
+        success: createResult.success,
+        error: createResult.error,
+        hasUser: !!createResult.user,
+        email: email.substring(0, 3) + '***',
+        ip: request.headers.get('x-forwarded-for'),
+      });
+      
       if (!createResult.success || !createResult.user) {
         logger.error('FAILED TO CREATE USER FROM OAUTH', {
           error: createResult.error,
@@ -302,11 +322,12 @@ export async function GET(request: NextRequest) {
         .update(`${user.id}-${Date.now()}-oauth-temp`)
         .digest('hex');
       
+      // Set cookies with sameSite: 'lax' to ensure they're sent on redirect
       response.cookies.set('access_granted', 'true', {
         maxAge: 60 * 60 * 2, // 2 hours
         httpOnly: false,
         secure: process.env.NODE_ENV === 'production' && !isLocalhost,
-        sameSite: 'strict',
+        sameSite: 'lax', // Changed from 'strict' to 'lax' for OAuth redirects
         path: '/',
         ...(cookieDomain && { domain: cookieDomain })
       });
@@ -315,7 +336,7 @@ export async function GET(request: NextRequest) {
         maxAge: 60 * 60 * 2, // 2 hours
         httpOnly: false,
         secure: process.env.NODE_ENV === 'production' && !isLocalhost,
-        sameSite: 'strict',
+        sameSite: 'lax', // Changed from 'strict' to 'lax' for OAuth redirects
         path: '/',
         ...(cookieDomain && { domain: cookieDomain })
       });
@@ -324,7 +345,7 @@ export async function GET(request: NextRequest) {
         maxAge: 60 * 60 * 2, // 2 hours
         httpOnly: false,
         secure: process.env.NODE_ENV === 'production' && !isLocalhost,
-        sameSite: 'strict',
+        sameSite: 'lax', // Changed from 'strict' to 'lax' for OAuth redirects
         path: '/',
         ...(cookieDomain && { domain: cookieDomain })
       });

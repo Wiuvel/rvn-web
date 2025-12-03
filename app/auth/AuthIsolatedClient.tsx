@@ -74,10 +74,15 @@ export default function AuthIsolatedClient() {
             
             if (response.ok) {
               const result = await response.json();
+              // Wait a bit to ensure cookies are set
+              await new Promise(resolve => setTimeout(resolve, 100));
+              
               if (result.redirect) {
                 window.location.href = result.redirect;
               } else if (result.dashboard_token) {
                 window.location.href = `/dashboard/${result.dashboard_token}`;
+              } else {
+                window.location.href = '/auth?error=telegram_auth_failed';
               }
             } else {
               const errorData = await response.json();
