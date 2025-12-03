@@ -267,11 +267,14 @@ export async function POST(request: NextRequest) {
 
     if (accessGranted && accessHash) {
       // Preserve existing protection cookies
+      // Use sameSite: 'lax' to ensure cookies work in cross-site OAuth scenarios
+      // Note: These cookies likely won't exist in cross-site OAuth callbacks due to sameSite restrictions,
+      // but if they do (e.g., from same-site navigation), preserve them with lax policy
       response.cookies.set('access_granted', accessGranted, {
         maxAge: 60 * 60 * 2,
         httpOnly: false,
         secure: process.env.NODE_ENV === 'production' && !isLocalhost,
-        sameSite: 'strict',
+        sameSite: 'lax', // Changed from 'strict' to 'lax' for OAuth redirects
         path: '/',
         ...(cookieDomain && { domain: cookieDomain })
       });
@@ -280,7 +283,7 @@ export async function POST(request: NextRequest) {
         maxAge: 60 * 60 * 2,
         httpOnly: false,
         secure: process.env.NODE_ENV === 'production' && !isLocalhost,
-        sameSite: 'strict',
+        sameSite: 'lax', // Changed from 'strict' to 'lax' for OAuth redirects
         path: '/',
         ...(cookieDomain && { domain: cookieDomain })
       });
@@ -290,7 +293,7 @@ export async function POST(request: NextRequest) {
           maxAge: 60 * 60 * 2,
           httpOnly: false,
           secure: process.env.NODE_ENV === 'production' && !isLocalhost,
-          sameSite: 'strict',
+          sameSite: 'lax', // Changed from 'strict' to 'lax' for OAuth redirects
           path: '/',
           ...(cookieDomain && { domain: cookieDomain })
         });
