@@ -10,6 +10,65 @@ interface TelegramOAuthResult {
   error?: string;
 }
 
+// Helper function to check if we're in a popup
+function isPopupWindow(): boolean {
+  // Check sessionStorage first (most reliable after redirects)
+  if (sessionStorage.getItem('oauth_popup') === 'true') {
+    return true;
+  }
+  // Check window.opener
+  if (window.opener !== null) {
+    return true;
+  }
+  // Check URL parameter
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get('popup') === 'true') {
+    return true;
+  }
+  return false;
+}
+
+// Helper function to send message to parent and close popup
+function sendMessageAndClose(
+  type: 'OAUTH_SUCCESS' | 'OAUTH_ERROR', 
+  data: { dashboard_token?: string; redirect?: string; error?: string }
+) {
+  const isPopup = isPopupWindow();
+  
+  if (isPopup) {
+    // Clear popup flag
+    sessionStorage.removeItem('oauth_popup');
+    
+    // Try to send message to parent window
+    if (window.opener) {
+      try {
+        window.opener.postMessage(
+          {
+            type,
+            ...data
+          },
+          window.location.origin
+        );
+        console.log(`OAuth ${type} message sent to parent window`);
+      } catch (error) {
+        console.error('Failed to send message to parent:', error);
+      }
+    } else {
+      console.warn('window.opener is null, cannot send message');
+    }
+    
+    // Always close popup after sending message
+    setTimeout(() => {
+      console.log('Closing popup window');
+      window.close();
+    }, 100);
+    
+    return true;
+  }
+  
+  return false;
+}
+
 function OAuthHandlerContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -17,152 +76,88 @@ function OAuthHandlerContent() {
   const [handled, setHandled] = useState(false);
   const provider = searchParams.get('provider');
 
+  // Initialize: mark as popup if we detect it
   useEffect(() => {
-    // Prevent multiple executions
-    if (handled) {
-      return;
-    }
-    
-    // Check if we're in a popup window
-    // Check sessionStorage first (set when popup is opened), then URL parameter, then window.opener
-    const isPopupFromStorage = sessionStorage.getItem('oauth_popup') === 'true';
-    const isPopupFromUrl = searchParams.get('popup') === 'true';
-    const isPopupFromOpener = window.opener !== null;
-    const isPopup = isPopupFromStorage || isPopupFromUrl || isPopupFromOpener;
-    
-    // Save popup flag to sessionStorage if we detect it's a popup
-    if (isPopup && !isPopupFromStorage) {
+    if (isPopupWindow()) {
       sessionStorage.setItem('oauth_popup', 'true');
     }
+  }, []);
 
-    // Handle success callback from OAuth provider
+  // Handle success callback from OAuth provider
+  useEffect(() => {
+    if (handled) return;
+    
     const success = searchParams.get('success');
     const dashboardToken = searchParams.get('dashboard_token');
     
     if (success && dashboardToken) {
       setHandled(true);
       setStatus('processing');
-      // OAuth was successful - send message to parent and close
-      // CRITICAL: If we're in a popup, NEVER redirect - only send message and close
-      if (isPopup) {
-        // Clear popup flag from sessionStorage
-        sessionStorage.removeItem('oauth_popup');
-        
-        // Send message to parent window
-        // Try multiple times in case opener is temporarily unavailable after redirect
-        let messageSent = false;
-        const sendMessage = () => {
-          if (window.opener) {
-            try {
-              window.opener.postMessage(
-                {
-                  type: 'OAUTH_SUCCESS',
-                  dashboard_token: dashboardToken,
-                  redirect: `/dashboard/${dashboardToken}`
-                },
-                window.location.origin
-              );
-              messageSent = true;
-              console.log('OAuth success message sent to parent window');
-              return true;
-            } catch (error) {
-              console.error('Failed to send message to parent:', error);
-              return false;
-            }
-          } else {
-            console.warn('window.opener is null, cannot send message');
-          }
-          return false;
-        };
-        
-        // Try immediately
-        sendMessage();
-        
-        // If failed, try again after a short delay
-        if (!messageSent) {
-          setTimeout(() => {
-            sendMessage();
-          }, 50);
-        }
-        
-        // Try one more time after longer delay, then close
-        setTimeout(() => {
-          if (!messageSent) {
-            sendMessage();
-          }
-          // Close popup - this is critical, we MUST close it
-          // DO NOT redirect - just close
-          console.log('Closing popup window');
-          window.close();
-        }, 200);
-        
-        // Prevent any further execution that might cause redirect
-        // Return early to prevent any redirect logic
-        return;
-      } else {
+      
+      // CRITICAL: If in popup, send message and close - NEVER redirect
+      const wasHandled = sendMessageAndClose('OAUTH_SUCCESS', {
+        dashboard_token: dashboardToken,
+        redirect: `/dashboard/${dashboardToken}`
+      });
+      
+      if (!wasHandled) {
         // Not in popup - redirect normally
         sessionStorage.removeItem('oauth_popup');
         window.location.href = `/dashboard/${dashboardToken}`;
-        return;
       }
-    }
-
-    // Handle error callback
-    const error = searchParams.get('error');
-    if (error) {
-      setHandled(true);
-      const errorMessages: Record<string, string> = {
-        'user_creation_failed': 'Не удалось создать аккаунт',
-        'oauth_denied': 'Авторизация отменена',
-        'invalid_state': 'Ошибка безопасности',
-        'token_exchange_failed': 'Ошибка обмена токена',
-        'invalid_request': 'Неверный запрос',
-        'rate_limit': 'Превышен лимит запросов',
-        'oauth_not_configured': 'OAuth не настроен',
-        'no_access_token': 'Не получен токен доступа',
-        'user_info_failed': 'Ошибка получения информации о пользователе',
-        'no_email': 'Email не предоставлен',
-        'email_not_verified': 'Email не подтвержден',
-        'account_disabled': 'Аккаунт отключен',
-      };
       
-      if (isPopup) {
-        // Clear popup flag
-        sessionStorage.removeItem('oauth_popup');
-        // Try to send message to parent window
-        if (window.opener) {
-          window.opener.postMessage(
-            {
-              type: 'OAUTH_ERROR',
-              error: errorMessages[error] || 'Ошибка авторизации'
-            },
-            window.location.origin
-          );
-        }
-        // Close popup (even if opener is null, we still want to close)
-        setTimeout(() => {
-          window.close();
-        }, 100);
-      } else {
-        sessionStorage.removeItem('oauth_popup');
-        router.push(`/auth?error=${encodeURIComponent(error)}`);
-      }
       return;
     }
+  }, [searchParams, handled]);
 
+  // Handle error callback
+  useEffect(() => {
+    if (handled) return;
+    
+    const error = searchParams.get('error');
+    if (!error) return;
+    
+    setHandled(true);
+    
+    const errorMessages: Record<string, string> = {
+      'user_creation_failed': 'Не удалось создать аккаунт',
+      'oauth_denied': 'Авторизация отменена',
+      'invalid_state': 'Ошибка безопасности',
+      'token_exchange_failed': 'Ошибка обмена токена',
+      'invalid_request': 'Неверный запрос',
+      'rate_limit': 'Превышен лимит запросов',
+      'oauth_not_configured': 'OAuth не настроен',
+      'no_access_token': 'Не получен токен доступа',
+      'user_info_failed': 'Ошибка получения информации о пользователе',
+      'no_email': 'Email не предоставлен',
+      'email_not_verified': 'Email не подтвержден',
+      'account_disabled': 'Аккаунт отключен',
+    };
+    
+    // CRITICAL: If in popup, send message and close - NEVER redirect
+    const wasHandled = sendMessageAndClose('OAUTH_ERROR', {
+      error: errorMessages[error] || 'Ошибка авторизации'
+    });
+    
+    if (!wasHandled) {
+      // Not in popup - redirect to error page
+      sessionStorage.removeItem('oauth_popup');
+      router.push(`/auth?error=${encodeURIComponent(error)}`);
+    }
+  }, [searchParams, router, handled]);
+
+  // Handle provider initialization
+  useEffect(() => {
+    if (handled) return;
+    
     if (!provider) {
-      // No provider specified - error
       setHandled(true);
-      if (isPopup) {
-        window.opener?.postMessage(
-          {
-            type: 'OAUTH_ERROR',
-            error: 'Провайдер не указан'
-          },
-          window.location.origin
-        );
-        window.close();
-      } else {
+      const wasHandled = sendMessageAndClose('OAUTH_ERROR', {
+        error: 'Провайдер не указан'
+      });
+      
+      if (!wasHandled) {
+        sessionStorage.removeItem('oauth_popup');
         router.push('/auth?error=invalid_provider');
       }
       return;
@@ -172,7 +167,7 @@ function OAuthHandlerContent() {
     if (provider === 'google') {
       setStatus('redirecting');
       // Ensure popup flag is saved before redirect
-      if (isPopup) {
+      if (isPopupWindow()) {
         sessionStorage.setItem('oauth_popup', 'true');
       }
       // Redirect to Google OAuth endpoint
@@ -186,6 +181,10 @@ function OAuthHandlerContent() {
           if (data.botId && data.state) {
             // Store state in sessionStorage
             sessionStorage.setItem('telegram_oauth_state', data.state);
+            // Ensure popup flag is saved
+            if (isPopupWindow()) {
+              sessionStorage.setItem('oauth_popup', 'true');
+            }
             setStatus('redirecting');
             // Redirect to Telegram OAuth
             window.location.href = `https://oauth.telegram.org/auth?bot_id=${data.botId}&origin=${encodeURIComponent(window.location.origin)}&request_access=write&return_to=${encodeURIComponent(window.location.origin + '/auth/oauth-handler?provider=telegram&callback=true')}`;
@@ -195,31 +194,24 @@ function OAuthHandlerContent() {
         })
         .catch(error => {
           console.error('Telegram OAuth initialization error:', error);
-          if (isPopup) {
-            window.opener?.postMessage(
-              {
-                type: 'OAUTH_ERROR',
-                error: 'Ошибка подключения к Telegram'
-              },
-              window.location.origin
-            );
-            window.close();
-          } else {
+          setHandled(true);
+          const wasHandled = sendMessageAndClose('OAUTH_ERROR', {
+            error: 'Ошибка подключения к Telegram'
+          });
+          
+          if (!wasHandled) {
+            sessionStorage.removeItem('oauth_popup');
             router.push('/auth?error=telegram_init_failed');
           }
         });
     } else {
-      // Unknown provider
-      if (isPopup) {
-        window.opener?.postMessage(
-          {
-            type: 'OAUTH_ERROR',
-            error: 'Неизвестный провайдер'
-          },
-          window.location.origin
-        );
-        window.close();
-      } else {
+      setHandled(true);
+      const wasHandled = sendMessageAndClose('OAUTH_ERROR', {
+        error: 'Неизвестный провайдер'
+      });
+      
+      if (!wasHandled) {
+        sessionStorage.removeItem('oauth_popup');
         router.push('/auth?error=unknown_provider');
       }
     }
@@ -227,8 +219,9 @@ function OAuthHandlerContent() {
 
   // Handle Telegram callback (when returning from Telegram OAuth)
   useEffect(() => {
+    if (handled) return;
+    
     const isCallback = searchParams.get('callback') === 'true';
-    const isPopup = window.opener !== null;
     const currentProvider = searchParams.get('provider');
     
     // Early return if not a callback
@@ -236,6 +229,7 @@ function OAuthHandlerContent() {
       return;
     }
 
+    setHandled(true);
     setStatus('processing');
     
     // Check for Telegram hash in URL
@@ -292,7 +286,6 @@ function OAuthHandlerContent() {
           if (response.ok) {
             return data;
           } else {
-            // Server returned error
             return Promise.reject(data);
           }
         })
@@ -309,29 +302,14 @@ function OAuthHandlerContent() {
             throw new Error('Missing dashboard_token and redirect in response');
           }
 
-          if (isPopup && window.opener) {
-            // Send success to parent window
-            window.opener.postMessage(
-              {
-                type: 'OAUTH_SUCCESS',
-                dashboard_token: result.dashboard_token,
-                redirect: result.redirect || `/dashboard/${result.dashboard_token}`
-              },
-              window.location.origin
-            );
-            // Close popup
-            setTimeout(() => {
-              window.close();
-            }, 100);
-          } else if (!isPopup) {
+          // CRITICAL: If in popup, send message and close - NEVER redirect
+          const wasHandled = sendMessageAndClose('OAUTH_SUCCESS', {
+            dashboard_token: result.dashboard_token,
+            redirect: result.redirect || `/dashboard/${result.dashboard_token}`
+          });
+          
+          if (!wasHandled) {
             // Not in popup - redirect normally
-            if (result.redirect) {
-              window.location.href = result.redirect;
-            } else if (result.dashboard_token) {
-              window.location.href = `/dashboard/${result.dashboard_token}`;
-            }
-          } else {
-            // isPopup is true but window.opener is null - fallback to redirect
             if (result.redirect) {
               window.location.href = result.redirect;
             } else if (result.dashboard_token) {
@@ -348,68 +326,43 @@ function OAuthHandlerContent() {
                                error.error === 'oauth_not_configured' ? 'OAuth не настроен' :
                                error.message || 'Ошибка авторизации';
           
-          if (isPopup && window.opener) {
-            window.opener.postMessage(
-              {
-                type: 'OAUTH_ERROR',
-                error: errorMessage
-              },
-              window.location.origin
-            );
-            setTimeout(() => {
-              window.close();
-            }, 100);
-          } else if (!isPopup) {
-            router.push(`/auth?error=${encodeURIComponent(error.error || 'telegram_auth_failed')}`);
-          } else {
-            // isPopup is true but window.opener is null - fallback to error page
+          // CRITICAL: If in popup, send message and close - NEVER redirect
+          const wasHandled = sendMessageAndClose('OAUTH_ERROR', {
+            error: errorMessage
+          });
+          
+          if (!wasHandled) {
             router.push(`/auth?error=${encodeURIComponent(error.error || 'telegram_auth_failed')}`);
           }
         });
       } catch (error) {
         console.error('Telegram OAuth processing error:', error);
         const errorMessage = error instanceof Error ? error.message : 'Ошибка обработки данных Telegram';
-        if (isPopup && window.opener) {
-          window.opener.postMessage(
-            {
-              type: 'OAUTH_ERROR',
-              error: errorMessage === 'Missing required Telegram auth fields' 
-                ? 'Неполные данные авторизации Telegram'
-                : 'Ошибка обработки данных Telegram'
-            },
-            window.location.origin
-          );
-          setTimeout(() => {
-            window.close();
-          }, 100);
-        } else if (!isPopup) {
-          router.push('/auth?error=telegram_processing_failed');
-        } else {
-          // isPopup is true but window.opener is null - fallback to error page
+        const finalError = errorMessage === 'Missing required Telegram auth fields' 
+          ? 'Неполные данные авторизации Telegram'
+          : 'Ошибка обработки данных Telegram';
+        
+        // CRITICAL: If in popup, send message and close - NEVER redirect
+        const wasHandled = sendMessageAndClose('OAUTH_ERROR', {
+          error: finalError
+        });
+        
+        if (!wasHandled) {
           router.push('/auth?error=telegram_processing_failed');
         }
       }
     } else {
       // No Telegram auth result
-      if (isPopup && window.opener) {
-        window.opener.postMessage(
-          {
-            type: 'OAUTH_ERROR',
-            error: 'Данные авторизации не получены'
-          },
-          window.location.origin
-        );
-        setTimeout(() => {
-          window.close();
-        }, 100);
-      } else if (!isPopup) {
-        router.push('/auth?error=telegram_no_data');
-      } else {
-        // isPopup is true but window.opener is null - fallback to error page
+      // CRITICAL: If in popup, send message and close - NEVER redirect
+      const wasHandled = sendMessageAndClose('OAUTH_ERROR', {
+        error: 'Данные авторизации не получены'
+      });
+      
+      if (!wasHandled) {
         router.push('/auth?error=telegram_no_data');
       }
     }
-  }, [searchParams, router]);
+  }, [searchParams, router, handled]);
 
   return (
     <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-[rgba(10,16,32,0.95)] backdrop-blur-md">
@@ -447,4 +400,3 @@ export default function OAuthHandlerPage() {
     </Suspense>
   );
 }
-
