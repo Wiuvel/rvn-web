@@ -2,9 +2,9 @@
  * Утилиты для работы с ролями пользователей
  */
 
-import { supabaseAdmin } from './supabase';
-import { logger } from './secure-logger';
-import { cached } from './cache';
+import { supabaseAdmin } from '../database/supabase';
+import { logger } from '../utils/secure-logger';
+import { cached } from '../database/cache';
 
 export type UserRole = 'user' | 'support' | 'admin';
 
@@ -44,8 +44,7 @@ export async function hasUserRole(userId: string, role: UserRole): Promise<boole
         .maybeSingle();
 
       if (error) {
-        // PGRST116 - no rows returned (это нормально, если роли нет)
-        // Другие ошибки логируем
+        // PGRST116 - No rows returned
         if (error.code !== 'PGRST116') {
           logger.error('Error checking user role', {
             error: error.message,
@@ -66,16 +65,16 @@ export async function hasUserRole(userId: string, role: UserRole): Promise<boole
       });
       return false;
     }
-  }, 60); // Кэш на 60 секунд
+  }, 60);
 }
 
 /**
- * Получает все активные роли пользователя
+ * Gets all active roles for a user
  */
 export async function getUserRoles(userId: string): Promise<UserRole[]> {
   try {
     if (!supabaseAdmin) {
-      return ['user']; // По умолчанию все пользователи имеют роль 'user'
+      return ['user']; // By default, all users have the 'user' role
     }
 
     const { data, error } = await supabaseAdmin
@@ -86,8 +85,6 @@ export async function getUserRoles(userId: string): Promise<UserRole[]> {
       .is('revoked_at', null);
 
     if (error) {
-      // Не логируем ошибки для каждого пользователя, чтобы не замедлять загрузку таблицы
-      // Логируем только критические ошибки (не PGRST116 - "no rows returned")
       if (error.code !== 'PGRST116') {
         logger.warn('Error fetching user roles (non-critical)', {
           error: error.message,

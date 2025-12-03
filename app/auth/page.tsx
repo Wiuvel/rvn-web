@@ -1,7 +1,7 @@
 import { Metadata } from 'next';
 import { Suspense } from 'react';
 import AuthIsolatedClient from './AuthIsolatedClient';
-import { pageMetadata } from '@/lib/seo';
+import { pageMetadata } from '@/lib/utils/seo';
 
 export const metadata: Metadata = pageMetadata.auth;
 

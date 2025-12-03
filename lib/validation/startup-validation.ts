@@ -1,5 +1,5 @@
 import { validateEnv } from './env-validation';
-import { logger } from './secure-logger';
+import { logger } from '../utils/secure-logger';
 
 /**
  * Валидация всех критических компонентов при старте приложения

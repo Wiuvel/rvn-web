@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import SmoothScroll from "@/components/SmoothScroll";
 import ConditionalLayout from "@/components/ConditionalLayout";
-import { pageMetadata } from "@/lib/seo";
+import { pageMetadata } from "@/lib/utils/seo";
 import { exo2 } from "./fonts";
 
 export const metadata: Metadata = {

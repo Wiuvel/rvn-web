@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { supabaseAdmin } from '@/lib/supabase';
-import { generalRateLimit } from '@/lib/rate-limit';
-import { logger } from '@/lib/secure-logger';
-import { setCorsHeaders, handleCorsPreflight } from '@/lib/cors';
-import { getUserRoles, UserRole } from '@/lib/user-roles';
+import { supabaseAdmin } from '@/lib/database/supabase';
+import { generalRateLimit } from '@/lib/security/rate-limit';
+import { logger } from '@/lib/utils/secure-logger';
+import { setCorsHeaders, handleCorsPreflight } from '@/lib/security/cors';
+import { getUserRoles, UserRole } from '@/lib/auth/user-roles';
 
 export async function OPTIONS() {
   return handleCorsPreflight();

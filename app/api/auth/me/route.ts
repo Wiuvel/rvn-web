@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { getUserByToken } from '@/lib/auth';
-import { logger } from '@/lib/secure-logger';
-import { setCorsHeaders, handleCorsPreflight } from '@/lib/cors';
-import { hasUserRole } from '@/lib/user-roles';
+import { getUserByToken } from '@/lib/auth/index';
+import { logger } from '@/lib/utils/secure-logger';
+import { setCorsHeaders, handleCorsPreflight } from '@/lib/security/cors';
+import { hasUserRole } from '@/lib/auth/user-roles';
+import { SessionManager } from '@/lib/auth/session-manager';
 
 export async function OPTIONS() {
   return handleCorsPreflight();
@@ -14,6 +15,29 @@ export async function GET(request: NextRequest) {
     const cookieStore = await cookies();
     const dashboardToken = cookieStore.get('dashboard_token')?.value;
     const isAuthenticated = cookieStore.get('user_authenticated')?.value === 'true';
+    const sessionId = cookieStore.get('session_id')?.value;
+
+    // Validate session if exists
+    if (sessionId) {
+      const ipAddress = request.headers.get('x-forwarded-for') || 'unknown';
+      const userAgent = request.headers.get('user-agent') || 'unknown';
+      const validation = SessionManager.validateSession(sessionId, ipAddress, userAgent);
+      
+      if (!validation.valid) {
+        logger.warn('INVALID SESSION IN /api/auth/me', {
+          sessionId: sessionId.substring(0, 8) + '...',
+          reason: validation.reason,
+          ip: ipAddress
+        });
+        // Clear invalid session cookies
+        const response = NextResponse.json({ authenticated: false }, { status: 401 });
+        response.cookies.delete('session_id');
+        response.cookies.delete('user_authenticated');
+        response.cookies.delete('user_id');
+        response.cookies.delete('dashboard_token');
+        return setCorsHeaders(response);
+      }
+    }
 
     if (!isAuthenticated || !dashboardToken) {
       // Возвращаем 200 вместо 401, чтобы не выводить ошибку в консоль браузера

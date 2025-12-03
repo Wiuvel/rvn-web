@@ -7,7 +7,7 @@ import { gsap } from 'gsap';
 import AdminAuthForm from '@/components/AdminAuthForm';
 import MagicBentoGrid from '@/components/ui/MagicBentoGrid';
 import LoadingSpinner from '@/components/LoadingSpinner';
-import { GSAP_DEFAULT_DURATION, GSAP_DEFAULT_EASE, APP_VERSION } from '@/lib/constants';
+import { GSAP_DEFAULT_DURATION, GSAP_DEFAULT_EASE, APP_VERSION } from '@/lib/utils/constants';
 
 interface AuthState {
   isAuthenticated: boolean;

@@ -70,3 +70,4 @@ export function handleCorsPreflight(options: CorsOptions = {}): NextResponse {
   const response = new NextResponse(null, { status: 200 });
   return setCorsHeaders(response, options);
 }
+

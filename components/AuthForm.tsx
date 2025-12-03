@@ -3,7 +3,10 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { translateError } from '@/lib/error-translations';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { translateError } from '@/lib/utils/error-translations';
+import { loginSchema, registerSchema, type LoginFormData, type RegisterFormData } from '@/lib/validation/schemas';
 
 interface Turnstile {
   render: (
@@ -32,15 +35,30 @@ interface AuthFormProps {
 export default function AuthForm({ retpatch = '/dashboard/', initialError }: AuthFormProps) {
   const [currentTab, setCurrentTab] = useState<'login' | 'register'>('login');
   const [isLoading, setIsLoading] = useState(false);
-  const [registerData, setRegisterData] = useState({
-    username: '',
-    password: '',
-    confirmPassword: ''
+  
+  // React Hook Form setup for login
+  const loginForm = useForm<LoginFormData>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: {
+      username: '',
+      password: '',
+      csrfToken: '',
+    },
+    mode: 'onChange',
   });
-  const [loginData, setLoginData] = useState({
-    username: '',
-    password: ''
+
+  // React Hook Form setup for register
+  const registerForm = useForm<RegisterFormData>({
+    resolver: zodResolver(registerSchema),
+    defaultValues: {
+      username: '',
+      password: '',
+      confirmPassword: '',
+      csrfToken: '',
+    },
+    mode: 'onChange',
   });
+
   const [isPasswordValid, setIsPasswordValid] = useState({
     register: false,
     login: false
@@ -132,11 +150,7 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
     register: false,
     login: false
   });
-  const [errors, setErrors] = useState({
-    global: '',
-    register: { username: '', password: '', confirmPassword: '' },
-    login: { username: '', password: '' }
-  });
+  const [globalError, setGlobalError] = useState('');
   const [captchaResponse, setCaptchaResponse] = useState({
     register: '',
     login: ''
@@ -145,127 +159,31 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
   const [currentWidgetId, setCurrentWidgetId] = useState<string | null>(null);
   const [loginAttemptState, setLoginAttemptState] = useState<'idle' | 'error'>('idle');
 
-  const validateUsername = (username: string, formType: 'login' | 'register') => {
-    const usernameRegex = /^[a-zA-Z0-9_]+$/;
-    if (!usernameRegex.test(username)) {
-      setErrors(prev => ({
-        ...prev,
-        [formType]: { ...prev[formType], username: 'Логин может содержать только латиницу и цифры' }
-      }));
-      return false;
+  // Watch password changes for strength indicator
+  const registerPassword = registerForm.watch('password');
+  const loginPassword = loginForm.watch('password');
+  
+  useEffect(() => {
+    if (registerPassword) {
+      const strength = calculatePasswordStrength(registerPassword);
+      setIsPasswordValid(prev => ({ ...prev, register: strength.score > 0 }));
+      setShowPasswordStrength(prev => ({ ...prev, register: strength.score > 0 }));
+    } else {
+      setIsPasswordValid(prev => ({ ...prev, register: false }));
+      setShowPasswordStrength(prev => ({ ...prev, register: false }));
     }
-    if (username.length < 3) {
-      setErrors(prev => ({
-        ...prev,
-        [formType]: { ...prev[formType], username: 'Логин должен быть не короче 3 символов' }
-      }));
-      return false;
-    }
-    setErrors(prev => ({
-      ...prev,
-      [formType]: { ...prev[formType], username: '' }
-    }));
-    return true;
-  };
+  }, [registerPassword]);
 
-  const validatePassword = (password: string, formType: 'login' | 'register') => {
-    const passwordRegex = /^[a-zA-Z0-9!@#$%^&*()_+.\-=\[\]{};':"\\|,<>\/?]+$/;
-    if (password.length === 0) {
-      setErrors(prev => ({
-        ...prev,
-        [formType]: { ...prev[formType], password: '' }
-      }));
-      setIsPasswordValid(prev => ({ ...prev, [formType]: false }));
-      setShowPasswordStrength(prev => ({ ...prev, [formType]: false }));
-      if (formType === 'register') {
-        setRegisterData(prev => ({ ...prev, confirmPassword: '' }));
-        setErrors(prev => ({
-          ...prev,
-          register: { ...prev.register, confirmPassword: '' }
-        }));
-      }
-      return false;
+  useEffect(() => {
+    if (loginPassword) {
+      const strength = calculatePasswordStrength(loginPassword);
+      setIsPasswordValid(prev => ({ ...prev, login: strength.score > 0 }));
+      setShowPasswordStrength(prev => ({ ...prev, login: strength.score > 0 }));
+    } else {
+      setIsPasswordValid(prev => ({ ...prev, login: false }));
+      setShowPasswordStrength(prev => ({ ...prev, login: false }));
     }
-    if (!passwordRegex.test(password)) {
-      setErrors(prev => ({
-        ...prev,
-        [formType]: { ...prev[formType], password: 'Пароль может содержать только латиницу, цифры и спецсимволы (включая точку)' }
-      }));
-      setIsPasswordValid(prev => ({ ...prev, [formType]: false }));
-      setShowPasswordStrength(prev => ({ ...prev, [formType]: false }));
-      if (formType === 'register') {
-        setRegisterData(prev => ({ ...prev, confirmPassword: '' }));
-        setErrors(prev => ({
-          ...prev,
-          register: { ...prev.register, confirmPassword: '' }
-        }));
-      }
-      return false;
-    }
-    if (password.length < 6) {
-      setErrors(prev => ({
-        ...prev,
-        [formType]: { ...prev[formType], password: 'Пароль должен быть не менее 6 символов' }
-      }));
-      setIsPasswordValid(prev => ({ ...prev, [formType]: false }));
-      setShowPasswordStrength(prev => ({ ...prev, [formType]: false }));
-      if (formType === 'register') {
-        setRegisterData(prev => ({ ...prev, confirmPassword: '' }));
-        setErrors(prev => ({
-          ...prev,
-          register: { ...prev.register, confirmPassword: '' }
-        }));
-      }
-      return false;
-    }
-    setErrors(prev => ({
-      ...prev,
-      [formType]: { ...prev[formType], password: '' }
-    }));
-    setIsPasswordValid(prev => ({ ...prev, [formType]: true }));
-    setShowPasswordStrength(prev => ({ ...prev, [formType]: true }));
-    return true;
-  };
-
-  const validateConfirmPassword = (
-    confirmValue?: string,
-    passwordValue?: string
-  ) => {
-    const password = passwordValue ?? registerData.password;
-    const confirmation = confirmValue ?? registerData.confirmPassword;
-
-    if (!password) {
-      setErrors(prev => ({
-        ...prev,
-        register: { ...prev.register, confirmPassword: '' }
-      }));
-      return true;
-    }
-    
-    if (!confirmation) {
-      setErrors(prev => ({
-        ...prev,
-        register: { ...prev.register, confirmPassword: '' }
-      }));
-      return true;
-    }
-    
-    setShowPasswordStrength(prev => ({ ...prev, register: false }));
-    
-    if (confirmation !== password) {
-      setErrors(prev => ({
-        ...prev,
-        register: { ...prev.register, confirmPassword: 'Пароли не совпадают' }
-      }));
-      return false;
-    }
-    
-    setErrors(prev => ({
-      ...prev,
-      register: { ...prev.register, confirmPassword: '' }
-    }));
-    return true;
-  };
+  }, [loginPassword]);
 
   const fetchCsrfToken = async (): Promise<string | null> => {
     try {
@@ -284,122 +202,91 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
     } catch (error) {
       console.error('CSRF token fetch error:', error);
       setCsrfToken('');
-      setErrors(prev => ({
-        ...prev,
-        global: 'Не удалось получить токен безопасности. Обновите страницу.'
-      }));
+      setGlobalError('Не удалось получить токен безопасности. Обновите страницу.');
       return null;
     }
   };
 
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!validateForm('register')) return;
+  const handleRegister = async (data: RegisterFormData) => {
     const tokenToUse = csrfToken || (await fetchCsrfToken());
     if (!tokenToUse) {
       return;
     }
     setIsLoading(true);
-    setErrors(prev => ({ ...prev, global: '' }));
+    setGlobalError('');
     
     try {
       const response = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          username: escapeHtml(registerData.username),
-          password: registerData.password,
-          confirmPassword: registerData.confirmPassword,
+          username: escapeHtml(data.username),
+          password: data.password,
+          confirmPassword: data.confirmPassword,
           csrfToken: tokenToUse
         })
       });
-      const data = await response.json();
+      const responseData = await response.json();
       if (response.ok) {
-        // Перенаправляем на dashboard с токеном
-        window.location.href = `/dashboard/${data.dashboard_token}`;
+        window.location.href = `/dashboard/${responseData.dashboard_token}`;
       } else {
-        const translatedError = translateError(data.error || 'Ошибка регистрации');
-        setErrors(prev => ({ ...prev, global: escapeHtml(translatedError) }));
+        const translatedError = translateError(responseData.error || 'Ошибка регистрации');
+        setGlobalError(escapeHtml(translatedError));
         if (response.status === 403) {
           fetchCsrfToken();
         }
       }
     } catch {
-      setErrors(prev => ({ ...prev, global: 'API ERROR: 405.' }));
+      setGlobalError('API ERROR: 405.');
       fetchCsrfToken();
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!validateForm('login')) return;
+  const handleLogin = async (data: LoginFormData) => {
     const tokenToUse = csrfToken || (await fetchCsrfToken());
     if (!tokenToUse) {
       return;
     }
     setIsLoading(true);
     setLoginAttemptState('idle');
-    setErrors(prev => ({ ...prev, global: '' }));
+    setGlobalError('');
     
     try {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          username: escapeHtml(loginData.username),
-          password: loginData.password,
+          username: escapeHtml(data.username),
+          password: data.password,
           csrfToken: tokenToUse
         })
       });
-      const data = await response.json();
+      const responseData = await response.json();
       if (response.ok) {
-        // Перенаправляем с учетом retpatch
         if (retpatch && retpatch !== '/dashboard/') {
-          // Если retpatch указан и это не дефолтный путь, используем его
           window.location.href = retpatch;
         } else {
-          // По умолчанию - dashboard с токеном
-          window.location.href = `/dashboard/${data.dashboard_token}`;
+          window.location.href = `/dashboard/${responseData.dashboard_token}`;
         }
       } else {
         setLoginAttemptState('error');
-        const translatedError = translateError(data.error || 'Ошибка входа');
-        setErrors(prev => ({ ...prev, global: escapeHtml(translatedError) }));
+        const translatedError = translateError(responseData.error || 'Ошибка входа');
+        setGlobalError(escapeHtml(translatedError));
         if (response.status === 403) {
           fetchCsrfToken();
         }
       }
     } catch {
       setLoginAttemptState('error');
-      setErrors(prev => ({ ...prev, global: 'Ошибка сети. Попробуйте позже.' }));
+      setGlobalError('Ошибка сети. Попробуйте позже.');
       fetchCsrfToken();
     } finally {
       setIsLoading(false);
     }
   };
 
-  const validateForm = (formType: 'login' | 'register') => {
-    const isValidUsername = validateUsername(
-      formType === 'register' ? registerData.username : loginData.username, 
-      formType
-    );
-    const isValidPassword = validatePassword(
-      formType === 'register' ? registerData.password : loginData.password, 
-      formType
-    );
-    let isValidConfirm = true;
-    if (formType === 'register') {
-      isValidConfirm = validateConfirmPassword();
-    }
-    // const hasCaptcha = !!captchaResponse[formType];
-    // if (!hasCaptcha) {
-    //   setErrors(prev => ({ ...prev, global: 'Подтвердите, что вы не робот' }));
-    //   return false;
-    // }
-    return isValidUsername && isValidPassword && isValidConfirm;
-  };
 
   // Handle OAuth login
   const oauthLogin = async (provider: string) => {
@@ -408,13 +295,16 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
       if (provider === 'google') {
         // Redirect to Google OAuth endpoint
         window.location.href = '/api/auth/oauth/google';
+      } else if (provider === 'telegram') {
+        // Redirect to Telegram OAuth endpoint
+        window.location.href = '/api/auth/oauth/telegram';
       } else if (provider === 'twitch') {
         // Twitch OAuth not implemented yet
-        setErrors(prev => ({ ...prev, global: 'Twitch авторизация пока недоступна' }));
+        setGlobalError('Twitch авторизация пока недоступна');
         setIsLoading(false);
       }
     } catch {
-      setErrors(prev => ({ ...prev, global: 'Ошибка подключения к провайдеру' }));
+      setGlobalError('Ошибка подключения к провайдеру');
       setIsLoading(false);
     }
   };
@@ -430,13 +320,9 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
   };
 
   const resetForm = () => {
-    setRegisterData({ username: '', password: '', confirmPassword: '' });
-    setLoginData({ username: '', password: '' });
-    setErrors({
-      global: '',
-      register: { username: '', password: '', confirmPassword: '' },
-      login: { username: '', password: '' }
-    });
+    registerForm.reset();
+    loginForm.reset();
+    setGlobalError('');
     setIsPasswordValid({ register: false, login: false });
     setShowPasswordStrength({ register: false, login: false });
     setCaptchaResponse({ register: '', login: '' });
@@ -469,12 +355,12 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
         sitekey: '3x00000000000000000000FF',
         theme: 'dark',
         callback: (token: string) => {
-          setCaptchaResponse(prev => ({ ...prev, [formType]: token }));
-          setErrors(prev => ({ ...prev, global: '' }));
+          setCaptchaResponse(prev => ({ ...prev, [formType]: token })); 
+          setGlobalError('');
         },
         'error-callback': () => {
           setCaptchaResponse(prev => ({ ...prev, [formType]: '' }));
-          setErrors(prev => ({ ...prev, global: 'Ошибка загрузки капчи' }));
+          setGlobalError('Ошибка загрузки капчи');
         }
       });
       setCurrentWidgetId(widgetId);
@@ -496,7 +382,7 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
   useEffect(() => {
     if (initialError) {
       const translatedError = translateError(initialError);
-      setErrors(prev => ({ ...prev, global: translatedError }));
+      setGlobalError(translatedError);
     }
   }, [initialError]);
 
@@ -509,28 +395,20 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
 
         {/* Registration Form */}
         {currentTab === 'register' && (
-          <form onSubmit={handleRegister} className="space-y-4">
+          <form onSubmit={registerForm.handleSubmit(handleRegister)} className="space-y-4">
             <label className="block">
               <span className="sr-only">Логин</span>
               <input
                 type="text"
-                value={registerData.username}
-                onChange={(e) => {
-                  if (errors.global) {
-                    setErrors(prev => ({ ...prev, global: '' }));
-                  }
-                  setRegisterData(prev => ({ ...prev, username: e.target.value }));
-                  validateUsername(e.target.value, 'register');
-                }}
+                {...registerForm.register('username')}
                 placeholder="Логин"
-                required
                 autoComplete="username"
                 className="w-full px-4 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-white"
               />
             </label>
-            {errors.register.username && (
+            {registerForm.formState.errors.username && (
               <p className="text-red-500 text-sm mt-1" role="alert">
-                {errors.register.username}
+                {registerForm.formState.errors.username.message}
               </p>
             )}
 
@@ -539,17 +417,8 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
                 <span className="sr-only">Пароль</span>
                 <input
                   type={showPassword.register ? 'text' : 'password'}
-                  value={registerData.password}
-                  onChange={(e) => {
-                  const nextValue = e.target.value;
-                  setRegisterData(prev => ({ ...prev, password: nextValue }));
-                  validatePassword(nextValue, 'register');
-                  if (registerData.confirmPassword) {
-                    validateConfirmPassword(registerData.confirmPassword, nextValue);
-                  }
-                  }}
+                  {...registerForm.register('password')}
                   placeholder="Пароль"
-                  required
                   autoComplete="new-password"
                   className="w-full px-4 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-white pr-10"
                 />
@@ -571,8 +440,8 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
             </div>
 
             {/* Password Strength Indicator */}
-            {showPasswordStrength.register && registerData.password.length > 0 && !registerData.confirmPassword && (() => {
-              const strength = calculatePasswordStrength(registerData.password);
+            {showPasswordStrength.register && registerPassword && !registerForm.watch('confirmPassword') && (() => {
+              const strength = calculatePasswordStrength(registerPassword);
               const widthPercent = strength.score === 0 ? 0 : (strength.score / 4) * 100;
               
               return (
@@ -606,9 +475,9 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
               );
             })()}
 
-            {errors.register.password && (
+            {registerForm.formState.errors.password && (
               <p className="text-red-400 text-xs mt-1" role="alert">
-                {errors.register.password}
+                {registerForm.formState.errors.password.message}
               </p>
             )}
 
@@ -616,14 +485,8 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
               <span className="sr-only">Подтверждение пароля</span>
               <input
                 type="password"
-                value={registerData.confirmPassword}
-                onChange={(e) => {
-                  const nextValue = e.target.value;
-                  setRegisterData(prev => ({ ...prev, confirmPassword: nextValue }));
-                  validateConfirmPassword(nextValue);
-                }}
+                {...registerForm.register('confirmPassword')}
                 placeholder="Подтверждение пароля"
-                required
                 autoComplete="new-password"
                 disabled={!isPasswordValid.register}
                 className={`w-full px-4 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-white ${
@@ -631,9 +494,9 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
                 }`}
               />
             </label>
-            {errors.register.confirmPassword && (
+            {registerForm.formState.errors.confirmPassword && (
               <p className="text-red-400 text-xs mt-1" role="alert">
-                {errors.register.confirmPassword}
+                {registerForm.formState.errors.confirmPassword.message}
               </p>
             )}
 
@@ -668,13 +531,13 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
             </div>
             <input type="hidden" name="cf-turnstile-response" value={captchaResponse.register} />
 
-            {errors.global && (
+            {globalError && (
               <p
-                className={`auth-feedback ${errors.global ? 'visible' : ''}`}
+                className={`auth-feedback ${globalError ? 'visible' : ''}`}
                 role="alert"
                 aria-live="assertive"
               >
-                {errors.global}
+                {globalError}
               </p>
             )}
 
@@ -707,6 +570,16 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
               <button
                 type="button"
                 className="oauth-btn"
+                onClick={() => oauthLogin('telegram')}
+                disabled={isLoading}
+                title="Войти через Telegram"
+                aria-label="Войти через Telegram"
+              >
+                <Image src="/static/icons/oauth/telegram.svg" alt="Telegram" width={20} height={20} />
+              </button>
+              <button
+                type="button"
+                className="oauth-btn"
                 onClick={() => oauthLogin('twitch')}
                 disabled={isLoading}
                 title="Войти через Twitch"
@@ -731,31 +604,29 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
 
         {/* Authorization Form */}
         {currentTab === 'login' && (
-          <form onSubmit={handleLogin} className="space-y-4">
+          <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-4">
             <label className="block">
               <span className="sr-only">Логин</span>
               <input
                 type="text"
-                value={loginData.username}
+                {...loginForm.register('username')}
                 onChange={(e) => {
-                  if (errors.global) {
-                    setErrors(prev => ({ ...prev, global: '' }));
+                  loginForm.register('username').onChange(e);
+                  if (globalError) {
+                    setGlobalError('');
                   }
                   if (loginAttemptState === 'error') {
                     setLoginAttemptState('idle');
                   }
-                  setLoginData(prev => ({ ...prev, username: e.target.value }));
-                  validateUsername(e.target.value, 'login');
                 }}
                 placeholder="Логин"
-                required
                 autoComplete="username"
                 className="w-full px-4 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-white"
               />
             </label>
-            {errors.login.username && (
+            {loginForm.formState.errors.username && (
               <p className="text-red-500 text-sm mt-1" role="alert">
-                {errors.login.username}
+                {loginForm.formState.errors.username.message}
               </p>
             )}
 
@@ -764,19 +635,17 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
                 <span className="sr-only">Пароль</span>
                 <input
                   type={showPassword.login ? 'text' : 'password'}
-                  value={loginData.password}
+                  {...loginForm.register('password')}
                   onChange={(e) => {
-                  if (errors.global) {
-                    setErrors(prev => ({ ...prev, global: '' }));
-                  }
-                  if (loginAttemptState === 'error') {
-                    setLoginAttemptState('idle');
-                  }
-                    setLoginData(prev => ({ ...prev, password: e.target.value }));
-                    validatePassword(e.target.value, 'login');
+                    loginForm.register('password').onChange(e);
+                    if (globalError) {
+                      setGlobalError('');
+                    }
+                    if (loginAttemptState === 'error') {
+                      setLoginAttemptState('idle');
+                    }
                   }}
                   placeholder="Пароль"
-                  required
                   autoComplete="current-password"
                   className="w-full px-4 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-white pr-10"
                 />
@@ -796,9 +665,9 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
                 />
               </button>
             </div>
-            {errors.login.password && (
+            {loginForm.formState.errors.password && (
               <p className="text-red-500 text-xs mt-1" role="alert">
-                {errors.login.password}
+                {loginForm.formState.errors.password.message}
               </p>
             )}
 
@@ -818,13 +687,13 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
               </button>
             </div>
 
-            {errors.global && (
+            {globalError && (
               <p
-                className={`auth-feedback ${errors.global ? 'visible' : ''}`}
+                className={`auth-feedback ${globalError ? 'visible' : ''}`}
                 role="alert"
                 aria-live="assertive"
               >
-                {errors.global}
+                {globalError}
               </p>
             )}
 
@@ -842,6 +711,16 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
                 aria-label="Войти через Google"
               >
                 <Image src="/static/icons/oauth/google.svg" alt="Google" width={20} height={20} />
+              </button>
+              <button
+                type="button"
+                className="oauth-btn"
+                onClick={() => oauthLogin('telegram')}
+                disabled={isLoading}
+                title="Войти через Telegram"
+                aria-label="Войти через Telegram"
+              >
+                <Image src="/static/icons/oauth/telegram.svg" alt="Telegram" width={20} height={20} />
               </button>
               <button
                 type="button"

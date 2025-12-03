@@ -63,8 +63,7 @@ export const useFadeIn = (delay: number = 0) => {
     if (!elementRef.current) return;
 
     const element = elementRef.current;
-    
-    gsap.fromTo(element, 
+    const animation = gsap.fromTo(element, 
       { 
         opacity: 0, 
         y: 20 
@@ -83,106 +82,15 @@ export const useFadeIn = (delay: number = 0) => {
         }
       }
     );
+
+    return () => {
+      animation.kill();
+    };
   }, [delay]);
 
   return elementRef;
 };
 
-export const useSlideInLeft = (delay: number = 0) => {
-  const elementRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!elementRef.current) return;
-
-    const element = elementRef.current;
-    
-    gsap.fromTo(element, 
-      { 
-        opacity: 0, 
-        x: -30 
-      },
-      { 
-        opacity: 1, 
-        x: 0, 
-        duration: 0.5, 
-        ease: "power2.out",
-        delay,
-        scrollTrigger: {
-          trigger: element,
-          start: "top 85%",
-          end: "bottom 15%",
-          toggleActions: "play none none none"
-        }
-      }
-    );
-  }, [delay]);
-
-  return elementRef;
-};
-
-export const useSlideInRight = (delay: number = 0) => {
-  const elementRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!elementRef.current) return;
-
-    const element = elementRef.current;
-    
-    gsap.fromTo(element, 
-      { 
-        opacity: 0, 
-        x: 30 
-      },
-      { 
-        opacity: 1, 
-        x: 0, 
-        duration: 0.5, 
-        ease: "power2.out",
-        delay,
-        scrollTrigger: {
-          trigger: element,
-          start: "top 85%",
-          end: "bottom 15%",
-          toggleActions: "play none none none"
-        }
-      }
-    );
-  }, [delay]);
-
-  return elementRef;
-};
-
-export const useScaleIn = (delay: number = 0) => {
-  const elementRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!elementRef.current) return;
-
-    const element = elementRef.current;
-    
-    gsap.fromTo(element, 
-      { 
-        opacity: 0, 
-        scale: 0.95 
-      },
-      { 
-        opacity: 1, 
-        scale: 1, 
-        duration: 0.5, 
-        ease: "power2.out",
-        delay,
-        scrollTrigger: {
-          trigger: element,
-          start: "top 85%",
-          end: "bottom 15%",
-          toggleActions: "play none none none"
-        }
-      }
-    );
-  }, [delay]);
-
-  return elementRef;
-};
 
 export const useStaggeredFadeIn = (delay: number = 0, stagger: number = 0.05) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -191,8 +99,7 @@ export const useStaggeredFadeIn = (delay: number = 0, stagger: number = 0.05) =>
     if (!containerRef.current) return;
 
     const elements = containerRef.current.children;
-    
-    gsap.fromTo(elements, 
+    const animation = gsap.fromTo(elements, 
       { 
         opacity: 0, 
         y: 15,
@@ -214,142 +121,12 @@ export const useStaggeredFadeIn = (delay: number = 0, stagger: number = 0.05) =>
         }
       }
     );
+
+    return () => {
+      animation.kill();
+    };
   }, [delay, stagger]);
 
   return containerRef;
-};
-
-export const useRotateIn = (delay: number = 0) => {
-  const elementRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!elementRef.current) return;
-
-    const element = elementRef.current;
-    
-    gsap.fromTo(element, 
-      { 
-        opacity: 0, 
-        rotation: 5,
-        scale: 0.95
-      },
-      { 
-        opacity: 1, 
-        rotation: 0,
-        scale: 1,
-        duration: 0.5, 
-        ease: "power2.out",
-        delay,
-        scrollTrigger: {
-          trigger: element,
-          start: "top 85%",
-          end: "bottom 15%",
-          toggleActions: "play none none none"
-        }
-      }
-    );
-  }, [delay]);
-
-  return elementRef;
-};
-
-export const useSlideInUp = (delay: number = 0) => {
-  const elementRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!elementRef.current) return;
-
-    const element = elementRef.current;
-    
-    gsap.fromTo(element, 
-      { 
-        opacity: 0, 
-        y: 25
-      },
-      { 
-        opacity: 1, 
-        y: 0,
-        duration: 0.5, 
-        ease: "power2.out",
-        delay,
-        scrollTrigger: {
-          trigger: element,
-          start: "top 85%",
-          end: "bottom 15%",
-          toggleActions: "play none none none"
-        }
-      }
-    );
-  }, [delay]);
-
-  return elementRef;
-};
-
-export const useBounceIn = (delay: number = 0) => {
-  const elementRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!elementRef.current) return;
-
-    const element = elementRef.current;
-    
-    gsap.fromTo(element, 
-      { 
-        opacity: 0, 
-        scale: 0.8,
-        y: 20
-      },
-      { 
-        opacity: 1, 
-        scale: 1,
-        y: 0,
-        duration: 0.5, 
-        ease: "back.out(1.2)",
-        delay,
-        scrollTrigger: {
-          trigger: element,
-          start: "top 85%",
-          end: "bottom 15%",
-          toggleActions: "play none none none"
-        }
-      }
-    );
-  }, [delay]);
-
-  return elementRef;
-};
-
-export const useElasticIn = (delay: number = 0) => {
-  const elementRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!elementRef.current) return;
-
-    const element = elementRef.current;
-    
-    gsap.fromTo(element, 
-      { 
-        opacity: 0, 
-        scale: 0.8,
-        rotation: -5
-      },
-      { 
-        opacity: 1, 
-        scale: 1,
-        rotation: 0,
-        duration: 0.6, 
-        ease: "elastic.out(1, 0.5)",
-        delay,
-        scrollTrigger: {
-          trigger: element,
-          start: "top 85%",
-          end: "bottom 15%",
-          toggleActions: "play none none none"
-        }
-      }
-    );
-  }, [delay]);
-
-  return elementRef;
 };
 

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+// Using full gsap for ScrollToPlugin
 import { gsap } from 'gsap';
 import { ScrollToPlugin } from 'gsap/ScrollToPlugin';
 

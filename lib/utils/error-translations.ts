@@ -67,7 +67,7 @@ const errorTranslations: Record<string, string> = {
   [ERROR_INVALID_STATUS_TRANSITION]: 'Недопустимый переход статуса',
   [ERROR_TICKET_NOT_ASSIGNED]: 'Тикет должен быть назначен вам для изменения статуса',
   
-  // Ошибки валидации (из validation-schema.ts)
+  // Ошибки валидации (из Zod схем)
   'Username is required': 'Логин обязателен',
   'Username must be a string': 'Логин должен быть строкой',
   'Username must be at least 3 characters long': 'Логин должен содержать минимум 3 символа',

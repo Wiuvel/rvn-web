@@ -3,8 +3,8 @@
  */
 import { ZodSchema, ZodError } from 'zod';
 import { NextRequest, NextResponse } from 'next/server';
-import { setCorsHeaders } from '@/lib/cors';
-import { ERROR_INVALID_REQUEST_DATA } from '@/lib/constants';
+import { setCorsHeaders } from '@/lib/security/cors';
+import { ERROR_INVALID_REQUEST_DATA } from '@/lib/utils/constants';
 
 /**
  * Валидация body запроса

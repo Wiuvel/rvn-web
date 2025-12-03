@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { UserData } from '@/types';
 import { useMenuAnimation } from '@/hooks/useMenuAnimation';
-import { getGradientClasses } from '@/lib/avatar-gradients';
+import { getGradientClasses } from '@/lib/utils/avatar-gradients';
 
 interface UserMenuProps {
   userData: UserData;

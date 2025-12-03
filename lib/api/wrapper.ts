@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { RateLimiter } from './rate-limit';
-import { verifyCSRFToken } from './csrf';
-import { ServerValidator } from './server-validation';
-import { logger } from './secure-logger';
-import { setCorsHeaders, handleCorsPreflight } from './cors';
-import { checkAuth } from './auth-helper';
-import { ERROR_NOT_AUTHENTICATED } from './constants';
-import type { User } from './auth';
+import { RateLimiter } from '../security/rate-limit';
+import { verifyCSRFToken } from '../security/csrf';
+import { usernameSchema, passwordSchema } from '../validation/schemas';
+import { logger } from '../utils/secure-logger';
+import { setCorsHeaders, handleCorsPreflight } from '../security/cors';
+import { checkAuth } from '../auth/helper';
+import { ERROR_NOT_AUTHENTICATED } from '../utils/constants';
+import type { User } from '../auth/index';
 
 declare module 'next/server' {
   interface NextRequest {
@@ -71,7 +71,7 @@ export function withApiHandler(
       if (rateLimit) {
         const rateLimitResult = await rateLimit.check(request);
         if (!rateLimitResult.allowed) {
-          logger.warn(`Rate limit exceeded for ${method} request`, {
+          logger.warn(`RATE LIMIT EXCEEDED FOR ${method.toUpperCase()} REQUEST`, {
             ip: request.headers.get('x-forwarded-for'),
             userAgent: request.headers.get('user-agent')
           });
@@ -84,9 +84,9 @@ export function withApiHandler(
         }
       }
 
-      // Auth check
+      // Auth check with session validation
       if (requireAuth) {
-        const authResult = await checkAuth();
+        const authResult = await checkAuth(request);
         if (!authResult.isAuthenticated || !authResult.user) {
           return setCorsHeaders(
             NextResponse.json(
@@ -146,10 +146,11 @@ export function withApiHandler(
         }
       }
 
-      // Username Validation
+      // Username Validation with Zod
       if (validateUsername && data.username) {
-        const validation = ServerValidator.validateUsername(data.username);
-        if (!validation.isValid) {
+        try {
+          usernameSchema.parse(data.username);
+        } catch {
           return setCorsHeaders(
             NextResponse.json(
               { error: 'Invalid username format' },
@@ -159,10 +160,11 @@ export function withApiHandler(
         }
       }
 
-      // Password Validation
+      // Password Validation with Zod
       if (validatePassword && data.password) {
-        const validation = ServerValidator.validatePassword(data.password);
-        if (!validation.isValid) {
+        try {
+          passwordSchema.parse(data.password);
+        } catch {
           return setCorsHeaders(
             NextResponse.json(
               { error: 'Invalid password format' },
@@ -172,13 +174,9 @@ export function withApiHandler(
         }
       }
 
-      // Confirm password validation
+      // Confirm password validation with Zod
       if (validateConfirmPassword && data.password && data.confirmPassword) {
-        const validation = ServerValidator.validateConfirmPassword(
-          data.password,
-          data.confirmPassword
-        );
-        if (!validation.isValid) {
+        if (data.password !== data.confirmPassword) {
           return setCorsHeaders(
             NextResponse.json(
               { error: 'Passwords do not match' },

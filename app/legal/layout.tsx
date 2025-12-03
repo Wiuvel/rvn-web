@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "../globals.css";
 import "./legal.css";
-import { pageMetadata } from "@/lib/seo";
+import { pageMetadata } from "@/lib/utils/seo";
 
 export const metadata: Metadata = pageMetadata.legal;
 

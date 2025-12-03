@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { generateCSRFToken, generateSessionId } from '@/lib/csrf';
-import { generalRateLimit } from '@/lib/rate-limit';
-import { logger } from '@/lib/secure-logger';
-import { setCorsHeaders, handleCorsPreflight } from '@/lib/cors';
+import { generateCSRFToken } from '@/lib/security/csrf';
+import { generateSessionId } from '@/lib/utils/index';
+import { generalRateLimit } from '@/lib/security/rate-limit';
+import { logger } from '@/lib/utils/secure-logger';
+import { setCorsHeaders, handleCorsPreflight } from '@/lib/security/cors';
 
 const ADMIN_SESSION_COOKIE = 'admin_session_id';
 

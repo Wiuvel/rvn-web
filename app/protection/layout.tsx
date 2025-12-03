@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import './protection.css';
-import { pageMetadata } from '@/lib/seo';
+import { pageMetadata } from '@/lib/utils/seo';
 import { exo2 } from '../fonts';
 
 export const metadata: Metadata = {

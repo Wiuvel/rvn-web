@@ -6,9 +6,9 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { gsap } from 'gsap';
-import { MESSAGE_MAX_LENGTH, TICKET_SUBJECT_MAX_LENGTH, MAX_TICKETS_PER_USER, MESSAGE_TIMEOUT, AUTH_FETCH_TIMEOUT, GSAP_DEFAULT_DURATION, GSAP_DEFAULT_EASE, MARK_AS_READ_DEBOUNCE } from '@/lib/constants';
-import { translateError } from '@/lib/error-translations';
-import { getGradientClasses } from '@/lib/avatar-gradients';
+import { MESSAGE_MAX_LENGTH, TICKET_SUBJECT_MAX_LENGTH, MAX_TICKETS_PER_USER, MESSAGE_TIMEOUT, AUTH_FETCH_TIMEOUT, GSAP_DEFAULT_DURATION, GSAP_DEFAULT_EASE, MARK_AS_READ_DEBOUNCE } from '@/lib/utils/constants';
+import { translateError } from '@/lib/utils/error-translations';
+import { getGradientClasses } from '@/lib/utils/avatar-gradients';
 
 // Lazy load RateLimitCaptcha для оптимизации bundle size
 const RateLimitCaptcha = dynamic(() => import('@/components/RateLimitCaptcha'), {

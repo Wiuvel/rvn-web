@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { logger } from '@/lib/secure-logger';
-import { setCorsHeaders, handleCorsPreflight } from '@/lib/cors';
+import { logger } from '@/lib/utils/secure-logger';
+import { setCorsHeaders, handleCorsPreflight } from '@/lib/security/cors';
 
 export async function OPTIONS() {
   return handleCorsPreflight();

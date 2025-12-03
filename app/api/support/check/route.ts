@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { generalRateLimit } from '@/lib/rate-limit';
-import { logger } from '@/lib/secure-logger';
-import { setCorsHeaders, handleCorsPreflight } from '@/lib/cors';
-import { getUserByToken } from '@/lib/auth';
-import { hasUserRole } from '@/lib/user-roles';
-import { ERROR_INTERNAL_SERVER_ERROR, ERROR_TOO_MANY_REQUESTS } from '@/lib/constants';
+import { generalRateLimit } from '@/lib/security/rate-limit';
+import { logger } from '@/lib/utils/secure-logger';
+import { setCorsHeaders, handleCorsPreflight } from '@/lib/security/cors';
+import { getUserByToken } from '@/lib/auth/index';
+import { hasUserRole } from '@/lib/auth/user-roles';
+import { ERROR_INTERNAL_SERVER_ERROR, ERROR_TOO_MANY_REQUESTS } from '@/lib/utils/constants';
 
 export async function OPTIONS() {
   return handleCorsPreflight();

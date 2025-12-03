@@ -6,8 +6,8 @@ interface RateLimitStore {
   };
 }
 
-import { RATE_LIMIT_CLEANUP_INTERVAL, RATE_LIMIT_IMMUNITY_DURATION } from './constants';
-import { getClientIP } from './ip-validator';
+import { RATE_LIMIT_CLEANUP_INTERVAL, RATE_LIMIT_IMMUNITY_DURATION } from '../utils/constants';
+import { getClientIP } from '../validation/ip-validator';
 
 const store: RateLimitStore = {};
 
@@ -205,3 +205,4 @@ export const generalRateLimit = new RateLimiter({
   windowMs: 5 * 60 * 1000,
   maxRequests: 100,
 });
+

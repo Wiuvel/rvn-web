@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "../globals.css";
 import Script from "next/script";
-import { pageMetadata } from "@/lib/seo";
+import { pageMetadata } from "@/lib/utils/seo";
 
 export const metadata: Metadata = pageMetadata.auth;
 

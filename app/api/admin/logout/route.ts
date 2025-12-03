@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { logger } from '@/lib/secure-logger';
-import { setCorsHeaders, handleCorsPreflight } from '@/lib/cors';
-import { SessionManager } from '@/lib/session-manager';
-import { revokeCSRFToken } from '@/lib/csrf';
+import { logger } from '@/lib/utils/secure-logger';
+import { setCorsHeaders, handleCorsPreflight } from '@/lib/security/cors';
+import { SessionManager } from '@/lib/auth/session-manager';
+import { revokeCSRFToken } from '@/lib/security/csrf';
 
 const ADMIN_SESSION_COOKIE = 'admin_session_id';
 

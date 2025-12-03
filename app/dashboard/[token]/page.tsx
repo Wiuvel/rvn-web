@@ -7,8 +7,8 @@ import Image from 'next/image';
 import { useFadeIn, useStaggeredFadeIn } from '@/hooks/useGSAP';
 import { gsap } from 'gsap';
 import LoadingSpinner from '@/components/LoadingSpinner';
-import { getGradientClasses } from '@/lib/avatar-gradients';
-import { APP_VERSION } from '@/lib/constants';
+import { getGradientClasses } from '@/lib/utils/avatar-gradients';
+import { APP_VERSION } from '@/lib/utils/constants';
 
 interface UserData {
   id: string;

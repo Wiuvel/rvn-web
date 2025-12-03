@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { generateCSRFToken, generateSessionId, getCSRFStoreSize } from '@/lib/csrf';
-import { generalRateLimit } from '@/lib/rate-limit';
-import { logger } from '@/lib/secure-logger';
-import { setCorsHeaders, handleCorsPreflight } from '@/lib/cors';
+import { generateCSRFToken, getCSRFStoreSize } from '@/lib/security/csrf';
+import { generateSessionId } from '@/lib/utils/index';
+import { generalRateLimit } from '@/lib/security/rate-limit';
+import { logger } from '@/lib/utils/secure-logger';
+import { setCorsHeaders, handleCorsPreflight } from '@/lib/security/cors';
 
 export async function OPTIONS() {
   return handleCorsPreflight();
@@ -13,7 +14,7 @@ export async function GET(request: NextRequest) {
     // Rate limiting
     const rateLimitResult = await generalRateLimit.check(request);
     if (!rateLimitResult.allowed) {
-      logger.warn('Rate limit exceeded for CSRF token request', {
+      logger.warn('RATE LIMIT EXCEEDED FOR CSRF TOKEN REQUEST', {
         ip: request.headers.get('x-forwarded-for'),
         userAgent: request.headers.get('user-agent')
       });
@@ -32,7 +33,7 @@ export async function GET(request: NextRequest) {
     // Если session ID не существует, создаем новый
     if (!sessionId) {
       sessionId = generateSessionId();
-      logger.info('Created new session_id for CSRF token', {
+      logger.info('CREATED NEW SESSION_ID FOR CSRF TOKEN', {
         sessionId: sessionId.substring(0, 8) + '...',
         ip: request.headers.get('x-forwarded-for')
       });
@@ -41,7 +42,7 @@ export async function GET(request: NextRequest) {
     const csrfToken = generateCSRFToken(sessionId);
     
     // Логируем для отладки
-    logger.info('CSRF token generated', {
+    logger.info('CSRF TOKEN GENERATED', {
       sessionId: sessionId.substring(0, 8) + '...',
       tokenLength: csrfToken.length,
       storeSize: getCSRFStoreSize(),
@@ -66,7 +67,7 @@ export async function GET(request: NextRequest) {
 
     return setCorsHeaders(response);
   } catch (error) {
-    logger.error('CSRF token generation error', {
+    logger.error('CSRF TOKEN GENERATION ERROR', {
       error: error instanceof Error ? error.message : 'Unknown error',
       ip: request.headers.get('x-forwarded-for')
     });

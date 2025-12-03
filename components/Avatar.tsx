@@ -1,4 +1,4 @@
-import { getGradientClasses } from '@/lib/avatar-gradients';
+import { getGradientClasses } from '@/lib/utils/avatar-gradients';
 
 interface AvatarProps {
   username: string;

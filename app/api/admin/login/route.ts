@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { authenticateAdmin } from '@/lib/auth';
-import { authRateLimit } from '@/lib/rate-limit';
-import { verifyCSRFToken, revokeCSRFToken } from '@/lib/csrf';
-import { ServerValidator } from '@/lib/server-validation';
-import { logger } from '@/lib/secure-logger';
-import { setCorsHeaders, handleCorsPreflight } from '@/lib/cors';
-import { SessionManager } from '@/lib/session-manager';
+import { authenticateAdmin } from '@/lib/auth/index';
+import { authRateLimit } from '@/lib/security/rate-limit';
+import { verifyCSRFToken, revokeCSRFToken } from '@/lib/security/csrf';
+import { validateRequestBody } from '@/lib/api/validation';
+import { adminAuthSchema } from '@/lib/validation/schemas';
+import { sanitizeInput } from '@/lib/security/sanitize';
+import { logger } from '@/lib/utils/secure-logger';
+import { setCorsHeaders, handleCorsPreflight } from '@/lib/security/cors';
+import { SessionManager } from '@/lib/auth/session-manager';
 
 const ADMIN_SESSION_COOKIE = 'admin_session_id';
 
@@ -29,28 +31,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { username, password, csrfToken } = await request.json();
-
-    const dataValidation = ServerValidator.validateRequestData({ username, password });
-    if (!dataValidation.isValid) {
-      return setCorsHeaders(
-        NextResponse.json({ error: 'Invalid request data' }, { status: 400 }),
-      );
+    // Validate request body with Zod
+    const validation = await validateRequestBody(request, adminAuthSchema);
+    if (!validation.success) {
+      return validation.response;
     }
 
-    const usernameValidation = ServerValidator.validateUsername(username);
-    if (!usernameValidation.isValid) {
-      return setCorsHeaders(
-        NextResponse.json({ error: 'Invalid username format' }, { status: 400 }),
-      );
-    }
-
-    const passwordValidation = ServerValidator.validatePassword(password);
-    if (!passwordValidation.isValid) {
-      return setCorsHeaders(
-        NextResponse.json({ error: 'Invalid password format' }, { status: 400 }),
-      );
-    }
+    const { username, password, csrfToken } = validation.data;
 
     const currentSessionId = request.cookies.get(ADMIN_SESSION_COOKIE)?.value;
     if (currentSessionId && csrfToken && !verifyCSRFToken(csrfToken, currentSessionId)) {
@@ -82,7 +69,7 @@ export async function POST(request: NextRequest) {
 
     const sessionId = SessionManager.createSession(
       result.admin.id,
-      ServerValidator.sanitizeInput(username),
+      sanitizeInput(username),
       ipAddress,
       userAgent,
     );
@@ -93,7 +80,7 @@ export async function POST(request: NextRequest) {
     const response = NextResponse.json(
       {
         message: 'Admin login successful',
-        username: ServerValidator.sanitizeInput(username),
+        username: sanitizeInput(username),
       },
       { status: 200 },
     );
@@ -106,7 +93,7 @@ export async function POST(request: NextRequest) {
       path: '/',
     });
 
-    response.cookies.set('admin_username', ServerValidator.sanitizeInput(username), {
+    response.cookies.set('admin_username', sanitizeInput(username), {
       maxAge: 60 * 60 * 6,
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production' && !isLocalhost,
@@ -115,7 +102,7 @@ export async function POST(request: NextRequest) {
     });
 
     logger.info('Admin login success', {
-      username: ServerValidator.sanitizeInput(username),
+      username: sanitizeInput(username),
       sessionId: sessionId.substring(0, 8) + '...',
       ip: ipAddress,
     });

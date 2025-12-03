@@ -13,6 +13,7 @@ declare global {
 }
 
 export default function AppsSection() {
+  const badgeRef = useFadeIn(0) as React.RefObject<HTMLDivElement>;
   const titleRef = useFadeIn(0.1) as React.RefObject<HTMLHeadingElement>;
   const descriptionRef = useFadeIn(0.2) as React.RefObject<HTMLParagraphElement>;
   const buttonsRef = useStaggeredFadeIn(0.3, 0.05) as React.RefObject<HTMLDivElement>;
@@ -78,12 +79,14 @@ export default function AppsSection() {
       <div className="mx-auto max-w-7xl px-6 sm:px-8 lg:px-12 xl:px-16 py-12 md:py-16">
                 <div className="flex flex-col">
                   <div className="w-full space-y-6">
-                    <Badge variant="outline" className="bg-neutral-800/50 border-neutral-700/50 text-neutral-400 hover:bg-neutral-800/50">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
-                      </svg>
-                      Software
-                    </Badge>
+                    <div ref={badgeRef}>
+                      <Badge variant="outline" className="bg-neutral-800/50 border-neutral-700/50 text-neutral-400 hover:bg-neutral-800/50">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+                        </svg>
+                        Software
+                      </Badge>
+                    </div>
                     <h2 ref={titleRef} className="text-2xl md:text-3xl lg:text-4xl font-semibold text-left leading-tight">Поддерживаемые приложения</h2>
             <div ref={descriptionRef}>
               <p className="mt-2 md:mt-3 text-neutral-300 text-base md:text-lg text-left max-w-xl block md:hidden">

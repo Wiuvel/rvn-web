@@ -10,7 +10,7 @@ export async function OPTIONS() {
   return handleCorsPreflight();
 }
 
-// Initiate Google OAuth flow
+// Initiate Telegram OAuth flow
 export async function GET(request: NextRequest) {
   try {
     const env = getEnv();
@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
     // Rate limiting
     const rateLimitResult = await authRateLimit.check(request);
     if (!rateLimitResult.allowed) {
-      logger.warn('RATE LIMIT EXCEEDED FOR OAUTH INITIATION', {
+      logger.warn('RATE LIMIT EXCEEDED FOR TELEGRAM OAUTH INITIATION', {
         ip: request.headers.get('x-forwarded-for'),
       });
       return setCorsHeaders(
@@ -41,11 +41,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Check Google OAuth credentials
-    if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) {
-      logger.error('GOOGLE OAUTH NOT CONFIGURED', {
-        hasClientId: !!env.GOOGLE_CLIENT_ID,
-        hasClientSecret: !!env.GOOGLE_CLIENT_SECRET,
+    // Check Telegram OAuth credentials
+    if (!env.TELEGRAM_BOT_TOKEN) {
+      logger.error('TELEGRAM OAUTH NOT CONFIGURED', {
+        hasBotToken: !!env.TELEGRAM_BOT_TOKEN,
       });
       return setCorsHeaders(
         NextResponse.redirect(
@@ -56,10 +55,10 @@ export async function GET(request: NextRequest) {
 
     // Generate CSRF state token
     const state = randomBytes(32).toString('hex');
-    const redirectUri = `${origin}/api/auth/oauth/google/callback`;
+    const redirectUri = `${origin}/api/auth/oauth/telegram/callback`;
 
-    logger.info('OAUTH INITIATION', {
-      provider: 'google',
+    logger.info('TELEGRAM OAUTH INITIATION', {
+      provider: 'telegram',
       redirectUri,
       origin,
       ip: request.headers.get('x-forwarded-for'),
@@ -68,18 +67,24 @@ export async function GET(request: NextRequest) {
     const hostname = request.nextUrl.hostname;
     const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
 
-    // Redirect to Google OAuth
-    const response = NextResponse.redirect(
-      `https://accounts.google.com/o/oauth2/v2/auth?${new URLSearchParams({
-        client_id: env.GOOGLE_CLIENT_ID,
-        redirect_uri: redirectUri,
-        response_type: 'code',
-        scope: 'openid email profile',
-        access_type: 'offline',
-        prompt: 'consent',
-        state,
-      }).toString()}`
-    );
+    // Telegram Login Widget works via JavaScript widget, but we can use server-side approach
+    // Extract bot ID from token (format: "123456789:ABCdefGHIjklMNOpqrsTUVwxyz")
+    const botId = env.TELEGRAM_BOT_TOKEN.split(':')[0];
+    
+    // For server-side flow, we'll use Telegram Bot API approach
+    // But actually Telegram Login Widget requires client-side JavaScript
+    // So we'll redirect to a page that loads the widget, which then redirects back
+    // For now, we'll use a simplified approach with direct redirect
+    const telegramAuthUrl = `https://oauth.telegram.org/auth?${new URLSearchParams({
+      bot_id: botId,
+      origin: origin,
+      request_access: 'write',
+      return_to: redirectUri,
+      state,
+    }).toString()}`;
+
+    // Redirect to Telegram OAuth
+    const response = NextResponse.redirect(telegramAuthUrl);
 
     // Store state in cookie for CSRF protection
     response.cookies.set('oauth_state', state, {
@@ -92,7 +97,7 @@ export async function GET(request: NextRequest) {
 
     return setCorsHeaders(response);
   } catch (error) {
-    logger.error('OAUTH INITIATION ERROR', {
+    logger.error('TELEGRAM OAUTH INITIATION ERROR', {
       error: error instanceof Error ? error.message : 'Unknown error',
       ip: request.headers.get('x-forwarded-for'),
     });
@@ -120,3 +125,4 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+

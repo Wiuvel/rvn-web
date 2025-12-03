@@ -26,7 +26,7 @@ import type {
   VerifyProtectionResponse,
   IpResponse,
   Ticket,
-} from './api/types';
+} from './types';
 
 /**
  * Базовый класс для API клиента

@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { generalRateLimit } from '@/lib/rate-limit';
-import { logger } from '@/lib/secure-logger';
-import { setCorsHeaders, handleCorsPreflight } from '@/lib/cors';
+import { generalRateLimit } from '@/lib/security/rate-limit';
+import { logger } from '@/lib/utils/secure-logger';
+import { setCorsHeaders, handleCorsPreflight } from '@/lib/security/cors';
 import {
   ERROR_INTERNAL_SERVER_ERROR,
   ERROR_INVALID_REQUEST_DATA,
   ERROR_NOT_AUTHENTICATED
-} from '@/lib/constants';
+} from '@/lib/utils/constants';
 
 export async function OPTIONS() {
   return handleCorsPreflight();

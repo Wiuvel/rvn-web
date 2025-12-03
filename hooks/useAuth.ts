@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { UserData } from '@/types';
-import { AUTH_FETCH_TIMEOUT } from '@/lib/constants';
+import { AUTH_FETCH_TIMEOUT } from '@/lib/utils/constants';
 
 export interface UseAuthOptions {
   requireAuth?: boolean;
@@ -171,9 +171,8 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
         controller.abort();
       }
     };
-    // onSuccess и onError не должны быть в зависимостях, так как это функции,
-    // которые могут меняться при каждом рендере, что приведет к бесконечным перезапросам
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [requireAuth, redirectOnFail, redirectOnTimeout, silent, validateToken, router]);
 
   return { userData, loading, error };

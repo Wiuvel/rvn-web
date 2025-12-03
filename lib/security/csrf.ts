@@ -1,6 +1,19 @@
 import { createHmac, timingSafeEqual, randomBytes } from 'crypto';
+import { getEnv } from '../validation/env-validation';
 
-const CSRF_SECRET = process.env.CSRF_SECRET || 'default-csrf-secret-change-in-production';
+// Get CSRF secret from validated env (will throw if not set or invalid)
+function getCSRFSecret(): string {
+  try {
+    return getEnv().CSRF_SECRET;
+  } catch {
+    // Fallback only for development/testing
+    if (process.env.NODE_ENV === 'development') {
+      return 'default-csrf-secret-change-in-production-dev-only';
+    }
+    throw new Error('CSRF_SECRET must be configured in production');
+  }
+}
+
 const CSRF_TOKEN_LIFETIME = 60 * 60 * 1000; // 1 hour
 
 interface CSRFStore {
@@ -47,7 +60,7 @@ export function generateCSRFToken(sessionId: string): string {
   const timestamp = Date.now().toString();
   const nonce = randomBytes(16).toString('hex');
   const data = `${sessionId}-${timestamp}-${nonce}`;
-  const signature = createHmac('sha256', CSRF_SECRET)
+  const signature = createHmac('sha256', getCSRFSecret())
     .update(data)
     .digest('hex');
   
@@ -120,7 +133,7 @@ export function verifyCSRFToken(token: string, sessionId: string, detailed?: boo
     
     // Verify signature (это основная проверка безопасности)
     const data = `${tokenSessionId}-${timestamp}-${nonce}`;
-    const expectedSignature = createHmac('sha256', CSRF_SECRET)
+    const expectedSignature = createHmac('sha256', getCSRFSecret())
       .update(data)
       .digest('hex');
     
@@ -170,7 +183,7 @@ export function verifyCSRFToken(token: string, sessionId: string, detailed?: boo
  * Реэкспорт для обратной совместимости
  * @deprecated Используйте generateSessionId из lib/utils напрямую
  */
-export { generateSessionId } from './utils';
+export { generateSessionId } from '../utils/index';
 
 export function revokeCSRFToken(sessionId: string): void {
   delete csrfStore[sessionId];
@@ -191,3 +204,4 @@ export function cleanupCSRF(): void {
 export function getCSRFStoreSize(): number {
   return Object.keys(csrfStore).length;
 }
+

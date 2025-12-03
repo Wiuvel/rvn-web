@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { authenticateUser } from '@/lib/auth';
-import { authRateLimit } from '@/lib/rate-limit';
-import { verifyCSRFToken, revokeCSRFToken, getCSRFTokenInfo, getCSRFStoreSize } from '@/lib/csrf';
-import { ServerValidator } from '@/lib/server-validation';
-import { logger } from '@/lib/secure-logger';
-import { setCorsHeaders, handleCorsPreflight } from '@/lib/cors';
-import { SessionManager } from '@/lib/session-manager';
+import { authenticateUser } from '@/lib/auth/index';
+import { authRateLimit } from '@/lib/security/rate-limit';
+import { verifyCSRFToken, revokeCSRFToken, getCSRFTokenInfo, getCSRFStoreSize } from '@/lib/security/csrf';
+import { validateRequestBody } from '@/lib/api/validation';
+import { loginSchema } from '@/lib/validation/schemas';
+import { sanitizeInput } from '@/lib/security/sanitize';
+import { logger } from '@/lib/utils/secure-logger';
+import { setCorsHeaders, handleCorsPreflight } from '@/lib/security/cors';
+import { SessionManager } from '@/lib/auth/session-manager';
 
 export async function OPTIONS() {
   return handleCorsPreflight();
@@ -15,7 +17,7 @@ export async function POST(request: NextRequest) {
   try {
     const rateLimitResult = await authRateLimit.check(request);
     if (!rateLimitResult.allowed) {
-      logger.warn('Rate limit exceeded for login attempt', {
+      logger.warn('RATE LIMIT EXCEEDED FOR LOGIN ATTEMPT', {
         ip: request.headers.get('x-forwarded-for'),
         userAgent: request.headers.get('user-agent')
       });
@@ -27,37 +29,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { username, password, csrfToken } = await request.json();
-
-    const dataValidation = ServerValidator.validateRequestData({ username, password });
-    if (!dataValidation.isValid) {
-      return setCorsHeaders(
-        NextResponse.json(
-          { error: 'Invalid request data' },
-          { status: 400 }
-        )
-      );
+    // Validate request body with Zod
+    const validation = await validateRequestBody(request, loginSchema);
+    if (!validation.success) {
+      return validation.response;
     }
 
-    const usernameValidation = ServerValidator.validateUsername(username);
-    if (!usernameValidation.isValid) {
-      return setCorsHeaders(
-        NextResponse.json(
-          { error: 'Invalid username format' },
-          { status: 400 }
-        )
-      );
-    }
-
-    const passwordValidation = ServerValidator.validatePassword(password);
-    if (!passwordValidation.isValid) {
-      return setCorsHeaders(
-        NextResponse.json(
-          { error: 'Invalid password format' },
-          { status: 400 }
-        )
-      );
-    }
+    const { username, password, csrfToken } = validation.data;
 
     const currentSessionId = request.cookies.get('session_id')?.value;
     
@@ -65,7 +43,7 @@ export async function POST(request: NextRequest) {
     // Если session_id нет, CSRF токен не требуется (первый запрос, но все равно проверяем если передан)
     if (currentSessionId) {
       if (!csrfToken) {
-        logger.warn('Missing CSRF token for login attempt with existing session', {
+        logger.warn('MISSING CSRF TOKEN FOR LOGIN ATTEMPT WITH EXISTING SESSION', {
           ip: request.headers.get('x-forwarded-for'),
           hasSessionId: true
         });
@@ -79,7 +57,7 @@ export async function POST(request: NextRequest) {
       
       // Логируем информацию о токене перед проверкой
       const tokenInfo = getCSRFTokenInfo(currentSessionId);
-      logger.info('CSRF token verification attempt', {
+      logger.info('CSRF TOKEN VERIFICATION ATTEMPT', {
         sessionIdPrefix: currentSessionId?.substring(0, 8),
         tokenExistsInStore: tokenInfo.exists,
         tokenLength: csrfToken?.length || 0,
@@ -89,7 +67,7 @@ export async function POST(request: NextRequest) {
       
       const csrfValidation = verifyCSRFToken(csrfToken, currentSessionId, true);
       if (!csrfValidation.valid) {
-        logger.warn('Invalid CSRF token for login attempt', {
+        logger.warn('INVALID CSRF TOKEN FOR LOGIN ATTEMPT', {
           ip: request.headers.get('x-forwarded-for'),
           hasSessionId: true,
           hasCsrfToken: !!csrfToken,
@@ -110,7 +88,7 @@ export async function POST(request: NextRequest) {
     } else if (csrfToken) {
       // Если session_id нет, но CSRF токен передан - это подозрительно
       // Но не блокируем, так как это может быть первый запрос после очистки cookies
-      logger.info('CSRF token provided without session_id for login attempt', {
+      logger.info('CSRF TOKEN PROVIDED WITHOUT SESSION_ID FOR LOGIN ATTEMPT', {
         ip: request.headers.get('x-forwarded-for'),
         hasCsrfToken: true
       });
@@ -119,8 +97,8 @@ export async function POST(request: NextRequest) {
     const result = await authenticateUser(username, password);
 
     if (!result.success) {
-      logger.warn('Failed login attempt', {
-        username: ServerValidator.sanitizeInput(username),
+      logger.warn('FAILED LOGIN ATTEMPT', {
+        username: sanitizeInput(username),
         ip: request.headers.get('x-forwarded-for'),
         userAgent: request.headers.get('user-agent')
       });
@@ -138,9 +116,16 @@ export async function POST(request: NextRequest) {
     const hostname = request.nextUrl.hostname;
     const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
     
+    // Session rotation: destroy old session if exists (prevents session fixation)
+    const oldSessionId = currentSessionId;
+    if (oldSessionId) {
+      SessionManager.destroySession(oldSessionId);
+      revokeCSRFToken(oldSessionId);
+    }
+    
     const sessionId = SessionManager.createSession(
       result.user!.id,
-      ServerValidator.sanitizeInput(username),
+      sanitizeInput(username),
       ipAddress,
       userAgent
     );
@@ -149,8 +134,8 @@ export async function POST(request: NextRequest) {
     revokeCSRFToken(sessionId);
     await SessionManager.setSessionCookie(sessionId, isLocalhost);
 
-    logger.info('Successful login', {
-      username: ServerValidator.sanitizeInput(username),
+    logger.info('SUCCESSFUL LOGIN', {
+      username: sanitizeInput(username),
       sessionId: sessionId.substring(0, 8) + '...',
       ip: ipAddress
     });
@@ -190,7 +175,7 @@ export async function POST(request: NextRequest) {
 
     return setCorsHeaders(response);
   } catch (error) {
-    logger.error('Login error', {
+    logger.error('LOGIN ERROR', {
       error: error instanceof Error ? error.message : 'Unknown error',
       ip: request.headers.get('x-forwarded-for')
     });

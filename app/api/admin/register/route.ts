@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdmin, checkAdminExists } from '@/lib/auth';
-import { authRateLimit } from '@/lib/rate-limit';
-import { verifyCSRFToken } from '@/lib/csrf';
-import { ServerValidator } from '@/lib/server-validation';
-import { logger } from '@/lib/secure-logger';
-import { setCorsHeaders, handleCorsPreflight } from '@/lib/cors';
+import { createAdmin, checkAdminExists } from '@/lib/auth/index';
+import { authRateLimit } from '@/lib/security/rate-limit';
+import { verifyCSRFToken } from '@/lib/security/csrf';
+import { validateRequestBody } from '@/lib/api/validation';
+import { adminRegisterSchema } from '@/lib/validation/schemas';
+import { sanitizeInput } from '@/lib/security/sanitize';
+import { logger } from '@/lib/utils/secure-logger';
+import { setCorsHeaders, handleCorsPreflight } from '@/lib/security/cors';
 
 const ADMIN_SESSION_COOKIE = 'admin_session_id';
 
@@ -38,38 +40,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { username, password, confirmPassword, csrfToken } = await request.json();
-
-    const dataValidation = ServerValidator.validateRequestData({
-      username,
-      password,
-      confirmPassword,
-    });
-    if (!dataValidation.isValid) {
-      return setCorsHeaders(
-        NextResponse.json({ error: 'Invalid request data' }, { status: 400 }),
-      );
+    // Validate request body with Zod
+    const validation = await validateRequestBody(request, adminRegisterSchema);
+    if (!validation.success) {
+      return validation.response;
     }
 
-    const usernameValidation = ServerValidator.validateUsername(username);
-    if (!usernameValidation.isValid) {
-      return setCorsHeaders(
-        NextResponse.json({ error: 'Invalid username format' }, { status: 400 }),
-      );
-    }
-
-    const passwordValidation = ServerValidator.validatePassword(password);
-    if (!passwordValidation.isValid) {
-      return setCorsHeaders(
-        NextResponse.json({ error: 'Invalid password format' }, { status: 400 }),
-      );
-    }
-
-    if (password !== confirmPassword) {
-      return setCorsHeaders(
-        NextResponse.json({ error: 'Passwords do not match' }, { status: 400 }),
-      );
-    }
+    const { username, password, csrfToken } = validation.data;
 
     const currentSessionId = request.cookies.get(ADMIN_SESSION_COOKIE)?.value;
     if (currentSessionId && csrfToken && !verifyCSRFToken(csrfToken, currentSessionId)) {
@@ -91,7 +68,7 @@ export async function POST(request: NextRequest) {
     }
 
     logger.info('Admin account created', {
-      username: ServerValidator.sanitizeInput(username),
+      username: sanitizeInput(username),
       ip: request.headers.get('x-forwarded-for'),
     });
 

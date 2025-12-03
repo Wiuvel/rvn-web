@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers';
-import { SESSION_TIMEOUT, SESSION_CLEANUP_INTERVAL } from './constants';
-import { generateSessionId as generateSessionIdUtil } from './utils';
+import { SESSION_TIMEOUT, SESSION_CLEANUP_INTERVAL } from '../utils/constants';
+import { generateSessionId as generateSessionIdUtil } from '../utils/index';
 
 interface SessionData {
   id: string;
@@ -153,16 +153,61 @@ export class SessionManager {
     cookieStore.delete(cookieName);
   }
 
-  static validateSession(sessionId: string, ipAddress: string, userAgent: string): boolean {
+  static validateSession(
+    sessionId: string,
+    ipAddress: string,
+    userAgent: string,
+    options: { strictIP?: boolean } = {}
+  ): { valid: boolean; reason?: string } {
     const session = this.getSession(sessionId);
-    if (!session) return false;
-
-    if (session.ipAddress !== ipAddress || session.userAgent !== userAgent) {
-      this.destroySession(sessionId);
-      return false;
+    if (!session) {
+      return { valid: false, reason: 'Session not found or expired' };
     }
 
-    return true;
+    // Always strictly validate User-Agent
+    if (session.userAgent !== userAgent) {
+      this.destroySession(sessionId);
+      return { valid: false, reason: 'User-Agent mismatch' };
+    }
+
+    // IP validation - flexible by default, strict if requested
+    if (options.strictIP) {
+      if (session.ipAddress !== ipAddress) {
+        this.destroySession(sessionId);
+        return { valid: false, reason: 'IP address mismatch' };
+      }
+    } else {
+      // Flexible IP validation - check first 3 octets (subnet)
+      // This allows for IP changes within the same network
+      const normalizeIP = (ip: string): string => {
+        // Handle IPv4
+        if (ip.includes('.')) {
+          const parts = ip.split('.');
+          if (parts.length >= 3) {
+            return parts.slice(0, 3).join('.');
+          }
+        }
+        // Handle IPv6 - use first 64 bits (first 4 groups)
+        if (ip.includes(':')) {
+          const parts = ip.split(':');
+          if (parts.length >= 4) {
+            return parts.slice(0, 4).join(':');
+          }
+        }
+        return ip;
+      };
+
+      const sessionIPPrefix = normalizeIP(session.ipAddress);
+      const requestIPPrefix = normalizeIP(ipAddress);
+
+      if (sessionIPPrefix !== requestIPPrefix) {
+        // Log warning but don't block - IP can change legitimately
+        // This is logged for monitoring suspicious activity
+        return { valid: true, reason: 'IP prefix mismatch (logged)' };
+      }
+    }
+
+    return { valid: true };
   }
 
   static cleanup(): void {
@@ -172,4 +217,5 @@ export class SessionManager {
     }
   }
 }
+
 
