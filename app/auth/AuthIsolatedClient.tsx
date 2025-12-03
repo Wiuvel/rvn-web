@@ -77,17 +77,54 @@ export default function AuthIsolatedClient() {
               // Wait a bit to ensure cookies are set
               await new Promise(resolve => setTimeout(resolve, 100));
               
-              if (result.redirect) {
-                window.location.href = result.redirect;
-              } else if (result.dashboard_token) {
-                window.location.href = `/dashboard/${result.dashboard_token}`;
+              // Check if we're in a popup window
+              if (window.opener) {
+                // Send success message to parent window
+                window.opener.postMessage(
+                  {
+                    type: 'OAUTH_SUCCESS',
+                    dashboard_token: result.dashboard_token,
+                    redirect: result.redirect || `/dashboard/${result.dashboard_token}`
+                  },
+                  window.location.origin
+                );
+                // Close popup after a short delay
+                setTimeout(() => {
+                  window.close();
+                }, 100);
               } else {
-                window.location.href = '/auth?error=telegram_auth_failed';
+                // Not in popup - redirect normally
+                if (result.redirect) {
+                  window.location.href = result.redirect;
+                } else if (result.dashboard_token) {
+                  window.location.href = `/dashboard/${result.dashboard_token}`;
+                } else {
+                  window.location.href = '/auth?error=telegram_auth_failed';
+                }
               }
             } else {
               const errorData = await response.json();
-              // Redirect with error
-              window.location.href = `/auth?error=${encodeURIComponent(errorData.error || 'telegram_auth_failed')}`;
+              
+              // Check if we're in a popup window
+              if (window.opener) {
+                // Send error message to parent window
+                window.opener.postMessage(
+                  {
+                    type: 'OAUTH_ERROR',
+                    error: errorData.error === 'user_creation_failed' ? 'Не удалось создать аккаунт' :
+                           errorData.error === 'account_disabled' ? 'Аккаунт отключен' :
+                           'Ошибка авторизации'
+                  },
+                  window.location.origin
+                );
+                // Close popup after a short delay
+                setTimeout(() => {
+                  window.close();
+                }, 100);
+              } else {
+                // Not in popup - redirect with error
+                window.location.href = `/auth?error=${encodeURIComponent(errorData.error || 'telegram_auth_failed')}`;
+              }
             }
           } catch (error) {
             console.error('Telegram OAuth callback error:', error);

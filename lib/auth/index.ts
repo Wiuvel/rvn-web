@@ -424,6 +424,19 @@ export async function createUserFromOAuth(email: string, preferredUsername?: str
 
     // Use preferred username or extract from email
     let username = preferredUsername || email.split('@')[0];
+    
+    // Sanitize username: remove invalid characters, limit length
+    // Only allow alphanumeric, underscore, and hyphen
+    username = username.replace(/[^a-zA-Z0-9_-]/g, '_');
+    // Limit to 30 characters (database constraint)
+    if (username.length > 30) {
+      username = username.substring(0, 30);
+    }
+    // Ensure username is not empty
+    if (!username || username.trim().length === 0) {
+      username = `user_${Date.now().toString().slice(-8)}`;
+    }
+    
     const normalizedUsername = username.toLowerCase();
 
     // Check if username is already taken, if so, generate unique one
@@ -512,9 +525,14 @@ export async function createUserFromOAuth(email: string, preferredUsername?: str
     if (insertError) {
       logger.error('ERROR CREATING USER FROM OAUTH', {
         error: insertError.message,
-        code: insertError.code
+        code: insertError.code,
+        details: insertError.details,
+        hint: insertError.hint,
+        email: email.substring(0, 3) + '***',
+        username: username,
+        userId: userId
       });
-      return { success: false, error: 'Failed to create account' };
+      return { success: false, error: `Failed to create account: ${insertError.message}` };
     }
 
     return { success: true, user: newUser as User };

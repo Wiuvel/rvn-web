@@ -25,6 +25,33 @@ function handleProtection(request: NextRequest, pathname: string): NextResponse 
     return null;
   }
 
+  // OAuth handler page has immunity to protection middleware
+  // This page opens in popup and handles OAuth flow
+  if (pathname === '/auth/oauth-handler' || pathname.startsWith('/auth/oauth-handler/')) {
+    return null;
+  }
+
+  // OAuth callback page also has immunity
+  if (pathname === '/auth/oauth-callback' || pathname.startsWith('/auth/oauth-callback/')) {
+    return null;
+  }
+
+  // Allow /auth page without protection cookies
+  // This is the authentication page where OAuth callbacks are handled
+  // Client-side code will process OAuth callbacks (including hash-based Telegram callbacks)
+  // Protection middleware should not interfere with OAuth flow
+  if (pathname === '/auth' || pathname.startsWith('/auth/')) {
+    // Check for OAuth query parameters (Google OAuth uses query params)
+    const hasOAuthParams = request.nextUrl.searchParams.has('code') || 
+                          request.nextUrl.searchParams.has('state') || 
+                          request.nextUrl.searchParams.has('error');
+    
+    // Allow access to /auth page without protection cookies
+    // Hash-based callbacks (Telegram) are handled client-side and not visible to middleware
+    // Query-based callbacks (Google) are also handled here
+    return null;
+  }
+
   // If user has protection cookies, allow access
   if (accessGranted && accessHash) {
     return null;

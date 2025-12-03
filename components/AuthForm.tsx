@@ -288,38 +288,65 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
   };
 
 
-  // Handle OAuth login
+  // Handle OAuth login - opens in popup window via oauth-handler page
   const oauthLogin = async (provider: string) => {
     setIsLoading(true);
+    
+    // Listen for messages from OAuth popup
+    const handleMessage = (event: MessageEvent) => {
+      // Verify origin for security
+      if (event.origin !== window.location.origin) {
+        return;
+      }
+      
+      if (event.data.type === 'OAUTH_SUCCESS') {
+        window.removeEventListener('message', handleMessage);
+        setIsLoading(false);
+        
+        // Redirect to dashboard
+        if (event.data.redirect) {
+          window.location.href = event.data.redirect;
+        } else if (event.data.dashboard_token) {
+          window.location.href = `/dashboard/${event.data.dashboard_token}`;
+        }
+      } else if (event.data.type === 'OAUTH_ERROR') {
+        window.removeEventListener('message', handleMessage);
+        setIsLoading(false);
+        setGlobalError(event.data.error || 'Ошибка авторизации');
+      }
+    };
+    
+    window.addEventListener('message', handleMessage);
+    
     try {
-      if (provider === 'google') {
-        // Redirect to Google OAuth endpoint
-        window.location.href = '/api/auth/oauth/google';
-      } else if (provider === 'telegram') {
-        // Telegram Login Widget - redirect to widget page
-        try {
-          // Get bot_id and state from server
-          const response = await fetch('/api/auth/oauth/telegram');
-          if (!response.ok) {
-            throw new Error('Failed to initialize Telegram OAuth');
-          }
-          const { botId, state } = await response.json();
-          
-          // Store state in sessionStorage for callback
-          sessionStorage.setItem('telegram_oauth_state', state);
-          
-          // Redirect to Telegram Login Widget
-          // Widget will redirect back with hash containing user data
-          window.location.href = `https://oauth.telegram.org/auth?bot_id=${botId}&origin=${encodeURIComponent(window.location.origin)}&request_access=write&return_to=${encodeURIComponent(window.location.origin + '/auth')}`;
-        } catch {
-          setGlobalError('Ошибка подключения к Telegram');
+      // Open OAuth handler page in popup window
+      // This page has immunity to protection middleware and handles the OAuth flow
+      const width = 500;
+      const height = 600;
+      const left = (window.screen.width - width) / 2;
+      const top = (window.screen.height - height) / 2;
+      
+      const popup = window.open(
+        `/auth/oauth-handler?provider=${provider}`,
+        `${provider}_oauth`,
+        `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`
+      );
+      
+      if (!popup) {
+        setIsLoading(false);
+        setGlobalError('Пожалуйста, разрешите всплывающие окна для авторизации');
+        window.removeEventListener('message', handleMessage);
+        return;
+      }
+      
+      // Check if popup was closed manually
+      const checkClosed = setInterval(() => {
+        if (popup.closed) {
+          clearInterval(checkClosed);
+          window.removeEventListener('message', handleMessage);
           setIsLoading(false);
         }
-      } else if (provider === 'twitch') {
-        // Twitch OAuth not implemented yet
-        setGlobalError('Twitch авторизация пока недоступна');
-        setIsLoading(false);
-      }
+      }, 500);
     } catch {
       setGlobalError('Ошибка подключения к провайдеру');
       setIsLoading(false);

@@ -28,17 +28,23 @@ export async function GET(request: NextRequest) {
       ? env.PUBLIC_DOMAIN.slice(0, -1) 
       : env.PUBLIC_DOMAIN;
 
+    // Check if request is from popup (oauth-handler page opens in popup)
+    // This must be determined early as it's used in error handling
+    const referer = request.headers.get('referer') || '';
+    const isPopup = referer.includes('/auth/oauth-handler') || 
+                    referer.includes('popup') ||
+                    request.nextUrl.searchParams.get('popup') === 'true';
+
     // Rate limiting
     const rateLimitResult = await authRateLimit.check(request);
     if (!rateLimitResult.allowed) {
       logger.warn('RATE LIMIT EXCEEDED FOR OAUTH INITIATION', {
         ip: request.headers.get('x-forwarded-for'),
       });
-      return setCorsHeaders(
-        NextResponse.redirect(
-          new URL('/auth?error=rate_limit', origin)
-        )
-      );
+      const errorUrl = isPopup 
+        ? new URL('/auth/oauth-callback?error=rate_limit', origin)
+        : new URL('/auth?error=rate_limit', origin);
+      return setCorsHeaders(NextResponse.redirect(errorUrl));
     }
 
     // Check Google OAuth credentials
@@ -47,11 +53,11 @@ export async function GET(request: NextRequest) {
         hasClientId: !!env.GOOGLE_CLIENT_ID,
         hasClientSecret: !!env.GOOGLE_CLIENT_SECRET,
       });
-      return setCorsHeaders(
-        NextResponse.redirect(
-          new URL('/auth?error=oauth_not_configured', origin)
-        )
-      );
+      // For popup mode, redirect to callback page
+      const errorUrl = isPopup 
+        ? new URL('/auth/oauth-callback?error=oauth_not_configured', origin)
+        : new URL('/auth?error=oauth_not_configured', origin);
+      return setCorsHeaders(NextResponse.redirect(errorUrl));
     }
 
     // Generate CSRF state token
@@ -67,7 +73,10 @@ export async function GET(request: NextRequest) {
 
     const hostname = request.nextUrl.hostname;
     const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
-
+    
+    // Store popup flag in state cookie for callback
+    const stateWithPopup = isPopup ? `${state}:popup` : state;
+    
     // Redirect to Google OAuth
     const response = NextResponse.redirect(
       `https://accounts.google.com/o/oauth2/v2/auth?${new URLSearchParams({
@@ -77,12 +86,12 @@ export async function GET(request: NextRequest) {
         scope: 'openid email profile',
         access_type: 'offline',
         prompt: 'consent',
-        state,
+        state: stateWithPopup,
       }).toString()}`
     );
 
-    // Store state in cookie for CSRF protection
-    response.cookies.set('oauth_state', state, {
+    // Store state in cookie for CSRF protection (with popup flag if needed)
+    response.cookies.set('oauth_state', stateWithPopup, {
       maxAge: 10 * 60,
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production' && !isLocalhost,
