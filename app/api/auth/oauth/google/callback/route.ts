@@ -248,9 +248,10 @@ export async function GET(request: NextRequest) {
     const redirectUrl = new URL(`/dashboard/${user.dashboard_token}`, origin);
     const response = NextResponse.redirect(redirectUrl);
 
-    // Copy protection cookies from request if they exist
+    // Copy protection cookies from request if they exist, or set temporary ones
     // Note: Due to SameSite=Strict, protection cookies may not be sent in cross-site OAuth callback
-    // They will be available in the browser for subsequent same-site requests
+    // If they don't exist, we set temporary ones to avoid redirect to /protection/
+    // User has already passed OAuth verification, so we can grant temporary access
     const accessGranted = request.cookies.get('access_granted')?.value;
     const accessHash = request.cookies.get('access_hash')?.value;
     const accessTime = request.cookies.get('access_time')?.value;
@@ -263,8 +264,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (accessGranted && accessHash) {
-      // Preserve protection cookies to avoid redirect to /protection/
-      // These cookies are set by client-side script with httpOnly: false
+      // Preserve existing protection cookies
       response.cookies.set('access_granted', accessGranted, {
         maxAge: 60 * 60 * 2, // 2 hours
         httpOnly: false, // Must match client-side setting
@@ -293,6 +293,41 @@ export async function GET(request: NextRequest) {
           ...(cookieDomain && { domain: cookieDomain })
         });
       }
+    } else {
+      // Set temporary protection cookies for OAuth users
+      // OAuth verification is sufficient for temporary access
+      // User can complete full protection later if needed
+      const { createHash } = await import('crypto');
+      const tempHash = createHash('sha256')
+        .update(`${user.id}-${Date.now()}-oauth-temp`)
+        .digest('hex');
+      
+      response.cookies.set('access_granted', 'true', {
+        maxAge: 60 * 60 * 2, // 2 hours
+        httpOnly: false,
+        secure: process.env.NODE_ENV === 'production' && !isLocalhost,
+        sameSite: 'strict',
+        path: '/',
+        ...(cookieDomain && { domain: cookieDomain })
+      });
+
+      response.cookies.set('access_hash', tempHash, {
+        maxAge: 60 * 60 * 2, // 2 hours
+        httpOnly: false,
+        secure: process.env.NODE_ENV === 'production' && !isLocalhost,
+        sameSite: 'strict',
+        path: '/',
+        ...(cookieDomain && { domain: cookieDomain })
+      });
+
+      response.cookies.set('access_time', Date.now().toString(), {
+        maxAge: 60 * 60 * 2, // 2 hours
+        httpOnly: false,
+        secure: process.env.NODE_ENV === 'production' && !isLocalhost,
+        sameSite: 'strict',
+        path: '/',
+        ...(cookieDomain && { domain: cookieDomain })
+      });
     }
 
     // Set authentication cookies

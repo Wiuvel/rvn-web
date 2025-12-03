@@ -21,6 +21,10 @@ function handleProtection(request: NextRequest, pathname: string): NextResponse 
     return NextResponse.next();
   }
 
+  if (pathname.startsWith('/api/auth/oauth/')) {
+    return null;
+  }
+
   if (accessGranted && accessHash) {
     return null;
   }

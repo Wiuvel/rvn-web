@@ -415,11 +415,18 @@ export async function createUserFromOAuth(email: string, preferredUsername?: str
       return { success: false, error: ERROR_DATABASE_NOT_CONFIGURED };
     }
 
+    // First check if user exists by email (for OAuth, email is the primary identifier)
+    const existingUserByEmail = await getUserByEmail(email);
+    if (existingUserByEmail) {
+      // User already exists, return it
+      return { success: true, user: existingUserByEmail };
+    }
+
     // Use preferred username or extract from email
-    const username = preferredUsername || email.split('@')[0];
+    let username = preferredUsername || email.split('@')[0];
     const normalizedUsername = username.toLowerCase();
 
-    // Check if user already exists
+    // Check if username is already taken, if so, generate unique one
     const { data: existingUsers, error: checkError } = await supabaseAdmin
       .from('users')
       .select('id, username')
@@ -437,8 +444,31 @@ export async function createUserFromOAuth(email: string, preferredUsername?: str
       (u: { username: string }) => u.username.toLowerCase() === normalizedUsername
     );
     
+    // If username is taken, append random suffix
     if (existingUser) {
-      return { success: false, error: 'User already exists' };
+      const baseUsername = username;
+      let suffix = 1;
+      let uniqueUsername = `${baseUsername}_${suffix}`;
+      
+      while (suffix < 100) {
+        const { data: checkUsers } = await supabaseAdmin
+          .from('users')
+          .select('id')
+          .ilike('username', uniqueUsername.toLowerCase());
+        
+        if (!checkUsers || checkUsers.length === 0) {
+          username = uniqueUsername;
+          break;
+        }
+        
+        suffix++;
+        uniqueUsername = `${baseUsername}_${suffix}`;
+      }
+      
+      if (suffix >= 100) {
+        // Fallback: use timestamp
+        username = `${baseUsername}_${Date.now().toString().slice(-6)}`;
+      }
     }
 
     // Generate unique user_id

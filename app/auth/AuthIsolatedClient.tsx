@@ -14,33 +14,57 @@ export default function AuthIsolatedClient() {
   const [preloaderVisible, setPreloaderVisible] = useState(true);
   const [blueWidth, setBlueWidth] = useState<'0%' | '100%'>('0%');
 
-  // Handle Telegram OAuth callback (data comes via hash in URL)
+  // Handle Telegram OAuth callback (data comes via hash in URL as tgAuthResult)
   useEffect(() => {
     const handleTelegramCallback = async () => {
-      // Check if we have Telegram hash in URL (format: #id=123&hash=abc...)
+      // Check if we have Telegram hash in URL (format: #tgAuthResult=base64_json)
+      // Also check sessionStorage in case hash was lost during protection redirect
+      let tgAuthResult: string | null = null;
+      
       if (typeof window !== 'undefined' && window.location.hash) {
         const hash = window.location.hash.substring(1); // Remove #
         const params = new URLSearchParams(hash);
+        tgAuthResult = params.get('tgAuthResult');
         
-        // Check if this looks like Telegram OAuth data
-        if (params.has('id') && params.has('hash') && params.has('auth_date')) {
-          const state = sessionStorage.getItem('telegram_oauth_state');
-          sessionStorage.removeItem('telegram_oauth_state');
-          
-          // Extract all Telegram parameters
-          const telegramData: Record<string, string> = {};
-          params.forEach((value, key) => {
-            telegramData[key] = value;
-          });
-          
-          if (state) {
-            telegramData.state = state;
-          }
-          
-          // Clear hash from URL
-          window.history.replaceState(null, '', window.location.pathname + window.location.search);
-          
+        // Save to sessionStorage in case we get redirected to protection
+        if (tgAuthResult) {
+          sessionStorage.setItem('telegram_auth_result', tgAuthResult);
+        }
+      } else {
+        // Try to get from sessionStorage (in case hash was lost)
+        tgAuthResult = sessionStorage.getItem('telegram_auth_result');
+      }
+      
+      if (tgAuthResult) {
           try {
+            // Decode base64 and parse JSON
+            const decodedData = JSON.parse(atob(tgAuthResult));
+            
+            // Extract Telegram user data
+            const telegramData: Record<string, string> = {
+              id: decodedData.id?.toString(),
+              first_name: decodedData.first_name || '',
+              last_name: decodedData.last_name || '',
+              username: decodedData.username || '',
+              photo_url: decodedData.photo_url || '',
+              auth_date: decodedData.auth_date?.toString(),
+              hash: decodedData.hash,
+            };
+            
+            // Get state from sessionStorage
+            const state = sessionStorage.getItem('telegram_oauth_state');
+            sessionStorage.removeItem('telegram_oauth_state');
+            sessionStorage.removeItem('telegram_auth_result'); // Clear saved hash
+            
+            if (state) {
+              telegramData.state = state;
+            }
+            
+            // Clear hash from URL
+            const currentUrl = new URL(window.location.href);
+            currentUrl.hash = '';
+            window.history.replaceState(null, '', currentUrl.toString());
+            
             // Send data to server for verification
             const response = await fetch('/api/auth/oauth/telegram/callback', {
               method: 'POST',
@@ -60,11 +84,11 @@ export default function AuthIsolatedClient() {
               // Redirect with error
               window.location.href = `/auth?error=${encodeURIComponent(errorData.error || 'telegram_auth_failed')}`;
             }
-          } catch {
+          } catch (error) {
+            console.error('Telegram OAuth callback error:', error);
             window.location.href = '/auth?error=telegram_auth_failed';
           }
         }
-      }
     };
     
     handleTelegramCallback();
