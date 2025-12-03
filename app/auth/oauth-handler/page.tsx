@@ -14,26 +14,43 @@ function OAuthHandlerContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [status, setStatus] = useState<'loading' | 'redirecting' | 'processing'>('loading');
+  const [handled, setHandled] = useState(false);
   const provider = searchParams.get('provider');
 
   useEffect(() => {
+    // Prevent multiple executions
+    if (handled) {
+      return;
+    }
+    
     // Check if we're in a popup window
-    // Check both window.opener and URL parameter (for cases where redirect loses opener reference)
+    // Check sessionStorage first (set when popup is opened), then URL parameter, then window.opener
+    const isPopupFromStorage = sessionStorage.getItem('oauth_popup') === 'true';
     const isPopupFromUrl = searchParams.get('popup') === 'true';
     const isPopupFromOpener = window.opener !== null;
-    const isPopup = isPopupFromUrl || isPopupFromOpener;
+    const isPopup = isPopupFromStorage || isPopupFromUrl || isPopupFromOpener;
+    
+    // Save popup flag to sessionStorage if we detect it's a popup
+    if (isPopup && !isPopupFromStorage) {
+      sessionStorage.setItem('oauth_popup', 'true');
+    }
 
     // Handle success callback from OAuth provider
     const success = searchParams.get('success');
     const dashboardToken = searchParams.get('dashboard_token');
     
     if (success && dashboardToken) {
+      setHandled(true);
       setStatus('processing');
       // OAuth was successful - send message to parent and close
-      // Always check if we're in a popup first - if so, never redirect, just send message
+      // CRITICAL: If we're in a popup, NEVER redirect - only send message and close
       if (isPopup) {
+        // Clear popup flag from sessionStorage
+        sessionStorage.removeItem('oauth_popup');
+        
         // Send message to parent window
         // Try multiple times in case opener is temporarily unavailable after redirect
+        let messageSent = false;
         const sendMessage = () => {
           if (window.opener) {
             try {
@@ -45,30 +62,46 @@ function OAuthHandlerContent() {
                 },
                 window.location.origin
               );
+              messageSent = true;
+              console.log('OAuth success message sent to parent window');
               return true;
             } catch (error) {
               console.error('Failed to send message to parent:', error);
               return false;
             }
+          } else {
+            console.warn('window.opener is null, cannot send message');
           }
           return false;
         };
         
         // Try immediately
-        if (!sendMessage()) {
-          // If failed, try again after a short delay
+        sendMessage();
+        
+        // If failed, try again after a short delay
+        if (!messageSent) {
           setTimeout(() => {
             sendMessage();
           }, 50);
         }
         
-        // Close popup after ensuring message is sent
+        // Try one more time after longer delay, then close
         setTimeout(() => {
+          if (!messageSent) {
+            sendMessage();
+          }
+          // Close popup - this is critical, we MUST close it
+          // DO NOT redirect - just close
+          console.log('Closing popup window');
           window.close();
-        }, 150);
+        }, 200);
+        
+        // Prevent any further execution that might cause redirect
+        // Return early to prevent any redirect logic
         return;
       } else {
         // Not in popup - redirect normally
+        sessionStorage.removeItem('oauth_popup');
         window.location.href = `/dashboard/${dashboardToken}`;
         return;
       }
@@ -77,6 +110,7 @@ function OAuthHandlerContent() {
     // Handle error callback
     const error = searchParams.get('error');
     if (error) {
+      setHandled(true);
       const errorMessages: Record<string, string> = {
         'user_creation_failed': 'Не удалось создать аккаунт',
         'oauth_denied': 'Авторизация отменена',
@@ -93,6 +127,8 @@ function OAuthHandlerContent() {
       };
       
       if (isPopup) {
+        // Clear popup flag
+        sessionStorage.removeItem('oauth_popup');
         // Try to send message to parent window
         if (window.opener) {
           window.opener.postMessage(
@@ -108,6 +144,7 @@ function OAuthHandlerContent() {
           window.close();
         }, 100);
       } else {
+        sessionStorage.removeItem('oauth_popup');
         router.push(`/auth?error=${encodeURIComponent(error)}`);
       }
       return;
@@ -115,6 +152,7 @@ function OAuthHandlerContent() {
 
     if (!provider) {
       // No provider specified - error
+      setHandled(true);
       if (isPopup) {
         window.opener?.postMessage(
           {
@@ -133,6 +171,10 @@ function OAuthHandlerContent() {
     // Start OAuth flow based on provider
     if (provider === 'google') {
       setStatus('redirecting');
+      // Ensure popup flag is saved before redirect
+      if (isPopup) {
+        sessionStorage.setItem('oauth_popup', 'true');
+      }
       // Redirect to Google OAuth endpoint
       window.location.href = '/api/auth/oauth/google';
     } else if (provider === 'telegram') {
@@ -181,7 +223,7 @@ function OAuthHandlerContent() {
         router.push('/auth?error=unknown_provider');
       }
     }
-  }, [searchParams, router, provider]);
+  }, [searchParams, router, provider, handled]);
 
   // Handle Telegram callback (when returning from Telegram OAuth)
   useEffect(() => {
