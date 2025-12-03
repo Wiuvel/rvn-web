@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
   try {
     const env = getEnv();
     if (!env.PUBLIC_DOMAIN) {
-      logger.error('PUBLIC_DOMAIN NOT CONFIGURED');
+      logger.error('public_domain not configured');
       return setCorsHeaders(
         NextResponse.json(
           { error: 'OAuth service not configured' },
@@ -40,9 +40,7 @@ export async function GET(request: NextRequest) {
     // Rate limiting
     const rateLimitResult = await authRateLimit.check(request);
     if (!rateLimitResult.allowed) {
-      logger.warn('RATE LIMIT EXCEEDED FOR OAUTH CALLBACK', {
-        ip: request.headers.get('x-forwarded-for'),
-      });
+      logger.warn('rate limit exceeded');
       const errorUrl = isPopup 
         ? new URL('/auth/oauth-handler?provider=google&error=rate_limit', origin)
         : new URL('/auth?error=rate_limit', origin);
@@ -51,7 +49,7 @@ export async function GET(request: NextRequest) {
 
     // Check Google OAuth credentials
     if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) {
-      logger.error('GOOGLE OAUTH NOT CONFIGURED');
+      logger.error('google oauth not configured');
       const errorUrl = isPopup 
         ? new URL('/auth/oauth-handler?provider=google&error=oauth_not_configured', origin)
         : new URL('/auth?error=oauth_not_configured', origin);
@@ -64,10 +62,7 @@ export async function GET(request: NextRequest) {
 
     // Check for Google errors
     if (error) {
-      logger.warn('OAUTH ERROR FROM GOOGLE', {
-        error,
-        ip: request.headers.get('x-forwarded-for'),
-      });
+      logger.warn('oauth error from google', { error });
       const errorUrl = isPopup 
         ? new URL('/auth/oauth-handler?provider=google&error=oauth_denied', origin)
         : new URL('/auth?error=oauth_denied', origin);
@@ -76,11 +71,7 @@ export async function GET(request: NextRequest) {
 
     // Validate required parameters
     if (!code || !state) {
-      logger.warn('OAUTH CALLBACK MISSING PARAMETERS', {
-        hasCode: !!code,
-        hasState: !!state,
-        ip: request.headers.get('x-forwarded-for'),
-      });
+      logger.warn('oauth callback missing parameters');
       const errorUrl = isPopup 
         ? new URL('/auth/oauth-handler?provider=google&error=invalid_request', origin)
         : new URL('/auth?error=invalid_request', origin);
@@ -95,10 +86,7 @@ export async function GET(request: NextRequest) {
     const cleanStoredState = storedState?.includes(':popup') ? storedState.split(':')[0] : storedState;
     
     if (!cleanStoredState || cleanStoredState !== cleanState) {
-      logger.warn('OAUTH STATE MISMATCH', {
-        hasStoredState: !!storedState,
-        ip: request.headers.get('x-forwarded-for'),
-      });
+      logger.warn('oauth state mismatch');
       const errorUrl = isPopup 
         ? new URL('/auth/oauth-handler?provider=google&error=invalid_state', origin)
         : new URL('/auth?error=invalid_state', origin);
@@ -123,11 +111,8 @@ export async function GET(request: NextRequest) {
     });
 
     if (!tokenResponse.ok) {
-      const errorData = await tokenResponse.text();
-      logger.error('FAILED TO EXCHANGE OAUTH CODE FOR TOKEN', {
-        status: tokenResponse.status,
-        error: errorData,
-        ip: request.headers.get('x-forwarded-for'),
+      logger.error('failed to exchange oauth code', {
+        status: tokenResponse.status
       });
       const errorUrl = isPopup 
         ? new URL('/auth/oauth-handler?provider=google&error=token_exchange_failed', origin)
@@ -139,7 +124,7 @@ export async function GET(request: NextRequest) {
     const { access_token } = tokenData;
 
     if (!access_token) {
-      logger.error('NO ACCESS_TOKEN IN OAUTH RESPONSE');
+      logger.error('no access_token in oauth response');
       const errorUrl = isPopup 
         ? new URL('/auth/oauth-handler?provider=google&error=no_access_token', origin)
         : new URL('/auth?error=no_access_token', origin);
@@ -157,10 +142,7 @@ export async function GET(request: NextRequest) {
     );
 
     if (!userInfoResponse.ok) {
-      logger.error('FAILED TO FETCH USER INFO FROM GOOGLE', {
-        status: userInfoResponse.status,
-        ip: request.headers.get('x-forwarded-for'),
-      });
+      logger.error('failed to fetch user info', { status: userInfoResponse.status });
       const errorUrl = isPopup 
         ? new URL('/auth/oauth-handler?provider=google&error=user_info_failed', origin)
         : new URL('/auth?error=user_info_failed', origin);
@@ -171,7 +153,7 @@ export async function GET(request: NextRequest) {
     const { email, verified_email } = userInfo;
 
     if (!email) {
-      logger.error('NO EMAIL IN GOOGLE USER INFO');
+      logger.error('no email in user info');
       const errorUrl = isPopup 
         ? new URL('/auth/oauth-handler?provider=google&error=no_email', origin)
         : new URL('/auth?error=no_email', origin);
@@ -179,10 +161,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (!verified_email) {
-      logger.warn('GOOGLE EMAIL NOT VERIFIED', {
-        email: email.substring(0, 3) + '***',
-        ip: request.headers.get('x-forwarded-for'),
-      });
+      logger.warn('email not verified');
       const errorUrl = isPopup 
         ? new URL('/auth/oauth-handler?provider=google&error=email_not_verified', origin)
         : new URL('/auth?error=email_not_verified', origin);
@@ -193,34 +172,11 @@ export async function GET(request: NextRequest) {
     let user = await getUserByEmail(email);
     let isNewUser = false;
 
-    logger.info('GOOGLE OAUTH USER LOOKUP', {
-      email: email.substring(0, 3) + '***',
-      userFound: !!user,
-      ip: request.headers.get('x-forwarded-for'),
-    });
-
     if (!user) {
-      logger.info('CREATING NEW USER FROM GOOGLE OAUTH', {
-        email: email.substring(0, 3) + '***',
-        ip: request.headers.get('x-forwarded-for'),
-      });
-      
       const createResult = await createUserFromOAuth(email);
       
-      logger.info('GOOGLE OAUTH USER CREATION RESULT', {
-        success: createResult.success,
-        error: createResult.error,
-        hasUser: !!createResult.user,
-        email: email.substring(0, 3) + '***',
-        ip: request.headers.get('x-forwarded-for'),
-      });
-      
       if (!createResult.success || !createResult.user) {
-        logger.error('FAILED TO CREATE USER FROM OAUTH', {
-          error: createResult.error,
-          email: email.substring(0, 3) + '***',
-          ip: request.headers.get('x-forwarded-for'),
-        });
+        logger.error('failed to create user', { error: createResult.error });
         const errorUrl = isPopup 
           ? new URL('/auth/oauth-handler?provider=google&error=user_creation_failed', origin)
           : new URL('/auth?error=user_creation_failed', origin);
@@ -232,10 +188,7 @@ export async function GET(request: NextRequest) {
 
     // Check user activity
     if (!user.is_active) {
-      logger.warn('OAUTH LOGIN ATTEMPT FOR INACTIVE USER', {
-        userId: user.id,
-        ip: request.headers.get('x-forwarded-for'),
-      });
+      logger.warn('login attempt for inactive user', { userId: user.id });
       const errorUrl = isPopup 
         ? new URL('/auth/oauth-handler?provider=google&error=account_disabled', origin)
         : new URL('/auth?error=account_disabled', origin);
@@ -383,19 +336,12 @@ export async function GET(request: NextRequest) {
     // Clear OAuth state cookie
     response.cookies.delete('oauth_state');
 
-    logger.info('OAUTH LOGIN SUCCESSFUL', {
-      userId: user.id,
-      username: user.username,
-      isNewUser,
-      provider: 'google',
-      ip: ipAddress,
-    });
+    logger.info('google oauth login successful', { userId: user.id, isNewUser });
 
     return setCorsHeaders(response);
   } catch (error) {
-    logger.error('OAUTH CALLBACK ERROR', {
-      error: error instanceof Error ? error.message : 'Unknown error',
-      ip: request.headers.get('x-forwarded-for'),
+    logger.error('oauth callback error', {
+      error: error instanceof Error ? error.message : 'unknown error'
     });
     
     // Get origin for error redirect

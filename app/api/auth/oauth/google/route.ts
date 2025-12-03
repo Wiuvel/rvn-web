@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
   try {
     const env = getEnv();
     if (!env.PUBLIC_DOMAIN) {
-      logger.error('PUBLIC_DOMAIN NOT CONFIGURED');
+      logger.error('public_domain not configured');
       return setCorsHeaders(
         NextResponse.json(
           { error: 'OAuth service not configured' },
@@ -38,9 +38,7 @@ export async function GET(request: NextRequest) {
     // Rate limiting
     const rateLimitResult = await authRateLimit.check(request);
     if (!rateLimitResult.allowed) {
-      logger.warn('RATE LIMIT EXCEEDED FOR OAUTH INITIATION', {
-        ip: request.headers.get('x-forwarded-for'),
-      });
+      logger.warn('rate limit exceeded', { ip: request.headers.get('x-forwarded-for') });
       const errorUrl = isPopup 
         ? new URL('/auth/oauth-callback?error=rate_limit', origin)
         : new URL('/auth?error=rate_limit', origin);
@@ -49,10 +47,7 @@ export async function GET(request: NextRequest) {
 
     // Check Google OAuth credentials
     if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) {
-      logger.error('GOOGLE OAUTH NOT CONFIGURED', {
-        hasClientId: !!env.GOOGLE_CLIENT_ID,
-        hasClientSecret: !!env.GOOGLE_CLIENT_SECRET,
-      });
+      logger.error('google oauth not configured');
       // For popup mode, redirect to callback page
       const errorUrl = isPopup 
         ? new URL('/auth/oauth-callback?error=oauth_not_configured', origin)
@@ -64,12 +59,7 @@ export async function GET(request: NextRequest) {
     const state = randomBytes(32).toString('hex');
     const redirectUri = `${origin}/api/auth/oauth/google/callback`;
 
-    logger.info('OAUTH INITIATION', {
-      provider: 'google',
-      redirectUri,
-      origin,
-      ip: request.headers.get('x-forwarded-for'),
-    });
+    logger.info('google oauth initiated');
 
     const hostname = request.nextUrl.hostname;
     const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
@@ -101,9 +91,8 @@ export async function GET(request: NextRequest) {
 
     return setCorsHeaders(response);
   } catch (error) {
-    logger.error('OAUTH INITIATION ERROR', {
-      error: error instanceof Error ? error.message : 'Unknown error',
-      ip: request.headers.get('x-forwarded-for'),
+    logger.error('oauth initiation error', {
+      error: error instanceof Error ? error.message : 'unknown error'
     });
     
     try {

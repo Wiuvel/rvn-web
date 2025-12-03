@@ -384,17 +384,13 @@ export async function getUserByToken(dashboardToken: string): Promise<User | nul
 export async function getUserByEmail(email: string): Promise<User | null> {
   try {
     if (!supabaseAdmin) {
-      logger.warn('SUPABASEADMIN IS NULL IN getUserByEmail');
+      logger.warn('supabase admin is null');
       return null;
     }
 
     // Extract username from email (before @)
     const username = email.split('@')[0];
     
-    logger.info('SEARCHING USER BY EMAIL', {
-      email: email.substring(0, 3) + '***',
-      extractedUsername: username
-    });
     
     const { data: users, error } = await supabaseAdmin
       .from('users')
@@ -402,34 +398,17 @@ export async function getUserByEmail(email: string): Promise<User | null> {
       .ilike('username', username);
 
     if (error) {
-      logger.error('ERROR FETCHING USER BY EMAIL', {
-        error: error.message,
-        code: error.code,
-        email: email.substring(0, 3) + '***',
-        extractedUsername: username
-      });
+      logger.error('error fetching user by email', { error: error.message, code: error.code });
       return null;
     }
 
     if (!users || users.length === 0) {
-      logger.info('NO USER FOUND BY EMAIL', {
-        email: email.substring(0, 3) + '***',
-        extractedUsername: username
-      });
       return null;
     }
-
-    // Return first match (should be unique)
-    logger.info('USER FOUND BY EMAIL', {
-      email: email.substring(0, 3) + '***',
-      userId: users[0].id,
-      username: users[0].username
-    });
     return users[0] as User;
   } catch (error) {
-    logger.error('EXCEPTION IN getUserByEmail', {
-      error: error instanceof Error ? error.message : 'Unknown error',
-      email: email.substring(0, 3) + '***'
+    logger.error('exception in getUserByEmail', {
+      error: error instanceof Error ? error.message : 'unknown error'
     });
     return null;
   }
@@ -443,26 +422,10 @@ export async function createUserFromOAuth(email: string, preferredUsername?: str
       return { success: false, error: ERROR_DATABASE_NOT_CONFIGURED };
     }
 
-    // First check if user exists by email (for OAuth, email is the primary identifier)
-    logger.info('CHECKING EXISTING USER BY EMAIL', {
-      email: email.substring(0, 3) + '***',
-      preferredUsername: preferredUsername || 'none'
-    });
-    
     const existingUserByEmail = await getUserByEmail(email);
     if (existingUserByEmail) {
-      // User already exists, return it
-      logger.info('EXISTING USER FOUND BY EMAIL', {
-        email: email.substring(0, 3) + '***',
-        userId: existingUserByEmail.id,
-        username: existingUserByEmail.username
-      });
       return { success: true, user: existingUserByEmail };
     }
-    
-    logger.info('NO EXISTING USER FOUND, PROCEEDING WITH CREATION', {
-      email: email.substring(0, 3) + '***'
-    });
 
     // Use preferred username or extract from email
     let username = preferredUsername || email.split('@')[0];
@@ -488,7 +451,7 @@ export async function createUserFromOAuth(email: string, preferredUsername?: str
       .ilike('username', normalizedUsername);
 
     if (checkError) {
-      logger.error('ERROR CHECKING EXISTING USER FOR OAUTH', {
+      logger.error('error checking existing user', {
         error: checkError.message,
         code: checkError.code
       });
@@ -551,12 +514,6 @@ export async function createUserFromOAuth(email: string, preferredUsername?: str
     // OAuth users don't need password - set password_hash to null
     // This distinguishes OAuth users from password-based users
 
-    logger.info('ATTEMPTING TO CREATE OAUTH USER', {
-      email: email.substring(0, 3) + '***',
-      username: username,
-      userId: userId,
-      dashboardToken: dashboardToken.substring(0, 3) + '***'
-    });
 
     const { data: newUser, error: insertError } = await supabaseAdmin
       .from('users')
@@ -572,38 +529,23 @@ export async function createUserFromOAuth(email: string, preferredUsername?: str
       .single();
 
     if (insertError) {
-      logger.error('ERROR CREATING USER FROM OAUTH', {
+      logger.error('error creating user from oauth', {
         error: insertError.message,
-        code: insertError.code,
-        details: insertError.details,
-        hint: insertError.hint,
-        email: email.substring(0, 3) + '***',
-        username: username,
-        userId: userId,
-        dashboardToken: dashboardToken.substring(0, 3) + '***'
+        code: insertError.code
       });
       return { success: false, error: `Failed to create account: ${insertError.message}` };
     }
 
     if (!newUser) {
-      logger.error('USER CREATION RETURNED NULL', {
-        email: email.substring(0, 3) + '***',
-        username: username,
-        userId: userId
-      });
+      logger.error('user creation returned null');
       return { success: false, error: 'User creation returned null' };
     }
 
-    logger.info('OAUTH USER CREATED SUCCESSFULLY', {
-      userId: newUser.id,
-      username: newUser.username,
-      email: email.substring(0, 3) + '***'
-    });
 
     return { success: true, user: newUser as User };
   } catch (error) {
-    logger.error('UNEXPECTED ERROR CREATING USER FROM OAUTH', {
-      error: error instanceof Error ? error.message : 'Unknown error'
+    logger.error('unexpected error creating user from oauth', {
+      error: error instanceof Error ? error.message : 'unknown error'
     });
     return { success: false, error: 'Unexpected error' };
   }

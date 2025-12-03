@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
   try {
     const env = getEnv();
     if (!env.PUBLIC_DOMAIN) {
-      logger.error('PUBLIC_DOMAIN NOT CONFIGURED');
+      logger.error('public_domain not configured');
       return setCorsHeaders(
         NextResponse.json(
           { error: 'OAuth service not configured' },
@@ -31,9 +31,7 @@ export async function GET(request: NextRequest) {
     // Rate limiting
     const rateLimitResult = await authRateLimit.check(request);
     if (!rateLimitResult.allowed) {
-      logger.warn('RATE LIMIT EXCEEDED FOR TELEGRAM OAUTH INITIATION', {
-        ip: request.headers.get('x-forwarded-for'),
-      });
+      logger.warn('rate limit exceeded');
       return setCorsHeaders(
         NextResponse.redirect(
           new URL('/auth?error=rate_limit', origin)
@@ -43,9 +41,7 @@ export async function GET(request: NextRequest) {
 
     // Check Telegram OAuth credentials
     if (!env.TELEGRAM_BOT_TOKEN) {
-      logger.error('TELEGRAM OAUTH NOT CONFIGURED', {
-        hasBotToken: !!env.TELEGRAM_BOT_TOKEN,
-      });
+      logger.error('telegram oauth not configured');
       return setCorsHeaders(
         NextResponse.redirect(
           new URL('/auth?error=oauth_not_configured', origin)
@@ -55,14 +51,8 @@ export async function GET(request: NextRequest) {
 
     // Generate CSRF state token
     const state = randomBytes(32).toString('hex');
-    const redirectUri = `${origin}/api/auth/oauth/telegram/callback`;
 
-    logger.info('TELEGRAM OAUTH INITIATION', {
-      provider: 'telegram',
-      redirectUri,
-      origin,
-      ip: request.headers.get('x-forwarded-for'),
-    });
+    logger.info('telegram oauth initiated');
 
     const hostname = request.nextUrl.hostname;
     const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
@@ -86,9 +76,8 @@ export async function GET(request: NextRequest) {
 
     return setCorsHeaders(response);
   } catch (error) {
-    logger.error('TELEGRAM OAUTH INITIATION ERROR', {
-      error: error instanceof Error ? error.message : 'Unknown error',
-      ip: request.headers.get('x-forwarded-for'),
+    logger.error('telegram oauth initiation error', {
+      error: error instanceof Error ? error.message : 'unknown error'
     });
     
     try {

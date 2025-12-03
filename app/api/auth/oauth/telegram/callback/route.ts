@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
   try {
     const env = getEnv();
     if (!env.PUBLIC_DOMAIN) {
-      logger.error('PUBLIC_DOMAIN NOT CONFIGURED');
+      logger.error('public_domain not configured');
       return setCorsHeaders(
         NextResponse.json(
           { error: 'OAuth service not configured' },
@@ -34,9 +34,7 @@ export async function POST(request: NextRequest) {
     // Rate limiting
     const rateLimitResult = await authRateLimit.check(request);
     if (!rateLimitResult.allowed) {
-      logger.warn('RATE LIMIT EXCEEDED FOR TELEGRAM OAUTH CALLBACK', {
-        ip: request.headers.get('x-forwarded-for'),
-      });
+      logger.warn('rate limit exceeded');
       return setCorsHeaders(
         NextResponse.json(
           { error: 'rate_limit' },
@@ -47,7 +45,7 @@ export async function POST(request: NextRequest) {
 
     // Check Telegram OAuth credentials
     if (!env.TELEGRAM_BOT_TOKEN) {
-      logger.error('TELEGRAM OAUTH NOT CONFIGURED');
+      logger.error('telegram oauth not configured');
       return setCorsHeaders(
         NextResponse.json(
           { error: 'oauth_not_configured' },
@@ -69,12 +67,7 @@ export async function POST(request: NextRequest) {
 
     // Validate required parameters
     if (!id || !authDate || !hash) {
-      logger.warn('TELEGRAM OAUTH CALLBACK MISSING PARAMETERS', {
-        hasId: !!id,
-        hasAuthDate: !!authDate,
-        hasHash: !!hash,
-        ip: request.headers.get('x-forwarded-for'),
-      });
+      logger.warn('telegram oauth missing parameters');
       return setCorsHeaders(
         NextResponse.json(
           { error: 'invalid_request' },
@@ -86,10 +79,7 @@ export async function POST(request: NextRequest) {
     // Verify CSRF state token
     const storedState = request.cookies.get('oauth_state')?.value;
     if (!storedState || storedState !== state) {
-      logger.warn('TELEGRAM OAUTH STATE MISMATCH', {
-        hasStoredState: !!storedState,
-        ip: request.headers.get('x-forwarded-for'),
-      });
+      logger.warn('telegram oauth state mismatch');
       return setCorsHeaders(
         NextResponse.json(
           { error: 'invalid_state' },
@@ -122,9 +112,7 @@ export async function POST(request: NextRequest) {
       .digest('hex');
 
     if (calculatedHash !== hash) {
-      logger.warn('TELEGRAM OAUTH HASH MISMATCH', {
-        ip: request.headers.get('x-forwarded-for'),
-      });
+      logger.warn('telegram oauth hash mismatch');
       return setCorsHeaders(
         NextResponse.json(
           { error: 'invalid_hash' },
@@ -139,11 +127,7 @@ export async function POST(request: NextRequest) {
     const maxAge = 24 * 60 * 60; // 24 hours
 
     if (now - authTimestamp > maxAge) {
-      logger.warn('TELEGRAM OAUTH AUTH DATE EXPIRED', {
-        authTimestamp,
-        now,
-        ip: request.headers.get('x-forwarded-for'),
-      });
+      logger.warn('telegram oauth expired');
       return setCorsHeaders(
         NextResponse.json(
           { error: 'auth_expired' },
@@ -160,54 +144,19 @@ export async function POST(request: NextRequest) {
     let user = await getUserByEmail(telegramEmail);
     let isNewUser = false;
 
-    logger.info('TELEGRAM OAUTH USER LOOKUP', {
-      telegramEmail: telegramEmail.substring(0, 10) + '***',
-      userFound: !!user,
-      telegramId: id,
-      ip: request.headers.get('x-forwarded-for'),
-    });
-
     if (!user) {
-      // For Telegram, we need to use the exact username that matches the email
-      // Email format: telegram_{id}@telegram.local
-      // Username should be: telegram_{id} to match getUserByEmail logic
-      // But we can also use Telegram username if available (sanitized)
       const telegramUsernameFromEmail = `telegram_${id}`;
       const telegramUsername = username || telegramUsernameFromEmail;
-      // Ensure username is valid (only alphanumeric and underscore)
       let sanitizedUsername = telegramUsername.replace(/[^a-zA-Z0-9_]/g, '_').substring(0, 30);
       
-      // If sanitized username is different from email-based username, prefer email-based
-      // This ensures getUserByEmail can find the user later
       if (sanitizedUsername !== telegramUsernameFromEmail && !username) {
         sanitizedUsername = telegramUsernameFromEmail;
       }
       
-      logger.info('CREATING NEW USER FROM TELEGRAM OAUTH', {
-        telegramEmail: telegramEmail.substring(0, 10) + '***',
-        sanitizedUsername,
-        telegramUsernameFromEmail,
-        telegramId: id,
-        ip: request.headers.get('x-forwarded-for'),
-      });
-      
       const createResult = await createUserFromOAuth(telegramEmail, sanitizedUsername);
       
-      logger.info('TELEGRAM OAUTH USER CREATION RESULT', {
-        success: createResult.success,
-        error: createResult.error,
-        hasUser: !!createResult.user,
-        telegramEmail: telegramEmail.substring(0, 10) + '***',
-        telegramId: id,
-        ip: request.headers.get('x-forwarded-for'),
-      });
-      
       if (!createResult.success || !createResult.user) {
-        logger.error('FAILED TO CREATE USER FROM TELEGRAM OAUTH', {
-          error: createResult.error,
-          telegramId: id,
-          ip: request.headers.get('x-forwarded-for'),
-        });
+        logger.error('failed to create user', { error: createResult.error });
         return setCorsHeaders(
           NextResponse.json(
             { error: 'user_creation_failed' },
@@ -221,10 +170,7 @@ export async function POST(request: NextRequest) {
 
     // Check user activity
     if (!user.is_active) {
-      logger.warn('TELEGRAM OAUTH LOGIN ATTEMPT FOR INACTIVE USER', {
-        userId: user.id,
-        ip: request.headers.get('x-forwarded-for'),
-      });
+      logger.warn('login attempt for inactive user', { userId: user.id });
       return setCorsHeaders(
         NextResponse.json(
           { error: 'account_disabled' },
@@ -374,20 +320,12 @@ export async function POST(request: NextRequest) {
     // Clear OAuth state cookie
     response.cookies.delete('oauth_state');
 
-    logger.info('TELEGRAM OAUTH LOGIN SUCCESSFUL', {
-      userId: user.id,
-      username: user.username,
-      isNewUser,
-      provider: 'telegram',
-      telegramId: id,
-      ip: ipAddress,
-    });
+    logger.info('telegram oauth login successful', { userId: user.id, isNewUser });
 
     return setCorsHeaders(response);
   } catch (error) {
-    logger.error('TELEGRAM OAUTH CALLBACK ERROR', {
-      error: error instanceof Error ? error.message : 'Unknown error',
-      ip: request.headers.get('x-forwarded-for'),
+    logger.error('telegram oauth callback error', {
+      error: error instanceof Error ? error.message : 'unknown error'
     });
     
     try {

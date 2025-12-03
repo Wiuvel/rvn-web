@@ -293,10 +293,18 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
     setIsLoading(true);
     
     // Listen for messages from OAuth popup
+    let timeoutId: NodeJS.Timeout | null = null;
+    
     const handleMessage = (event: MessageEvent) => {
       // Verify origin for security
       if (event.origin !== window.location.origin) {
         return;
+      }
+      
+      // Clear timeout if message received
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
       }
       
       if (event.data.type === 'OAUTH_SUCCESS') {
@@ -339,14 +347,14 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
         return;
       }
       
-      // Check if popup was closed manually
-      const checkClosed = setInterval(() => {
-        if (popup.closed) {
-          clearInterval(checkClosed);
-          window.removeEventListener('message', handleMessage);
-          setIsLoading(false);
-        }
-      }, 500);
+      // Set timeout to handle case when popup is closed without sending message
+      // COOP (Cross-Origin-Opener-Policy) blocks popup.closed check, so we use timeout instead
+      // If no message is received within 10 minutes, assume popup was closed
+      timeoutId = setTimeout(() => {
+        window.removeEventListener('message', handleMessage);
+        setIsLoading(false);
+        setGlobalError('Авторизация была прервана. Попробуйте снова.');
+      }, 10 * 60 * 1000); // 10 minutes timeout
     } catch {
       setGlobalError('Ошибка подключения к провайдеру');
       setIsLoading(false);
