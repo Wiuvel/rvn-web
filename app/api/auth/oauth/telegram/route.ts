@@ -67,24 +67,13 @@ export async function GET(request: NextRequest) {
     const hostname = request.nextUrl.hostname;
     const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
 
-    // Telegram Login Widget works via JavaScript widget, but we can use server-side approach
+    // Telegram Login Widget works via JavaScript widget on client-side
     // Extract bot ID from token (format: "123456789:ABCdefGHIjklMNOpqrsTUVwxyz")
     const botId = env.TELEGRAM_BOT_TOKEN.split(':')[0];
     
-    // For server-side flow, we'll use Telegram Bot API approach
-    // But actually Telegram Login Widget requires client-side JavaScript
-    // So we'll redirect to a page that loads the widget, which then redirects back
-    // For now, we'll use a simplified approach with direct redirect
-    const telegramAuthUrl = `https://oauth.telegram.org/auth?${new URLSearchParams({
-      bot_id: botId,
-      origin: origin,
-      request_access: 'write',
-      return_to: redirectUri,
-      state,
-    }).toString()}`;
-
-    // Redirect to Telegram OAuth
-    const response = NextResponse.redirect(telegramAuthUrl);
+    // Return bot_id as JSON for client-side widget initialization
+    // Client will load Telegram Login Widget and send data to POST endpoint
+    const response = NextResponse.json({ botId, state });
 
     // Store state in cookie for CSRF protection
     response.cookies.set('oauth_state', state, {

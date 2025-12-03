@@ -13,8 +13,8 @@ export async function OPTIONS() {
 }
 
 // Handle Telegram OAuth callback
-// Telegram Login Widget returns data via hash, but we'll use query params for server-side flow
-export async function GET(request: NextRequest) {
+// Telegram Login Widget sends data via POST from client-side widget
+export async function POST(request: NextRequest) {
   try {
     const env = getEnv();
     if (!env.PUBLIC_DOMAIN) {
@@ -38,8 +38,9 @@ export async function GET(request: NextRequest) {
         ip: request.headers.get('x-forwarded-for'),
       });
       return setCorsHeaders(
-        NextResponse.redirect(
-          new URL('/auth?error=rate_limit', origin)
+        NextResponse.json(
+          { error: 'rate_limit' },
+          { status: 429 }
         )
       );
     }
@@ -48,22 +49,23 @@ export async function GET(request: NextRequest) {
     if (!env.TELEGRAM_BOT_TOKEN) {
       logger.error('TELEGRAM OAUTH NOT CONFIGURED');
       return setCorsHeaders(
-        NextResponse.redirect(
-          new URL('/auth?error=oauth_not_configured', origin)
+        NextResponse.json(
+          { error: 'oauth_not_configured' },
+          { status: 503 }
         )
       );
     }
 
-    // Get OAuth parameters from query string
-    const { searchParams } = request.nextUrl;
-    const id = searchParams.get('id');
-    const firstName = searchParams.get('first_name');
-    const lastName = searchParams.get('last_name');
-    const username = searchParams.get('username');
-    const photoUrl = searchParams.get('photo_url');
-    const authDate = searchParams.get('auth_date');
-    const hash = searchParams.get('hash');
-    const state = searchParams.get('state');
+    // Get OAuth parameters from request body (sent from client-side widget)
+    const body = await request.json();
+    const id = body.id?.toString();
+    const firstName = body.first_name;
+    const lastName = body.last_name;
+    const username = body.username;
+    const photoUrl = body.photo_url;
+    const authDate = body.auth_date?.toString();
+    const hash = body.hash;
+    const state = body.state;
 
     // Validate required parameters
     if (!id || !authDate || !hash) {
@@ -74,8 +76,9 @@ export async function GET(request: NextRequest) {
         ip: request.headers.get('x-forwarded-for'),
       });
       return setCorsHeaders(
-        NextResponse.redirect(
-          new URL('/auth?error=invalid_request', origin)
+        NextResponse.json(
+          { error: 'invalid_request' },
+          { status: 400 }
         )
       );
     }
@@ -88,8 +91,9 @@ export async function GET(request: NextRequest) {
         ip: request.headers.get('x-forwarded-for'),
       });
       return setCorsHeaders(
-        NextResponse.redirect(
-          new URL('/auth?error=invalid_state', origin)
+        NextResponse.json(
+          { error: 'invalid_state' },
+          { status: 403 }
         )
       );
     }
@@ -122,8 +126,9 @@ export async function GET(request: NextRequest) {
         ip: request.headers.get('x-forwarded-for'),
       });
       return setCorsHeaders(
-        NextResponse.redirect(
-          new URL('/auth?error=invalid_hash', origin)
+        NextResponse.json(
+          { error: 'invalid_hash' },
+          { status: 403 }
         )
       );
     }
@@ -140,8 +145,9 @@ export async function GET(request: NextRequest) {
         ip: request.headers.get('x-forwarded-for'),
       });
       return setCorsHeaders(
-        NextResponse.redirect(
-          new URL('/auth?error=auth_expired', origin)
+        NextResponse.json(
+          { error: 'auth_expired' },
+          { status: 403 }
         )
       );
     }
@@ -168,8 +174,9 @@ export async function GET(request: NextRequest) {
           ip: request.headers.get('x-forwarded-for'),
         });
         return setCorsHeaders(
-          NextResponse.redirect(
-            new URL('/auth?error=user_creation_failed', origin)
+          NextResponse.json(
+            { error: 'user_creation_failed' },
+            { status: 500 }
           )
         );
       }
@@ -184,8 +191,9 @@ export async function GET(request: NextRequest) {
         ip: request.headers.get('x-forwarded-for'),
       });
       return setCorsHeaders(
-        NextResponse.redirect(
-          new URL('/auth?error=account_disabled', origin)
+        NextResponse.json(
+          { error: 'account_disabled' },
+          { status: 403 }
         )
       );
     }
@@ -211,9 +219,13 @@ export async function GET(request: NextRequest) {
 
     await SessionManager.setSessionCookie(sessionId, isLocalhost);
 
-    // Create redirect response
-    const redirectUrl = new URL(`/dashboard/${user.dashboard_token}`, origin);
-    const response = NextResponse.redirect(redirectUrl);
+    // Create response with redirect URL (POST endpoint returns JSON)
+    const redirectUrl = `${origin}/dashboard/${user.dashboard_token}`;
+    const response = NextResponse.json({
+      success: true,
+      redirect: redirectUrl,
+      dashboard_token: user.dashboard_token,
+    });
 
     // Copy protection cookies from request if they exist
     const accessGranted = request.cookies.get('access_granted')?.value;
@@ -305,12 +317,10 @@ export async function GET(request: NextRequest) {
     try {
       const env = getEnv();
       if (env.PUBLIC_DOMAIN) {
-        const origin = env.PUBLIC_DOMAIN.endsWith('/') 
-          ? env.PUBLIC_DOMAIN.slice(0, -1) 
-          : env.PUBLIC_DOMAIN;
         return setCorsHeaders(
-          NextResponse.redirect(
-            new URL('/auth?error=internal_error', origin)
+          NextResponse.json(
+            { error: 'internal_error' },
+            { status: 500 }
           )
         );
       }

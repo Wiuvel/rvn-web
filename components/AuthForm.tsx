@@ -296,8 +296,25 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
         // Redirect to Google OAuth endpoint
         window.location.href = '/api/auth/oauth/google';
       } else if (provider === 'telegram') {
-        // Redirect to Telegram OAuth endpoint
-        window.location.href = '/api/auth/oauth/telegram';
+        // Telegram Login Widget - redirect to widget page
+        try {
+          // Get bot_id and state from server
+          const response = await fetch('/api/auth/oauth/telegram');
+          if (!response.ok) {
+            throw new Error('Failed to initialize Telegram OAuth');
+          }
+          const { botId, state } = await response.json();
+          
+          // Store state in sessionStorage for callback
+          sessionStorage.setItem('telegram_oauth_state', state);
+          
+          // Redirect to Telegram Login Widget
+          // Widget will redirect back with hash containing user data
+          window.location.href = `https://oauth.telegram.org/auth?bot_id=${botId}&origin=${encodeURIComponent(window.location.origin)}&request_access=write&return_to=${encodeURIComponent(window.location.origin + '/auth')}`;
+        } catch {
+          setGlobalError('Ошибка подключения к Telegram');
+          setIsLoading(false);
+        }
       } else if (provider === 'twitch') {
         // Twitch OAuth not implemented yet
         setGlobalError('Twitch авторизация пока недоступна');
@@ -609,16 +626,17 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
               <span className="sr-only">Логин</span>
               <input
                 type="text"
-                {...loginForm.register('username')}
-                onChange={(e) => {
-                  loginForm.register('username').onChange(e);
-                  if (globalError) {
-                    setGlobalError('');
-                  }
-                  if (loginAttemptState === 'error') {
-                    setLoginAttemptState('idle');
-                  }
-                }}
+                {...loginForm.register('username', {
+                  onChange: () => {
+                    // Clear errors when user starts typing
+                    if (globalError) {
+                      setGlobalError('');
+                    }
+                    if (loginAttemptState === 'error') {
+                      setLoginAttemptState('idle');
+                    }
+                  },
+                })}
                 placeholder="Логин"
                 autoComplete="username"
                 className="w-full px-4 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-white"
@@ -635,16 +653,16 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
                 <span className="sr-only">Пароль</span>
                 <input
                   type={showPassword.login ? 'text' : 'password'}
-                  {...loginForm.register('password')}
-                  onChange={(e) => {
-                    loginForm.register('password').onChange(e);
-                    if (globalError) {
-                      setGlobalError('');
-                    }
-                    if (loginAttemptState === 'error') {
-                      setLoginAttemptState('idle');
-                    }
-                  }}
+                  {...loginForm.register('password', {
+                    onChange: () => {
+                      if (globalError) {
+                        setGlobalError('');
+                      }
+                      if (loginAttemptState === 'error') {
+                        setLoginAttemptState('idle');
+                      }
+                    },
+                  })}
                   placeholder="Пароль"
                   autoComplete="current-password"
                   className="w-full px-4 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-white pr-10"

@@ -14,6 +14,62 @@ export default function AuthIsolatedClient() {
   const [preloaderVisible, setPreloaderVisible] = useState(true);
   const [blueWidth, setBlueWidth] = useState<'0%' | '100%'>('0%');
 
+  // Handle Telegram OAuth callback (data comes via hash in URL)
+  useEffect(() => {
+    const handleTelegramCallback = async () => {
+      // Check if we have Telegram hash in URL (format: #id=123&hash=abc...)
+      if (typeof window !== 'undefined' && window.location.hash) {
+        const hash = window.location.hash.substring(1); // Remove #
+        const params = new URLSearchParams(hash);
+        
+        // Check if this looks like Telegram OAuth data
+        if (params.has('id') && params.has('hash') && params.has('auth_date')) {
+          const state = sessionStorage.getItem('telegram_oauth_state');
+          sessionStorage.removeItem('telegram_oauth_state');
+          
+          // Extract all Telegram parameters
+          const telegramData: Record<string, string> = {};
+          params.forEach((value, key) => {
+            telegramData[key] = value;
+          });
+          
+          if (state) {
+            telegramData.state = state;
+          }
+          
+          // Clear hash from URL
+          window.history.replaceState(null, '', window.location.pathname + window.location.search);
+          
+          try {
+            // Send data to server for verification
+            const response = await fetch('/api/auth/oauth/telegram/callback', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(telegramData),
+            });
+            
+            if (response.ok) {
+              const result = await response.json();
+              if (result.redirect) {
+                window.location.href = result.redirect;
+              } else if (result.dashboard_token) {
+                window.location.href = `/dashboard/${result.dashboard_token}`;
+              }
+            } else {
+              const errorData = await response.json();
+              // Redirect with error
+              window.location.href = `/auth?error=${encodeURIComponent(errorData.error || 'telegram_auth_failed')}`;
+            }
+          } catch {
+            window.location.href = '/auth?error=telegram_auth_failed';
+          }
+        }
+      }
+    };
+    
+    handleTelegramCallback();
+  }, []);
+
   useEffect(() => {
     const fillTimer = setTimeout(() => {
       setBlueWidth('100%');
