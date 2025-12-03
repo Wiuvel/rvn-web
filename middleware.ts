@@ -95,6 +95,13 @@ function handleAuth(request: NextRequest, pathname: string): NextResponse | null
   const dashboardToken = request.cookies.get('dashboard_token')?.value;
 
   if (pathname === '/auth' || pathname.startsWith('/auth/')) {
+    // OAuth handler and callback pages should not be redirected by auth middleware
+    // They need to handle OAuth flow and communicate with parent window
+    if (pathname === '/auth/oauth-handler' || pathname.startsWith('/auth/oauth-handler/') ||
+        pathname === '/auth/oauth-callback' || pathname.startsWith('/auth/oauth-callback/')) {
+      return NextResponse.next();
+    }
+    
     if (isAuthenticated && dashboardToken) {
       const retpatch = request.nextUrl.searchParams.get('retpatch');
       if (retpatch) {

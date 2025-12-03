@@ -13,18 +13,27 @@ interface TelegramOAuthResult {
 // Helper function to check if we're in a popup
 function isPopupWindow(): boolean {
   // Check sessionStorage first (most reliable after redirects)
-  if (sessionStorage.getItem('oauth_popup') === 'true') {
+  const fromStorage = sessionStorage.getItem('oauth_popup') === 'true';
+  if (fromStorage) {
+    console.log('Popup detected from sessionStorage');
     return true;
   }
   // Check window.opener
-  if (window.opener !== null) {
+  const hasOpener = window.opener !== null;
+  if (hasOpener) {
+    console.log('Popup detected from window.opener');
     return true;
   }
   // Check URL parameter
   const urlParams = new URLSearchParams(window.location.search);
-  if (urlParams.get('popup') === 'true') {
+  const fromUrl = urlParams.get('popup') === 'true';
+  if (fromUrl) {
+    console.log('Popup detected from URL parameter');
+    // Save to sessionStorage for future checks
+    sessionStorage.setItem('oauth_popup', 'true');
     return true;
   }
+  console.log('Not detected as popup');
   return false;
 }
 
@@ -94,6 +103,15 @@ function OAuthHandlerContent() {
       setHandled(true);
       setStatus('processing');
       
+      // Debug logging
+      const isPopup = isPopupWindow();
+      console.log('OAuth success detected:', {
+        isPopup,
+        hasOpener: window.opener !== null,
+        sessionStorage: sessionStorage.getItem('oauth_popup'),
+        urlParam: searchParams.get('popup')
+      });
+      
       // CRITICAL: If in popup, send message and close - NEVER redirect
       const wasHandled = sendMessageAndClose('OAUTH_SUCCESS', {
         dashboard_token: dashboardToken,
@@ -101,9 +119,12 @@ function OAuthHandlerContent() {
       });
       
       if (!wasHandled) {
+        console.warn('Not in popup, redirecting normally');
         // Not in popup - redirect normally
         sessionStorage.removeItem('oauth_popup');
         window.location.href = `/dashboard/${dashboardToken}`;
+      } else {
+        console.log('Popup handled, should close soon');
       }
       
       return;
