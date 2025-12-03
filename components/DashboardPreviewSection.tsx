@@ -28,19 +28,19 @@ export default function DashboardPreviewSection() {
             </p>
             <div className="mt-4 md:mt-6 flex flex-wrap gap-3 md:gap-4 justify-start">
               <Button asChild variant="ghost" className="border-2 border-neutral-800/50 bg-transparent hover:bg-neutral-900/50 hover:border-neutral-700 hover:scale-105">
-                <Link href="/auth" prefetch={false}>
+                <Link href="/auth">
                   <LogIn className="h-5 w-5 flex-shrink-0" />
                   <span className="whitespace-nowrap">Авторизация</span>
                 </Link>
               </Button>
               <Button asChild variant="ghost" className="border-2 border-neutral-800/50 bg-transparent hover:bg-neutral-900/50 hover:border-neutral-700 hover:scale-105">
-                <Link href="#" prefetch={false}>
+                <Link href="#">
                   <Newspaper className="h-5 w-5 flex-shrink-0" />
                   <span className="whitespace-nowrap">Новости</span>
                 </Link>
               </Button>
               <Button asChild variant="ghost" className="border-2 border-neutral-800/50 bg-transparent hover:bg-neutral-900/50 hover:border-neutral-700 hover:scale-105">
-                <Link href="#advantages" prefetch={false}>
+                <Link href="#advantages">
                   <Info className="h-5 w-5 flex-shrink-0" />
                   <span className="whitespace-nowrap">О проекте</span>
                 </Link>

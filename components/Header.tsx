@@ -7,7 +7,6 @@ import { useRouter } from 'next/navigation';
 import { gsap } from 'gsap';
 import { Notification } from '@/types';
 import { useAuth } from '@/hooks/useAuth';
-import { useTokenRefresh } from '@/hooks/useTokenRefresh';
 import { UserMenu } from '@/components/UserMenu';
 import { NotificationsMenu } from '@/components/NotificationsMenu';
 import { GSAP_DEFAULT_DURATION, GSAP_DEFAULT_EASE } from '@/lib/constants';
@@ -29,9 +28,6 @@ export default function Header() {
   
   // Используем новый хук useAuth
   const { userData, loading } = useAuth({ silent: true });
-  
-  // Автоматическое обновление токенов перед истечением
-  useTokenRefresh();
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -217,9 +213,9 @@ export default function Header() {
             <span className="font-semibold text-white">Raven Private</span>
           </Link>
           <nav className="hidden lg:flex items-center gap-8 text-sm text-neutral-300">
-            <Link href="#pricing" prefetch={false} className="hover:text-white transition">Тарифы</Link>
-            <Link href="/support" prefetch={false} className="hover:text-white transition">Поддержка</Link>
-            <Link href="#faq" prefetch={false} className="hover:text-white transition">FAQ</Link>
+            <Link href="#pricing" className="hover:text-white transition">Тарифы</Link>
+            <Link href="/support" className="hover:text-white transition">Поддержка</Link>
+            <Link href="#faq" className="hover:text-white transition">FAQ</Link>
           </nav>
           <div className="hidden lg:flex items-center gap-2 relative" ref={userMenuRef}>
             {loading ? (
@@ -285,7 +281,6 @@ export default function Header() {
             ) : (
               <Link 
                 href="/auth" 
-                prefetch={false}
                 className="rounded-xl bg-primary-500 hover:bg-primary-400 px-4 py-2 text-sm font-medium text-white shadow-glow transition flex items-center gap-2"
               >
                 <Image 
@@ -370,7 +365,6 @@ export default function Header() {
                     </Link>
                     <Link
                       href="/support"
-                      prefetch={false}
                       onClick={() => setOpen(false)}
                       className="flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-xl text-white/80 hover:text-white hover:bg-white/5 transition-colors duration-200"
                     >
@@ -389,18 +383,13 @@ export default function Header() {
                         setOpen(false);
                         try {
                           const response = await fetch('/api/auth/logout', {
-                            method: 'POST',
-                            credentials: 'include'
+                            method: 'POST'
                           });
                           if (response.ok) {
-                            // Очищаем localStorage от access_token
-                            if (typeof window !== 'undefined') {
-                              localStorage.removeItem('access_token');
-                            }
                             router.push('/auth');
                           }
-                        } catch {
-                          // Тихий режим - ошибка logout не критична
+                        } catch (error) {
+                          console.error('Logout error:', error);
                         }
                       }}
                       className="w-full flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-xl text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors duration-200"
@@ -420,7 +409,6 @@ export default function Header() {
                 <>
                   <Link 
                     href="#pricing" 
-                    prefetch={false}
                     onClick={() => setOpen(false)} 
                     className="block text-white/80 hover:text-white transition-colors duration-300 py-2"
                   >
@@ -428,7 +416,6 @@ export default function Header() {
                   </Link>
                   <Link 
                     href="/support" 
-                    prefetch={false}
                     onClick={() => setOpen(false)} 
                     className="block text-white/80 hover:text-white transition-colors duration-300 py-2"
                   >
@@ -436,7 +423,6 @@ export default function Header() {
                   </Link>
                   <Link 
                     href="#faq" 
-                    prefetch={false}
                     onClick={() => setOpen(false)} 
                     className="block text-white/80 hover:text-white transition-colors duration-300 py-2"
                   >
@@ -445,7 +431,6 @@ export default function Header() {
                   <div className="pt-4 border-t border-white/10">
                     <Link 
                       href="/auth" 
-                      prefetch={false}
                       className="block text-white/80 hover:text-white transition-colors duration-300 py-2"
                     >
                       Войти

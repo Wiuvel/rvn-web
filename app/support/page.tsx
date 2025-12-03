@@ -261,10 +261,14 @@ export default function SupportPage() {
     for (const requestCallback of queue) {
       try {
         await requestCallback();
-      } catch {
+      } catch (error) {
         // Если запрос снова получил rate limit после иммунитета - это критическая ошибка
         // НЕ добавляем обратно в очередь и НЕ показываем капчу снова
-        // Тихий режим - ошибка обрабатывается через UI
+        if (error instanceof Error && error.message === 'RATE_LIMIT_EXCEEDED') {
+          console.error('Rate limit still active after CAPTCHA - immunity may not be working');
+        } else {
+          console.error('Error retrying request after rate limit clear:', error);
+        }
       }
     }
     
@@ -341,9 +345,8 @@ export default function SupportPage() {
         timeoutId = setTimeout(() => controller!.abort(), AUTH_FETCH_TIMEOUT);
 
         try {
-          let response = await fetch('/api/auth/me', {
-            signal: controller.signal,
-            cache: 'no-store'
+          const response = await fetch('/api/auth/me', {
+            signal: controller.signal
           });
           
           if (timeoutId) {
@@ -352,35 +355,6 @@ export default function SupportPage() {
           }
 
           if (!isMounted) return;
-
-          // Если получили 401, пытаемся обновить токен через refresh
-          if (response.status === 401) {
-            try {
-              const refreshResponse = await fetch('/api/auth/refresh', {
-                method: 'POST',
-                credentials: 'include',
-                signal: controller.signal,
-              });
-
-              if (refreshResponse.ok) {
-                // Токен обновлен, повторяем запрос
-                response = await fetch('/api/auth/me', {
-                  signal: controller.signal,
-                  cache: 'no-store',
-                });
-              } else {
-                // Refresh не удался, пользователь не авторизован
-                setUserData(null);
-                setIsSupport(false);
-                return;
-              }
-            } catch {
-              // Ошибка при обновлении токена
-              setUserData(null);
-              setIsSupport(false);
-              return;
-            }
-          }
 
           if (response.ok) {
             const data = await response.json();
@@ -410,9 +384,9 @@ export default function SupportPage() {
           }
           setUserData(null);
         }
-      } catch {
+      } catch (error) {
         if (!isMounted) return;
-        // Тихий режим - ошибка обрабатывается через UI
+        console.error('Failed to fetch user data:', error);
         setUserData(null);
       } finally {
         if (isMounted) {
@@ -583,8 +557,8 @@ export default function SupportPage() {
             markMessagesAsRead(activeTicket.id);
           }
         }
-      } catch {
-        // Тихий режим - ошибка проверки сообщений не критична
+      } catch (error) {
+        console.error('Error checking for new messages:', error);
       }
     };
 
@@ -631,8 +605,11 @@ export default function SupportPage() {
           },
           () => markMessagesAsRead(ticketId) // Retry callback
         );
-      } catch {
-        // Тихий режим - ошибка пометки сообщений не критична
+      } catch (error) {
+        // Не логируем RATE_LIMIT_EXCEEDED, так как это обрабатывается через капчу
+        if (error instanceof Error && error.message !== 'RATE_LIMIT_EXCEEDED') {
+          console.error('Error marking messages as read:', error);
+        }
       }
     }, MARK_AS_READ_DEBOUNCE);
   }, []); // Пустой массив зависимостей, так как функция не зависит от состояния
@@ -706,18 +683,13 @@ export default function SupportPage() {
   const handleLogout = async () => {
     try {
       const response = await fetch('/api/auth/logout', {
-        method: 'POST',
-        credentials: 'include'
+        method: 'POST'
       });
       if (response.ok) {
-        // Очищаем localStorage от access_token
-        if (typeof window !== 'undefined') {
-          localStorage.removeItem('access_token');
-        }
         router.push('/auth');
       }
-    } catch {
-      // Тихий режим - ошибка logout не критична
+    } catch (error) {
+      console.error('Logout error:', error);
     }
   };
 
@@ -889,7 +861,7 @@ export default function SupportPage() {
         // НЕ сбрасываем флаг, так как после капчи запрос повторится
         return;
       }
-      // Тихий режим - ошибка обрабатывается через UI
+      console.error('Error creating ticket:', error);
       showNotification('Ошибка создания обращения');
     } finally {
       // Сбрасываем флаг создания тикета в любом случае
@@ -1029,7 +1001,7 @@ export default function SupportPage() {
         // Rate limit обрабатывается через капчу, не показываем ошибку
         return;
       }
-      // Тихий режим - ошибка обрабатывается через UI
+      console.error('Error sending message:', error);
       showNotification('Ошибка отправки сообщения');
     } finally {
       // Сбрасываем флаг отправки в любом случае
@@ -1084,7 +1056,7 @@ export default function SupportPage() {
         setTicketsLoading(false);
         return;
       }
-      // Тихий режим - ошибка обрабатывается через UI
+      console.error('Error fetching tickets:', error);
       showNotification('Ошибка загрузки обращений');
     } finally {
       setTicketsLoading(false);
@@ -1160,8 +1132,8 @@ export default function SupportPage() {
         const errorMessage = data.error || 'Ошибка загрузки сообщений';
         showNotification(translateError(errorMessage));
       }
-    } catch {
-      // Тихий режим - ошибка обрабатывается через UI
+    } catch (error) {
+      console.error('Error fetching ticket messages:', error);
       showNotification('Ошибка загрузки сообщений');
     }
   };
@@ -1237,7 +1209,6 @@ export default function SupportPage() {
             </a>
             <Link
               href={`/auth?retpatch=${encodeURIComponent('/support/')}`}
-              prefetch={false}
               className="flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3 bg-primary-500 hover:bg-primary-400 rounded-xl text-white transition-colors text-sm sm:text-base"
             >
               <Image 
@@ -1266,8 +1237,8 @@ export default function SupportPage() {
               <span className="font-semibold text-white">Raven Private</span>
             </Link>
             <nav className="hidden lg:flex items-center gap-8 text-sm text-neutral-300">
-              <Link href="/" prefetch={false} className="hover:text-white transition">Главная</Link>
-              <Link href="/auth" prefetch={false} className="hover:text-white transition">Профиль</Link>
+              <Link href="/" className="hover:text-white transition">Главная</Link>
+              <Link href="/auth" className="hover:text-white transition">Профиль</Link>
             </nav>
             {userData && (
               <div className="hidden lg:flex items-center gap-2 relative" ref={userMenuRef}>

@@ -1,14 +1,12 @@
-/**
- * Централизованный экспорт всех API утилит
- */
+// Centralized export for all API utilities
 
-// Типы
+// Types
 export * from './types';
 
-// Схемы валидации
+// Validation schemas
 export * from './schemas';
 
-// Утилиты валидации
+// Validation utilities
 export * from './validation';
 
 

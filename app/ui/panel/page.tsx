@@ -10,7 +10,6 @@ export default function PanelSelection() {
           {/* Admin Panel Button */}
           <Link
             href="/ui/panel/admin"
-            prefetch={false}
             className="block h-64 rounded-xl border border-neutral-800 bg-neutral-900 hover:bg-neutral-800 hover:border-neutral-700 transition-colors relative"
           >
             <div className="absolute top-2 left-2 px-2 py-1 bg-blue-600/80 text-white text-xs font-medium rounded-md backdrop-blur-sm z-10">
@@ -34,7 +33,6 @@ export default function PanelSelection() {
           {/* Support Panel Button */}
           <Link
             href="/ui/panel/support"
-            prefetch={false}
             className="block h-64 rounded-xl border border-neutral-800 bg-neutral-900 hover:bg-neutral-800 hover:border-neutral-700 transition-colors"
           >
             <div className="h-full flex flex-col items-center justify-center p-8 text-center">

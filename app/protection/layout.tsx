@@ -5,6 +5,10 @@ import { exo2 } from '../fonts';
 
 export const metadata: Metadata = {
   ...pageMetadata.protection,
+  robots: 'noindex, nofollow, noarchive',
+  other: {
+    'googlebot': 'noindex, nofollow',
+  },
 };
 
 export default function ProtectionLayout({

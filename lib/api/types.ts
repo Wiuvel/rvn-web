@@ -1,10 +1,6 @@
-/**
- * Единая типизация для всех API эндпоинтов
- */
+// Unified API types for all endpoints
 
-/**
- * Базовый тип для всех API ответов
- */
+// Base API response type
 export interface ApiResponse<T = unknown> {
   success?: boolean;
   data?: T;
@@ -12,30 +8,22 @@ export interface ApiResponse<T = unknown> {
   message?: string;
 }
 
-/**
- * Тип для успешного ответа
- */
+// Success response type
 export type ApiSuccessResponse<T> = {
   success: true;
   data: T;
 };
 
-/**
- * Тип для ответа с ошибкой
- */
+// Error response type
 export type ApiErrorResponse = {
   success: false;
   error: string;
 };
 
-/**
- * Объединенный тип ответа API
- */
+// Combined API result type
 export type ApiResult<T> = ApiSuccessResponse<T> | ApiErrorResponse;
 
-/**
- * Типы для Auth API
- */
+// Auth API types
 export interface LoginRequest {
   username: string;
   password: string;
@@ -52,7 +40,7 @@ export interface RegisterRequest {
 export interface AuthResponse {
   message?: string;
   dashboard_token?: string;
-  access_token?: string; // JWT Access Token
+  access_token?: string;
   user?: UserData;
 }
 
@@ -78,9 +66,7 @@ export interface RefreshTokenResponse {
   access_token: string;
 }
 
-/**
- * Типы для Support API
- */
+// Support API types
 export type TicketStatus = 'open' | 'closed' | 'pending';
 
 export interface Ticket {
@@ -154,9 +140,7 @@ export interface SendMessageResponse {
   success: boolean;
 }
 
-/**
- * Типы для Admin API
- */
+// Admin API types
 export interface AdminUsersResponse {
   users: UserData[];
   total?: number;
@@ -171,9 +155,7 @@ export interface AdminTeamCountResponse {
   count: number;
 }
 
-/**
- * Типы для Protection API
- */
+// Protection API types
 export interface VerifyProtectionRequest {
   token: string;
 }
@@ -182,25 +164,19 @@ export interface VerifyProtectionResponse {
   success: boolean;
 }
 
-/**
- * Типы для IP API
- */
+// IP API types
 export interface IpResponse {
   ip: string;
 }
 
-/**
- * Query параметры для списка тикетов
- */
+// Query parameters for tickets list
 export interface TicketsQueryParams {
   status?: 'open' | 'closed' | 'pending' | 'all';
-  statuses?: string; // через запятую
+  statuses?: string;
   forUser?: boolean;
 }
 
-/**
- * Query параметры для списка пользователей
- */
+// Query parameters for users list
 export interface UsersQueryParams {
   page?: number;
   limit?: number;

@@ -25,7 +25,7 @@ export async function GET(request: Request) {
     const adminExists = await checkAdminExists();
     const cookieStore = await cookies();
     const isAuthenticated = cookieStore.get('admin_authenticated')?.value === 'true';
-    const username = cookieStore.get('admin_username')?.value || null;
+    const username = cookieStore.get('admin_username')?.value ?? null;
 
     return setCorsHeaders(
       NextResponse.json({

@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getEnv } from '@/lib/env-validation';
-import { createOrGetUserByEmail } from '@/lib/auth/users';
-import { generateAccessToken, generateRefreshToken } from '@/lib/auth/jwt';
-import { storeRefreshToken } from '@/lib/auth/tokens';
-import { setTokenCookies } from '@/lib/auth/cookies';
+import { createUserFromOAuth, getUserByEmail } from '@/lib/auth';
+import { SessionManager } from '@/lib/session-manager';
+import { ServerValidator } from '@/lib/server-validation';
 import { setCorsHeaders, handleCorsPreflight } from '@/lib/cors';
 import { logger } from '@/lib/secure-logger';
 import { authRateLimit } from '@/lib/rate-limit';
@@ -12,21 +11,20 @@ export async function OPTIONS() {
   return handleCorsPreflight();
 }
 
+// Handle Google OAuth callback
 export async function GET(request: NextRequest) {
   try {
-    // Получаем PUBLIC_DOMAIN в начале функции для всех редиректов
     const env = getEnv();
     if (!env.PUBLIC_DOMAIN) {
-      logger.error('PUBLIC_DOMAIN NOT CONFIGURED');
+      logger.error('PUBLIC_DOMAIN not configured');
       return setCorsHeaders(
         NextResponse.json(
-          { error: 'OAuth SERVICE NOT CONFIGURED' },
+          { error: 'OAuth service not configured' },
           { status: 503 }
         )
       );
     }
 
-    // Убираем trailing slash если есть
     const origin = env.PUBLIC_DOMAIN.endsWith('/') 
       ? env.PUBLIC_DOMAIN.slice(0, -1) 
       : env.PUBLIC_DOMAIN;
@@ -44,7 +42,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Проверяем наличие Google OAuth credentials
+    // Check Google OAuth credentials
     if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) {
       logger.error('Google OAuth not configured');
       return setCorsHeaders(
@@ -54,13 +52,13 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Получаем параметры из query string
+    // Get OAuth parameters
     const { searchParams } = request.nextUrl;
     const code = searchParams.get('code');
     const state = searchParams.get('state');
     const error = searchParams.get('error');
 
-    // Проверяем на ошибки от Google
+    // Check for Google errors
     if (error) {
       logger.warn('OAuth error from Google', {
         error,
@@ -73,7 +71,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Проверяем наличие code и state
+    // Validate required parameters
     if (!code || !state) {
       logger.warn('OAuth callback missing parameters', {
         hasCode: !!code,
@@ -87,7 +85,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Проверяем state токен (CSRF защита)
+    // Verify CSRF state token
     const storedState = request.cookies.get('oauth_state')?.value;
     if (!storedState || storedState !== state) {
       logger.warn('OAuth state mismatch', {
@@ -103,14 +101,7 @@ export async function GET(request: NextRequest) {
     
     const redirectUri = `${origin}/api/auth/oauth/google/callback`;
 
-    // Логируем для отладки
-    logger.info('OAuth callback - exchanging code', {
-      redirectUri,
-      origin,
-      ip: request.headers.get('x-forwarded-for'),
-    });
-
-    // Обмениваем code на access_token
+    // Exchange authorization code for access token
     const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
       headers: {
@@ -151,7 +142,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Получаем информацию о пользователе
+    // Fetch user info from Google
     const userInfoResponse = await fetch(
       'https://www.googleapis.com/oauth2/v2/userinfo',
       {
@@ -197,25 +188,29 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Создаем или получаем пользователя
-    const userResult = await createOrGetUserByEmail(email);
+    // Get or create user
+    let user = await getUserByEmail(email);
+    let isNewUser = false;
 
-    if (!userResult.success) {
-      logger.error('Failed to create or get user', {
-        error: userResult.error,
-        email: email.substring(0, 3) + '***',
-        ip: request.headers.get('x-forwarded-for'),
-      });
-      return setCorsHeaders(
-        NextResponse.redirect(
-          new URL('/auth?error=user_creation_failed', origin)
-        )
-      );
+    if (!user) {
+      const createResult = await createUserFromOAuth(email);
+      if (!createResult.success || !createResult.user) {
+        logger.error('Failed to create user from OAuth', {
+          error: createResult.error,
+          email: email.substring(0, 3) + '***',
+          ip: request.headers.get('x-forwarded-for'),
+        });
+        return setCorsHeaders(
+          NextResponse.redirect(
+            new URL('/auth?error=user_creation_failed', origin)
+          )
+        );
+      }
+      user = createResult.user;
+      isNewUser = true;
     }
 
-    const { user, isNewUser } = userResult;
-
-    // Проверяем активность пользователя
+    // Check user activity
     if (!user.is_active) {
       logger.warn('OAuth login attempt for inactive user', {
         userId: user.id,
@@ -228,45 +223,51 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Генерируем JWT токены
-    const accessToken = await generateAccessToken(
-      { id: user.id, username: user.username, user_id: user.user_id },
-      user.token_version
-    );
-
-    const { token: refreshToken, jti } = await generateRefreshToken(
-      user.id,
-      user.token_version
-    );
-
-    // Сохраняем refresh token в БД
+    // Create session
     const ipAddress = request.headers.get('x-forwarded-for') || 'unknown';
     const userAgent = request.headers.get('user-agent') || 'unknown';
-    const storeResult = await storeRefreshToken(
+    const hostname = request.nextUrl.hostname;
+    const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
+    
+    const sessionId = SessionManager.createSession(
       user.id,
-      refreshToken,
-      jti,
+      ServerValidator.sanitizeInput(user.username),
       ipAddress,
       userAgent
     );
 
-    if (!storeResult.success) {
-      logger.error('Failed to store refresh token', {
-        userId: user.id,
-        error: storeResult.error,
-      });
-      // Продолжаем - access token все равно будет работать
-    }
+    await SessionManager.setSessionCookie(sessionId, isLocalhost);
 
-    // Создаем redirect response (используем тот же origin, что и для OAuth)
-    const redirectUrl = new URL('/dashboard', origin);
+    // Create redirect response
+    const redirectUrl = new URL(`/dashboard/${user.dashboard_token}`, origin);
     const response = NextResponse.redirect(redirectUrl);
 
-    // Устанавливаем токены в cookies
-    const hostname = request.nextUrl.hostname;
-    setTokenCookies(response, accessToken, refreshToken, hostname);
+    // Set authentication cookies
+    response.cookies.set('user_authenticated', 'true', {
+      maxAge: 60 * 60 * 24 * 7,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production' && !isLocalhost,
+      sameSite: 'lax',
+      path: '/'
+    });
 
-    // Удаляем oauth_state cookie
+    response.cookies.set('user_id', user.id, {
+      maxAge: 60 * 60 * 24 * 7,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production' && !isLocalhost,
+      sameSite: 'lax',
+      path: '/'
+    });
+
+    response.cookies.set('dashboard_token', user.dashboard_token, {
+      maxAge: 60 * 60 * 24 * 7,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production' && !isLocalhost,
+      sameSite: 'lax',
+      path: '/'
+    });
+
+    // Clear OAuth state cookie
     response.cookies.delete('oauth_state');
 
     logger.info('OAuth login successful', {
@@ -284,7 +285,7 @@ export async function GET(request: NextRequest) {
       ip: request.headers.get('x-forwarded-for'),
     });
     
-    // Получаем origin для редиректа на ошибку
+    // Get origin for error redirect
     try {
       const env = getEnv();
       if (env.PUBLIC_DOMAIN) {
@@ -298,7 +299,7 @@ export async function GET(request: NextRequest) {
         );
       }
     } catch {
-      // Если не удалось получить env, возвращаем JSON ошибку
+      // Fallback to JSON error if env unavailable
     }
     
     return setCorsHeaders(
@@ -309,4 +310,3 @@ export async function GET(request: NextRequest) {
     );
   }
 }
-

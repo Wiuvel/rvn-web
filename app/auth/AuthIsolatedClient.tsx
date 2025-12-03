@@ -10,6 +10,7 @@ import ParticlesBackground from '@/components/ParticlesBackground';
 export default function AuthIsolatedClient() {
   const searchParams = useSearchParams();
   const retpatch = searchParams.get('retpatch') || '/dashboard/';
+  const errorParam = searchParams.get('error');
   const [preloaderVisible, setPreloaderVisible] = useState(true);
   const [blueWidth, setBlueWidth] = useState<'0%' | '100%'>('0%');
 
@@ -102,7 +103,7 @@ export default function AuthIsolatedClient() {
       <section className="flex-grow flex items-center justify-center px-4 sm:px-6 lg:px-8 py-12">
         <ParticlesBackground />
         <div className="z-10 grid grid-cols-1 md:grid-cols-2 gap-12 items-center w-full max-w-5xl">
-          <AuthForm retpatch={retpatch} />
+          <AuthForm retpatch={retpatch} initialError={errorParam || undefined} />
         </div>
         {/* Decorative Tree Image */}
         <div className="hidden md:flex pointer-events-none z-0 absolute inset-0 items-end justify-center">

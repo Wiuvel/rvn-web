@@ -69,9 +69,8 @@ export default function DashboardPage() {
         timeoutId = setTimeout(() => controller!.abort(), 10000);
 
         try {
-          let response = await fetch('/api/auth/me', {
-            signal: controller.signal,
-            cache: 'no-store'
+          const response = await fetch('/api/auth/me', {
+            signal: controller.signal
           });
           
           if (timeoutId) {
@@ -81,38 +80,10 @@ export default function DashboardPage() {
 
           if (!isMounted) return;
 
-          // Если получили 401, пытаемся обновить токен через refresh
-          if (response.status === 401) {
-            try {
-              const refreshResponse = await fetch('/api/auth/refresh', {
-                method: 'POST',
-                credentials: 'include',
-                signal: controller.signal,
-              });
-
-              if (refreshResponse.ok) {
-                // Токен обновлен, повторяем запрос
-                response = await fetch('/api/auth/me', {
-                  signal: controller.signal,
-                  cache: 'no-store',
-                });
-              } else {
-                // Refresh не удался, пользователь не авторизован
-                router.push('/auth');
-                return;
-              }
-            } catch {
-              // Ошибка при обновлении токена
-              router.push('/auth');
-              return;
-            }
-          }
-
           if (response.ok) {
             const data = await response.json();
             // Проверяем, что пользователь авторизован
-            // Если есть поле authenticated: false, значит пользователь не авторизован
-            if (data.authenticated === false || !data.dashboard_token || !data.id) {
+            if (data.authenticated === false || !data.dashboard_token) {
               router.push('/auth');
               return;
             }
@@ -144,7 +115,8 @@ export default function DashboardPage() {
         }
       } catch (error) {
         if (!isMounted) return;
-        // Тихий режим - ошибка обрабатывается через редирект
+
+        console.error('Failed to fetch user data:', error);
         // Проверяем, не является ли это таймаутом
         if (error instanceof Error && error.name === 'AbortError') {
           router.push('/error/500');
@@ -175,18 +147,13 @@ export default function DashboardPage() {
   const handleLogout = async () => {
     try {
       const response = await fetch('/api/auth/logout', {
-        method: 'POST',
-        credentials: 'include'
+        method: 'POST'
       });
       if (response.ok) {
-        // Очищаем localStorage от access_token
-        if (typeof window !== 'undefined') {
-          localStorage.removeItem('access_token');
-        }
         router.push('/auth');
       }
-    } catch {
-      // Тихий режим - ошибка logout не критична
+    } catch (error) {
+      console.error('Logout error:', error);
     }
   };
 
@@ -382,13 +349,13 @@ export default function DashboardPage() {
       <header className="fixed top-0 left-0 right-0 pt-4 z-[999]">
         <div className="mx-auto max-w-6xl px-4">
           <div className="backdrop-blur-lg bg-neutral-900/40 border border-white/10 rounded-full px-6 py-3 flex items-center justify-between shadow-lg">
-            <Link href="/" prefetch={false} className="flex items-center gap-2">
+            <Link href="/" className="flex items-center gap-2">
               <Image src="/static/logo.svg" alt="Raven Logo" width={256} height={256} className="w-6 h-6" priority/>
               <span className="font-semibold text-white">Raven Private</span>
             </Link>
             <nav className="hidden lg:flex items-center gap-8 text-sm text-neutral-300">
-              <Link href="/" prefetch={false} className="hover:text-white transition">Главная</Link>
-              <Link href="/auth/" prefetch={false} className="hover:text-white transition">Профиль</Link>
+              <Link href="/" className="hover:text-white transition">Главная</Link>
+              <Link href="/auth/" className="hover:text-white transition">Профиль</Link>
             </nav>
             {userData && (
               <div className="hidden lg:flex items-center gap-2 relative" ref={userMenuRef}>
@@ -511,7 +478,6 @@ export default function DashboardPage() {
                       </Link>
                       <Link
                         href="/support"
-                        prefetch={false}
                         onClick={() => setUserMenuOpen(false)}
                         className="flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-xl text-white/80 hover:text-white hover:bg-white/5 transition-colors duration-200"
                       >
@@ -594,7 +560,6 @@ export default function DashboardPage() {
                   </Link>
                   <Link
                     href="/support"
-                    prefetch={false}
                     onClick={() => setOpen(false)}
                     className="flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-xl text-white/80 hover:text-white hover:bg-white/5 transition-colors duration-200"
                   >
@@ -681,7 +646,7 @@ export default function DashboardPage() {
             </section>
             <section className="rounded-2xl border border-neutral-800 bg-neutral-900 p-5">
               <div className="text-sm text-neutral-400">Поддержка</div>
-              <Link href="/support" prefetch={false} className="mt-2 inline-block text-primary-400 hover:underline hover:text-primary-300 transition-colors">
+              <Link href="/support" className="mt-2 inline-block text-primary-400 hover:underline hover:text-primary-300 transition-colors">
                 Связаться с нами
               </Link>
             </section>

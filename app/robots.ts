@@ -11,12 +11,12 @@ export default function robots(): MetadataRoute.Robots {
           '/',
           '/auth',
           '/legal/',
-          '/support',
-          '/protection'
+          '/support'
         ],
         disallow: [
           '/api/',
           '/dashboard/',
+          '/protection/',
           '/_next/',
           '/admin/',
           '/ui/',
@@ -30,12 +30,12 @@ export default function robots(): MetadataRoute.Robots {
         allow: [
           '/',
           '/auth',
-          '/legal/',
-          '/protection'
+          '/legal/'
         ],
         disallow: [
           '/api/',
           '/dashboard/',
+          '/protection/',
           '/_next/',
           '/ui/',
           '/error/'
@@ -46,8 +46,7 @@ export default function robots(): MetadataRoute.Robots {
         allow: [
           '/',
           '/auth',
-          '/legal/',
-          '/protection'
+          '/legal/'
         ],
         disallow: [
           '/api/',

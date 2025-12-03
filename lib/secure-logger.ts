@@ -1,3 +1,4 @@
+// Log levels
 interface LogLevel {
   ERROR: 'error';
   WARN: 'warn';
@@ -12,6 +13,7 @@ const LOG_LEVELS: LogLevel = {
   DEBUG: 'debug'
 };
 
+// Log entry structure
 interface LogEntry {
   level: string;
   message: string;
@@ -22,7 +24,9 @@ interface LogEntry {
   userAgent?: string;
 }
 
+// Secure logger with data sanitization
 class SecureLogger {
+  // Sanitize sensitive data from log context
   private sanitizeData(data: unknown): unknown {
     if (typeof data !== 'object' || data === null) {
       return data;
@@ -50,6 +54,7 @@ class SecureLogger {
     return sanitized;
   }
 
+  // Anonymize IP addresses
   private anonymizeIP(ip: string): string {
     if (!ip || ip === 'unknown') return 'unknown';
     
@@ -70,6 +75,7 @@ class SecureLogger {
     return 'xxx.xxx.xxx.xxx';
   }
 
+  // Format log entry with sanitized context
   private formatLog(level: string, message: string, context?: Record<string, unknown>): LogEntry {
     return {
       level,
@@ -79,6 +85,7 @@ class SecureLogger {
     };
   }
 
+  // Write log entry (formatted in dev, JSON in production)
   private writeLog(entry: LogEntry): void {
     if (process.env.NODE_ENV === 'development') {
       const logMethod = entry.level === 'error' ? console.error :
@@ -86,35 +93,34 @@ class SecureLogger {
                        entry.level === 'info' ? console.info :
                        console.log;
       
-      // Краткий формат: [LEVEL] message | context
-      const contextStr = entry.context 
-        ? ` | ${Object.keys(entry.context).length} fields`
-        : '';
-      
-      logMethod(`[${entry.level.toUpperCase()}] ${entry.message}${contextStr}`, entry.context || '');
+      logMethod(
+        `[${entry.timestamp}] ${entry.level.toUpperCase()}: ${entry.message}`,
+        entry.context ? entry.context : ''
+      );
     } else {
-      // Production: JSON без timestamp (добавится на уровне системы логирования)
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { timestamp: _, ...logData } = entry;
-      console.log(JSON.stringify(logData));
+      console.log(JSON.stringify(entry));
     }
   }
 
+  // Log error
   error(message: string, context?: Record<string, unknown>): void {
     const entry = this.formatLog(LOG_LEVELS.ERROR, message, context);
     this.writeLog(entry);
   }
 
+  // Log warning
   warn(message: string, context?: Record<string, unknown>): void {
     const entry = this.formatLog(LOG_LEVELS.WARN, message, context);
     this.writeLog(entry);
   }
 
+  // Log info
   info(message: string, context?: Record<string, unknown>): void {
     const entry = this.formatLog(LOG_LEVELS.INFO, message, context);
     this.writeLog(entry);
   }
 
+  // Log debug (only in development)
   debug(message: string, context?: Record<string, unknown>): void {
     if (process.env.NODE_ENV === 'development') {
       const entry = this.formatLog(LOG_LEVELS.DEBUG, message, context);

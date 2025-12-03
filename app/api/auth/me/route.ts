@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyAuth, verifyRefreshAuth } from '@/lib/auth/verify';
-import { generateAccessToken, generateRefreshToken } from '@/lib/auth/jwt';
-import { storeRefreshToken, revokeTokenByJti } from '@/lib/auth/tokens';
-import { getActiveUserById, toPublicUser, getUserRoles } from '@/lib/auth/users';
-import { setTokenCookies, clearTokenCookies, extractTokensFromRequest } from '@/lib/auth/cookies';
-import { setCorsHeaders, handleCorsPreflight } from '@/lib/cors';
+import { cookies } from 'next/headers';
+import { getUserByToken } from '@/lib/auth';
 import { logger } from '@/lib/secure-logger';
+import { setCorsHeaders, handleCorsPreflight } from '@/lib/cors';
+import { hasUserRole } from '@/lib/user-roles';
 
 export async function OPTIONS() {
   return handleCorsPreflight();
@@ -13,125 +11,69 @@ export async function OPTIONS() {
 
 export async function GET(request: NextRequest) {
   try {
-    const authResult = await verifyAuth(request);
+    const cookieStore = await cookies();
+    const dashboardToken = cookieStore.get('dashboard_token')?.value;
+    const isAuthenticated = cookieStore.get('user_authenticated')?.value === 'true';
 
-    // Not authenticated - try to refresh if access token expired
-    if (!authResult.success) {
-      // Only return 200 for missing tokens
-      if (authResult.code === 'NO_TOKEN') {
-        return setCorsHeaders(
-          NextResponse.json({ authenticated: false }, { status: 200 })
-        );
-      }
-
-      // Token expired - try to refresh automatically
-      if (authResult.code === 'TOKEN_EXPIRED') {
-        const { refreshToken } = extractTokensFromRequest(request);
-        
-        // If refresh token exists, try to refresh
-        if (refreshToken) {
-          const refreshResult = await verifyRefreshAuth(request);
-          
-          if (refreshResult.success) {
-            const { userId, tokenVersion, jti: oldJti } = refreshResult;
-            const ipAddress = request.headers.get('x-forwarded-for') || 'unknown';
-            const userAgent = request.headers.get('user-agent') || 'unknown';
-
-            // Get user data
-            const user = await getActiveUserById(userId);
-            if (!user) {
-              return setCorsHeaders(
-                NextResponse.json({ authenticated: false }, { status: 200 })
-              );
-            }
-
-            // Generate new tokens
-            const newAccessToken = await generateAccessToken(
-              { id: user.id, username: user.username, user_id: user.user_id },
-              tokenVersion
-            );
-
-            const { token: newRefreshToken, jti: newJti } = await generateRefreshToken(
-              userId,
-              tokenVersion
-            );
-
-            // Store new refresh token BEFORE revoking old one
-            const storeResult = await storeRefreshToken(
-              userId,
-              newRefreshToken,
-              newJti,
-              ipAddress,
-              userAgent
-            );
-
-            if (storeResult.success) {
-              // Revoke old token (token rotation)
-              await revokeTokenByJti(oldJti, 'rotation');
-
-              // Get roles
-              const roles = await getUserRoles(user.id);
-              const isSupport = roles.includes('support');
-              const isAdmin = roles.includes('admin');
-
-              // Create response with new tokens
-              const response = NextResponse.json({
-                authenticated: true,
-                ...toPublicUser(user),
-                isSupport,
-                isAdmin,
-              });
-
-              // Set new cookies
-              const hostname = request.nextUrl.hostname;
-              setTokenCookies(response, newAccessToken, newRefreshToken, hostname);
-
-              return setCorsHeaders(response);
-            }
-          }
-        }
-
-        // Refresh failed or no refresh token - clear cookies and return expired status
-        const hostname = request.nextUrl.hostname;
-        const errorResponse = NextResponse.json(
-          { authenticated: false, expired: true },
-          { status: 401 }
-        );
-        clearTokenCookies(errorResponse, hostname);
-        
-        return setCorsHeaders(errorResponse);
-      }
-
-      // Other errors
+    if (!isAuthenticated || !dashboardToken) {
+      // Возвращаем 200 вместо 401, чтобы не выводить ошибку в консоль браузера
+      // Это нормальная ситуация для неавторизованных пользователей
       return setCorsHeaders(
         NextResponse.json(
-          { authenticated: false, error: authResult.message },
-          { status: 401 }
+          { authenticated: false }
         )
       );
     }
 
-    // Check for support/admin roles
-    const roles = authResult.roles;
-    const isSupport = roles.includes('support');
-    const isAdmin = roles.includes('admin');
+    const user = await getUserByToken(dashboardToken);
+    
+    if (!user) {
+      return setCorsHeaders(
+        NextResponse.json(
+          { error: 'User not found' },
+          { status: 404 }
+        )
+      );
+    }
+
+    // Проверяем роли пользователя
+    let isSupport = false;
+    let isAdmin = false;
+    try {
+      isSupport = await hasUserRole(user.id, 'support');
+      isAdmin = await hasUserRole(user.id, 'admin');
+    } catch (error) {
+      // Игнорируем ошибки проверки ролей, просто не устанавливаем флаги
+      logger.warn('Error checking user roles', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        userId: user.id
+      });
+    }
 
     return setCorsHeaders(
       NextResponse.json({
-        authenticated: true,
-        ...authResult.user,
+        id: user.id,
+        user_id: user.user_id,
+        username: user.username,
+        dashboard_token: user.dashboard_token,
+        created_at: user.created_at,
+        last_login: user.last_login,
+        avatar_gradient: user.avatar_gradient,
         isSupport,
-        isAdmin,
+        isAdmin
       })
     );
   } catch (error) {
-    logger.error('Auth me error', {
+    logger.error('Get user error', {
       error: error instanceof Error ? error.message : 'Unknown error',
-      ip: request.headers.get('x-forwarded-for'),
+      ip: request.headers.get('x-forwarded-for')
     });
-    // Internal error - return 500
     return setCorsHeaders(
-      NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+      NextResponse.json(
+        { error: 'Internal server error' },
+        { status: 500 }
+      )
     );
   }
 }
+

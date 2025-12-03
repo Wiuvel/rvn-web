@@ -66,14 +66,32 @@ export default function HeroSection() {
               Свобода и безопасность в <br className="hidden sm:block" />один <u>клик</u>
             </h1>
             <p ref={subtitleRef} className="mt-3 md:mt-4 text-neutral-300 text-base md:text-lg max-w-xl mx-auto lg:mx-0">
-              Быстрое и надежное решение с низкими тарифами и доступными серверами. Начните использовать уже сейчас.
+              Быстрое и надежное решение с низкими тарифами и доступными серверами. Только сегодня на {' '}
+              <a 
+                href="https://rvn.market" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-primary-400 hover:text-primary-300 transition-colors duration-200"
+              >
+                rvn.market
+                <svg 
+                  xmlns="http://www.w3.org/2000/svg" 
+                  className="h-3.5 w-3.5 md:h-4 md:w-4 inline-block" 
+                  fill="none" 
+                  viewBox="0 0 24 24" 
+                  stroke="currentColor" 
+                  strokeWidth="2"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+              </a>
             </p>
             <div ref={buttonsRef} className="mt-6 md:mt-8 flex flex-col sm:flex-row gap-3 justify-center lg:justify-start">
               <Button asChild size="lg" className="bg-primary-400 text-black hover:bg-primary-500 shadow-lg hover:shadow-blue-500/50 hover:scale-105 disabled:bg-neutral-800 disabled:text-neutral-500 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:scale-100 disabled:hover:shadow-lg">
-                <Link href="#pricing" prefetch={false}>Выбрать тариф</Link>
+                <Link href="#pricing">Выбрать тариф</Link>
               </Button>
               <Button asChild variant="ghost" size="lg" className="border-2 border-neutral-800/50 bg-transparent hover:bg-neutral-900/50 hover:border-neutral-700">
-                <Link href="#apps" prefetch={false}>Подробнее</Link>
+                <Link href="#apps">Подробнее</Link>
               </Button>
             </div>
             <div className="mt-4 md:mt-6 flex flex-wrap justify-center lg:justify-start gap-3 md:gap-4 text-xs text-neutral-400 animate-fadeIn">

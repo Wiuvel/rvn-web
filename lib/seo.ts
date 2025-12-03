@@ -129,7 +129,7 @@ export const pageMetadata = {
     description: 'Подтвердите, что вы человек, чтобы получить доступ к сайту Raven Private.',
     keywords: ['проверка', 'безопасность', 'captcha', 'защита'],
     url: '/protection',
-    noindex: false
+    noindex: true
   }),
 
   legal: generateMetadata({

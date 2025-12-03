@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { translateError } from '@/lib/error-translations';
@@ -27,9 +26,10 @@ declare global {
 
 interface AuthFormProps {
   retpatch?: string;
+  initialError?: string;
 }
 
-export default function AuthForm({ retpatch = '/dashboard/' }: AuthFormProps) {
+export default function AuthForm({ retpatch = '/dashboard/', initialError }: AuthFormProps) {
   const [currentTab, setCurrentTab] = useState<'login' | 'register'>('login');
   const [isLoading, setIsLoading] = useState(false);
   const [registerData, setRegisterData] = useState({
@@ -281,8 +281,8 @@ export default function AuthForm({ retpatch = '/dashboard/' }: AuthFormProps) {
       const token = data?.csrfToken || '';
       setCsrfToken(token);
       return token;
-    } catch {
-      // Тихий режим - ошибка обрабатывается через UI
+    } catch (error) {
+      console.error('CSRF token fetch error:', error);
       setCsrfToken('');
       setErrors(prev => ({
         ...prev,
@@ -401,11 +401,18 @@ export default function AuthForm({ retpatch = '/dashboard/' }: AuthFormProps) {
     return isValidUsername && isValidPassword && isValidConfirm;
   };
 
+  // Handle OAuth login
   const oauthLogin = async (provider: string) => {
     setIsLoading(true);
     try {
-      // Перенаправляем на API route для инициации OAuth
-      window.location.href = `/api/auth/oauth/${provider}`;
+      if (provider === 'google') {
+        // Redirect to Google OAuth endpoint
+        window.location.href = '/api/auth/oauth/google';
+      } else if (provider === 'twitch') {
+        // Twitch OAuth not implemented yet
+        setErrors(prev => ({ ...prev, global: 'Twitch авторизация пока недоступна' }));
+        setIsLoading(false);
+      }
     } catch {
       setErrors(prev => ({ ...prev, global: 'Ошибка подключения к провайдеру' }));
       setIsLoading(false);
@@ -485,64 +492,13 @@ export default function AuthForm({ retpatch = '/dashboard/' }: AuthFormProps) {
     fetchCsrfToken();
   }, []);
 
-  const searchParams = useSearchParams();
+  // Handle initial error from OAuth redirect
   useEffect(() => {
-    const errorParam = searchParams.get('error');
-    if (errorParam) {
-      let errorMessage = '';
-      switch (errorParam) {
-        case 'rate_limit':
-          errorMessage = 'Too many login attempts. Please try again later.';
-          break;
-        case 'oauth_denied':
-          errorMessage = 'OAuth authorization was denied';
-          break;
-        case 'invalid_request':
-          errorMessage = 'Invalid request';
-          break;
-        case 'invalid_state':
-          errorMessage = 'Invalid state token';
-          break;
-        case 'oauth_not_configured':
-          errorMessage = 'OAuth service is not configured';
-          break;
-        case 'token_exchange_failed':
-          errorMessage = 'Failed to exchange OAuth token';
-          break;
-        case 'no_access_token':
-          errorMessage = 'No access token received';
-          break;
-        case 'user_info_failed':
-          errorMessage = 'Failed to fetch user information';
-          break;
-        case 'no_email':
-          errorMessage = 'No email provided';
-          break;
-        case 'email_not_verified':
-          errorMessage = 'Email is not verified';
-          break;
-        case 'user_creation_failed':
-          errorMessage = 'Failed to create user account';
-          break;
-        case 'account_disabled':
-          errorMessage = 'Account is disabled';
-          break;
-        case 'internal_error':
-          errorMessage = 'Internal server error';
-          break;
-        default:
-          errorMessage = 'An error occurred';
-      }
-      const translatedError = translateError(errorMessage);
-      setErrors(prev => ({ ...prev, global: escapeHtml(translatedError) }));
-      setLoginAttemptState('error');
-      
-      // Очищаем параметр из URL
-      const url = new URL(window.location.href);
-      url.searchParams.delete('error');
-      window.history.replaceState({}, '', url.toString());
+    if (initialError) {
+      const translatedError = translateError(initialError);
+      setErrors(prev => ({ ...prev, global: translatedError }));
     }
-  }, [searchParams]);
+  }, [initialError]);
 
   return (
     <div className="w-full max-w-md mx-auto">
@@ -730,6 +686,33 @@ export default function AuthForm({ retpatch = '/dashboard/' }: AuthFormProps) {
               >
                 {isLoading && <span className="spinner"></span>}
                 <span>{isLoading ? 'Отправка...' : 'Зарегистрироваться'}</span>
+              </button>
+            </div>
+
+            <div className="divider">
+              <span>или авторизироваться через</span>
+            </div>
+
+            <div className="oauth-grid">
+              <button
+                type="button"
+                className="oauth-btn"
+                onClick={() => oauthLogin('google')}
+                disabled={isLoading}
+                title="Войти через Google"
+                aria-label="Войти через Google"
+              >
+                <Image src="/static/icons/oauth/google.svg" alt="Google" width={20} height={20} />
+              </button>
+              <button
+                type="button"
+                className="oauth-btn"
+                onClick={() => oauthLogin('twitch')}
+                disabled={isLoading}
+                title="Войти через Twitch"
+                aria-label="Войти через Twitch"
+              >
+                <Image src="/static/icons/oauth/twitch.svg" alt="Twitch" width={20} height={20} />
               </button>
             </div>
 

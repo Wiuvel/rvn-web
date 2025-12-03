@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createUser, toPublicUser } from '@/lib/auth/users';
-import { generateAccessToken, generateRefreshToken } from '@/lib/auth/jwt';
-import { storeRefreshToken } from '@/lib/auth/tokens';
-import { setTokenCookies } from '@/lib/auth/cookies';
+import { createUser } from '@/lib/auth';
 import { authRateLimit } from '@/lib/rate-limit';
-import { setCorsHeaders, handleCorsPreflight } from '@/lib/cors';
+import { verifyCSRFToken } from '@/lib/csrf';
+import { ServerValidator } from '@/lib/server-validation';
 import { logger } from '@/lib/secure-logger';
+import { setCorsHeaders, handleCorsPreflight } from '@/lib/cors';
+import { SessionManager } from '@/lib/session-manager';
 
 export async function OPTIONS() {
   return handleCorsPreflight();
@@ -16,8 +16,9 @@ export async function POST(request: NextRequest) {
     // Rate limiting
     const rateLimitResult = await authRateLimit.check(request);
     if (!rateLimitResult.allowed) {
-      logger.warn('Rate limit exceeded for registration', {
+      logger.warn('Rate limit exceeded for registration attempt', {
         ip: request.headers.get('x-forwarded-for'),
+        userAgent: request.headers.get('user-agent')
       });
       return setCorsHeaders(
         NextResponse.json(
@@ -27,108 +28,153 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Parse request
-    const body = await request.json();
-    const { username, password, confirmPassword } = body;
+    const { username, password, confirmPassword, csrfToken } = await request.json();
 
-    // Validate input
-    if (!username || typeof username !== 'string') {
-      return setCorsHeaders(
-        NextResponse.json({ error: 'Username is required' }, { status: 400 })
-      );
-    }
-
-    if (username.length < 3 || username.length > 20) {
+    // Валидация входных данных
+    const dataValidation = ServerValidator.validateRequestData({ username, password, confirmPassword });
+    if (!dataValidation.isValid) {
       return setCorsHeaders(
         NextResponse.json(
-          { error: 'Username must be 3-20 characters' },
+          { error: 'Invalid request data' },
           { status: 400 }
         )
       );
     }
 
-    if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+    // Валидация username
+    const usernameValidation = ServerValidator.validateUsername(username);
+    if (!usernameValidation.isValid) {
       return setCorsHeaders(
         NextResponse.json(
-          { error: 'Username can only contain letters, numbers, and underscores' },
+          { error: 'Invalid username format' },
           { status: 400 }
         )
       );
     }
 
-    if (!password || typeof password !== 'string' || password.length < 6) {
+    // Валидация password
+    const passwordValidation = ServerValidator.validatePassword(password);
+    if (!passwordValidation.isValid) {
       return setCorsHeaders(
         NextResponse.json(
-          { error: 'Password must be at least 6 characters' },
+          { error: 'Invalid password format' },
           { status: 400 }
         )
       );
     }
 
-    if (password !== confirmPassword) {
+    // Валидация confirmPassword
+    const confirmPasswordValidation = ServerValidator.validateConfirmPassword(password, confirmPassword);
+    if (!confirmPasswordValidation.isValid) {
       return setCorsHeaders(
-        NextResponse.json({ error: 'Passwords do not match' }, { status: 400 })
+        NextResponse.json(
+          { error: 'Passwords do not match' },
+          { status: 400 }
+        )
       );
     }
 
-    // Create user
-    const createResult = await createUser(username, password);
-
-    if (!createResult.success) {
-      logger.warn('Failed registration attempt', {
-        username: username.substring(0, 3) + '***',
+    // CSRF защита - упрощенная для регистрации
+    const currentSessionId = request.cookies.get('session_id')?.value;
+    if (currentSessionId && csrfToken && !verifyCSRFToken(csrfToken, currentSessionId)) {
+      logger.warn('Invalid CSRF token for registration attempt', {
         ip: request.headers.get('x-forwarded-for'),
-        error: createResult.error,
+        hasSessionId: !!currentSessionId,
+        hasCsrfToken: !!csrfToken
       });
       return setCorsHeaders(
-        NextResponse.json({ error: createResult.error }, { status: 400 })
+        NextResponse.json(
+          { error: 'Invalid request' },
+          { status: 403 }
+        )
       );
     }
 
-    const { user } = createResult;
+    const result = await createUser(username, password);
+
+    if (!result.success) {
+      logger.warn('Failed user creation attempt', {
+        username: ServerValidator.sanitizeInput(username),
+        ip: request.headers.get('x-forwarded-for'),
+        userAgent: request.headers.get('user-agent'),
+        error: result.error
+      });
+      return setCorsHeaders(
+        NextResponse.json(
+          { error: result.error || 'Failed to create account' },
+          { status: 400 }
+        )
+      );
+    }
+
+    // Create session for the new user
     const ipAddress = request.headers.get('x-forwarded-for') || 'unknown';
     const userAgent = request.headers.get('user-agent') || 'unknown';
-
-    // Generate tokens
-    const accessToken = await generateAccessToken(
-      { id: user.id, username: user.username, user_id: user.user_id },
-      user.token_version
+    const hostname = request.nextUrl.hostname;
+    const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
+    
+    const sessionId = SessionManager.createSession(
+      result.user!.id,
+      ServerValidator.sanitizeInput(username),
+      ipAddress,
+      userAgent
     );
 
-    const { token: refreshToken, jti } = await generateRefreshToken(
-      user.id,
-      user.token_version
-    );
+    await SessionManager.setSessionCookie(sessionId, isLocalhost);
 
-    // Store refresh token
-    await storeRefreshToken(user.id, refreshToken, jti, ipAddress, userAgent);
-
-    // Create response
+    // Set authentication cookies
     const response = NextResponse.json(
-      {
-        message: 'Registration successful',
-        user: toPublicUser(user),
+      { 
+        message: 'User created successfully',
+        dashboard_token: result.user!.dashboard_token
       },
       { status: 201 }
     );
 
-    // Set cookies
-    const hostname = request.nextUrl.hostname;
-    setTokenCookies(response, accessToken, refreshToken, hostname);
+    response.cookies.set('user_authenticated', 'true', {
+      maxAge: 60 * 60 * 24 * 7,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production' && !isLocalhost,
+      sameSite: 'strict',
+      path: '/'
+    });
 
-    logger.info('User registered', {
-      userId: user.id,
-      ip: ipAddress,
+    response.cookies.set('user_id', result.user!.id, {
+      maxAge: 60 * 60 * 24 * 7,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production' && !isLocalhost,
+      sameSite: 'strict',
+      path: '/'
+    });
+
+    response.cookies.set('dashboard_token', result.user!.dashboard_token, {
+      maxAge: 60 * 60 * 24 * 7,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production' && !isLocalhost,
+      sameSite: 'strict',
+      path: '/'
+    });
+
+    // Successful registration
+    logger.info('Successful user registration', {
+      username: ServerValidator.sanitizeInput(username),
+      ip: request.headers.get('x-forwarded-for')
     });
 
     return setCorsHeaders(response);
   } catch (error) {
     logger.error('Registration error', {
       error: error instanceof Error ? error.message : 'Unknown error',
-      ip: request.headers.get('x-forwarded-for'),
+      ip: request.headers.get('x-forwarded-for')
     });
     return setCorsHeaders(
-      NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+      NextResponse.json(
+        { error: 'Internal server error' },
+        { status: 500 }
+      )
     );
   }
 }
+
+
+

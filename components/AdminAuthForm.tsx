@@ -60,8 +60,8 @@ export default function AdminAuthForm({ onAuthSuccess }: AdminAuthFormProps) {
       const response = await fetch('/api/admin/csrf');
       const data = await response.json();
       setCsrfToken(data.csrfToken);
-    } catch {
-      // Тихий режим - ошибка CSRF обрабатывается через UI
+    } catch (error) {
+      console.error('Error getting CSRF token:', error);
     }
   }, []);
 
@@ -71,8 +71,8 @@ export default function AdminAuthForm({ onAuthSuccess }: AdminAuthFormProps) {
       const response = await fetch('/api/admin/check');
       const data = await response.json();
       setAuthState(data);
-    } catch {
-      // Тихий режим - ошибка auth обрабатывается через UI
+    } catch (error) {
+      console.error('Error checking auth status:', error);
     } finally {
       setIsCheckingAuth(false);
     }
@@ -175,8 +175,8 @@ export default function AdminAuthForm({ onAuthSuccess }: AdminAuthFormProps) {
           alert('Запись успешно создана. Войдите в систему.');
         }, 300);
       }
-    } catch {
-      // Тихий режим - ошибка auth обрабатывается через UI
+    } catch (error) {
+      console.error('Auth error:', error);
       setError('Ошибка сети. Попробуйте позже.');
       setLoginSuccess(false);
     } finally {

@@ -1,14 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 import { generalRateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/secure-logger';
 import { setCorsHeaders, handleCorsPreflight } from '@/lib/cors';
-import { verifyAuth } from '@/lib/auth/verify';
 
 export async function OPTIONS() {
   return handleCorsPreflight();
 }
 
-export async function GET(request: NextRequest) {
+export async function GET(request: Request) {
   try {
     // Rate limiting
     const rateLimitResult = await generalRateLimit.check(request);
@@ -25,13 +25,16 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const authResult = await verifyAuth(request);
+    const cookieStore = await cookies();
+    const isAuthenticated = cookieStore.get('user_authenticated')?.value === 'true';
+    const userId = cookieStore.get('user_id')?.value;
+    const dashboardToken = cookieStore.get('dashboard_token')?.value;
 
     return setCorsHeaders(
       NextResponse.json({
-        authenticated: authResult.success,
-        userId: authResult.success ? authResult.user.id : null,
-        dashboardToken: authResult.success ? authResult.user.dashboard_token : null,
+        isAuthenticated,
+        userId: isAuthenticated ? userId : null,
+        dashboardToken: isAuthenticated ? dashboardToken : null
       })
     );
   } catch (error) {

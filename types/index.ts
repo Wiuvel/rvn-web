@@ -1,52 +1,13 @@
-/**
- * Реэкспорт типов из lib/api для обратной совместимости
- * Рекомендуется использовать импорты напрямую из lib/api
- */
-export type {
-  // Базовые типы
-  ApiResponse,
-  ApiSuccessResponse,
-  ApiErrorResponse,
-  ApiResult,
-  
-  // Auth типы
-  LoginRequest,
-  RegisterRequest,
-  AuthResponse,
-  UserData,
-  AuthCheckResponse,
-  
-  // Support типы
-  TicketStatus,
-  Ticket,
-  SupportMessage,
-  CreateTicketRequest,
-  UpdateTicketRequest,
-  SendMessageRequest,
-  TicketsListResponse,
-  TicketDetailResponse,
-  CreateTicketResponse,
-  SendMessageResponse,
-  TicketsQueryParams,
-  
-  // Admin типы
-  AdminUsersResponse,
-  AdminUserRoleRequest,
-  AdminTeamCountResponse,
-  UsersQueryParams,
-  
-  // Другие типы
-  VerifyProtectionRequest,
-  VerifyProtectionResponse,
-  IpResponse,
-} from '@/lib/api/types';
+export interface UserData {
+  id: string;
+  user_id: string;
+  username: string;
+  dashboard_token: string;
+  created_at: string;
+  last_login?: string;
+  avatar_gradient?: string | null;
+}
 
-// Импорты для использования в локальных типах
-import type { Ticket, SupportMessage } from '@/lib/api/types';
-
-/**
- * Локальные типы (не связанные с API)
- */
 export interface Notification {
   id: string;
   title: string;
@@ -54,13 +15,78 @@ export interface Notification {
   created_at: string;
 }
 
-// Обратная совместимость - старые типы
-export interface TicketsResponse {
+/**
+ * Базовый тип для API ответов
+ */
+export interface ApiResponse<T = unknown> {
+  success?: boolean;
+  data?: T;
+  error?: string;
+}
+
+/**
+ * Типы для Support API
+ */
+export interface Ticket {
+  id: string;
+  user_id: string;
+  subject: string;
+  status: 'open' | 'closed' | 'pending';
+  created_at: string;
+  updated_at: string;
+  last_message_at: string | null;
+  assigned_to: string | null;
+  user?: {
+    id: string;
+    username: string;
+    user_id: string;
+    avatar_gradient?: string | null;
+  };
+  assigned_user?: {
+    id: string;
+    username: string;
+    user_id: string;
+    avatar_gradient?: string | null;
+  } | null;
+}
+
+export interface SupportMessage {
+  id: string;
+  ticket_id: string;
+  sender_id: string;
+  sender_type: 'user' | 'support';
+  message_text: string;
+  created_at: string;
+  sender?: {
+    id: string;
+    username: string;
+    user_id: string;
+    avatar_gradient?: string | null;
+  };
+}
+
+export interface TicketsResponse extends ApiResponse {
   tickets: Ticket[];
 }
 
-export interface TicketResponse {
+export interface TicketResponse extends ApiResponse {
   ticket: Ticket;
   messages: SupportMessage[];
+}
+
+/**
+ * Типы для Auth API
+ */
+export interface AuthResponse extends ApiResponse {
+  user?: UserData;
+  dashboardToken?: string;
+}
+
+/**
+ * Типы для Admin API
+ */
+export interface AdminUsersResponse extends ApiResponse {
+  users?: UserData[];
+  total?: number;
 }
 

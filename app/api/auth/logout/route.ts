@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyAuth } from '@/lib/auth/verify';
-import { revokeAllUserTokens, revokeRefreshToken } from '@/lib/auth/tokens';
-import { clearTokenCookies, extractTokensFromRequest } from '@/lib/auth/cookies';
-import { setCorsHeaders, handleCorsPreflight } from '@/lib/cors';
+import { cookies } from 'next/headers';
 import { logger } from '@/lib/secure-logger';
+import { setCorsHeaders, handleCorsPreflight } from '@/lib/cors';
+import { SessionManager } from '@/lib/session-manager';
+import { revokeCSRFToken } from '@/lib/csrf';
 
 export async function OPTIONS() {
   return handleCorsPreflight();
@@ -11,53 +11,47 @@ export async function OPTIONS() {
 
 export async function POST(request: NextRequest) {
   try {
-    const hostname = request.nextUrl.hostname;
-    const { refreshToken } = extractTokensFromRequest(request);
-
-    // Try to get user ID from access token (optional - logout should work even with invalid token)
-    const authResult = await verifyAuth(request);
-    const userId = authResult.success ? authResult.user.id : null;
-
-    // Revoke current refresh token
-    if (refreshToken) {
-      await revokeRefreshToken(refreshToken, 'logout');
+    const cookieStore = await cookies();
+    const sessionId = cookieStore.get('session_id')?.value;
+    const userId = cookieStore.get('user_id')?.value;
+    
+    // Destroy session if exists
+    if (sessionId) {
+      SessionManager.destroySession(sessionId);
+      revokeCSRFToken(sessionId);
     }
+    
+    // Secure cookie deletion
+    await SessionManager.clearSessionCookie();
+    cookieStore.delete('user_authenticated');
+    cookieStore.delete('user_id');
+    cookieStore.delete('dashboard_token');
 
-    // Revoke all user tokens if we have userId
+    // Log successful logout
     if (userId) {
-      const revokeResult = await revokeAllUserTokens(userId, 'logout');
-      if (revokeResult.success && revokeResult.count) {
-        logger.info('User logged out', {
-          userId,
-          revokedTokens: revokeResult.count,
-          ip: request.headers.get('x-forwarded-for'),
-        });
-      }
+      logger.info('User logout', {
+        userId: userId,
+        sessionId: sessionId ? sessionId.substring(0, 8) + '...' : 'none',
+        ip: request.headers.get('x-forwarded-for')
+      });
     }
 
-    // Create response and clear cookies
-    const response = NextResponse.json(
-      { message: 'Logout successful' },
-      { status: 200 }
+    return setCorsHeaders(
+      NextResponse.json(
+        { message: 'Logout successful' },
+        { status: 200 }
+      )
     );
-
-    clearTokenCookies(response, hostname);
-
-    return setCorsHeaders(response);
   } catch (error) {
     logger.error('Logout error', {
       error: error instanceof Error ? error.message : 'Unknown error',
-      ip: request.headers.get('x-forwarded-for'),
+      ip: request.headers.get('x-forwarded-for')
     });
-
-    // Even on error, try to clear cookies
-    const response = NextResponse.json(
-      { message: 'Logout completed' },
-      { status: 200 }
+    return setCorsHeaders(
+      NextResponse.json(
+        { error: 'Internal server error' },
+        { status: 500 }
+      )
     );
-
-    clearTokenCookies(response, request.nextUrl.hostname);
-
-    return setCorsHeaders(response);
   }
 }

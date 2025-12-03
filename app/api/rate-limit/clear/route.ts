@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 import { generalRateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/secure-logger';
 import { setCorsHeaders, handleCorsPreflight } from '@/lib/cors';
-import { verifyAuth } from '@/lib/auth/verify';
 import {
   ERROR_INTERNAL_SERVER_ERROR,
   ERROR_INVALID_REQUEST_DATA,
@@ -30,9 +30,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Проверка авторизации (только для авторизованных пользователей)
-    const authResult = await verifyAuth(request);
+    const cookieStore = await cookies();
+    const isAuthenticated = cookieStore.get('user_authenticated')?.value === 'true';
 
-    if (!authResult.success) {
+    if (!isAuthenticated) {
       return setCorsHeaders(
         NextResponse.json(
           { error: ERROR_NOT_AUTHENTICATED },

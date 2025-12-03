@@ -1,8 +1,6 @@
 import { createHmac, timingSafeEqual, randomBytes } from 'crypto';
-import { getEnv } from './env-validation';
 
-const env = getEnv();
-const CSRF_SECRET = env.CSRF_SECRET;
+const CSRF_SECRET = process.env.CSRF_SECRET || 'default-csrf-secret-change-in-production';
 const CSRF_TOKEN_LIFETIME = 60 * 60 * 1000; // 1 hour
 
 interface CSRFStore {

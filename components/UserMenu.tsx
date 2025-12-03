@@ -41,19 +41,14 @@ export function UserMenu({
   const handleLogout = async () => {
     try {
       const response = await fetch('/api/auth/logout', {
-        method: 'POST',
-        credentials: 'include'
+        method: 'POST'
       });
       if (response.ok) {
-        // Очищаем localStorage от access_token
-        if (typeof window !== 'undefined') {
-          localStorage.removeItem('access_token');
-        }
         onClose();
         router.push('/auth');
       }
-    } catch {
-      // Тихий режим - ошибка logout не критична
+    } catch (error) {
+      console.error('Logout error:', error);
     }
   };
 
@@ -115,7 +110,6 @@ export function UserMenu({
           </Link>
           <Link
             href="/support"
-            prefetch={false}
             onClick={onClose}
             className="flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-xl text-white/80 hover:text-white hover:bg-white/5 transition-colors duration-200"
           >

@@ -30,8 +30,8 @@ export async function GET(request: NextRequest) {
 
     // Проверка авторизации админа
     const cookieStore = await cookies();
+    const adminUsername = cookieStore.get('admin_username')?.value;
     const isAuthenticated = cookieStore.get('admin_authenticated')?.value === 'true';
-    const adminUsername = cookieStore.get('admin_username')?.value || null;
 
     if (!isAuthenticated || !adminUsername) {
       return setCorsHeaders(
@@ -101,8 +101,8 @@ export async function POST(request: NextRequest) {
 
     // Проверка авторизации админа
     const cookieStore = await cookies();
+    const adminUsername = cookieStore.get('admin_username')?.value;
     const isAuthenticated = cookieStore.get('admin_authenticated')?.value === 'true';
-    const adminUsername = cookieStore.get('admin_username')?.value || null;
 
     if (!isAuthenticated || !adminUsername) {
       return setCorsHeaders(
@@ -205,8 +205,8 @@ export async function DELETE(request: NextRequest) {
 
     // Проверка авторизации админа
     const cookieStore = await cookies();
+    const adminUsername = cookieStore.get('admin_username')?.value;
     const isAuthenticated = cookieStore.get('admin_authenticated')?.value === 'true';
-    const adminUsername = cookieStore.get('admin_username')?.value || null;
 
     if (!isAuthenticated || !adminUsername) {
       return setCorsHeaders(

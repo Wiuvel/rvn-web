@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 import { generalRateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/secure-logger';
 import { setCorsHeaders, handleCorsPreflight } from '@/lib/cors';
-import { verifyAuth } from '@/lib/auth/verify';
+import { getUserByToken } from '@/lib/auth';
 import { hasUserRole } from '@/lib/user-roles';
 import { ERROR_INTERNAL_SERVER_ERROR, ERROR_TOO_MANY_REQUESTS } from '@/lib/constants';
 
@@ -30,9 +31,11 @@ export async function GET(request: NextRequest) {
     }
 
     // Проверка авторизации пользователя
-    const authResult = await verifyAuth(request);
+    const cookieStore = await cookies();
+    const isAuthenticated = cookieStore.get('user_authenticated')?.value === 'true';
+    const dashboardToken = cookieStore.get('dashboard_token')?.value;
 
-    if (!authResult.success) {
+    if (!isAuthenticated || !dashboardToken) {
       return setCorsHeaders(
         NextResponse.json({
           isAuthenticated: false,
@@ -41,7 +44,16 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const user = authResult.user;
+    // Получаем пользователя по токену
+    const user = await getUserByToken(dashboardToken);
+    if (!user) {
+      return setCorsHeaders(
+        NextResponse.json({
+          isAuthenticated: false,
+          hasSupportAccess: false
+        })
+      );
+    }
 
     // Проверяем роль поддержки (может выбросить ошибку если БД не настроена)
     let hasSupportAccess = false;
@@ -81,19 +93,24 @@ export async function GET(request: NextRequest) {
     });
     
     // При ошибке БД возвращаем 200 с информацией об ошибке, а не 500
-    const retryAuthResult = await verifyAuth(request);
+    const cookieStore = await cookies();
+    const isAuthenticated = cookieStore.get('user_authenticated')?.value === 'true';
+    const dashboardToken = cookieStore.get('dashboard_token')?.value;
     
-    if (retryAuthResult.success) {
-      return setCorsHeaders(
-        NextResponse.json({
-          isAuthenticated: true,
-          hasSupportAccess: false,
-          username: retryAuthResult.user.username,
-          userId: retryAuthResult.user.id,
-          user_id: retryAuthResult.user.user_id,
-          error: 'Database not configured'
-        })
-      );
+    if (isAuthenticated && dashboardToken) {
+      const user = await getUserByToken(dashboardToken);
+      if (user) {
+        return setCorsHeaders(
+          NextResponse.json({
+            isAuthenticated: true,
+            hasSupportAccess: false,
+            username: user.username,
+            userId: user.id,
+            user_id: user.user_id,
+            error: 'Database not configured'
+          })
+        );
+      }
     }
     
     return setCorsHeaders(

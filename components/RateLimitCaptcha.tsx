@@ -175,8 +175,8 @@ export default function RateLimitCaptcha({ isOpen, onSuccess, onClose }: RateLim
       });
 
       widgetIdRef.current = widgetId;
-    } catch {
-      // Тихий режим - ошибка обрабатывается через UI
+    } catch (err) {
+      console.error('Error rendering Turnstile:', err);
       setError('Ошибка инициализации капчи');
       isProcessingRef.current = false;
     }

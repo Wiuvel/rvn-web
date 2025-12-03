@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { getEnv } from './env-validation';
 
 interface CorsOptions {
   origin?: string | string[] | boolean;
@@ -9,11 +8,9 @@ interface CorsOptions {
   maxAge?: number;
 }
 
-const env = getEnv();
-
 const defaultOptions: CorsOptions = {
   origin: process.env.NODE_ENV === 'production' 
-    ? env.ALLOWED_ORIGINS?.split(',') || false
+    ? process.env.ALLOWED_ORIGINS?.split(',') || false
     : true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: [

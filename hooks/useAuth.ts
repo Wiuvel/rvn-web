@@ -1,29 +1,16 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-
-// ============================================================================
-// Types
-// ============================================================================
-
-export interface UserData {
-  id: string;
-  user_id: string;
-  username: string;
-  dashboard_token: string;
-  avatar_gradient?: string | null;
-  created_at: string;
-  last_login?: string | null;
-  isSupport?: boolean;
-  isAdmin?: boolean;
-}
+import { UserData } from '@/types';
+import { AUTH_FETCH_TIMEOUT } from '@/lib/constants';
 
 export interface UseAuthOptions {
   requireAuth?: boolean;
   redirectOnFail?: string;
-  silent?: boolean;
-  validateToken?: string;
+  redirectOnTimeout?: string;
+  silent?: boolean; // Не выводить ошибки в консоль
+  validateToken?: string; // Проверять совпадение токена
   onSuccess?: (data: UserData) => void;
   onError?: (error: Error) => void;
 }
@@ -32,28 +19,17 @@ export interface UseAuthReturn {
   userData: UserData | null;
   loading: boolean;
   error: Error | null;
-  refetch: () => Promise<void>;
 }
-
-// ============================================================================
-// Constants
-// ============================================================================
-
-const FETCH_TIMEOUT = 10000;
-const RETRY_DELAY = 1000;
-
-// ============================================================================
-// Hook Implementation
-// ============================================================================
 
 export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
   const {
     requireAuth = false,
     redirectOnFail,
+    redirectOnTimeout,
     silent = false,
     validateToken,
     onSuccess,
-    onError,
+    onError
   } = options;
 
   const [userData, setUserData] = useState<UserData | null>(null);
@@ -61,183 +37,145 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
   const [error, setError] = useState<Error | null>(null);
   const router = useRouter();
 
-  const isMountedRef = useRef(true);
-  const fetchingRef = useRef(false);
+  useEffect(() => {
+    let isMounted = true;
+    let controller: AbortController | null = null;
+    let timeoutId: NodeJS.Timeout | null = null;
 
-  const fetchUserData = useCallback(async (isRetry = false) => {
-    if (fetchingRef.current) return;
-    fetchingRef.current = true;
+    const fetchUserData = async () => {
+      try {
+        controller = new AbortController();
+        timeoutId = setTimeout(() => controller!.abort(), AUTH_FETCH_TIMEOUT);
 
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
+        try {
+          const response = await fetch('/api/auth/me', {
+            signal: controller.signal,
+            cache: 'no-store' // Ensure fresh data
+          });
 
-      const response = await fetch('/api/auth/me', {
-        signal: controller.signal,
-        cache: 'no-store',
-      });
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+            timeoutId = null;
+          }
 
-      clearTimeout(timeoutId);
+          if (!isMounted) return;
 
-      if (!isMountedRef.current) return;
+          if (response.ok) {
+            const data = await response.json();
 
-      // Handle 401 - try to refresh token
-      if (response.status === 401) {
-        const data = await response.json();
+            // Проверяем, что пользователь авторизован
+            if (data.authenticated === false || !data.dashboard_token) {
+              if (requireAuth && redirectOnFail) {
+                router.push(redirectOnFail);
+                return;
+              }
+              setUserData(null);
+              return;
+            }
 
-        // Token expired - try to refresh
-        if (data.expired && !isRetry) {
-          const refreshed = await tryRefreshToken();
-          if (refreshed) {
-            fetchingRef.current = false;
-            await fetchUserData(true);
+            // Проверяем совпадение токена, если требуется
+            if (validateToken && data.dashboard_token !== validateToken) {
+              if (redirectOnFail) {
+                router.push(redirectOnFail);
+                return;
+              }
+              setUserData(null);
+              return;
+            }
+
+            setUserData(data);
+            if (onSuccess) {
+              onSuccess(data);
+            }
+          } else {
+            if (requireAuth && redirectOnFail) {
+              router.push(redirectOnFail);
+              return;
+            }
+            setUserData(null);
+          }
+        } catch (fetchError: unknown) {
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+            timeoutId = null;
+          }
+
+          if (!isMounted) return;
+
+          // Обработка таймаута
+          if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+            const timeoutError = new Error('Request timeout');
+            setError(timeoutError);
+            
+            if (redirectOnTimeout) {
+              router.push(redirectOnTimeout);
+              return;
+            }
+            
+            if (onError) {
+              onError(timeoutError);
+            } else if (!silent) {
+              console.error('Auth check timeout');
+            }
             return;
           }
-        }
 
-        // Not authenticated
-        if (requireAuth && redirectOnFail) {
-          router.push(redirectOnFail);
-        }
-        setUserData(null);
-        setLoading(false);
-        fetchingRef.current = false;
-        return;
-      }
+          // Обработка других ошибок
+          const err = fetchError instanceof Error ? fetchError : new Error('Unknown error');
+          setError(err);
+          
+          if (onError) {
+            onError(err);
+          } else if (!silent) {
+            console.error('Failed to fetch user data:', err);
+          }
 
-      // Handle success
-      if (response.ok) {
-        const data = await response.json();
-
-        // Check if actually authenticated
-        if (data.authenticated === false) {
           if (requireAuth && redirectOnFail) {
             router.push(redirectOnFail);
+            return;
           }
+          
           setUserData(null);
-          setLoading(false);
-          fetchingRef.current = false;
-          return;
+        }
+      } catch (error) {
+        if (!isMounted) return;
+
+        const err = error instanceof Error ? error : new Error('Unknown error');
+        setError(err);
+
+        if (onError) {
+          onError(err);
+        } else if (!silent) {
+          console.error('Failed to check auth:', err);
         }
 
-        // Validate token if required
-        if (validateToken && data.dashboard_token !== validateToken) {
-          if (redirectOnFail) {
-            router.push(redirectOnFail);
-          }
-          setUserData(null);
-          setLoading(false);
-          fetchingRef.current = false;
-          return;
-        }
-
-        setUserData(data);
-        setError(null);
-
-        // Dispatch success event for other components
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('authSuccess'));
-        }
-
-        if (onSuccess) {
-          onSuccess(data);
-        }
-      } else {
-        // Other error
         if (requireAuth && redirectOnFail) {
           router.push(redirectOnFail);
+          return;
         }
-        setUserData(null);
-      }
-    } catch (err) {
-      if (!isMountedRef.current) return;
-
-      const error = err instanceof Error ? err : new Error('Unknown error');
-
-      // Handle abort (timeout)
-      if (error.name === 'AbortError') {
-        setError(new Error('Request timeout'));
-      } else {
-        setError(error);
-      }
-
-      if (onError && !silent) {
-        onError(error);
-      }
-
-      if (requireAuth && redirectOnFail) {
-        router.push(redirectOnFail);
-      }
-
-      setUserData(null);
-    } finally {
-      if (isMountedRef.current) {
-        setLoading(false);
-      }
-      fetchingRef.current = false;
-    }
-  }, [requireAuth, redirectOnFail, silent, validateToken, onSuccess, onError, router]);
-
-  // Try to refresh access token
-  const tryRefreshToken = async (): Promise<boolean> => {
-    try {
-      const response = await fetch('/api/auth/refresh', {
-        method: 'POST',
-        credentials: 'include',
-      });
-
-      if (response.ok) {
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('tokenRefreshed'));
-        }
-        return true;
-      }
-
-      // If refresh failed (401), cookies are cleared by server
-      // Clear user data and redirect if needed
-      if (response.status === 401) {
-        setUserData(null);
-        if (requireAuth && redirectOnFail) {
-          router.push(redirectOnFail);
+      } finally {
+        if (isMounted) {
+          setLoading(false);
         }
       }
+    };
 
-      return false;
-    } catch {
-      return false;
-    }
-  };
-
-  // Initial fetch
-  useEffect(() => {
-    isMountedRef.current = true;
     fetchUserData();
 
-    // Listen for token refresh events
-    const handleTokenRefreshed = () => {
-      if (isMountedRef.current) {
-        setTimeout(() => {
-          fetchUserData();
-        }, 100);
-      }
-    };
-
-    if (typeof window !== 'undefined') {
-      window.addEventListener('tokenRefreshed', handleTokenRefreshed);
-    }
-
     return () => {
-      isMountedRef.current = false;
-      if (typeof window !== 'undefined') {
-        window.removeEventListener('tokenRefreshed', handleTokenRefreshed);
+      isMounted = false;
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+      if (controller) {
+        controller.abort();
       }
     };
-  }, [fetchUserData]);
+    // onSuccess и onError не должны быть в зависимостях, так как это функции,
+    // которые могут меняться при каждом рендере, что приведет к бесконечным перезапросам
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [requireAuth, redirectOnFail, redirectOnTimeout, silent, validateToken, router]);
 
-  return {
-    userData,
-    loading,
-    error,
-    refetch: fetchUserData,
-  };
+  return { userData, loading, error };
 }
+

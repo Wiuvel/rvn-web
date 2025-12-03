@@ -11,10 +11,7 @@ export default function Error({
   reset: () => void;
 }) {
   useEffect(() => {
-    // Логируем только в development
-    if (process.env.NODE_ENV === 'development') {
-      console.error('[ERR] Boundary:', error.message);
-    }
+    console.error('Error boundary caught:', error);
   }, [error]);
 
   return (

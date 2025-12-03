@@ -35,8 +35,8 @@ export default function ProtectionPage() {
         if (!isCancelled) {
           setIpAddress(data.ip ?? '—');
         }
-      } catch {
-        // Тихий режим - ошибка получения IP не критична
+      } catch (error) {
+        console.error('Failed to fetch IP address:', error);
         if (!isCancelled) {
           setIpError(true);
         }
