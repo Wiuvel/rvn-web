@@ -6,6 +6,7 @@ import { sanitizeInput } from '@/lib/security/sanitize';
 import { setCorsHeaders, handleCorsPreflight } from '@/lib/security/cors';
 import { logger } from '@/lib/utils/secure-logger';
 import { authRateLimit } from '@/lib/security/rate-limit';
+import { getErrorRedirectUrl, GOOGLE_ERROR_MAP } from '@/lib/utils/oauth-errors';
 
 export async function OPTIONS() {
   return handleCorsPreflight();
@@ -53,40 +54,34 @@ export async function GET(request: NextRequest) {
     const rateLimitResult = await authRateLimit.check(request);
     if (!rateLimitResult.allowed) {
       logger.warn('rate limit exceeded');
-      const errorUrl = isPopup 
-        ? new URL('/auth/oauth-handler?provider=google&error=rate_limit&popup=true', origin)
-        : new URL('/auth?error=rate_limit', origin);
+      const errorUrl = getErrorRedirectUrl('rate_limit', origin, isPopup);
       return setCorsHeaders(NextResponse.redirect(errorUrl));
     }
 
     // Check Google OAuth credentials
     if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) {
       logger.error('google oauth not configured');
-      const errorUrl = isPopup 
-        ? new URL('/auth/oauth-handler?provider=google&error=oauth_not_configured&popup=true', origin)
-        : new URL('/auth?error=oauth_not_configured', origin);
+      const errorUrl = getErrorRedirectUrl('oauth_not_configured', origin, isPopup);
       return setCorsHeaders(NextResponse.redirect(errorUrl));
     }
 
     // Get OAuth parameters
     const code = searchParams.get('code');
-    const error = searchParams.get('error');
+    const googleError = searchParams.get('error');
 
-    // Check for Google errors
-    if (error) {
-      logger.warn('oauth error from google', { error });
-      const errorUrl = isPopup 
-        ? new URL('/auth/oauth-handler?provider=google&error=oauth_denied&popup=true', origin)
-        : new URL('/auth?error=oauth_denied', origin);
+    // Check for Google errors (e.g., ?error=access_denied, ?error=rate_limit)
+    if (googleError) {
+      logger.warn('oauth error from google', { error: googleError });
+      // Map Google error to generic error code
+      const errorCode = GOOGLE_ERROR_MAP[googleError] || 'oauth_denied';
+      const errorUrl = getErrorRedirectUrl(errorCode, origin, isPopup);
       return setCorsHeaders(NextResponse.redirect(errorUrl));
     }
 
     // Validate required parameters
     if (!code || !state) {
       logger.warn('oauth callback missing parameters');
-      const errorUrl = isPopup 
-        ? new URL('/auth/oauth-handler?provider=google&error=invalid_request&popup=true', origin)
-        : new URL('/auth?error=invalid_request', origin);
+      const errorUrl = getErrorRedirectUrl('invalid_request', origin, isPopup);
       return setCorsHeaders(NextResponse.redirect(errorUrl));
     }
 
@@ -97,9 +92,7 @@ export async function GET(request: NextRequest) {
     
     if (!cleanStoredState || cleanStoredState !== cleanState) {
       logger.warn('oauth state mismatch');
-      const errorUrl = isPopup 
-        ? new URL('/auth/oauth-handler?provider=google&error=invalid_state&popup=true', origin)
-        : new URL('/auth?error=invalid_state', origin);
+      const errorUrl = getErrorRedirectUrl('invalid_state', origin, isPopup);
       return setCorsHeaders(NextResponse.redirect(errorUrl));
     }
     
@@ -124,9 +117,7 @@ export async function GET(request: NextRequest) {
       logger.error('failed to exchange oauth code', {
         status: tokenResponse.status
       });
-      const errorUrl = isPopup 
-        ? new URL('/auth/oauth-handler?provider=google&error=token_exchange_failed&popup=true', origin)
-        : new URL('/auth?error=token_exchange_failed', origin);
+      const errorUrl = getErrorRedirectUrl('token_exchange_failed', origin, isPopup);
       return setCorsHeaders(NextResponse.redirect(errorUrl));
     }
 
@@ -135,9 +126,7 @@ export async function GET(request: NextRequest) {
 
     if (!access_token) {
       logger.error('no access_token in oauth response');
-      const errorUrl = isPopup 
-        ? new URL('/auth/oauth-handler?provider=google&error=no_access_token&popup=true', origin)
-        : new URL('/auth?error=no_access_token', origin);
+      const errorUrl = getErrorRedirectUrl('no_access_token', origin, isPopup);
       return setCorsHeaders(NextResponse.redirect(errorUrl));
     }
 
@@ -153,9 +142,7 @@ export async function GET(request: NextRequest) {
 
     if (!userInfoResponse.ok) {
       logger.error('failed to fetch user info', { status: userInfoResponse.status });
-      const errorUrl = isPopup 
-        ? new URL('/auth/oauth-handler?provider=google&error=user_info_failed&popup=true', origin)
-        : new URL('/auth?error=user_info_failed', origin);
+      const errorUrl = getErrorRedirectUrl('user_info_failed', origin, isPopup);
       return setCorsHeaders(NextResponse.redirect(errorUrl));
     }
 
@@ -164,17 +151,13 @@ export async function GET(request: NextRequest) {
 
     if (!email) {
       logger.error('no email in user info');
-      const errorUrl = isPopup 
-        ? new URL('/auth/oauth-handler?provider=google&error=no_email&popup=true', origin)
-        : new URL('/auth?error=no_email', origin);
+      const errorUrl = getErrorRedirectUrl('no_email', origin, isPopup);
       return setCorsHeaders(NextResponse.redirect(errorUrl));
     }
 
     if (!verified_email) {
       logger.warn('email not verified');
-      const errorUrl = isPopup 
-        ? new URL('/auth/oauth-handler?provider=google&error=email_not_verified&popup=true', origin)
-        : new URL('/auth?error=email_not_verified', origin);
+      const errorUrl = getErrorRedirectUrl('email_not_verified', origin, isPopup);
       return setCorsHeaders(NextResponse.redirect(errorUrl));
     }
 
@@ -187,9 +170,7 @@ export async function GET(request: NextRequest) {
       
       if (!createResult.success || !createResult.user) {
         logger.error('failed to create user', { error: createResult.error });
-        const errorUrl = isPopup 
-          ? new URL('/auth/oauth-handler?provider=google&error=user_creation_failed&popup=true', origin)
-          : new URL('/auth?error=user_creation_failed', origin);
+        const errorUrl = getErrorRedirectUrl('user_creation_failed', origin, isPopup);
         return setCorsHeaders(NextResponse.redirect(errorUrl));
       }
       user = createResult.user;
@@ -199,9 +180,7 @@ export async function GET(request: NextRequest) {
     // Check user activity
     if (!user.is_active) {
       logger.warn('login attempt for inactive user', { userId: user.id });
-      const errorUrl = isPopup 
-        ? new URL('/auth/oauth-handler?provider=google&error=account_disabled&popup=true', origin)
-        : new URL('/auth?error=account_disabled', origin);
+      const errorUrl = getErrorRedirectUrl('account_disabled', origin, isPopup);
       return setCorsHeaders(NextResponse.redirect(errorUrl));
     }
 
@@ -361,11 +340,8 @@ export async function GET(request: NextRequest) {
         const origin = env.PUBLIC_DOMAIN.endsWith('/') 
           ? env.PUBLIC_DOMAIN.slice(0, -1) 
           : env.PUBLIC_DOMAIN;
-        return setCorsHeaders(
-          NextResponse.redirect(
-            new URL('/auth?error=internal_error', origin)
-          )
-        );
+        const errorUrl = getErrorRedirectUrl('internal_error', origin, false);
+        return setCorsHeaders(NextResponse.redirect(errorUrl));
       }
     } catch {
       // Fallback to JSON error if env unavailable

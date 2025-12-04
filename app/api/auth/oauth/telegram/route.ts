@@ -4,6 +4,7 @@ import { getEnv } from '@/lib/validation/env-validation';
 import { setCorsHeaders, handleCorsPreflight } from '@/lib/security/cors';
 import { logger } from '@/lib/utils/secure-logger';
 import { authRateLimit } from '@/lib/security/rate-limit';
+import { getErrorRedirectUrl, getOAuthErrorMessage } from '@/lib/utils/oauth-errors';
 
 // Handle CORS preflight
 export async function OPTIONS() {
@@ -32,21 +33,15 @@ export async function GET(request: NextRequest) {
     const rateLimitResult = await authRateLimit.check(request);
     if (!rateLimitResult.allowed) {
       logger.warn('rate limit exceeded');
-      return setCorsHeaders(
-        NextResponse.redirect(
-          new URL('/auth?error=rate_limit', origin)
-        )
-      );
+      const errorUrl = getErrorRedirectUrl('rate_limit', origin, false);
+      return setCorsHeaders(NextResponse.redirect(errorUrl));
     }
 
     // Check Telegram OAuth credentials
     if (!env.TELEGRAM_BOT_TOKEN) {
       logger.error('telegram oauth not configured');
-      return setCorsHeaders(
-        NextResponse.redirect(
-          new URL('/auth?error=oauth_not_configured', origin)
-        )
-      );
+      const errorUrl = getErrorRedirectUrl('oauth_not_configured', origin, false);
+      return setCorsHeaders(NextResponse.redirect(errorUrl));
     }
 
     // Generate CSRF state token
@@ -58,12 +53,27 @@ export async function GET(request: NextRequest) {
     const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
 
     // Telegram Login Widget works via JavaScript widget on client-side
-    // Extract bot ID from token (format: "123456789:ABCdefGHIjklMNOpqrsTUVwxyz")
-    const botId = env.TELEGRAM_BOT_TOKEN.split(':')[0];
+    // Telegram Login Widget requires bot username (e.g., "@my_bot"), not bot ID
+    // Bot username should be set in TELEGRAM_BOT_USERNAME env variable
+    if (!env.TELEGRAM_BOT_USERNAME) {
+      logger.error('TELEGRAM_BOT_USERNAME not configured');
+      return setCorsHeaders(
+        NextResponse.json(
+          { 
+            error: 'oauth_not_configured',
+            message: getOAuthErrorMessage('oauth_not_configured')
+          },
+          { status: 503 }
+        )
+      );
+    }
     
-    // Return bot_id as JSON for client-side widget initialization
+    // Remove @ if present (Telegram widget expects username without @)
+    const botUsername = env.TELEGRAM_BOT_USERNAME.replace(/^@/, '');
+    
+    // Return bot_username as JSON for client-side widget initialization
     // Client will load Telegram Login Widget and send data to POST endpoint
-    const response = NextResponse.json({ botId, state });
+    const response = NextResponse.json({ botUsername, state });
 
     // Store state in cookie for CSRF protection
     response.cookies.set('oauth_state', state, {
@@ -86,11 +96,8 @@ export async function GET(request: NextRequest) {
         const origin = env.PUBLIC_DOMAIN.endsWith('/') 
           ? env.PUBLIC_DOMAIN.slice(0, -1) 
           : env.PUBLIC_DOMAIN;
-        return setCorsHeaders(
-          NextResponse.redirect(
-            new URL('/auth?error=oauth_init_error', origin)
-          )
-        );
+        const errorUrl = getErrorRedirectUrl('oauth_init_error', origin, false);
+        return setCorsHeaders(NextResponse.redirect(errorUrl));
       }
     } catch {
     }

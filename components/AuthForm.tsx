@@ -7,6 +7,7 @@ import dynamic from 'next/dynamic';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { translateError } from '@/lib/utils/error-translations';
+import { getOAuthErrorMessage } from '@/lib/utils/oauth-errors';
 import { loginSchema, registerSchema, type LoginFormData, type RegisterFormData } from '@/lib/validation/schemas';
 
 interface WindowWithPopup extends Window {
@@ -422,7 +423,8 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
         setIsLoading(false);
         setIsPopupOpen(false);
         setActiveProvider(null);
-        setGlobalError(event.data.error || 'Ошибка авторизации');
+        // Error message is already generic and provider-agnostic from handler
+        setGlobalError(event.data.error || getOAuthErrorMessage('unknown_error'));
       }
     };
     
@@ -445,7 +447,8 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
       if (!popup) {
         setIsLoading(false);
         setActiveProvider(null);
-        setGlobalError('Пожалуйста, разрешите всплывающие окна для авторизации');
+        // Popup-specific error - show in /auth/ page
+        setGlobalError(getOAuthErrorMessage('popup_blocked'));
         window.removeEventListener('message', handleMessage);
         return;
       }
@@ -491,10 +494,10 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
         setIsLoading(false);
         setIsPopupOpen(false);
         setActiveProvider(null);
-        setGlobalError('Авторизация была прервана. Попробуйте снова.');
+        setGlobalError(getOAuthErrorMessage('popup_timeout'));
       }, 10 * 60 * 1000); // 10 minutes timeout
     } catch {
-      setGlobalError('Ошибка подключения к провайдеру');
+      setGlobalError(getOAuthErrorMessage('network_error'));
       setIsLoading(false);
       setActiveProvider(null);
     }
@@ -530,10 +533,13 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
   }, []);
 
   // Handle initial error from OAuth redirect
+  // Only popup-specific errors should reach /auth/ page
+  // Other OAuth errors are handled in oauth-handler
   useEffect(() => {
     if (initialError) {
-      const translatedError = translateError(initialError);
-      setGlobalError(translatedError);
+      // Use OAuth error messages for OAuth errors, fallback to translateError for other errors
+      const errorMessage = getOAuthErrorMessage(initialError) || translateError(initialError);
+      setGlobalError(errorMessage);
     }
   }, [initialError]);
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, Suspense, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
+import { getOAuthErrorMessage, isPopupSpecificError } from '@/lib/utils/oauth-errors';
 
 interface TelegramOAuthResult {
   success: boolean;
@@ -26,28 +27,40 @@ interface WindowWithTelegram extends Window {
 
 // Helper function to check if we're in a popup
 function isPopupWindow(): boolean {
-  // Check sessionStorage first (most reliable after redirects)
-  const fromStorage = sessionStorage.getItem('oauth_popup') === 'true';
-  if (fromStorage) {
-    console.log('Popup detected from sessionStorage');
-    return true;
+  // SSR check
+  if (typeof window === 'undefined' || typeof sessionStorage === 'undefined') {
+    return false;
   }
+  
+  // Check sessionStorage first (most reliable after redirects)
+  try {
+    const fromStorage = sessionStorage.getItem('oauth_popup') === 'true';
+    if (fromStorage) {
+      return true;
+    }
+  } catch {
+    // sessionStorage may be unavailable
+  }
+  
   // Check window.opener
   const hasOpener = window.opener !== null;
   if (hasOpener) {
-    console.log('Popup detected from window.opener');
     return true;
   }
+  
   // Check URL parameter
-  const urlParams = new URLSearchParams(window.location.search);
-  const fromUrl = urlParams.get('popup') === 'true';
-  if (fromUrl) {
-    console.log('Popup detected from URL parameter');
-    // Save to sessionStorage for future checks
-    sessionStorage.setItem('oauth_popup', 'true');
-    return true;
+  try {
+    const urlParams = new URLSearchParams(window.location.search);
+    const fromUrl = urlParams.get('popup') === 'true';
+    if (fromUrl) {
+      // Save to sessionStorage for future checks
+      sessionStorage.setItem('oauth_popup', 'true');
+      return true;
+    }
+  } catch {
+    // sessionStorage may be unavailable
   }
-  console.log('Not detected as popup');
+  
   return false;
 }
 
@@ -57,16 +70,27 @@ function sendMessageAndClose(
   data: { dashboard_token?: string; redirect?: string; error?: string },
   setError?: (message: string | null) => void,
   setStatus?: (status: 'loading' | 'redirecting' | 'processing' | 'error') => void
-) {
+): boolean {
+  // SSR check
+  if (typeof window === 'undefined') {
+    return false;
+  }
+  
   const isPopup = isPopupWindow();
   
   if (isPopup) {
     // Clear popup flag
-    sessionStorage.removeItem('oauth_popup');
+    try {
+      if (typeof sessionStorage !== 'undefined') {
+        sessionStorage.removeItem('oauth_popup');
+      }
+    } catch {
+      // sessionStorage may be unavailable
+    }
     
     if (type === 'OAUTH_ERROR' && setError && setStatus) {
       // Show error in popup instead of closing immediately
-      setError(data.error || 'Ошибка авторизации');
+      setError(data.error || getOAuthErrorMessage('unknown_error'));
       setStatus('error');
       
       // Try to send message to parent window
@@ -79,16 +103,16 @@ function sendMessageAndClose(
             },
             window.location.origin
           );
-          console.log(`OAuth ${type} message sent to parent window`);
-        } catch (error) {
-          console.error('Failed to send message to parent:', error);
+        } catch {
+          // Silent fail - error already displayed in popup
         }
       }
       
       // Close popup after 3 seconds
       setTimeout(() => {
-        console.log('Closing popup window after error');
-        window.close();
+        if (typeof window !== 'undefined') {
+          window.close();
+        }
       }, 3000);
       
       return true;
@@ -104,18 +128,16 @@ function sendMessageAndClose(
           },
           window.location.origin
         );
-        console.log(`OAuth ${type} message sent to parent window`);
-      } catch (error) {
-        console.error('Failed to send message to parent:', error);
+      } catch {
+        // Silent fail - popup will close anyway
       }
-    } else {
-      console.warn('window.opener is null, cannot send message');
     }
     
     // Always close popup after sending message
     setTimeout(() => {
-      console.log('Closing popup window');
-      window.close();
+      if (typeof window !== 'undefined') {
+        window.close();
+      }
     }, 100);
     
     return true;
@@ -134,8 +156,14 @@ function OAuthHandlerContent() {
 
   // Initialize: mark as popup if we detect it
   useEffect(() => {
-    if (isPopupWindow()) {
-      sessionStorage.setItem('oauth_popup', 'true');
+    if (typeof window !== 'undefined' && typeof sessionStorage !== 'undefined') {
+      if (isPopupWindow()) {
+        try {
+          sessionStorage.setItem('oauth_popup', 'true');
+        } catch {
+          // sessionStorage may be unavailable
+        }
+      }
     }
   }, []);
 
@@ -150,15 +178,6 @@ function OAuthHandlerContent() {
       setHandled(true);
       setStatus('processing');
       
-      // Debug logging
-      const isPopup = isPopupWindow();
-      console.log('OAuth success detected:', {
-        isPopup,
-        hasOpener: window.opener !== null,
-        sessionStorage: sessionStorage.getItem('oauth_popup'),
-        urlParam: searchParams.get('popup')
-      });
-      
       // CRITICAL: If in popup, send message and close - NEVER redirect
       const wasHandled = sendMessageAndClose('OAUTH_SUCCESS', {
         dashboard_token: dashboardToken,
@@ -166,19 +185,22 @@ function OAuthHandlerContent() {
       }, setErrorMessage, setStatus);
       
       if (!wasHandled) {
-        console.warn('Not in popup, redirecting normally');
         // Not in popup - redirect normally
-        sessionStorage.removeItem('oauth_popup');
+        try {
+          if (typeof sessionStorage !== 'undefined') {
+            sessionStorage.removeItem('oauth_popup');
+          }
+        } catch {
+          // sessionStorage may be unavailable
+        }
         window.location.href = `/dashboard/${dashboardToken}`;
-      } else {
-        console.log('Popup handled, should close soon');
       }
       
       return;
     }
   }, [searchParams, handled]);
 
-  // Handle error callback
+  // Handle error callback from URL parameters (including provider errors like Google's ?error=...)
   useEffect(() => {
     if (handled) return;
     
@@ -187,42 +209,51 @@ function OAuthHandlerContent() {
     
     setHandled(true);
     
-    const errorMessages: Record<string, string> = {
-      'user_creation_failed': 'Не удалось создать аккаунт',
-      'oauth_denied': 'Авторизация отменена',
-      'invalid_state': 'Ошибка безопасности',
-      'token_exchange_failed': 'Ошибка обмена токена',
-      'invalid_request': 'Неверный запрос',
-      'rate_limit': 'Превышен лимит запросов',
-      'oauth_not_configured': 'OAuth не настроен',
-      'no_access_token': 'Не получен токен доступа',
-      'user_info_failed': 'Ошибка получения информации о пользователе',
-      'no_email': 'Email не предоставлен',
-      'email_not_verified': 'Email не подтвержден',
-      'account_disabled': 'Аккаунт отключен',
-    };
+    // Check if this is a popup-specific error (should redirect to /auth/)
+    if (isPopupSpecificError(error)) {
+      try {
+        if (typeof sessionStorage !== 'undefined') {
+          sessionStorage.removeItem('oauth_popup');
+        }
+      } catch {
+        // sessionStorage may be unavailable
+      }
+      router.push(`/auth?error=${encodeURIComponent(error)}`);
+      return;
+    }
     
-    // CRITICAL: If in popup, send message and close - NEVER redirect
+    // Get generic error message (no provider mentions)
+    const errorMessage = getOAuthErrorMessage(error);
+    
+    // CRITICAL: If in popup, show error in popup - NEVER redirect
     const wasHandled = sendMessageAndClose('OAUTH_ERROR', {
-      error: errorMessages[error] || 'Ошибка авторизации'
+      error: errorMessage
     }, setErrorMessage, setStatus);
     
     if (!wasHandled) {
       // Not in popup - redirect to error page
-      sessionStorage.removeItem('oauth_popup');
+      try {
+        if (typeof sessionStorage !== 'undefined') {
+          sessionStorage.removeItem('oauth_popup');
+        }
+      } catch {
+        // sessionStorage may be unavailable
+      }
       router.push(`/auth?error=${encodeURIComponent(error)}`);
     }
   }, [searchParams, router, handled]);
 
   // Function to create Telegram Widget
-  const createTelegramWidget = useCallback((botId: string, state: string) => {
+  const createTelegramWidget = useCallback((botUsername: string, state: string) => {
+    if (typeof window === 'undefined' || typeof document === 'undefined') {
+      return;
+    }
+    
     setStatus('processing');
     
     // Define callback function globally before creating widget
     const win = window as WindowWithTelegram;
     win.onTelegramAuth = (user: TelegramUser) => {
-      console.log('Telegram auth callback received:', user);
-      
       // Remove widget container
       const container = document.getElementById('telegram-login-container');
       if (container) {
@@ -231,10 +262,20 @@ function OAuthHandlerContent() {
       
         // Validate required fields
         if (!user.id || !user.hash || !user.auth_date) {
-          console.error('Missing required Telegram auth fields');
+          console.error('Missing required Telegram auth fields:', { 
+            hasId: !!user.id, 
+            hasHash: !!user.hash, 
+            hasAuthDate: !!user.auth_date 
+          });
           setHandled(true);
+          const errorMsg = getOAuthErrorMessage('telegram_incomplete_data');
+          
+          // Always set error in state to display it
+          setErrorMessage(errorMsg);
+          setStatus('error');
+          
           const wasHandled = sendMessageAndClose('OAUTH_ERROR', {
-            error: 'Неполные данные авторизации Telegram'
+            error: errorMsg
           }, setErrorMessage, setStatus);
           
           if (!wasHandled) {
@@ -256,7 +297,13 @@ function OAuthHandlerContent() {
       };
       
       // Clear state from sessionStorage
-      sessionStorage.removeItem('telegram_oauth_state');
+      try {
+        if (typeof sessionStorage !== 'undefined') {
+          sessionStorage.removeItem('telegram_oauth_state');
+        }
+      } catch {
+        // sessionStorage may be unavailable
+      }
       
       // Send to server
       fetch('/api/auth/oauth/telegram/callback', {
@@ -301,15 +348,28 @@ function OAuthHandlerContent() {
           }
         }
       })
-      .catch((error: { error?: string; message?: string }) => {
+      .catch((error: unknown) => {
         console.error('Telegram OAuth callback error:', error);
         setHandled(true);
-        const errorMsg = error.error === 'user_creation_failed' ? 'Не удалось создать аккаунт' :
-                             error.error === 'account_disabled' ? 'Аккаунт отключен' :
-                             error.error === 'rate_limit' ? 'Превышен лимит запросов' :
-                             error.error === 'invalid_state' ? 'Ошибка безопасности' :
-                             error.error === 'oauth_not_configured' ? 'OAuth не настроен' :
-                             error.message || 'Ошибка авторизации';
+        
+        // Handle network errors
+        let errorCode: string;
+        if (error instanceof Error) {
+          const errorMessage = error.message || '';
+          if (errorMessage.includes('Failed to fetch') || errorMessage.includes('failed to fetch') || errorMessage.includes('NetworkError')) {
+            errorCode = 'network_error';
+          } else {
+            errorCode = 'telegram_auth_failed';
+          }
+        } else if (error && typeof error === 'object' && 'error' in error) {
+          const errorObj = error as { error?: string };
+          errorCode = errorObj.error || 'telegram_auth_failed';
+        } else {
+          errorCode = 'telegram_auth_failed';
+        }
+        
+        // Get generic error message (no provider mentions)
+        const errorMsg = getOAuthErrorMessage(errorCode);
         
         // CRITICAL: If in popup, send message and close - NEVER redirect
         const wasHandled = sendMessageAndClose('OAUTH_ERROR', {
@@ -317,10 +377,16 @@ function OAuthHandlerContent() {
         }, setErrorMessage, setStatus);
         
         if (!wasHandled) {
-          router.push(`/auth?error=${encodeURIComponent(error.error || 'telegram_auth_failed')}`);
+          router.push(`/auth?error=${encodeURIComponent(errorCode)}`);
         }
       });
     };
+    
+    // Cleanup previous container if exists
+    const existingContainer = document.getElementById('telegram-login-container');
+    if (existingContainer) {
+      existingContainer.remove();
+    }
     
     // Create container for widget
     const container = document.createElement('div');
@@ -336,22 +402,27 @@ function OAuthHandlerContent() {
     document.body.appendChild(container);
 
     // Create widget script
+    // Telegram Login Widget requires bot username (without @)
     const widgetScript = document.createElement('script');
     widgetScript.async = true;
     widgetScript.src = 'https://telegram.org/js/telegram-widget.js?22';
-    widgetScript.setAttribute('data-telegram-login', botId);
+    widgetScript.setAttribute('data-telegram-login', botUsername);
     widgetScript.setAttribute('data-size', 'large');
     widgetScript.setAttribute('data-onauth', 'onTelegramAuth(user)');
     widgetScript.setAttribute('data-request-access', 'write');
     
     container.appendChild(widgetScript);
-  }, [setStatus, setHandled, setErrorMessage, router]);
+  }, [router]);
 
   // Function to load Telegram Widget and handle callback
-  const loadTelegramWidget = useCallback((botId: string, state: string) => {
+  const loadTelegramWidget = useCallback((botUsername: string, state: string) => {
+    if (typeof document === 'undefined') {
+      return;
+    }
+    
     // Check if script already loaded
     if (document.getElementById('telegram-widget-script')) {
-      createTelegramWidget(botId, state);
+      createTelegramWidget(botUsername, state);
       return;
     }
 
@@ -361,31 +432,62 @@ function OAuthHandlerContent() {
     script.src = 'https://telegram.org/js/telegram-widget.js?22';
     script.async = true;
     script.onload = () => {
-      createTelegramWidget(botId, state);
+      createTelegramWidget(botUsername, state);
     };
-    script.onerror = () => {
-      console.error('Failed to load Telegram Widget script');
+    script.onerror = (error) => {
+      console.error('Failed to load Telegram Widget script:', error);
       setHandled(true);
+      const errorMsg = getOAuthErrorMessage('telegram_widget_load_failed');
+      
+      // Always set error in state to display it
+      setErrorMessage(errorMsg);
+      setStatus('error');
+      
       const wasHandled = sendMessageAndClose('OAUTH_ERROR', {
-        error: 'Ошибка загрузки виджета Telegram'
+        error: errorMsg
       }, setErrorMessage, setStatus);
       
       if (!wasHandled) {
-        sessionStorage.removeItem('oauth_popup');
+        try {
+          if (typeof sessionStorage !== 'undefined') {
+            sessionStorage.removeItem('oauth_popup');
+          }
+        } catch {
+          // sessionStorage may be unavailable
+        }
         router.push('/auth?error=telegram_widget_load_failed');
       }
     };
     document.head.appendChild(script);
-  }, [createTelegramWidget, setHandled, setErrorMessage, setStatus, router]);
+  }, [createTelegramWidget, router]);
 
   // Handle provider initialization
   useEffect(() => {
     if (handled) return;
     
+    // If there's an error in URL, don't process provider initialization
+    // Error handling is done in separate useEffect
+    const error = searchParams.get('error');
+    if (error) {
+      return;
+    }
+    
+    // If there's a success in URL, don't process provider initialization
+    // Success handling is done in separate useEffect
+    const success = searchParams.get('success');
+    if (success) {
+      return;
+    }
+    
     if (!provider) {
       setHandled(true);
+      const errorMsg = getOAuthErrorMessage('invalid_provider');
+      // Always set error in state to display it
+      setErrorMessage(errorMsg);
+      setStatus('error');
+      
       const wasHandled = sendMessageAndClose('OAUTH_ERROR', {
-        error: 'Провайдер не указан'
+        error: errorMsg
       }, setErrorMessage, setStatus);
       
       if (!wasHandled) {
@@ -399,52 +501,109 @@ function OAuthHandlerContent() {
     if (provider === 'google') {
       setStatus('redirecting');
       // Ensure popup flag is saved before redirect
-      if (isPopupWindow()) {
-        sessionStorage.setItem('oauth_popup', 'true');
+      try {
+        if (typeof sessionStorage !== 'undefined' && isPopupWindow()) {
+          sessionStorage.setItem('oauth_popup', 'true');
+        }
+      } catch {
+        // sessionStorage may be unavailable
       }
       // Redirect to Google OAuth endpoint
-      window.location.href = '/api/auth/oauth/google';
+      if (typeof window !== 'undefined') {
+        window.location.href = '/api/auth/oauth/google';
+      }
     } else if (provider === 'telegram') {
       setStatus('loading');
       // Initialize Telegram OAuth using Login Widget
       fetch('/api/auth/oauth/telegram')
-        .then(response => response.json())
+        .then(async response => {
+          const data = await response.json();
+          if (!response.ok) {
+            // If response is not OK, throw error with error details
+            throw { error: data.error || 'telegram_init_failed', message: data.message || 'Ошибка инициализации Telegram OAuth' };
+          }
+          return data;
+        })
         .then(data => {
-          if (data.botId && data.state) {
+          if (data.botUsername && data.state) {
             // Store state in sessionStorage
-            sessionStorage.setItem('telegram_oauth_state', data.state);
-            // Ensure popup flag is saved
-            if (isPopupWindow()) {
-              sessionStorage.setItem('oauth_popup', 'true');
+            try {
+              if (typeof sessionStorage !== 'undefined') {
+                sessionStorage.setItem('telegram_oauth_state', data.state);
+                // Ensure popup flag is saved
+                if (isPopupWindow()) {
+                  sessionStorage.setItem('oauth_popup', 'true');
+                }
+              }
+            } catch {
+              // sessionStorage may be unavailable
             }
             
             // Load Telegram Widget script and create widget
-            loadTelegramWidget(data.botId, data.state);
+            loadTelegramWidget(data.botUsername, data.state);
           } else {
-            throw new Error('Failed to initialize Telegram OAuth');
+            throw { 
+              error: 'telegram_init_failed', 
+              message: 'Неполные данные от сервера. Проверьте настройки TELEGRAM_BOT_USERNAME.' 
+            };
           }
         })
         .catch(error => {
           console.error('Telegram OAuth initialization error:', error);
           setHandled(true);
+          
+          // Determine error code
+          let errorCode: string;
+          if (error && typeof error === 'object' && 'error' in error) {
+            const errorObj = error as { error?: string; message?: string };
+            errorCode = errorObj.error || 'telegram_init_failed';
+          } else if (error instanceof Error) {
+            // Handle network errors
+            if (error.message.includes('Failed to fetch') || error.message.includes('failed to fetch') || error.message.includes('NetworkError')) {
+              errorCode = 'network_error';
+            } else {
+              errorCode = 'telegram_init_failed';
+            }
+          } else {
+            errorCode = 'telegram_init_failed';
+          }
+          
+          // Get generic error message (no provider mentions)
+          const errorMessage = getOAuthErrorMessage(errorCode);
+          
+          // Always set error in state to display it
+          setErrorMessage(errorMessage);
+          setStatus('error');
+          
           const wasHandled = sendMessageAndClose('OAUTH_ERROR', {
-            error: 'Ошибка подключения к Telegram'
+            error: errorMessage
           }, setErrorMessage, setStatus);
           
           if (!wasHandled) {
-            sessionStorage.removeItem('oauth_popup');
-            router.push('/auth?error=telegram_init_failed');
+            try {
+              if (typeof sessionStorage !== 'undefined') {
+                sessionStorage.removeItem('oauth_popup');
+              }
+            } catch {
+              // sessionStorage may be unavailable
+            }
+            router.push(`/auth?error=${encodeURIComponent(errorCode)}`);
           }
         });
     } else {
       setHandled(true);
+      const errorMsg = getOAuthErrorMessage('invalid_provider');
+      // Always set error in state to display it
+      setErrorMessage(errorMsg);
+      setStatus('error');
+      
       const wasHandled = sendMessageAndClose('OAUTH_ERROR', {
-        error: 'Неизвестный провайдер'
+        error: errorMsg
       }, setErrorMessage, setStatus);
       
       if (!wasHandled) {
         sessionStorage.removeItem('oauth_popup');
-        router.push('/auth?error=unknown_provider');
+        router.push('/auth?error=invalid_provider');
       }
     }
   }, [searchParams, router, provider, handled, loadTelegramWidget]);

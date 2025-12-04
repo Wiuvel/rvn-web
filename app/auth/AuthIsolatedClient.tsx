@@ -6,6 +6,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import AuthForm from '../../components/AuthForm';
 import ParticlesBackground from '@/components/ParticlesBackground';
+import { getOAuthErrorMessage } from '@/lib/utils/oauth-errors';
 
 export default function AuthIsolatedClient() {
   const searchParams = useSearchParams();
@@ -107,13 +108,12 @@ export default function AuthIsolatedClient() {
               
               // Check if we're in a popup window
               if (window.opener) {
-                // Send error message to parent window
+                // Send error message to parent window (already generic from server)
+                const errorMessage = getOAuthErrorMessage(errorData.error || 'telegram_auth_failed');
                 window.opener.postMessage(
                   {
                     type: 'OAUTH_ERROR',
-                    error: errorData.error === 'user_creation_failed' ? 'Не удалось создать аккаунт' :
-                           errorData.error === 'account_disabled' ? 'Аккаунт отключен' :
-                           'Ошибка авторизации'
+                    error: errorMessage
                   },
                   window.location.origin
                 );

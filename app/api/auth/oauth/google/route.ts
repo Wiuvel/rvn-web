@@ -4,6 +4,7 @@ import { getEnv } from '@/lib/validation/env-validation';
 import { setCorsHeaders, handleCorsPreflight } from '@/lib/security/cors';
 import { logger } from '@/lib/utils/secure-logger';
 import { authRateLimit } from '@/lib/security/rate-limit';
+import { getErrorRedirectUrl } from '@/lib/utils/oauth-errors';
 
 // Handle CORS preflight
 export async function OPTIONS() {
@@ -39,19 +40,14 @@ export async function GET(request: NextRequest) {
     const rateLimitResult = await authRateLimit.check(request);
     if (!rateLimitResult.allowed) {
       logger.warn('rate limit exceeded', { ip: request.headers.get('x-forwarded-for') });
-      const errorUrl = isPopup 
-        ? new URL('/auth/oauth-callback?error=rate_limit', origin)
-        : new URL('/auth?error=rate_limit', origin);
+      const errorUrl = getErrorRedirectUrl('rate_limit', origin, isPopup);
       return setCorsHeaders(NextResponse.redirect(errorUrl));
     }
 
     // Check Google OAuth credentials
     if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) {
       logger.error('google oauth not configured');
-      // For popup mode, redirect to callback page
-      const errorUrl = isPopup 
-        ? new URL('/auth/oauth-callback?error=oauth_not_configured', origin)
-        : new URL('/auth?error=oauth_not_configured', origin);
+      const errorUrl = getErrorRedirectUrl('oauth_not_configured', origin, isPopup);
       return setCorsHeaders(NextResponse.redirect(errorUrl));
     }
 
@@ -101,11 +97,8 @@ export async function GET(request: NextRequest) {
         const origin = env.PUBLIC_DOMAIN.endsWith('/') 
           ? env.PUBLIC_DOMAIN.slice(0, -1) 
           : env.PUBLIC_DOMAIN;
-        return setCorsHeaders(
-          NextResponse.redirect(
-            new URL('/auth?error=oauth_init_error', origin)
-          )
-        );
+        const errorUrl = getErrorRedirectUrl('oauth_init_error', origin, false);
+        return setCorsHeaders(NextResponse.redirect(errorUrl));
       }
     } catch {
     }

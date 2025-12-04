@@ -433,12 +433,18 @@ export async function createUserFromOAuth(email: string, preferredUsername?: str
     // Sanitize username: remove invalid characters, limit length
     // Only allow alphanumeric, underscore, and hyphen
     username = username.replace(/[^a-zA-Z0-9_-]/g, '_');
+    // Remove leading/trailing underscores and collapse multiple underscores
+    username = username.replace(/^_+|_+$/g, '').replace(/_+/g, '_');
     // Limit to 30 characters (database constraint)
     if (username.length > 30) {
       username = username.substring(0, 30);
     }
-    // Ensure username is not empty
-    if (!username || username.trim().length === 0) {
+    // Ensure username is not empty and meets minimum length requirement (3 chars)
+    if (!username || username.trim().length === 0 || username.length < 3) {
+      username = `user_${Date.now().toString().slice(-8)}`;
+    }
+    // If username consists only of underscores after sanitization, generate a new one
+    if (username.replace(/_/g, '').length === 0) {
       username = `user_${Date.now().toString().slice(-8)}`;
     }
     

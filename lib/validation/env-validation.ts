@@ -28,6 +28,7 @@ const envSchema = z.object({
   
   // Telegram OAuth
   TELEGRAM_BOT_TOKEN: z.string().optional(),
+  TELEGRAM_BOT_USERNAME: z.string().optional(),
   
   // Public domain for OAuth redirects (optional, falls back to host header)
   PUBLIC_DOMAIN: z.string().url().optional(),
@@ -64,6 +65,7 @@ export function validateEnv(): Env {
       GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
       GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
       TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN,
+      TELEGRAM_BOT_USERNAME: process.env.TELEGRAM_BOT_USERNAME,
       PUBLIC_DOMAIN: process.env.PUBLIC_DOMAIN,
       NODE_ENV: process.env.NODE_ENV || 'development',
     });

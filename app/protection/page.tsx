@@ -77,10 +77,7 @@ export default function ProtectionPage() {
 
         container.innerHTML = '';
         
-        // Убеждаемся, что sitekey - строка
         const sitekey: string = '0x4AAAAAACDQkGbAxIWAKp08';
-        
-        // Создаем объект опций с явными типами
         const renderOptions: TurnstileRenderOptions = {
           sitekey: sitekey,
           theme: 'dark',

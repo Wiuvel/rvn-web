@@ -7,6 +7,7 @@ import { sanitizeInput } from '@/lib/security/sanitize';
 import { setCorsHeaders, handleCorsPreflight } from '@/lib/security/cors';
 import { logger } from '@/lib/utils/secure-logger';
 import { authRateLimit } from '@/lib/security/rate-limit';
+import { getOAuthErrorMessage } from '@/lib/utils/oauth-errors';
 
 export async function OPTIONS() {
   return handleCorsPreflight();
@@ -31,7 +32,6 @@ export async function POST(request: NextRequest) {
       ? env.PUBLIC_DOMAIN.slice(0, -1) 
       : env.PUBLIC_DOMAIN;
 
-    // Rate limiting
     const rateLimitResult = await authRateLimit.check(request);
     if (!rateLimitResult.allowed) {
       logger.warn('rate limit exceeded');
@@ -67,10 +67,13 @@ export async function POST(request: NextRequest) {
 
     // Validate required parameters
     if (!id || !authDate || !hash) {
-      logger.warn('telegram oauth missing parameters');
+      logger.warn('telegram oauth missing parameters', { hasId: !!id, hasAuthDate: !!authDate, hasHash: !!hash });
       return setCorsHeaders(
         NextResponse.json(
-          { error: 'invalid_request' },
+          { 
+            error: 'invalid_request',
+            message: getOAuthErrorMessage('invalid_request')
+          },
           { status: 400 }
         )
       );
@@ -82,7 +85,7 @@ export async function POST(request: NextRequest) {
       logger.warn('telegram oauth state mismatch');
       return setCorsHeaders(
         NextResponse.json(
-          { error: 'invalid_state' },
+          { error: 'invalid_state', message: getOAuthErrorMessage('invalid_state') },
           { status: 403 }
         )
       );
@@ -112,10 +115,16 @@ export async function POST(request: NextRequest) {
       .digest('hex');
 
     if (calculatedHash !== hash) {
-      logger.warn('telegram oauth hash mismatch');
+      logger.warn('telegram oauth hash mismatch', { 
+        calculatedHash: calculatedHash.substring(0, 8) + '...', 
+        receivedHash: hash.substring(0, 8) + '...' 
+      });
       return setCorsHeaders(
         NextResponse.json(
-          { error: 'invalid_hash' },
+          { 
+            error: 'invalid_hash',
+            message: getOAuthErrorMessage('invalid_hash')
+          },
           { status: 403 }
         )
       );
@@ -127,10 +136,17 @@ export async function POST(request: NextRequest) {
     const maxAge = 24 * 60 * 60; // 24 hours
 
     if (now - authTimestamp > maxAge) {
-      logger.warn('telegram oauth expired');
+      logger.warn('telegram oauth expired', { 
+        authTimestamp, 
+        now, 
+        age: now - authTimestamp 
+      });
       return setCorsHeaders(
         NextResponse.json(
-          { error: 'auth_expired' },
+          { 
+            error: 'auth_expired',
+            message: getOAuthErrorMessage('auth_expired')
+          },
           { status: 403 }
         )
       );
@@ -146,10 +162,22 @@ export async function POST(request: NextRequest) {
 
     if (!user) {
       const telegramUsernameFromEmail = `telegram_${id}`;
-      const telegramUsername = username || telegramUsernameFromEmail;
-      let sanitizedUsername = telegramUsername.replace(/[^a-zA-Z0-9_]/g, '_').substring(0, 30);
+      let sanitizedUsername: string;
       
-      if (sanitizedUsername !== telegramUsernameFromEmail && !username) {
+      if (username) {
+        // Sanitize username from Telegram
+        sanitizedUsername = username.replace(/[^a-zA-Z0-9_-]/g, '_');
+        // Remove leading/trailing underscores and collapse multiple underscores
+        sanitizedUsername = sanitizedUsername.replace(/^_+|_+$/g, '').replace(/_+/g, '_');
+        // Limit to 30 characters
+        if (sanitizedUsername.length > 30) {
+          sanitizedUsername = sanitizedUsername.substring(0, 30);
+        }
+        // If sanitized username is invalid (too short or only underscores), use fallback
+        if (!sanitizedUsername || sanitizedUsername.length < 3 || sanitizedUsername.replace(/_/g, '').length === 0) {
+          sanitizedUsername = telegramUsernameFromEmail;
+        }
+      } else {
         sanitizedUsername = telegramUsernameFromEmail;
       }
       
@@ -159,7 +187,10 @@ export async function POST(request: NextRequest) {
         logger.error('failed to create user', { error: createResult.error });
         return setCorsHeaders(
           NextResponse.json(
-            { error: 'user_creation_failed' },
+            { 
+              error: 'user_creation_failed',
+              message: getOAuthErrorMessage('user_creation_failed')
+            },
             { status: 500 }
           )
         );
@@ -173,7 +204,7 @@ export async function POST(request: NextRequest) {
       logger.warn('login attempt for inactive user', { userId: user.id });
       return setCorsHeaders(
         NextResponse.json(
-          { error: 'account_disabled' },
+          { error: 'account_disabled', message: getOAuthErrorMessage('account_disabled') },
           { status: 403 }
         )
       );
