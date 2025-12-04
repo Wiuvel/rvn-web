@@ -249,7 +249,7 @@ export default function AdminAuthForm({ onAuthSuccess }: AdminAuthFormProps) {
                 {loading || isSubmitting ? (
                   <>
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    {loginSuccess ? 'Успешно!' : 'Вход...'}
+                    {loginSuccess ? 'Успешно!' : 'Вход..'}
                   </>
                 ) : (
                   'Войти'
@@ -388,7 +388,7 @@ export default function AdminAuthForm({ onAuthSuccess }: AdminAuthFormProps) {
               {loading || isSubmitting ? (
                 <>
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                  {loginSuccess ? 'Успешно!' : (isLogin ? 'Вход...' : 'Регистрация...')}
+                  {loginSuccess ? 'Успешно!' : (isLogin ? 'Вход..' : 'Регистрация..')}
                 </>
               ) : (
                 isLogin ? 'Войти' : 'Зарегистрироваться'

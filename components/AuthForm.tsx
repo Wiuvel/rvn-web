@@ -1,31 +1,26 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import dynamic from 'next/dynamic';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { translateError } from '@/lib/utils/error-translations';
 import { loginSchema, registerSchema, type LoginFormData, type RegisterFormData } from '@/lib/validation/schemas';
 
-interface Turnstile {
-  render: (
-    container: string | HTMLElement,
-    options: {
-      sitekey: string;
-      theme?: string;
-      callback?: (token: string) => void;
-      'error-callback'?: () => void;
-    }
-  ) => string;
-  remove: (widgetId: string) => void;
+interface WindowWithPopup extends Window {
+  __lastPopup?: Window & {
+    __checkInterval?: NodeJS.Timeout;
+  };
 }
 
-declare global {
-  interface Window {
-    turnstile?: Turnstile;
-  }
-}
+// Lazy load RateLimitCaptcha для оптимизации bundle size
+const RateLimitCaptcha = dynamic(() => import('@/components/RateLimitCaptcha'), {
+  ssr: false,
+  loading: () => null
+});
+
 
 interface AuthFormProps {
   retpatch?: string;
@@ -35,6 +30,12 @@ interface AuthFormProps {
 export default function AuthForm({ retpatch = '/dashboard/', initialError }: AuthFormProps) {
   const [currentTab, setCurrentTab] = useState<'login' | 'register'>('login');
   const [isLoading, setIsLoading] = useState(false);
+  const [isPopupOpen, setIsPopupOpen] = useState(false);
+  const [activeProvider, setActiveProvider] = useState<string | null>(null);
+  const [showRateLimitCaptcha, setShowRateLimitCaptcha] = useState(false);
+  const isCaptchaOpenRef = useRef(false);
+  const pendingRequestsQueueRef = useRef<Array<() => Promise<void>>>([]);
+  const isProcessingCaptchaRef = useRef(false);
   
   // React Hook Form setup for login
   const loginForm = useForm<LoginFormData>({
@@ -151,12 +152,7 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
     login: false
   });
   const [globalError, setGlobalError] = useState('');
-  const [captchaResponse, setCaptchaResponse] = useState({
-    register: '',
-    login: ''
-  });
   const [csrfToken, setCsrfToken] = useState('');
-  const [currentWidgetId, setCurrentWidgetId] = useState<string | null>(null);
   const [loginAttemptState, setLoginAttemptState] = useState<'idle' | 'error'>('idle');
 
   // Watch password changes for strength indicator
@@ -185,6 +181,67 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
     }
   }, [loginPassword]);
 
+  // Обертка для fetch с обработкой rate limit
+  const fetchWithRateLimit = async (
+    url: string,
+    options: RequestInit = {},
+    retryCallback?: () => Promise<void>
+  ): Promise<Response> => {
+    const response = await fetch(url, options);
+    
+    if (response.status === 429) {
+      // Добавляем callback в очередь вместо перезаписи - исправляет race condition
+      if (retryCallback) {
+        pendingRequestsQueueRef.current.push(retryCallback);
+      }
+      
+      // Открываем модальное окно только если:
+      // 1. Оно еще не открыто
+      // 2. Капча не обрабатывается (предотвращает повторные открытия)
+      if (!isCaptchaOpenRef.current && !isProcessingCaptchaRef.current) {
+        isCaptchaOpenRef.current = true;
+        setShowRateLimitCaptcha(true);
+      }
+      throw new Error('RATE_LIMIT_EXCEEDED');
+    }
+    
+    return response;
+  };
+
+  const handleRateLimitSuccess = async () => {
+    // Устанавливаем флаг обработки капчи - предотвращает повторные открытия
+    isProcessingCaptchaRef.current = true;
+    
+    // Закрываем модальное окно
+    isCaptchaOpenRef.current = false;
+    setShowRateLimitCaptcha(false);
+    
+    // Увеличиваем задержку для гарантированного применения иммунитета на сервере
+    // Cookie устанавливается сразу, но store может обновиться с небольшой задержкой
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // Обрабатываем ВСЕ запросы из очереди последовательно
+    const queue = [...pendingRequestsQueueRef.current];
+    pendingRequestsQueueRef.current = []; // Очищаем очередь сразу
+    
+    for (const requestCallback of queue) {
+      try {
+        await requestCallback();
+      } catch (error) {
+        // Если запрос снова получил rate limit после иммунитета - это критическая ошибка
+        // НЕ добавляем обратно в очередь и НЕ показываем капчу снова
+        if (error instanceof Error && error.message === 'RATE_LIMIT_EXCEEDED') {
+          console.error('Rate limit still active after CAPTCHA - immunity may not be working');
+        } else {
+          console.error('Error retrying request after rate limit clear:', error);
+        }
+      }
+    }
+    
+    // Сбрасываем флаг обработки только после обработки всех запросов
+    isProcessingCaptchaRef.current = false;
+  };
+
   const fetchCsrfToken = async (): Promise<string | null> => {
     try {
       const response = await fetch('/api/auth/csrf', {
@@ -202,7 +259,7 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
     } catch (error) {
       console.error('CSRF token fetch error:', error);
       setCsrfToken('');
-      setGlobalError('Не удалось получить токен безопасности. Обновите страницу.');
+      setGlobalError('Не удалось получить токен безопасности.');
       return null;
     }
   };
@@ -215,33 +272,43 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
     setIsLoading(true);
     setGlobalError('');
     
-    try {
-      const response = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          username: escapeHtml(data.username),
-          password: data.password,
-          confirmPassword: data.confirmPassword,
-          csrfToken: tokenToUse
-        })
-      });
-      const responseData = await response.json();
-      if (response.ok) {
-        window.location.href = `/dashboard/${responseData.dashboard_token}`;
-      } else {
-        const translatedError = translateError(responseData.error || 'Ошибка регистрации');
-        setGlobalError(escapeHtml(translatedError));
-        if (response.status === 403) {
+    const performRegister = async () => {
+      try {
+        const response = await fetchWithRateLimit('/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            username: escapeHtml(data.username),
+            password: data.password,
+            confirmPassword: data.confirmPassword,
+            csrfToken: tokenToUse
+          })
+        }, performRegister);
+        
+        const responseData = await response.json();
+        if (response.ok) {
+          window.location.href = `/dashboard/${responseData.dashboard_token}`;
+        } else {
+          const translatedError = translateError(responseData.error || 'Ошибка регистрации');
+          setGlobalError(escapeHtml(translatedError));
+          if (response.status === 403) {
+            fetchCsrfToken();
+          }
+          setIsLoading(false);
+        }
+      } catch (error) {
+        if (error instanceof Error && error.message === 'RATE_LIMIT_EXCEEDED') {
+          // Rate limit обработан, запрос добавлен в очередь
+          setIsLoading(false);
+        } else {
+          setGlobalError('API ERROR: 405.');
           fetchCsrfToken();
+          setIsLoading(false);
         }
       }
-    } catch {
-      setGlobalError('API ERROR: 405.');
-      fetchCsrfToken();
-    } finally {
-      setIsLoading(false);
-    }
+    };
+
+    await performRegister();
   };
 
   const handleLogin = async (data: LoginFormData) => {
@@ -253,44 +320,55 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
     setLoginAttemptState('idle');
     setGlobalError('');
     
-    try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          username: escapeHtml(data.username),
-          password: data.password,
-          csrfToken: tokenToUse
-        })
-      });
-      const responseData = await response.json();
-      if (response.ok) {
-        if (retpatch && retpatch !== '/dashboard/') {
-          window.location.href = retpatch;
+    const performLogin = async () => {
+      try {
+        const response = await fetchWithRateLimit('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            username: escapeHtml(data.username),
+            password: data.password,
+            csrfToken: tokenToUse
+          })
+        }, performLogin);
+        
+        const responseData = await response.json();
+        if (response.ok) {
+          if (retpatch && retpatch !== '/dashboard/') {
+            window.location.href = retpatch;
+          } else {
+            window.location.href = `/dashboard/${responseData.dashboard_token}`;
+          }
         } else {
-          window.location.href = `/dashboard/${responseData.dashboard_token}`;
+          setLoginAttemptState('error');
+          const translatedError = translateError(responseData.error || 'Ошибка входа');
+          setGlobalError(escapeHtml(translatedError));
+          if (response.status === 403) {
+            fetchCsrfToken();
+          }
+          setIsLoading(false);
         }
-      } else {
-        setLoginAttemptState('error');
-        const translatedError = translateError(responseData.error || 'Ошибка входа');
-        setGlobalError(escapeHtml(translatedError));
-        if (response.status === 403) {
+      } catch (error) {
+        if (error instanceof Error && error.message === 'RATE_LIMIT_EXCEEDED') {
+          // Rate limit обработан, запрос добавлен в очередь
+          setIsLoading(false);
+        } else {
+          setLoginAttemptState('error');
+          setGlobalError('Ошибка сети. Попробуйте позже.');
           fetchCsrfToken();
+          setIsLoading(false);
         }
       }
-    } catch {
-      setLoginAttemptState('error');
-      setGlobalError('Ошибка сети. Попробуйте позже.');
-      fetchCsrfToken();
-    } finally {
-      setIsLoading(false);
-    }
+    };
+
+    await performLogin();
   };
 
 
   // Handle OAuth login - opens in popup window via oauth-handler page
   const oauthLogin = async (provider: string) => {
     setIsLoading(true);
+    setActiveProvider(provider);
     
     // Listen for messages from OAuth popup
     let timeoutId: NodeJS.Timeout | null = null;
@@ -308,8 +386,20 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
       }
       
       if (event.data.type === 'OAUTH_SUCCESS') {
+        // Clear any intervals
+        const win = window as WindowWithPopup;
+        const popupWindow = win.__lastPopup;
+        if (popupWindow && popupWindow.__checkInterval) {
+          clearInterval(popupWindow.__checkInterval);
+        }
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+          timeoutId = null;
+        }
         window.removeEventListener('message', handleMessage);
         setIsLoading(false);
+        setIsPopupOpen(false);
+        setActiveProvider(null);
         
         // Redirect to dashboard
         if (event.data.redirect) {
@@ -318,8 +408,20 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
           window.location.href = `/dashboard/${event.data.dashboard_token}`;
         }
       } else if (event.data.type === 'OAUTH_ERROR') {
+        // Clear any intervals
+        const win = window as WindowWithPopup;
+        const popupWindow = win.__lastPopup;
+        if (popupWindow && popupWindow.__checkInterval) {
+          clearInterval(popupWindow.__checkInterval);
+        }
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+          timeoutId = null;
+        }
         window.removeEventListener('message', handleMessage);
         setIsLoading(false);
+        setIsPopupOpen(false);
+        setActiveProvider(null);
         setGlobalError(event.data.error || 'Ошибка авторизации');
       }
     };
@@ -342,22 +444,59 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
       
       if (!popup) {
         setIsLoading(false);
+        setActiveProvider(null);
         setGlobalError('Пожалуйста, разрешите всплывающие окна для авторизации');
         window.removeEventListener('message', handleMessage);
         return;
+      }
+      
+      // Store popup reference for cleanup
+      const win = window as WindowWithPopup;
+      win.__lastPopup = popup as Window & { __checkInterval?: NodeJS.Timeout };
+      
+      // Mark popup as open
+      setIsPopupOpen(true);
+      
+      // Check if popup was closed manually (polling since COOP may block popup.closed)
+      const checkPopupClosed = setInterval(() => {
+        try {
+          if (popup.closed) {
+            clearInterval(checkPopupClosed);
+            if (timeoutId) {
+              clearTimeout(timeoutId);
+              timeoutId = null;
+            }
+            window.removeEventListener('message', handleMessage);
+            setIsLoading(false);
+            setIsPopupOpen(false);
+            setActiveProvider(null);
+          }
+        } catch {
+          // COOP may block access, but we'll try anyway
+          // If it fails, timeout will handle it
+        }
+      }, 500); // Check every 500ms
+      
+      // Store interval ID to clear it on success/error
+      if (win.__lastPopup) {
+        win.__lastPopup.__checkInterval = checkPopupClosed;
       }
       
       // Set timeout to handle case when popup is closed without sending message
       // COOP (Cross-Origin-Opener-Policy) blocks popup.closed check, so we use timeout instead
       // If no message is received within 10 minutes, assume popup was closed
       timeoutId = setTimeout(() => {
+        clearInterval(checkPopupClosed);
         window.removeEventListener('message', handleMessage);
         setIsLoading(false);
+        setIsPopupOpen(false);
+        setActiveProvider(null);
         setGlobalError('Авторизация была прервана. Попробуйте снова.');
       }, 10 * 60 * 1000); // 10 minutes timeout
     } catch {
       setGlobalError('Ошибка подключения к провайдеру');
       setIsLoading(false);
+      setActiveProvider(null);
     }
   };
 
@@ -377,7 +516,6 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
     setGlobalError('');
     setIsPasswordValid({ register: false, login: false });
     setShowPasswordStrength({ register: false, login: false });
-    setCaptchaResponse({ register: '', login: '' });
     setIsLoading(false);
     setLoginAttemptState('idle');
   };
@@ -385,46 +523,7 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
   const switchTab = (tab: 'login' | 'register') => {
     setCurrentTab(tab);
     resetForm();
-    setTimeout(() => loadCaptcha(tab), 50);
-    fetchCsrfToken();
   };
-
-  const loadCaptcha = (formType: 'login' | 'register') => {
-    if (
-      currentWidgetId &&
-      typeof window !== 'undefined' &&
-      window.turnstile
-    ) {
-      window.turnstile.remove(currentWidgetId);
-    }
-
-    const containerId = `${formType}-captcha-container`;
-    const container = document.getElementById(containerId);
-    if (container) container.innerHTML = '';
-
-    if (typeof window !== 'undefined' && window.turnstile) {
-      const widgetId = window.turnstile.render('#' + containerId, {
-        sitekey: '3x00000000000000000000FF',
-        theme: 'dark',
-        callback: (token: string) => {
-          setCaptchaResponse(prev => ({ ...prev, [formType]: token })); 
-          setGlobalError('');
-        },
-        'error-callback': () => {
-          setCaptchaResponse(prev => ({ ...prev, [formType]: '' }));
-          setGlobalError('Ошибка загрузки капчи');
-        }
-      });
-      setCurrentWidgetId(widgetId);
-    } else {
-      setTimeout(() => loadCaptcha(formType), 100);
-    }
-  };
-
-  useEffect(() => {
-    loadCaptcha(currentTab);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentTab]);
 
   useEffect(() => {
     fetchCsrfToken();
@@ -439,15 +538,16 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
   }, [initialError]);
 
   return (
-    <div className="w-full max-w-md mx-auto">
-      <div className="bg-neutral-900/80 backdrop-blur-md p-8 rounded-2xl border border-neutral-800 shadow-lg animate-fadeIn overflow-hidden">
+    <>
+      <div className="w-full max-w-md mx-auto">
+        <div className="bg-neutral-900/80 backdrop-blur-md p-8 rounded-2xl border border-neutral-800 shadow-lg animate-fadeIn overflow-hidden">
         <h2 className="text-2xl font-semibold mb-6 text-center">
           {currentTab === 'register' ? 'Регистрация' : 'Вход'}
         </h2>
 
         {/* Registration Form */}
         {currentTab === 'register' && (
-          <form onSubmit={registerForm.handleSubmit(handleRegister)} className="space-y-4">
+          <form onSubmit={registerForm.handleSubmit(handleRegister)} className="space-y-4 animate-formSwitch">
             <label className="block">
               <span className="sr-only">Логин</span>
               <input
@@ -455,11 +555,12 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
                 {...registerForm.register('username')}
                 placeholder="Логин"
                 autoComplete="username"
-                className="w-full px-4 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-white"
+                disabled={isPopupOpen}
+                className="w-full px-4 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
               />
             </label>
             {registerForm.formState.errors.username && (
-              <p className="text-red-500 text-sm mt-1" role="alert">
+              <p className="text-red-500 text-xs mt-1" role="alert">
                 {registerForm.formState.errors.username.message}
               </p>
             )}
@@ -467,13 +568,14 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
             <div className="relative">
               <label className="block">
                 <span className="sr-only">Пароль</span>
-                <input
-                  type={showPassword.register ? 'text' : 'password'}
-                  {...registerForm.register('password')}
-                  placeholder="Пароль"
-                  autoComplete="new-password"
-                  className="w-full px-4 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-white pr-10"
-                />
+                  <input
+                    type={showPassword.register ? 'text' : 'password'}
+                    {...registerForm.register('password')}
+                    placeholder="Пароль"
+                    autoComplete="new-password"
+                    disabled={isPopupOpen}
+                    className="w-full px-4 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-white pr-10 disabled:opacity-50 disabled:cursor-not-allowed"
+                  />
               </label>
               <button
                 type="button"
@@ -528,41 +630,41 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
             })()}
 
             {registerForm.formState.errors.password && (
-              <p className="text-red-400 text-xs mt-1" role="alert">
+              <p className="text-red-500 text-xs mt-1" role="alert">
                 {registerForm.formState.errors.password.message}
               </p>
             )}
 
             <label className="block">
               <span className="sr-only">Подтверждение пароля</span>
-              <input
-                type="password"
-                {...registerForm.register('confirmPassword')}
-                placeholder="Подтверждение пароля"
-                autoComplete="new-password"
-                disabled={!isPasswordValid.register}
-                className={`w-full px-4 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-white ${
-                  isPasswordValid.register ? 'opacity-100' : 'opacity-50'
-                }`}
-              />
+                <input
+                  type="password"
+                  {...registerForm.register('confirmPassword')}
+                  placeholder="Подтверждение пароля"
+                  autoComplete="new-password"
+                  disabled={!isPasswordValid.register || isPopupOpen}
+                  className={`w-full px-4 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-white disabled:cursor-not-allowed ${
+                    isPasswordValid.register && !isPopupOpen ? 'opacity-100' : 'opacity-50'
+                  }`}
+                />
             </label>
             {registerForm.formState.errors.confirmPassword && (
-              <p className="text-red-400 text-xs mt-1" role="alert">
+              <p className="text-red-500 text-xs mt-1" role="alert">
                 {registerForm.formState.errors.confirmPassword.message}
               </p>
             )}
 
             <div className="flex justify-center select-none">
               <p className="text-xs text-neutral-400 text-center">
-                При регистрации вы соглашаетесь с{' '}
+                Нажимая ‹Зарегистрироваться›, вы принимаете{' '}
                 <Link
                   href="/legal/terms/"
                   target="_blank"
                   rel="noopener noreferrer"
                   prefetch={false}
-                  className="text-primary-400 hover:underline"
+                  className="text-blue-400 hover:text-blue-300 hover:underline transition-colors"
                 >
-                  Пользовательским соглашением
+                  Пользовательское соглашение
                 </Link>
                 {' '}и{' '}
                 <Link
@@ -570,18 +672,24 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
                   target="_blank"
                   rel="noopener noreferrer"
                   prefetch={false}
-                  className="text-primary-400 hover:underline"
+                  className="text-blue-400 hover:text-blue-300 hover:underline transition-colors"
                 >
-                  Политикой конфиденциальности
+                  Политику конфиденциальности
                 </Link>
                 .
               </p>
             </div>
 
-            <div className="flex justify-center mt-4">
-              <div id="register-captcha-container"></div>
+            <div className="flex justify-center">
+              <button
+                type="submit"
+                className="glass-btn"
+                disabled={isLoading || isPopupOpen}
+              >
+                {isLoading && !activeProvider && <span className="spinner"></span>}
+                <span>{isLoading && !activeProvider ? 'Отправка..' : 'Зарегистрироваться'}</span>
+              </button>
             </div>
-            <input type="hidden" name="cf-turnstile-response" value={captchaResponse.register} />
 
             {globalError && (
               <p
@@ -593,103 +701,108 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
               </p>
             )}
 
-            <div className="flex justify-center">
-              <button
-                type="submit"
-                className="glass-btn"
-                disabled={isLoading || !captchaResponse.register}
-              >
-                {isLoading && <span className="spinner"></span>}
-                <span>{isLoading ? 'Отправка...' : 'Зарегистрироваться'}</span>
-              </button>
-            </div>
-
             <div className="divider">
-              <span>или авторизироваться через</span>
+              <span>или авторизация через</span>
             </div>
 
             <div className="oauth-grid">
               <button
                 type="button"
                 className="oauth-btn"
-                onClick={() => oauthLogin('google')}
-                disabled={isLoading}
-                title="Войти через Google"
-                aria-label="Войти через Google"
+                onClick={() => oauthLogin('vk')}
+                disabled={isLoading || isPopupOpen}
+                title="Войти через VK ID"
+                aria-label="Войти через VK ID"
               >
-                <Image src="/static/icons/oauth/google.svg" alt="Google" width={20} height={20} />
+                {activeProvider === 'vk' ? (
+                  <div className="w-5 h-5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+                ) : (
+                  <Image src="/static/icons/oauth/vk.svg" alt="VK" width={20} height={20} className="oauth-icon" />
+                )}
               </button>
               <button
                 type="button"
                 className="oauth-btn"
+                onClick={() => oauthLogin('yandex')}
+                disabled={isLoading || isPopupOpen}
+                title="Войти через Yandex ID"
+                aria-label="Войти через Yandex ID"
+              >
+                {activeProvider === 'yandex' ? (
+                  <div className="w-5 h-5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+                ) : (
+                  <Image src="/static/icons/oauth/yandex.svg" alt="Yandex" width={20} height={20} className="oauth-icon" />
+                )}
+              </button>              
+              <button
+                type="button"
+                className="oauth-btn"
                 onClick={() => oauthLogin('telegram')}
-                disabled={isLoading}
+                disabled={isLoading || isPopupOpen}
                 title="Войти через Telegram"
                 aria-label="Войти через Telegram"
               >
-                <Image src="/static/icons/oauth/telegram.svg" alt="Telegram" width={20} height={20} />
+                {activeProvider === 'telegram' ? (
+                  <div className="w-5 h-5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+                ) : (
+                  <Image src="/static/icons/oauth/telegram.svg" alt="Telegram" width={20} height={20} className="oauth-icon" />
+                )}
+              </button>              
+              <button
+                type="button"
+                className="oauth-btn"
+                onClick={() => oauthLogin('google')}
+                disabled={isLoading || isPopupOpen}
+                title="Войти через Google"
+                aria-label="Войти через Google"
+              >
+                {activeProvider === 'google' ? (
+                  <div className="w-5 h-5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+                ) : (
+                  <Image src="/static/icons/oauth/google.svg" alt="Google" width={20} height={20} className="oauth-icon" />
+                )}
               </button>
               <button
                 type="button"
                 className="oauth-btn"
                 onClick={() => oauthLogin('twitch')}
-                disabled={isLoading}
+                disabled={isLoading || isPopupOpen}
                 title="Войти через Twitch"
                 aria-label="Войти через Twitch"
               >
-                <Image src="/static/icons/oauth/twitch.svg" alt="Twitch" width={20} height={20} />
+                {activeProvider === 'twitch' ? (
+                  <div className="w-5 h-5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+                ) : (
+                  <Image src="/static/icons/oauth/twitch.svg" alt="Twitch" width={20} height={20} className="oauth-icon" />
+                )}
               </button>
             </div>
 
-            <p className="text-center text-sm">
-              Уже есть аккаунт?{' '}
-              <button
-                type="button"
-                onClick={() => switchTab('login')}
-                className="text-sky-300 hover:underline"
-              >
-                Войти
-              </button>
-            </p>
+            <div className="mt-4">
+              <p className="text-center text-sm">
+                <span className="text-neutral-400 font-semibold underline underline-offset-4">Уже есть аккаунт?</span>{' '}
+                <button
+                  type="button"
+                  onClick={() => switchTab('login')}
+                  className="text-white bg-white/10 px-1.5 sm:px-2 py-0.5 rounded font-medium hover:bg-white/15 transition-colors"
+                >
+                  Вход
+                </button>
+              </p>
+            </div>
           </form>
         )}
 
         {/* Authorization Form */}
         {currentTab === 'login' && (
-          <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-4">
+          <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-4 animate-formSwitch">
             <label className="block">
               <span className="sr-only">Логин</span>
-              <input
-                type="text"
-                {...loginForm.register('username', {
-                  onChange: () => {
-                    // Clear errors when user starts typing
-                    if (globalError) {
-                      setGlobalError('');
-                    }
-                    if (loginAttemptState === 'error') {
-                      setLoginAttemptState('idle');
-                    }
-                  },
-                })}
-                placeholder="Логин"
-                autoComplete="username"
-                className="w-full px-4 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-white"
-              />
-            </label>
-            {loginForm.formState.errors.username && (
-              <p className="text-red-500 text-sm mt-1" role="alert">
-                {loginForm.formState.errors.username.message}
-              </p>
-            )}
-
-            <div className="relative">
-              <label className="block">
-                <span className="sr-only">Пароль</span>
                 <input
-                  type={showPassword.login ? 'text' : 'password'}
-                  {...loginForm.register('password', {
+                  type="text"
+                  {...loginForm.register('username', {
                     onChange: () => {
+                      // Clear errors when user starts typing
                       if (globalError) {
                         setGlobalError('');
                       }
@@ -698,10 +811,38 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
                       }
                     },
                   })}
-                  placeholder="Пароль"
-                  autoComplete="current-password"
-                  className="w-full px-4 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-white pr-10"
+                  placeholder="Логин"
+                  autoComplete="username"
+                  disabled={isPopupOpen}
+                  className="w-full px-4 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
                 />
+            </label>
+            {loginForm.formState.errors.username && (
+              <p className="text-red-500 text-xs mt-1" role="alert">
+                {loginForm.formState.errors.username.message}
+              </p>
+            )}
+
+            <div className="relative">
+              <label className="block">
+                <span className="sr-only">Пароль</span>
+                  <input
+                    type={showPassword.login ? 'text' : 'password'}
+                    {...loginForm.register('password', {
+                      onChange: () => {
+                        if (globalError) {
+                          setGlobalError('');
+                        }
+                        if (loginAttemptState === 'error') {
+                          setLoginAttemptState('idle');
+                        }
+                      },
+                    })}
+                    placeholder="Пароль"
+                    autoComplete="current-password"
+                    disabled={isPopupOpen}
+                    className="w-full px-4 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-white pr-10 disabled:opacity-50 disabled:cursor-not-allowed"
+                  />
               </label>
               <button
                 type="button"
@@ -724,19 +865,40 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
               </p>
             )}
 
-            <div className="flex justify-center mt-4">
-              <div id="login-captcha-container"></div>
+            <div className="flex justify-center select-none">
+              <p className="text-xs text-neutral-400 text-center">
+                Нажимая ‹Войти›, вы принимаете{' '}
+                <Link
+                  href="/legal/terms/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  prefetch={false}
+                  className="text-blue-400 hover:text-blue-300 hover:underline transition-colors"
+                >
+                  Пользовательское соглашение
+                </Link>
+                {' '}и{' '}
+                <Link
+                  href="/legal/privacy/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  prefetch={false}
+                  className="text-blue-400 hover:text-blue-300 hover:underline transition-colors"
+                >
+                  Политику конфиденциальности
+                </Link>
+                .
+              </p>
             </div>
-            <input type="hidden" name="cf-turnstile-response" value={captchaResponse.login} />
 
             <div className="flex justify-center">
               <button
                 type="submit"
                 className={`glass-btn ${loginAttemptState === 'error' ? 'btn-shake' : ''}`}
-                disabled={isLoading || !captchaResponse.login}
+                disabled={isLoading || isPopupOpen}
               >
-                {isLoading && <span className="spinner"></span>}
-                <span>{isLoading ? 'Вход...' : 'Войти'}</span>
+                {isLoading && !activeProvider && <span className="spinner"></span>}
+                <span>{isLoading && !activeProvider ? 'Вход..' : 'Войти'}</span>
               </button>
             </div>
 
@@ -751,55 +913,112 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
             )}
 
             <div className="divider">
-              <span>или авторизироваться через</span>
+              <span>или авторизация через</span>
             </div>
 
             <div className="oauth-grid">
               <button
                 type="button"
                 className="oauth-btn"
-                onClick={() => oauthLogin('google')}
-                disabled={isLoading}
-                title="Войти через Google"
-                aria-label="Войти через Google"
+                onClick={() => oauthLogin('vk')}
+                disabled={isLoading || isPopupOpen}
+                title="Войти через VK ID"
+                aria-label="Войти через VK ID"
               >
-                <Image src="/static/icons/oauth/google.svg" alt="Google" width={20} height={20} />
+                {activeProvider === 'vk' ? (
+                  <div className="w-5 h-5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+                ) : (
+                  <Image src="/static/icons/oauth/vk.svg" alt="VK" width={20} height={20} className="oauth-icon" />
+                )}
               </button>
               <button
                 type="button"
                 className="oauth-btn"
+                onClick={() => oauthLogin('yandex')}
+                disabled={isLoading || isPopupOpen}
+                title="Войти через Yandex ID"
+                aria-label="Войти через Yandex ID"
+              >
+                {activeProvider === 'yandex' ? (
+                  <div className="w-5 h-5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+                ) : (
+                  <Image src="/static/icons/oauth/yandex.svg" alt="Yandex" width={20} height={20} className="oauth-icon" />
+                )}
+              </button>              
+              <button
+                type="button"
+                className="oauth-btn"
                 onClick={() => oauthLogin('telegram')}
-                disabled={isLoading}
+                disabled={isLoading || isPopupOpen}
                 title="Войти через Telegram"
                 aria-label="Войти через Telegram"
               >
-                <Image src="/static/icons/oauth/telegram.svg" alt="Telegram" width={20} height={20} />
+                {activeProvider === 'telegram' ? (
+                  <div className="w-5 h-5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+                ) : (
+                  <Image src="/static/icons/oauth/telegram.svg" alt="Telegram" width={20} height={20} className="oauth-icon" />
+                )}
+              </button>
+              <button
+                type="button"
+                className="oauth-btn"
+                onClick={() => oauthLogin('google')}
+                disabled={isLoading || isPopupOpen}
+                title="Войти через Google"
+                aria-label="Войти через Google"
+              >
+                {activeProvider === 'google' ? (
+                  <div className="w-5 h-5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+                ) : (
+                  <Image src="/static/icons/oauth/google.svg" alt="Google" width={20} height={20} className="oauth-icon" />
+                )}
               </button>
               <button
                 type="button"
                 className="oauth-btn"
                 onClick={() => oauthLogin('twitch')}
-                disabled={isLoading}
+                disabled={isLoading || isPopupOpen}
                 title="Войти через Twitch"
                 aria-label="Войти через Twitch"
               >
-                <Image src="/static/icons/oauth/twitch.svg" alt="Twitch" width={20} height={20} />
+                {activeProvider === 'twitch' ? (
+                  <div className="w-5 h-5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+                ) : (
+                  <Image src="/static/icons/oauth/twitch.svg" alt="Twitch" width={20} height={20} className="oauth-icon" />
+                )}
               </button>
             </div>
 
-            <p className="text-center text-sm">
-              Нет аккаунта?{' '}
-              <button
-                type="button"
-                onClick={() => switchTab('register')}
-                className="text-sky-300 hover:underline"
-              >
-                Зарегистрироваться
-              </button>
-            </p>
+            <div className="mt-4">
+              <p className="text-center text-sm">
+                <span className="text-neutral-400 font-semibold underline underline-offset-4">Нет учетной записи?</span>{' '}
+                <button
+                  type="button"
+                  onClick={() => switchTab('register')}
+                  className="text-white bg-white/10 px-1.5 sm:px-2 py-0.5 rounded font-medium hover:bg-white/15 transition-colors"
+                >
+                  Регистрация
+                </button>
+              </p>
+            </div>
           </form>
         )}
+        </div>
       </div>
-    </div>
+
+      <RateLimitCaptcha
+        isOpen={showRateLimitCaptcha}
+        onSuccess={handleRateLimitSuccess}
+        onClose={() => {
+          // При закрытии очищаем очередь и сбрасываем все флаги
+          isCaptchaOpenRef.current = false;
+          isProcessingCaptchaRef.current = false;
+          setShowRateLimitCaptcha(false);
+          pendingRequestsQueueRef.current = [];
+        }}
+      />
+    </>
   );
 }
+
+

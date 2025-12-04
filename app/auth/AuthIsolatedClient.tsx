@@ -228,7 +228,7 @@ export default function AuthIsolatedClient() {
           <AuthForm retpatch={retpatch} initialError={errorParam || undefined} />
         </div>
         {/* Decorative Tree Image */}
-        <div className="hidden md:flex pointer-events-none z-0 absolute inset-0 items-end justify-center">
+        <div className="hidden md:flex pointer-events-none z-0 fixed bottom-0 left-0 right-0 items-end justify-center">
           <Image 
             src="/static/templates/overlay-login.png" 
             alt="Декоративное дерево"
@@ -239,12 +239,11 @@ export default function AuthIsolatedClient() {
               height: '90vh', 
               minHeight: '480px', 
               maxHeight: '1200px', 
-              width: '72vw', 
+              width: '120vw', 
               minWidth: '720px', 
-              maxWidth: '1320px', 
-              position: 'relative', 
-              left: '3%', 
-              objectFit: 'contain'
+              maxWidth: 'none', 
+              objectFit: 'contain',
+              objectPosition: 'center bottom'
             }}
             priority
             placeholder="empty"

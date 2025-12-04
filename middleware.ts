@@ -31,11 +31,6 @@ function handleProtection(request: NextRequest, pathname: string): NextResponse 
     return null;
   }
 
-  // OAuth callback page also has immunity
-  if (pathname === '/auth/oauth-callback' || pathname.startsWith('/auth/oauth-callback/')) {
-    return null;
-  }
-
   // Allow /auth page without protection cookies
   // This is the authentication page where OAuth callbacks are handled
   // Client-side code will process OAuth callbacks (including hash-based Telegram callbacks)

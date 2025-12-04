@@ -13,6 +13,14 @@ export default function Footer() {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       gsap.registerPlugin(ScrollTrigger);
+      const isMobile = window.innerWidth < 768;
+      
+      if (isMobile) {
+        // На мобильных устройствах просто устанавливаем финальное состояние без анимации
+        gsap.set('.footer-container', { opacity: 1, y: 0 });
+        return;
+      }
+      
       gsap.fromTo('.footer-container', 
         { 
           opacity: 0, 

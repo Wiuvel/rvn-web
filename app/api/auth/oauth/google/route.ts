@@ -66,7 +66,7 @@ export async function GET(request: NextRequest) {
     
     // Store popup flag in state cookie for callback
     const stateWithPopup = isPopup ? `${state}:popup` : state;
-    
+
     // Redirect to Google OAuth
     const response = NextResponse.redirect(
       `https://accounts.google.com/o/oauth2/v2/auth?${new URLSearchParams({

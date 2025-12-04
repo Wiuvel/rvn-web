@@ -537,7 +537,6 @@ button, a {
 .oauth-btn:hover {
     background: rgba(255, 255, 255, 0.1);
     border-color: rgba(255, 255, 255, 0.25);
-    transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(22, 163, 255, 0.2);
 }
 
@@ -559,12 +558,21 @@ button, a {
 .oauth-btn img {
     width: 20px;
     height: 20px;
-    transition: all 0.3s ease;
+    transition: transform 0.3s ease;
 }
 
 .oauth-btn:hover svg,
 .oauth-btn:hover img {
     transform: scale(1.1);
+}
+
+.oauth-icon {
+    transition: transform 0.3s ease, filter 0s;
+}
+
+.oauth-btn:hover .oauth-icon {
+    transform: scale(1.1);
+    filter: brightness(0) saturate(100%) invert(60%) sepia(95%) saturate(2000%) hue-rotate(195deg) brightness(1.1);
 }
 
 .tree-glow {
@@ -640,6 +648,62 @@ button, a {
 
 @keyframes spin {
     to { transform: rotate(360deg); }
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes scaleIn {
+    from {
+        opacity: 0;
+        transform: scale(0.9);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+@keyframes formSwitch {
+    from {
+        transform: translateX(20px);
+    }
+    to {
+        transform: translateX(0);
+    }
+}
+
+.animate-fadeIn {
+    animation: fadeIn 0.3s ease-out;
+}
+
+.animate-slideUp {
+    animation: slideUp 0.4s ease-out;
+}
+
+.animate-scaleIn {
+    animation: scaleIn 0.3s ease-out;
+}
+
+.animate-formSwitch {
+    animation: formSwitch 0.3s ease-out;
 }
 
 /* Кастомный скролл для support страницы */

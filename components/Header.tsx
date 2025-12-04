@@ -32,6 +32,13 @@ export default function Header() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
+    const isMobile = window.innerWidth < 768;
+    if (isMobile) {
+      // На мобильных устройствах просто устанавливаем финальное состояние без анимации
+      gsap.set('.header-container', { opacity: 1, y: 0 });
+      return;
+    }
+    
     gsap.fromTo('.header-container', 
       { 
         opacity: 0, 

@@ -56,58 +56,79 @@ export default function ProtectionPage() {
     const script = document.createElement('script');
     script.src = '/static/protection/sf-turnstile.js';
     script.defer = true;
-        script.onload = () => {
-          setTimeout(() => {
-            if (typeof window === 'undefined') return;
+    script.onload = () => {
+      // Ждем загрузки Turnstile API и кастомного скрипта
+      const initTurnstile = () => {
+        if (typeof window === 'undefined') return;
 
-            const win = window as TurnstileWindow;
+        const win = window as TurnstileWindow;
 
-            if (win.turnstile) {
-              const container = document.getElementById('turnstile-container');
-              if (container) {
-                container.innerHTML = '';
-                win.turnstile.render(container, {
-                  sitekey: '0x4AAAAAACDQkGbAxIWAKp08',
-                  theme: 'dark',
-                  size: 'flexible',
-                  callback: (token: string) => {
-                    if (typeof win.onSuccessCallback === 'function') {
-                      win.onSuccessCallback(token);
-                    }
-                  },
-                  'error-callback': () => {
-                    if (typeof win.onErrorCallback === 'function') {
-                      win.onErrorCallback();
-                    }
-                  },
-                  'before-interactive-callback': () => {
-                    if (typeof win.onBeforeInteractiveCallback === 'function') {
-                      win.onBeforeInteractiveCallback();
-                    }
-                  },
-                  'after-interactive-callback': () => {
-                    if (typeof win.onAfterInteractiveCallback === 'function') {
-                      win.onAfterInteractiveCallback();
-                    }
-                  },
-                  'unsupported-callback': () => {
-                    if (typeof win.onUnsupportedCallback === 'function') {
-                      win.onUnsupportedCallback();
-                    }
-                  }
-                });
-              }
+        // Проверяем, что Turnstile API загружен
+        if (!win.turnstile || typeof win.turnstile.render !== 'function') {
+          setTimeout(initTurnstile, 100);
+          return;
+        }
+
+        const container = document.getElementById('turnstile-container');
+        if (!container) {
+          setTimeout(initTurnstile, 100);
+          return;
+        }
+
+        container.innerHTML = '';
+        
+        // Убеждаемся, что sitekey - строка
+        const sitekey: string = '0x4AAAAAACDQkGbAxIWAKp08';
+        
+        // Создаем объект опций с явными типами
+        const renderOptions: TurnstileRenderOptions = {
+          sitekey: sitekey,
+          theme: 'dark',
+          size: 'flexible',
+          callback: (token: string) => {
+            if (typeof win.onSuccessCallback === 'function') {
+              win.onSuccessCallback(token);
             }
-
-            if (win.resetTitleFill) {
-              win.resetTitleFill();
+          },
+          'error-callback': () => {
+            if (typeof win.onErrorCallback === 'function') {
+              win.onErrorCallback();
             }
-
-            if (win.updateStatusText) {
-              win.updateStatusText();
+          },
+          'before-interactive-callback': () => {
+            if (typeof win.onBeforeInteractiveCallback === 'function') {
+              win.onBeforeInteractiveCallback();
             }
-          }, 100);
+          },
+          'after-interactive-callback': () => {
+            if (typeof win.onAfterInteractiveCallback === 'function') {
+              win.onAfterInteractiveCallback();
+            }
+          },
+          'unsupported-callback': () => {
+            if (typeof win.onUnsupportedCallback === 'function') {
+              win.onUnsupportedCallback();
+            }
+          }
         };
+        
+        try {
+          win.turnstile.render(container, renderOptions);
+        } catch (error) {
+          console.error('Failed to render Turnstile:', error);
+        }
+
+        if (win.resetTitleFill) {
+          win.resetTitleFill();
+        }
+
+        if (win.updateStatusText) {
+          win.updateStatusText();
+        }
+      };
+
+      setTimeout(initTurnstile, 100);
+    };
     script.onerror = (error) => {
       console.error('Failed to load protection script:', error);
     };

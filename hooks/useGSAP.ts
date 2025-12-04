@@ -42,10 +42,9 @@ export const useGSAP = () => {
 
       const isMobile = window.innerWidth < 768;
       if (isMobile) {
-        gsap.defaults({
-          duration: 0.4,
-          ease: "power2.out"
-        });
+        // Отключаем все ScrollTrigger анимации на мобильных устройствах
+        ScrollTrigger.getAll().forEach(trigger => trigger.disable());
+        gsap.globalTimeline.timeScale(0);
       }
 
     }, containerRef);
@@ -63,6 +62,14 @@ export const useFadeIn = (delay: number = 0) => {
     if (!elementRef.current) return;
 
     const element = elementRef.current;
+    const isMobile = window.innerWidth < 768;
+    
+    if (isMobile) {
+      // На мобильных устройствах просто устанавливаем финальное состояние без анимации
+      gsap.set(element, { opacity: 1, y: 0 });
+      return;
+    }
+
     const animation = gsap.fromTo(element, 
       { 
         opacity: 0, 
@@ -97,6 +104,15 @@ export const useStaggeredFadeIn = (delay: number = 0, stagger: number = 0.05) =>
 
   useEffect(() => {
     if (!containerRef.current) return;
+
+    const isMobile = window.innerWidth < 768;
+    
+    if (isMobile) {
+      // На мобильных устройствах просто устанавливаем финальное состояние без анимации
+      const elements = containerRef.current.children;
+      gsap.set(elements, { opacity: 1, y: 0, scale: 1 });
+      return;
+    }
 
     const elements = containerRef.current.children;
     const animation = gsap.fromTo(elements, 
