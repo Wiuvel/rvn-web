@@ -1,12 +1,12 @@
 'use client';
 
-import HeroSection from "@/components/HeroSection";
-import FeaturesSection from "@/components/FeaturesSection";
-import PricingSection from "@/components/PricingSection";
-import AdvantagesSection from "@/components/AdvantagesSection";
-import DashboardPreviewSection from "@/components/DashboardPreviewSection";
-import AppsSection from "@/components/AppsSection";
-import FAQSection from "@/components/FAQSection";
+import HeroSection from "@/components/sections/Hero";
+import FeaturesSection from "@/components/sections/Features";
+import PricingSection from "@/components/sections/Pricing";
+import AdvantagesSection from "@/components/sections/Advantages";
+import DashboardPreviewSection from "@/components/sections/DashboardPreview";
+import AppsSection from "@/components/sections/Apps";
+import FAQSection from "@/components/sections/FAQ";
 import { useGSAP } from "@/hooks/useGSAP";
 
 export default function Home() {

@@ -3,8 +3,8 @@
 import Link from 'next/link';
 import { useFadeIn } from '@/hooks/useGSAP';
 import { useState, useEffect } from 'react';
-import LegalNavigation from '@/components/LegalNavigation';
-import PolicyCardSkeleton from '@/components/PolicyCardSkeleton';
+import LegalNavigation from '@/components/navigation/Legal';
+import Skeleton from '@/components/ui/Skeleton';
 
 export default function CookiePolicyPage() {
   const titleRef = useFadeIn(0.1);
@@ -40,7 +40,7 @@ export default function CookiePolicyPage() {
             <div className="legal-main-content">
               <LegalNavigation />
               {isLoading ? (
-                <PolicyCardSkeleton />
+                <Skeleton />
               ) : (
               <div className="policy-card">
             <h2><strong>1. Общие положения</strong></h2>

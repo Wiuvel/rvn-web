@@ -11,7 +11,7 @@ import { translateError } from '@/lib/utils/error-translations';
 import { getGradientClasses } from '@/lib/utils/avatar-gradients';
 
 // Lazy load RateLimitCaptcha для оптимизации bundle size
-const RateLimitCaptcha = dynamic(() => import('@/components/RateLimitCaptcha'), {
+const RateLimitCaptcha = dynamic(() => import('@/components/auth/RateLimitCaptcha'), {
   ssr: false,
   loading: () => null
 });

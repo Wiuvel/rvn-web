@@ -1,4 +1,4 @@
-export default function PolicyCardSkeleton() {
+export default function Skeleton() {
   return (
     <div className="policy-card-skeleton">
       <div className="skeleton-line skeleton-title"></div>

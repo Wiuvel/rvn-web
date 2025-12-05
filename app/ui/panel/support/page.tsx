@@ -5,9 +5,9 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { gsap } from 'gsap';
 import { translateError } from '@/lib/utils/error-translations';
-import RateLimitCaptcha from '@/components/RateLimitCaptcha';
+import RateLimitCaptcha from '@/components/auth/RateLimitCaptcha';
 import { GSAP_DEFAULT_DURATION, GSAP_DEFAULT_EASE } from '@/lib/utils/constants';
-import LoadingSpinner from '@/components/LoadingSpinner';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { getGradientClasses } from '@/lib/utils/avatar-gradients';
 
 interface AuthState {

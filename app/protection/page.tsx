@@ -53,17 +53,13 @@ export default function ProtectionPage() {
   useEffect(() => {
     if (!isMounted) return;
 
-    const script = document.createElement('script');
-    script.src = '/static/protection/sf-turnstile.js';
-    script.defer = true;
-    script.onload = () => {
-      // Ждем загрузки Turnstile API и кастомного скрипта
+      import('@/lib/scripts/protection').then(() => {
+
       const initTurnstile = () => {
         if (typeof window === 'undefined') return;
 
         const win = window as TurnstileWindow;
 
-        // Проверяем, что Turnstile API загружен
         if (!win.turnstile || typeof win.turnstile.render !== 'function') {
           setTimeout(initTurnstile, 100);
           return;
@@ -125,21 +121,9 @@ export default function ProtectionPage() {
       };
 
       setTimeout(initTurnstile, 100);
-    };
-    script.onerror = (error) => {
+    }).catch((error) => {
       console.error('Failed to load protection script:', error);
-    };
-    
-    const existingScript = document.querySelector('script[src="/static/protection/sf-turnstile.js"]');
-    if (!existingScript) {
-      document.head.appendChild(script);
-    }
-
-    return () => {
-      if (document.head.contains(script)) {
-        document.head.removeChild(script);
-      }
-    };
+    });
   }, [isMounted]);
 
   const canReveal = Boolean(ipAddress) && !ipError && !isIpRevealed;

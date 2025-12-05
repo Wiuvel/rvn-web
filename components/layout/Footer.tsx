@@ -42,6 +42,7 @@ export default function Footer() {
     }
   }, []);
 
+
   return (
     <footer className="border-t border-neutral-800/70 relative z-50">
       <div className="footer-container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 md:py-10 text-sm text-neutral-400">
@@ -124,8 +125,8 @@ export default function Footer() {
                   <path d="M16.0037 9.41421L7.39712 18.0208L5.98291 16.6066L14.5895 8H7.00373V6H18.0037V17H16.0037V9.41421Z"></path>
                 </svg>
               </Link>
-              <Image src="/static/payments/merchant-spb.svg" alt="СПБ" width={70} height={70} className="h-8" loading="lazy" />
-              <Image src="/static/payments/merchant-mir.svg" alt="МИР" width={70} height={70} className="h-5" loading="lazy" />
+              <Image src="/static/payments/merchant-spb.svg" alt="СПБ" width={70} height={70} className="h-14" loading="lazy" />
+              <Image src="/static/payments/merchant-mir.svg" alt="МИР" width={70} height={70} className="h-10" loading="lazy" />
               <Image src="/static/payments/merchant-visa.svg" alt="Visa" width={40} height={40} className="h-10" loading="lazy" />
               <Image src="/static/payments/merchant-mcard.svg" alt="Mastercard" width={40} height={40} className="h-10" loading="lazy" />
             </div>

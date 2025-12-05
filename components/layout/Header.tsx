@@ -7,8 +7,8 @@ import { useRouter } from 'next/navigation';
 import { gsap } from 'gsap';
 import { Notification } from '@/types';
 import { useAuth } from '@/hooks/useAuth';
-import { UserMenu } from '@/components/UserMenu';
-import { NotificationsMenu } from '@/components/NotificationsMenu';
+import { UserMenu } from '@/components/navigation/UserMenu';
+import { NotificationsMenu } from '@/components/navigation/Notifications';
 import { GSAP_DEFAULT_DURATION, GSAP_DEFAULT_EASE } from '@/lib/utils/constants';
 import { getGradientClasses } from '@/lib/utils/avatar-gradients';
 

@@ -103,29 +103,38 @@ export const useStaggeredFadeIn = (delay: number = 0, stagger: number = 0.05) =>
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!containerRef.current) return;
+    if (!containerRef.current || typeof window === 'undefined') return;
 
     const isMobile = window.innerWidth < 768;
+    const elements = containerRef.current.children;
     
     if (isMobile) {
       // На мобильных устройствах просто устанавливаем финальное состояние без анимации
-      const elements = containerRef.current.children;
       gsap.set(elements, { opacity: 1, y: 0, scale: 1 });
       return;
     }
 
-    const elements = containerRef.current.children;
-    const animation = gsap.fromTo(elements, 
-      { 
-        opacity: 0, 
-        y: 15,
-        scale: 0.98
-      },
-      { 
-        opacity: 1, 
+    // Проверяем видимость с небольшой задержкой (чтобы DOM успел отрендериться)
+    const timeout = setTimeout(() => {
+      if (!containerRef.current) return;
+      
+      const rect = containerRef.current.getBoundingClientRect();
+      const isAlreadyVisible = rect.top < window.innerHeight * 0.85;
+      
+      if (isAlreadyVisible) {
+        // Если элемент уже виден, оставляем его видимым (не применяем анимацию)
+        gsap.set(elements, { opacity: 1, y: 0, scale: 1 });
+        return;
+      }
+
+      // Если элемент не виден, устанавливаем начальное состояние и создаем анимацию
+      gsap.set(elements, { opacity: 0, y: 15, scale: 0.98 });
+      
+      const animation = gsap.to(elements, {
+        opacity: 1,
         y: 0,
         scale: 1,
-        duration: 0.4, 
+        duration: 0.4,
         ease: "power2.out",
         delay,
         stagger,
@@ -135,11 +144,18 @@ export const useStaggeredFadeIn = (delay: number = 0, stagger: number = 0.05) =>
           end: "bottom 15%",
           toggleActions: "play none none none"
         }
-      }
-    );
+      });
+
+      // Сохраняем ссылку на анимацию для очистки
+      (containerRef.current as any).__gsapAnimation = animation;
+    }, 150);
 
     return () => {
-      animation.kill();
+      clearTimeout(timeout);
+      const animation = (containerRef.current as any)?.__gsapAnimation;
+      if (animation) {
+        animation.kill();
+      }
     };
   }, [delay, stagger]);
 

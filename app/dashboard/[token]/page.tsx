@@ -6,7 +6,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useFadeIn, useStaggeredFadeIn } from '@/hooks/useGSAP';
 import { gsap } from 'gsap';
-import LoadingSpinner from '@/components/LoadingSpinner';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { getGradientClasses } from '@/lib/utils/avatar-gradients';
 import { APP_VERSION } from '@/lib/utils/constants';
 

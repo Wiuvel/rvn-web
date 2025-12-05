@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import AuroraBackground from './ui/AuroraBackground';
+import AuroraBackground from '@/components/ui/AuroraBackground';
 import { translateError } from '@/lib/utils/error-translations';
 import { adminAuthSchema, adminRegisterSchema, type AdminAuthFormData, type AdminRegisterFormData } from '@/lib/validation/schemas';
 

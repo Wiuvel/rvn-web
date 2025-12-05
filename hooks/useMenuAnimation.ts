@@ -24,21 +24,19 @@ export function useMenuAnimation(
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    // Убиваем предыдущую анимацию, если она есть
     if (animationRef.current) {
       animationRef.current.kill();
       animationRef.current = null;
     }
 
     if (isOpen) {
-      // Если меню должно быть открыто, но еще не рендерится - начинаем рендеринг
       if (!shouldRender) {
         setShouldRender(true);
       }
       
       requestAnimationFrame(() => {
         if (menuRef.current) {
-          // Убиваем любые активные анимации на элементе
+
           gsap.killTweensOf(menuRef.current);
           
           gsap.set(menuRef.current, {
@@ -59,10 +57,10 @@ export function useMenuAnimation(
         }
       });
     } else {
-      // Если меню должно быть закрыто и оно рендерится - запускаем анимацию закрытия
+
       if (shouldRender) {
         if (menuRef.current) {
-          // Убиваем любые активные анимации на элементе
+
           gsap.killTweensOf(menuRef.current);
           
           animationRef.current = gsap.to(menuRef.current, {
@@ -78,7 +76,6 @@ export function useMenuAnimation(
             }
           });
         } else {
-          // Если элемент еще не создан, просто закрываем
           setShouldRender(false);
           if (onClose) onClose();
         }
@@ -86,7 +83,6 @@ export function useMenuAnimation(
     }
   }, [isOpen, shouldRender, onClose]);
 
-  // Очистка при размонтировании
   useEffect(() => {
     return () => {
       if (animationRef.current) {

@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import AuthForm from '../../components/AuthForm';
-import ParticlesBackground from '@/components/ParticlesBackground';
+import AuthForm from '@/components/auth/Form';
+import ParticlesBackground from '@/components/effects/Particles';
 import { getOAuthErrorMessage } from '@/lib/utils/oauth-errors';
 
 export default function AuthIsolatedClient() {

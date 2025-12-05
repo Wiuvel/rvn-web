@@ -17,7 +17,7 @@ interface WindowWithPopup extends Window {
 }
 
 // Lazy load RateLimitCaptcha для оптимизации bundle size
-const RateLimitCaptcha = dynamic(() => import('@/components/RateLimitCaptcha'), {
+const RateLimitCaptcha = dynamic(() => import('@/components/auth/RateLimitCaptcha'), {
   ssr: false,
   loading: () => null
 });
@@ -708,7 +708,7 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
             )}
 
             <div className="divider">
-              <span>или авторизация через</span>
+              <span className="text-neutral-400">или авторизация через</span>
             </div>
 
             <div className="oauth-grid">
@@ -919,7 +919,7 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
             )}
 
             <div className="divider">
-              <span>или авторизация через</span>
+              <span className="text-neutral-400">или авторизация через</span>
             </div>
 
             <div className="oauth-grid">
@@ -1026,5 +1026,4 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
     </>
   );
 }
-
 

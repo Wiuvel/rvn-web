@@ -89,4 +89,3 @@ export interface AdminUsersResponse extends ApiResponse {
   users?: UserData[];
   total?: number;
 }
-
