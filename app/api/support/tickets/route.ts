@@ -378,6 +378,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    logger.info('Ticket created', {
+      ticketId: ticket.id,
+      userId: user.id,
+      subject: subject.trim().substring(0, 50)
+    });
+
+    // Трекинг аналитики
+    try {
+      const { trackTicketCreated } = await import('@/lib/analytics/support-analytics');
+      await trackTicketCreated(ticket.id, user.id, ticket.status);
+    } catch (error) {
+      // Игнорируем ошибки аналитики, чтобы не блокировать создание тикета
+      logger.warn('Failed to track ticket creation analytics', {
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+
     // Создаем первое сообщение
     const { error: messageError } = await supabaseAdmin
       .from('support_messages')
@@ -402,6 +419,23 @@ export async function POST(request: NextRequest) {
           { status: 500 }
         )
       );
+    }
+
+    logger.info('Ticket message created', {
+      ticketId: ticket.id,
+      userId: user.id,
+      messageLength: message.trim().length
+    });
+
+    // Трекинг аналитики для первого сообщения
+    try {
+      const { trackMessageSent } = await import('@/lib/analytics/support-analytics');
+      await trackMessageSent(ticket.id, user.id, 'user');
+    } catch (error) {
+      // Игнорируем ошибки аналитики
+      logger.warn('Failed to track message analytics', {
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
     }
 
     return setCorsHeaders(

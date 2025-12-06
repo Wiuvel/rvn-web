@@ -178,18 +178,15 @@ initPromise.then(() => {
               const websocketModule = require(modulePath);
               if (websocketModule && websocketModule.initWebSocketServer) {
                 websocketModule.initWebSocketServer(httpServer);
-                console.log('✓ WebSocket server initialized from:', modulePath);
                 return true;
               }
             }
           } catch (e) {
-            console.warn('⚠ Failed to load WebSocket module from:', modulePath, e.message);
             continue;
           }
         }
         
         // Если не удалось загрузить напрямую, пробуем через API route
-        console.warn('⚠ Could not load WebSocket module directly, trying API route...');
         try {
           const http = require('http');
           const initUrl = `http://localhost:${port}/api/websocket/init`;
@@ -202,32 +199,26 @@ initPromise.then(() => {
                 try {
                   const result = JSON.parse(data);
                   if (result.initialized) {
-                    console.log('✓ WebSocket server initialized via API route (production)');
                     resolve(true);
                   } else {
-                    console.warn('⚠ WebSocket server initialization failed via API route:', result.error);
                     resolve(false);
                   }
                 } catch (e) {
-                  console.warn('⚠ Failed to parse WebSocket init response');
                   resolve(false);
                 }
               });
             });
             
-            req.on('error', (err) => {
-              console.warn('⚠ Failed to call WebSocket init API:', err.message);
+            req.on('error', () => {
               resolve(false);
             });
             
             req.setTimeout(5000, () => {
               req.destroy();
-              console.warn('⚠ WebSocket init API timeout');
               resolve(false);
             });
           });
         } catch (err) {
-          console.warn('⚠ WebSocket initialization via API route failed:', err.message);
           return false;
         }
       }
@@ -247,39 +238,32 @@ initPromise.then(() => {
                 try {
                   const result = JSON.parse(data);
                   if (result.initialized) {
-                    console.log('✓ WebSocket server initialized via API route');
                     resolve(true);
                   } else {
-                    console.warn('⚠ WebSocket server initialization failed via API route:', result.error);
                     resolve(false);
                   }
                 } catch (e) {
-                  console.warn('⚠ Failed to parse WebSocket init response');
                   resolve(false);
                 }
               });
             });
             
-            req.on('error', (err) => {
-              console.warn('⚠ Failed to call WebSocket init API:', err.message);
+            req.on('error', () => {
               resolve(false);
             });
             
             req.setTimeout(5000, () => {
               req.destroy();
-              console.warn('⚠ WebSocket init API timeout');
               resolve(false);
             });
           });
         } catch (err) {
-          console.warn('⚠ WebSocket initialization via API route failed:', err.message);
           return false;
         }
       }
 
       return false;
     } catch (err) {
-      console.warn('⚠ WebSocket server initialization failed:', err.message);
       return false;
     }
   };

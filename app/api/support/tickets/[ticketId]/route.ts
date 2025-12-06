@@ -381,6 +381,16 @@ export async function PUT(
 
     // Отправляем обновление тикета через WebSocket
     if (ticket) {
+      logger.info('Ticket updated', {
+        ticketId,
+        status: ticket.status,
+        oldStatus,
+        assignedTo: ticket.assigned_to,
+        oldAssignedTo,
+        updatedBy: user.id,
+        isSupport
+      });
+      
       broadcastTicketUpdate(ticketId, {
         id: ticketId,
         status: ticket.status,
@@ -390,6 +400,13 @@ export async function PUT(
 
       // Если изменилось назначение, отправляем событие
       if (assignedTo !== undefined && assignedTo !== oldAssignedTo) {
+        logger.info('Ticket assignment changed', {
+          ticketId,
+          oldAssignedTo,
+          newAssignedTo: assignedTo,
+          assignedBy: user.id
+        });
+        
         broadcastTicketAssignment(
           ticketId,
           assignedTo || null,
@@ -405,6 +422,16 @@ export async function PUT(
       if (status === 'pending' && oldStatus === 'open') {
         messageText = 'Ваше обращение приняли в обработку. Ожидайте ответа.';
       } else if (status === 'closed') {
+        // Трекинг аналитики при закрытии тикета
+        try {
+          const { trackTicketClosed } = await import('@/lib/analytics/support-analytics');
+          await trackTicketClosed(ticketId, user.id, status);
+        } catch (error) {
+          logger.warn('Failed to track ticket closure analytics', {
+            error: error instanceof Error ? error.message : 'Unknown error'
+          });
+        }
+        
         if (closeReason && closeReason.trim()) {
           messageText = `Ваше обращение было закрыто по причине: ${closeReason.trim()}`;
         } else {

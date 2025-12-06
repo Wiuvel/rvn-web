@@ -208,13 +208,24 @@ export async function POST(
         sender: senderData,
       };
       
-      logger.info('Broadcasting new message via WebSocket', {
+      logger.info('Message created and broadcasting via WebSocket', {
         ticketId,
         messageId: newMessage.id,
         senderType: newMessage.sender_type,
-        hasSender: !!senderData,
-        messageText: messageForBroadcast.message_text.substring(0, 50)
+        senderId: newMessage.sender_id,
+        messageLength: newMessage.message_text.length,
+        hasSender: !!senderData
       });
+      
+      // Трекинг аналитики
+      try {
+        const { trackMessageSent } = await import('@/lib/analytics/support-analytics');
+        await trackMessageSent(ticketId, newMessage.sender_id, newMessage.sender_type);
+      } catch (error) {
+        logger.warn('Failed to track message analytics', {
+          error: error instanceof Error ? error.message : 'Unknown error'
+        });
+      }
       
       try {
         broadcastNewMessage(ticketId, messageForBroadcast);

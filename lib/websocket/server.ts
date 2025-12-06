@@ -65,8 +65,19 @@ export function initWebSocketServer(httpServer: HTTPServer): SocketIOServer<Supp
     perMessageDeflate: false,
   });
 
-  io.on('connection', (socket) => {
-    logger.info('WebSocket client connected', { socketId: socket.id });
+  io.on('connection', async (socket) => {
+    logger.info('WebSocket client connected', { 
+      socketId: socket.id,
+      totalConnections: io!.sockets.sockets.size 
+    });
+
+    // Трекинг аналитики WebSocket подключения
+    try {
+      const { trackWebSocketConnection } = await import('@/lib/analytics/support-analytics');
+      await trackWebSocketConnection();
+    } catch {
+      // Игнорируем ошибки аналитики
+    }
 
     // Обработка присоединения к тикету с валидацией
     socket.on('support:join', async (data) => {
@@ -111,7 +122,13 @@ export function initWebSocketServer(httpServer: HTTPServer): SocketIOServer<Supp
 
       const room = `ticket:${ticketId}`;
       socket.join(room);
-      logger.info('Client joined ticket room', { socketId: socket.id, ticketId, userId, isSupport });
+      logger.info('Client joined ticket room', { 
+        socketId: socket.id, 
+        ticketId, 
+        userId, 
+        isSupport,
+        roomSize: io!.sockets.adapter.rooms.get(room)?.size || 0
+      });
     });
 
     // Обработка выхода из тикета
@@ -119,7 +136,10 @@ export function initWebSocketServer(httpServer: HTTPServer): SocketIOServer<Supp
       const { ticketId } = data;
       const room = `ticket:${ticketId}`;
       socket.leave(room);
-      logger.info('Client left ticket room', { socketId: socket.id, ticketId });
+      logger.info('Client left ticket room', { 
+        socketId: socket.id, 
+        ticketId 
+      });
     });
 
     // Обработка статуса печати с rate limiting
@@ -144,7 +164,6 @@ export function initWebSocketServer(httpServer: HTTPServer): SocketIOServer<Supp
         }
         if (limit.count >= TYPING_RATE_LIMIT_COUNT && timeSinceLastEmit < 60000) {
           // Превышен лимит событий в минуту
-          logger.warn('Typing rate limit exceeded', { socketId: socket.id, ticketId, userId });
           return;
         }
         limit.lastEmit = now;
@@ -173,7 +192,10 @@ export function initWebSocketServer(httpServer: HTTPServer): SocketIOServer<Supp
     });
 
     socket.on('disconnect', () => {
-      logger.info('WebSocket client disconnected', { socketId: socket.id });
+      logger.info('WebSocket client disconnected', { 
+        socketId: socket.id,
+        remainingConnections: io!.sockets.sockets.size - 1
+      });
       
       // Очищаем rate limiting для этого соединения
       for (const [key] of typingRateLimits.entries()) {
@@ -192,10 +214,32 @@ export function initWebSocketServer(httpServer: HTTPServer): SocketIOServer<Supp
     });
   });
 
-  logger.info('WebSocket server initialized');
+  logger.info('WebSocket server initialized', {
+    totalConnections: io!.sockets.sockets.size,
+    queueSize: messageQueue.length
+  });
   
   // Обрабатываем очередь сообщений после инициализации
   processMessageQueue();
+  
+  // Периодическое логирование статистики (каждые 5 минут)
+  setInterval(() => {
+    if (io) {
+      const rooms = new Set<string>();
+      io.sockets.adapter.rooms.forEach((_, roomName) => {
+        if (roomName.startsWith('ticket:')) {
+          rooms.add(roomName);
+        }
+      });
+      
+      logger.info('WebSocket server statistics', {
+        totalConnections: io.sockets.sockets.size,
+        activeRooms: rooms.size,
+        queueSize: messageQueue.length,
+        typingRateLimits: typingRateLimits.size
+      });
+    }
+  }, 5 * 60 * 1000); // 5 минут
   
   return io;
 }
@@ -259,7 +303,10 @@ function processMessageQueue(): void {
   }
 
   if (processedMessages.length > 0) {
-    logger.info('Processed queued messages', { count: processedMessages.length });
+    logger.info('Processed queued messages', {
+      count: processedMessages.length,
+      remainingInQueue: messageQueue.length
+    });
   }
 }
 
@@ -270,8 +317,15 @@ function queueMessage(type: QueuedMessage['type'], ticketId: string, data: Queue
   // Ограничиваем размер очереди
   if (messageQueue.length >= MAX_QUEUE_SIZE) {
     // Удаляем самые старые сообщения
+    const removedCount = messageQueue.length - MAX_QUEUE_SIZE + 1;
     messageQueue.sort((a, b) => a.timestamp - b.timestamp);
-    messageQueue.splice(0, messageQueue.length - MAX_QUEUE_SIZE + 1);
+    messageQueue.splice(0, removedCount);
+    logger.warn('Message queue overflow, removed old messages', {
+      removedCount,
+      queueSize: messageQueue.length,
+      type,
+      ticketId
+    });
   }
 
   messageQueue.push({
@@ -312,11 +366,6 @@ export function broadcastNewMessage(
     
     // Проверяем еще раз после попытки инициализации
     if (!io) {
-      logger.warn('WebSocket server not initialized, queuing message', {
-        ticketId,
-        messageId: message.id,
-        initializationAttempted
-      });
       // Добавляем сообщение в очередь для отправки после инициализации
       queueMessage('message', ticketId, { ticketId, message });
       return;
@@ -324,17 +373,25 @@ export function broadcastNewMessage(
   }
 
   const room = `ticket:${ticketId}`;
-  io.to(room).emit('support:message:new', {
+  const roomSize = io!.sockets.adapter.rooms.get(room)?.size || 0;
+  io!.to(room).emit('support:message:new', {
     ticketId,
     message,
   });
-
-  logger.info('Broadcasted new message', { 
-    ticketId, 
+  
+  logger.info('Broadcasted new message', {
+    ticketId,
     messageId: message.id,
     senderType: message.sender_type,
-    roomClients: io.sockets.adapter.rooms.get(room)?.size || 0
+    roomSize
   });
+
+  // Трекинг аналитики WebSocket сообщений (неблокирующий)
+  import('@/lib/analytics/support-analytics')
+    .then(({ trackWebSocketMessage }) => trackWebSocketMessage())
+    .catch(() => {
+      // Игнорируем ошибки аналитики
+    });
 }
 
 /**
@@ -345,18 +402,22 @@ export function broadcastTicketUpdate(
   ticket: TicketUpdatedData['ticket']
 ): void {
   if (!io) {
-    logger.warn('WebSocket server not initialized, queuing ticket update');
     queueMessage('ticketUpdate', ticketId, { ticketId, ticket });
     return;
   }
 
   const room = `ticket:${ticketId}`;
-  io.to(room).emit('support:ticket:updated', {
+  const roomSize = io!.sockets.adapter.rooms.get(room)?.size || 0;
+  io!.to(room).emit('support:ticket:updated', {
     ticketId,
     ticket,
   });
-
-  logger.info('Broadcasted ticket update', { ticketId, status: ticket.status });
+  
+  logger.info('Broadcasted ticket update', {
+    ticketId,
+    status: ticket.status,
+    roomSize
+  });
 }
 
 /**
@@ -368,19 +429,23 @@ export function broadcastTicketAssignment(
   assignedUser: TicketAssignedData['assignedUser']
 ): void {
   if (!io) {
-    logger.warn('WebSocket server not initialized, queuing ticket assignment');
     queueMessage('ticketAssignment', ticketId, { ticketId, assignedTo, assignedUser });
     return;
   }
 
   const room = `ticket:${ticketId}`;
-  io.to(room).emit('support:ticket:assigned', {
+  const roomSize = io!.sockets.adapter.rooms.get(room)?.size || 0;
+  io!.to(room).emit('support:ticket:assigned', {
     ticketId,
     assignedTo,
     assignedUser,
   });
-
-  logger.info('Broadcasted ticket assignment', { ticketId, assignedTo });
+  
+  logger.info('Broadcasted ticket assignment', {
+    ticketId,
+    assignedTo,
+    roomSize
+  });
 }
 
 /**
@@ -395,21 +460,26 @@ export function broadcastMessageRead(
     // Пытаемся инициализировать, если сервер еще не инициализирован
     const httpServer = global.__httpServer;
     if (httpServer) {
-      logger.warn('WebSocket server not initialized, attempting to initialize...');
       initWebSocketServer(httpServer);
     }
     
     // Проверяем еще раз после попытки инициализации
     if (!io) {
-      logger.warn('WebSocket server not initialized, queuing message read status');
       queueMessage('messageRead', ticketId, { ticketId, messageIds, readBy });
       return;
     }
   }
 
   const room = `ticket:${ticketId}`;
-  io.to(room).emit('support:message:read', { ticketId, messageIds, readBy });
-  logger.info('Broadcasted message read status', { ticketId, messageIds: messageIds.length, readBy });
+  const roomSize = io!.sockets.adapter.rooms.get(room)?.size || 0;
+  io!.to(room).emit('support:message:read', { ticketId, messageIds, readBy });
+  
+  logger.info('Broadcasted message read status', {
+    ticketId,
+    messageCount: messageIds.length,
+    readBy,
+    roomSize
+  });
 }
 
 
