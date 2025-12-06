@@ -7,6 +7,7 @@ import { getUserByToken } from '@/lib/auth/index';
 import { hasUserRole } from '@/lib/auth/user-roles';
 import { supabaseAdmin } from '@/lib/database/supabase';
 import { ERROR_INTERNAL_SERVER_ERROR, ERROR_NOT_AUTHENTICATED, ERROR_TICKET_NOT_FOUND, ERROR_ACCESS_DENIED, ERROR_TOO_MANY_REQUESTS, ERROR_INVALID_REQUEST_DATA } from '@/lib/utils/constants';
+import { broadcastMessageRead } from '@/lib/websocket/server';
 
 export async function OPTIONS() {
   return handleCorsPreflight();
@@ -107,19 +108,17 @@ export async function POST(
     // Поддержка видит прочитанными сообщения от пользователя
     const senderTypeToMark = isSupport ? 'user' : 'support';
 
-    const { error: updateError } = await supabaseAdmin
+    // Сначала получаем ID сообщений, которые будут отмечены как прочитанные
+    const { data: messagesToMark, error: selectError } = await supabaseAdmin
       .from('support_messages')
-      .update({
-        is_read: true,
-        read_at: new Date().toISOString()
-      })
+      .select('id')
       .eq('ticket_id', ticketId)
       .eq('sender_type', senderTypeToMark)
       .eq('is_read', false);
 
-    if (updateError) {
-      logger.error('Error marking messages as read', {
-        error: updateError.message,
+    if (selectError) {
+      logger.error('Error selecting messages to mark as read', {
+        error: selectError.message,
         ticketId
       });
       return setCorsHeaders(
@@ -128,6 +127,37 @@ export async function POST(
           { status: 500 }
         )
       );
+    }
+
+    const messageIds = messagesToMark?.map(m => m.id) || [];
+
+    // Если есть сообщения для отметки
+    if (messageIds.length > 0) {
+      const { error: updateError } = await supabaseAdmin
+        .from('support_messages')
+        .update({
+          is_read: true,
+          read_at: new Date().toISOString()
+        })
+        .eq('ticket_id', ticketId)
+        .eq('sender_type', senderTypeToMark)
+        .eq('is_read', false);
+
+      if (updateError) {
+        logger.error('Error marking messages as read', {
+          error: updateError.message,
+          ticketId
+        });
+        return setCorsHeaders(
+          NextResponse.json(
+            { error: ERROR_INTERNAL_SERVER_ERROR },
+            { status: 500 }
+          )
+        );
+      }
+
+      // Отправляем WebSocket событие об обновлении статуса прочитанности
+      broadcastMessageRead(ticketId, messageIds, isSupport ? 'support' : 'user');
     }
 
     return setCorsHeaders(

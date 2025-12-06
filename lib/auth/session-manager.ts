@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers';
 import { SESSION_TIMEOUT, SESSION_CLEANUP_INTERVAL } from '../utils/constants';
 import { generateSessionId as generateSessionIdUtil } from '../utils/index';
+import { logger } from '../utils/secure-logger';
 
 interface SessionData {
   id: string;
@@ -157,17 +158,39 @@ export class SessionManager {
     sessionId: string,
     ipAddress: string,
     userAgent: string,
-    options: { strictIP?: boolean } = {}
+    options: { strictIP?: boolean; updateCookie?: boolean } = {}
   ): { valid: boolean; reason?: string } {
     const session = this.getSession(sessionId);
     if (!session) {
       return { valid: false, reason: 'Session not found or expired' };
     }
 
-    // Always strictly validate User-Agent
-    if (session.userAgent !== userAgent) {
-      this.destroySession(sessionId);
-      return { valid: false, reason: 'User-Agent mismatch' };
+    // Смягченная валидация User-Agent - проверяем только основную часть
+    // Извлекаем основную информацию о браузере и ОС (игнорируем версии и детали)
+    const normalizeUserAgent = (ua: string): string => {
+      // Извлекаем основную информацию: браузер и ОС
+      const browserMatch = ua.match(/(Chrome|Firefox|Safari|Edge|Opera|Brave|Vivaldi|YandexBrowser|YaBrowser)/i);
+      const osMatch = ua.match(/(Windows|Mac|Linux|Android|iOS|iPhone|iPad)/i);
+      const browser = browserMatch ? browserMatch[1].toLowerCase() : 'unknown';
+      const os = osMatch ? osMatch[1].toLowerCase() : 'unknown';
+      return `${browser}:${os}`;
+    };
+
+    const sessionUANormalized = normalizeUserAgent(session.userAgent);
+    const requestUANormalized = normalizeUserAgent(userAgent);
+
+    // Если основная часть User-Agent не совпадает - это подозрительно
+    if (sessionUANormalized !== requestUANormalized) {
+      // Логируем, но не уничтожаем сессию сразу - может быть легитимное изменение
+      logger.warn('User-Agent mismatch detected', {
+        sessionId: sessionId.substring(0, 8) + '...',
+        sessionUA: session.userAgent.substring(0, 50),
+        requestUA: userAgent.substring(0, 50),
+        sessionNormalized: sessionUANormalized,
+        requestNormalized: requestUANormalized
+      });
+      // Обновляем User-Agent в сессии на новый (адаптируемся к изменениям)
+      session.userAgent = userAgent;
     }
 
     // IP validation - flexible by default, strict if requested
@@ -207,7 +230,28 @@ export class SessionManager {
       }
     }
 
+    if (options.updateCookie) {
+    }
+
     return { valid: true };
+  }
+
+  /**
+   * Обновить cookie сессии (продлить время жизни)
+   */
+  static async refreshSessionCookie(
+    sessionId: string,
+    isLocalhost: boolean = false,
+    cookieName = 'session_id'
+  ): Promise<void> {
+    // Проверяем, что сессия существует и не истекла
+    const session = this.getSession(sessionId);
+    if (!session) {
+      return; // Сессия не существует или истекла
+    }
+
+    // Обновляем cookie с новым maxAge
+    await this.setSessionCookie(sessionId, isLocalhost, cookieName);
   }
 
   static cleanup(): void {

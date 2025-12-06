@@ -6,7 +6,6 @@ import Link from 'next/link';
 import Image from 'next/image';
 import AuthForm from '@/components/auth/Form';
 import ParticlesBackground from '@/components/effects/Particles';
-import { getOAuthErrorMessage } from '@/lib/utils/oauth-errors';
 
 export default function AuthIsolatedClient() {
   const searchParams = useSearchParams();
@@ -15,126 +14,6 @@ export default function AuthIsolatedClient() {
   const [preloaderVisible, setPreloaderVisible] = useState(true);
   const [blueWidth, setBlueWidth] = useState<'0%' | '100%'>('0%');
 
-  // Handle Telegram OAuth callback (data comes via hash in URL as tgAuthResult)
-  useEffect(() => {
-    const handleTelegramCallback = async () => {
-      // Check if we have Telegram hash in URL (format: #tgAuthResult=base64_json)
-      // Also check sessionStorage in case hash was lost during protection redirect
-      let tgAuthResult: string | null = null;
-      
-      if (typeof window !== 'undefined' && window.location.hash) {
-        const hash = window.location.hash.substring(1); // Remove #
-        const params = new URLSearchParams(hash);
-        tgAuthResult = params.get('tgAuthResult');
-        
-        // Save to sessionStorage in case we get redirected to protection
-        if (tgAuthResult) {
-          sessionStorage.setItem('telegram_auth_result', tgAuthResult);
-        }
-      } else {
-        // Try to get from sessionStorage (in case hash was lost)
-        tgAuthResult = sessionStorage.getItem('telegram_auth_result');
-      }
-      
-      if (tgAuthResult) {
-          try {
-            // Decode base64 and parse JSON
-            const decodedData = JSON.parse(atob(tgAuthResult));
-            
-            // Extract Telegram user data
-            const telegramData: Record<string, string> = {
-              id: decodedData.id?.toString(),
-              first_name: decodedData.first_name || '',
-              last_name: decodedData.last_name || '',
-              username: decodedData.username || '',
-              photo_url: decodedData.photo_url || '',
-              auth_date: decodedData.auth_date?.toString(),
-              hash: decodedData.hash,
-            };
-            
-            // Get state from sessionStorage
-            const state = sessionStorage.getItem('telegram_oauth_state');
-            sessionStorage.removeItem('telegram_oauth_state');
-            sessionStorage.removeItem('telegram_auth_result'); // Clear saved hash
-            
-            if (state) {
-              telegramData.state = state;
-            }
-            
-            // Clear hash from URL
-            const currentUrl = new URL(window.location.href);
-            currentUrl.hash = '';
-            window.history.replaceState(null, '', currentUrl.toString());
-            
-            // Send data to server for verification
-            const response = await fetch('/api/auth/oauth/telegram/callback', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(telegramData),
-            });
-            
-            if (response.ok) {
-              const result = await response.json();
-              // Wait a bit to ensure cookies are set
-              await new Promise(resolve => setTimeout(resolve, 100));
-              
-              // Check if we're in a popup window
-              if (window.opener) {
-                // Send success message to parent window
-                window.opener.postMessage(
-                  {
-                    type: 'OAUTH_SUCCESS',
-                    dashboard_token: result.dashboard_token,
-                    redirect: result.redirect || `/dashboard/${result.dashboard_token}`
-                  },
-                  window.location.origin
-                );
-                // Close popup after a short delay
-                setTimeout(() => {
-                  window.close();
-                }, 100);
-              } else {
-                // Not in popup - redirect normally
-                if (result.redirect) {
-                  window.location.href = result.redirect;
-                } else if (result.dashboard_token) {
-                  window.location.href = `/dashboard/${result.dashboard_token}`;
-                } else {
-                  window.location.href = '/auth?error=telegram_auth_failed';
-                }
-              }
-            } else {
-              const errorData = await response.json();
-              
-              // Check if we're in a popup window
-              if (window.opener) {
-                // Send error message to parent window (already generic from server)
-                const errorMessage = getOAuthErrorMessage(errorData.error || 'telegram_auth_failed');
-                window.opener.postMessage(
-                  {
-                    type: 'OAUTH_ERROR',
-                    error: errorMessage
-                  },
-                  window.location.origin
-                );
-                // Close popup after a short delay
-                setTimeout(() => {
-                  window.close();
-                }, 100);
-              } else {
-                // Not in popup - redirect with error
-                window.location.href = `/auth?error=${encodeURIComponent(errorData.error || 'telegram_auth_failed')}`;
-              }
-            }
-          } catch (error) {
-            console.error('Telegram OAuth callback error:', error);
-            window.location.href = '/auth?error=telegram_auth_failed';
-          }
-        }
-    };
-    
-    handleTelegramCallback();
-  }, []);
 
   useEffect(() => {
     const fillTimer = setTimeout(() => {

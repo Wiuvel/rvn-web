@@ -1,0 +1,186 @@
+/**
+ * Кастомный сервер для Next.js с поддержкой WebSocket
+ * Запускает Next.js приложение и WebSocket сервер на одном порту
+ */
+
+const { createServer } = require('http');
+const { parse } = require('url');
+const next = require('next');
+
+const dev = process.env.NODE_ENV !== 'production';
+const hostname = '0.0.0.0';
+const port = parseInt(process.env.PORT || '3001', 10);
+
+const app = next({ dev, hostname, port });
+const handle = app.getRequestHandler();
+
+app.prepare().then(() => {
+  const httpServer = createServer(async (req, res) => {
+    try {
+      const parsedUrl = parse(req.url, true);
+      await handle(req, res, parsedUrl);
+    } catch (err) {
+      console.error('Error occurred handling', req.url, err);
+      res.statusCode = 500;
+      res.end('internal server error');
+    }
+  });
+
+  // Сохраняем HTTP сервер в глобальной переменной для доступа из API routes
+  global.__httpServer = httpServer;
+
+  // Инициализируем WebSocket сервер
+  const initWebSocket = async () => {
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      const cwd = process.cwd();
+      
+      // Список возможных путей для поиска модуля (production)
+      const possiblePaths = [
+        // Standalone режим (production Docker) - файлы копируются в корень
+        path.join(cwd, 'lib/websocket/server.js'),
+        // Production build - скомпилированные файлы
+        path.join(cwd, '.next/server/chunks/lib/websocket/server.js'),
+        path.join(cwd, '.next/server/app/lib/websocket/server.js'),
+        path.join(cwd, '.next/server/lib/websocket/server.js'),
+        // Относительные пути
+        './lib/websocket/server.js',
+        './.next/server/chunks/lib/websocket/server.js',
+      ];
+
+      // В production пробуем загрузить напрямую
+      if (!dev) {
+        for (const modulePath of possiblePaths) {
+          try {
+            if (fs.existsSync(modulePath)) {
+              delete require.cache[require.resolve(modulePath)];
+              const websocketModule = require(modulePath);
+              if (websocketModule && websocketModule.initWebSocketServer) {
+                websocketModule.initWebSocketServer(httpServer);
+                console.log('✓ WebSocket server initialized from:', modulePath);
+                return true;
+              }
+            }
+          } catch (e) {
+            console.warn('⚠ Failed to load WebSocket module from:', modulePath, e.message);
+            continue;
+          }
+        }
+        
+        // Если не удалось загрузить напрямую, пробуем через API route
+        console.warn('⚠ Could not load WebSocket module directly, trying API route...');
+        try {
+          const http = require('http');
+          const initUrl = `http://localhost:${port}/api/websocket/init`;
+          
+          return new Promise((resolve) => {
+            const req = http.get(initUrl, (res) => {
+              let data = '';
+              res.on('data', (chunk) => { data += chunk; });
+              res.on('end', () => {
+                try {
+                  const result = JSON.parse(data);
+                  if (result.initialized) {
+                    console.log('✓ WebSocket server initialized via API route (production)');
+                    resolve(true);
+                  } else {
+                    console.warn('⚠ WebSocket server initialization failed via API route:', result.error);
+                    resolve(false);
+                  }
+                } catch (e) {
+                  console.warn('⚠ Failed to parse WebSocket init response');
+                  resolve(false);
+                }
+              });
+            });
+            
+            req.on('error', (err) => {
+              console.warn('⚠ Failed to call WebSocket init API:', err.message);
+              resolve(false);
+            });
+            
+            req.setTimeout(5000, () => {
+              req.destroy();
+              console.warn('⚠ WebSocket init API timeout');
+              resolve(false);
+            });
+          });
+        } catch (err) {
+          console.warn('⚠ WebSocket initialization via API route failed:', err.message);
+          return false;
+        }
+      }
+
+      // В dev режиме используем API route для инициализации
+      if (dev) {
+        try {
+          // Делаем HTTP запрос к API route для инициализации
+          const http = require('http');
+          const initUrl = `http://localhost:${port}/api/websocket/init`;
+          
+          return new Promise((resolve) => {
+            const req = http.get(initUrl, (res) => {
+              let data = '';
+              res.on('data', (chunk) => { data += chunk; });
+              res.on('end', () => {
+                try {
+                  const result = JSON.parse(data);
+                  if (result.initialized) {
+                    console.log('✓ WebSocket server initialized via API route');
+                    resolve(true);
+                  } else {
+                    console.warn('⚠ WebSocket server initialization failed via API route:', result.error);
+                    resolve(false);
+                  }
+                } catch (e) {
+                  console.warn('⚠ Failed to parse WebSocket init response');
+                  resolve(false);
+                }
+              });
+            });
+            
+            req.on('error', (err) => {
+              console.warn('⚠ Failed to call WebSocket init API:', err.message);
+              resolve(false);
+            });
+            
+            req.setTimeout(5000, () => {
+              req.destroy();
+              console.warn('⚠ WebSocket init API timeout');
+              resolve(false);
+            });
+          });
+        } catch (err) {
+          console.warn('⚠ WebSocket initialization via API route failed:', err.message);
+          return false;
+        }
+      }
+
+      return false;
+    } catch (err) {
+      console.warn('⚠ WebSocket server initialization failed:', err.message);
+      return false;
+    }
+  };
+
+  httpServer
+    .once('error', (err) => {
+      console.error(err);
+      process.exit(1);
+    })
+    .listen(port, () => {
+      console.log(`> Ready on http://${hostname}:${port}`);
+      
+      if (dev) {
+        setTimeout(async () => {
+          await initWebSocket();
+        }, 1000);
+      } else {
+        const initialized = initWebSocket();
+        if (!initialized) {
+          setTimeout(() => initWebSocket(), 1000);
+        }
+      }
+    });
+});

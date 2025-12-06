@@ -7,15 +7,15 @@ import { sanitizeInput } from '@/lib/security/sanitize';
 import { setCorsHeaders, handleCorsPreflight } from '@/lib/security/cors';
 import { logger } from '@/lib/utils/secure-logger';
 import { authRateLimit } from '@/lib/security/rate-limit';
-import { getOAuthErrorMessage } from '@/lib/utils/oauth-errors';
+import { getErrorRedirectUrl } from '@/lib/utils/oauth-errors';
 
 export async function OPTIONS() {
   return handleCorsPreflight();
 }
 
 // Handle Telegram OAuth callback
-// Telegram Login Widget sends data via POST from client-side widget
-export async function POST(request: NextRequest) {
+// Telegram OAuth redirects back with parameters in query string
+export async function GET(request: NextRequest) {
   try {
     const env = getEnv();
     if (!env.PUBLIC_DOMAIN) {
@@ -32,63 +32,65 @@ export async function POST(request: NextRequest) {
       ? env.PUBLIC_DOMAIN.slice(0, -1) 
       : env.PUBLIC_DOMAIN;
 
+    // Get state early to determine if this is a popup request
+    const { searchParams } = request.nextUrl;
+    const state = searchParams.get('state');
+    // Check stored state cookie to determine if this is a popup request
+    const storedState = request.cookies.get('oauth_state')?.value;
+    const referer = request.headers.get('referer') || '';
+    let isPopup = false;
+    if (storedState) {
+      isPopup = storedState.includes(':popup');
+    }
+    // Fallback: check referer if cookie check didn't work
+    if (!isPopup && referer.includes('/auth/oauth-handler')) {
+      isPopup = true;
+    }
+    // Additional fallback: check if state parameter contains popup flag
+    if (!isPopup && state && state.includes(':popup')) {
+      isPopup = true;
+    }
+
+    // Rate limiting
     const rateLimitResult = await authRateLimit.check(request);
     if (!rateLimitResult.allowed) {
       logger.warn('rate limit exceeded');
-      return setCorsHeaders(
-        NextResponse.json(
-          { error: 'rate_limit' },
-          { status: 429 }
-        )
-      );
+      const errorUrl = getErrorRedirectUrl('rate_limit', origin, isPopup);
+      return setCorsHeaders(NextResponse.redirect(errorUrl));
     }
 
     // Check Telegram OAuth credentials
     if (!env.TELEGRAM_BOT_TOKEN) {
       logger.error('telegram oauth not configured');
-      return setCorsHeaders(
-        NextResponse.json(
-          { error: 'oauth_not_configured' },
-          { status: 503 }
-        )
-      );
+      const errorUrl = getErrorRedirectUrl('oauth_not_configured', origin, isPopup);
+      return setCorsHeaders(NextResponse.redirect(errorUrl));
     }
 
-    // Get OAuth parameters from request body (sent from client-side widget)
-    const body = await request.json();
-    const id = body.id?.toString();
-    const firstName = body.first_name;
-    const lastName = body.last_name;
-    const username = body.username;
-    const photoUrl = body.photo_url;
-    const authDate = body.auth_date?.toString();
-    const hash = body.hash;
-    const state = body.state;
+    // Get OAuth parameters from query string (Telegram OAuth redirects with query params)
+    const id = searchParams.get('id')?.toString();
+    const firstName = searchParams.get('first_name') || undefined;
+    const lastName = searchParams.get('last_name') || undefined;
+    const username = searchParams.get('username') || undefined;
+    const photoUrl = searchParams.get('photo_url') || undefined;
+    const authDate = searchParams.get('auth_date')?.toString();
+    const hash = searchParams.get('hash') || undefined;
 
     // Validate required parameters
     if (!id || !authDate || !hash) {
       logger.warn('telegram oauth missing parameters', { hasId: !!id, hasAuthDate: !!authDate, hasHash: !!hash });
-      return setCorsHeaders(
-        NextResponse.json(
-          { 
-            error: 'invalid_request',
-            message: getOAuthErrorMessage('invalid_request')
-          },
-          { status: 400 }
-        )
-      );
+      const errorUrl = getErrorRedirectUrl('invalid_request', origin, isPopup);
+      return setCorsHeaders(NextResponse.redirect(errorUrl));
     }
 
     // Verify CSRF state token
-    const storedState = request.cookies.get('oauth_state')?.value;
-    if (!storedState || storedState !== state) {
+    // storedState already retrieved above for isPopup determination
+    const cleanState = isPopup && state ? state.split(':')[0] : state;
+    const cleanStoredState = storedState?.includes(':popup') ? storedState.split(':')[0] : storedState;
+    
+    if (!cleanStoredState || cleanStoredState !== cleanState) {
       logger.warn('telegram oauth state mismatch');
-      return setCorsHeaders(
-        NextResponse.json(
-          { error: 'invalid_state', message: getOAuthErrorMessage('invalid_state') },
-          { status: 403 }
-        )
-      );
+      const errorUrl = getErrorRedirectUrl('invalid_state', origin, isPopup);
+      return setCorsHeaders(NextResponse.redirect(errorUrl));
     }
 
     // Verify Telegram hash
@@ -119,15 +121,8 @@ export async function POST(request: NextRequest) {
         calculatedHash: calculatedHash.substring(0, 8) + '...', 
         receivedHash: hash.substring(0, 8) + '...' 
       });
-      return setCorsHeaders(
-        NextResponse.json(
-          { 
-            error: 'invalid_hash',
-            message: getOAuthErrorMessage('invalid_hash')
-          },
-          { status: 403 }
-        )
-      );
+      const errorUrl = getErrorRedirectUrl('invalid_hash', origin, isPopup);
+      return setCorsHeaders(NextResponse.redirect(errorUrl));
     }
 
     // Check auth_date (should be within last 24 hours)
@@ -141,15 +136,8 @@ export async function POST(request: NextRequest) {
         now, 
         age: now - authTimestamp 
       });
-      return setCorsHeaders(
-        NextResponse.json(
-          { 
-            error: 'auth_expired',
-            message: getOAuthErrorMessage('auth_expired')
-          },
-          { status: 403 }
-        )
-      );
+      const errorUrl = getErrorRedirectUrl('auth_expired', origin, isPopup);
+      return setCorsHeaders(NextResponse.redirect(errorUrl));
     }
 
     // Generate email from Telegram ID (since Telegram doesn't provide email)
@@ -185,15 +173,8 @@ export async function POST(request: NextRequest) {
       
       if (!createResult.success || !createResult.user) {
         logger.error('failed to create user', { error: createResult.error });
-        return setCorsHeaders(
-          NextResponse.json(
-            { 
-              error: 'user_creation_failed',
-              message: getOAuthErrorMessage('user_creation_failed')
-            },
-            { status: 500 }
-          )
-        );
+        const errorUrl = getErrorRedirectUrl('user_creation_failed', origin, isPopup);
+        return setCorsHeaders(NextResponse.redirect(errorUrl));
       }
       user = createResult.user;
       isNewUser = true;
@@ -202,12 +183,8 @@ export async function POST(request: NextRequest) {
     // Check user activity
     if (!user.is_active) {
       logger.warn('login attempt for inactive user', { userId: user.id });
-      return setCorsHeaders(
-        NextResponse.json(
-          { error: 'account_disabled', message: getOAuthErrorMessage('account_disabled') },
-          { status: 403 }
-        )
-      );
+      const errorUrl = getErrorRedirectUrl('account_disabled', origin, isPopup);
+      return setCorsHeaders(NextResponse.redirect(errorUrl));
     }
 
     // Create session with rotation (prevent session fixation)
@@ -231,13 +208,9 @@ export async function POST(request: NextRequest) {
 
     await SessionManager.setSessionCookie(sessionId, isLocalhost);
 
-    // Create response with redirect URL (POST endpoint returns JSON)
+    // Create response with redirect URL
     const redirectUrl = `${origin}/dashboard/${user.dashboard_token}`;
-    const response = NextResponse.json({
-      success: true,
-      redirect: redirectUrl,
-      dashboard_token: user.dashboard_token,
-    });
+    const response = NextResponse.redirect(redirectUrl);
 
     // Copy protection cookies from request if they exist, or set temporary ones
     // If they don't exist, we set temporary ones to avoid redirect to /protection/
@@ -362,16 +335,21 @@ export async function POST(request: NextRequest) {
     try {
       const env = getEnv();
       if (env.PUBLIC_DOMAIN) {
-        return setCorsHeaders(
-          NextResponse.json(
-            { error: 'internal_error' },
-            { status: 500 }
-          )
-        );
+        const origin = env.PUBLIC_DOMAIN.endsWith('/') 
+          ? env.PUBLIC_DOMAIN.slice(0, -1) 
+          : env.PUBLIC_DOMAIN;
+        // Determine if popup from error context
+        const referer = request.headers.get('referer') || '';
+        const isPopup = referer.includes('/auth/oauth-handler') || 
+                        referer.includes('popup') ||
+                        request.nextUrl.searchParams.get('popup') === 'true';
+        const errorUrl = getErrorRedirectUrl('internal_error', origin, isPopup);
+        return setCorsHeaders(NextResponse.redirect(errorUrl));
       }
     } catch {
     }
     
+    // Fallback error response
     return setCorsHeaders(
       NextResponse.json(
         { error: 'Internal server error' },

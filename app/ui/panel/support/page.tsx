@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { gsap } from 'gsap';
@@ -9,6 +9,7 @@ import RateLimitCaptcha from '@/components/auth/RateLimitCaptcha';
 import { GSAP_DEFAULT_DURATION, GSAP_DEFAULT_EASE } from '@/lib/utils/constants';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { getGradientClasses } from '@/lib/utils/avatar-gradients';
+import { useWebSocket } from '@/hooks/useWebSocket';
 
 interface AuthState {
   isAuthenticated: boolean;
@@ -40,6 +41,14 @@ interface Ticket {
     user_id: string;
     avatar_gradient?: string | null;
   } | null;
+  last_message?: {
+    id: string;
+    message_text: string;
+    sender_type: 'user' | 'support' | 'system';
+    created_at: string;
+    is_read: boolean;
+  } | null;
+  unread_count?: number;
 }
 
 interface Message {
@@ -412,6 +421,14 @@ export default function SupportPanel() {
     isProcessingCaptchaRef.current = false;
   };
 
+  // Инициализация WebSocket
+  const { socket, isConnected, joinTicket, leaveTicket } = useWebSocket({
+    enabled: authState.hasSupportAccess,
+    userId: authState.userId || undefined,
+    ticketId: activeTicket?.id,
+    isSupport: true,
+  });
+
   useEffect(() => {
     checkAuthStatus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -460,6 +477,175 @@ export default function SupportPanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tickets.length, authState.hasSupportAccess]);
 
+  // Отметка сообщений как прочитанных с debounce
+  const markMessagesAsRead = useCallback(async (ticketId: string) => {
+    // Очищаем предыдущий таймер
+    if (markReadTimeoutRef.current) {
+      clearTimeout(markReadTimeoutRef.current);
+    }
+    
+    // Устанавливаем новый таймер (debounce 2 секунды)
+    markReadTimeoutRef.current = setTimeout(async () => {
+      // Проверяем, что тикет не изменился
+      if (currentTicketIdRef.current !== ticketId) {
+        return;
+      }
+      
+      try {
+        await fetchWithRateLimit(
+          `/api/support/tickets/${ticketId}/messages/read`,
+          {
+            method: 'POST',
+            credentials: 'include'
+          },
+          () => markMessagesAsRead(ticketId) // Retry callback
+        );
+      } catch (error) {
+        // Не логируем RATE_LIMIT_EXCEEDED, так как это обрабатывается через капчу
+        if (error instanceof Error && error.message !== 'RATE_LIMIT_EXCEEDED') {
+          console.error('Error marking messages as read:', error);
+        }
+      }
+    }, 2000);
+  }, []);
+
+  // WebSocket: присоединение/отсоединение от тикета
+  useEffect(() => {
+    if (!socket || !activeTicket || !authState.userId || !authState.hasSupportAccess) return;
+
+    joinTicket(activeTicket.id, authState.userId, true);
+
+    return () => {
+      leaveTicket(activeTicket.id);
+    };
+  }, [socket, activeTicket, authState.userId, authState.hasSupportAccess, joinTicket, leaveTicket]);
+
+  // Ref для хранения текущих сообщений (для проверки в WebSocket обработчиках)
+  const messagesRef = useRef<Message[]>([]);
+  
+  // Синхронизируем ref с state
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+
+  // WebSocket: обработка новых сообщений и обновлений тикетов
+  useEffect(() => {
+    if (!socket || !activeTicket || !authState.hasSupportAccess) return;
+
+    const handleNewMessage = (data: { ticketId: string; message: Message }) => {
+      if (data.ticketId !== activeTicket.id) return;
+
+      // Проверяем, что сообщение еще не добавлено (используем ref для актуальных данных)
+      const messageExists = messagesRef.current.some(m => m.id === data.message.id);
+      if (messageExists) return;
+
+      // Добавляем новое сообщение
+      setMessages(prev => {
+        const updated = [...prev, data.message];
+        messagesRef.current = updated; // Обновляем ref сразу
+        return updated;
+      });
+
+      // Обновляем last_message_at и last_message в списке тикетов
+      updateTicketInList(data.ticketId, {
+        last_message_at: data.message.created_at,
+        last_message: {
+          id: data.message.id,
+          message_text: data.message.message_text,
+          sender_type: data.message.sender_type,
+          created_at: data.message.created_at,
+          is_read: data.message.is_read
+        }
+      });
+
+      // Отмечаем сообщение как прочитанное
+      markMessagesAsRead(data.ticketId);
+    };
+
+    const handleTicketUpdate = (data: {
+      ticketId: string;
+      ticket: {
+        status: 'open' | 'closed' | 'pending';
+        updated_at: string;
+        closed_at?: string | null;
+      };
+    }) => {
+      if (data.ticketId !== activeTicket.id) return;
+
+      setActiveTicket(prev => {
+        if (!prev || prev.id !== data.ticketId) return prev;
+        return {
+          ...prev,
+          status: data.ticket.status,
+          updated_at: data.ticket.updated_at,
+          closed_at: data.ticket.closed_at,
+        };
+      });
+
+      // Обновляем тикет в списке
+      updateTicketInList(data.ticketId, {
+        status: data.ticket.status,
+        updated_at: data.ticket.updated_at,
+        closed_at: data.ticket.closed_at,
+      });
+    };
+
+    const handleTicketAssignment = (data: {
+      ticketId: string;
+      assignedTo: string | null;
+      assignedUser: {
+        id: string;
+        username: string;
+        user_id: string;
+        avatar_gradient?: string | null;
+      } | null;
+    }) => {
+      if (data.ticketId !== activeTicket.id) return;
+
+      setActiveTicket(prev => {
+        if (!prev || prev.id !== data.ticketId) return prev;
+        return {
+          ...prev,
+          assigned_to: data.assignedTo,
+          assigned_user: data.assignedUser,
+        };
+      });
+
+      // Обновляем тикет в списке
+      updateTicketInList(data.ticketId, {
+        assigned_to: data.assignedTo,
+        assigned_user: data.assignedUser,
+      });
+    };
+
+    const handleMessageRead = (data: {
+      ticketId: string;
+      messageIds: string[];
+      readBy: 'user' | 'support';
+    }) => {
+      if (data.ticketId !== activeTicket.id) return;
+
+      // Обновляем статус прочитанности сообщений
+      setMessages(prev => prev.map(msg => 
+        data.messageIds.includes(msg.id)
+          ? { ...msg, is_read: true }
+          : msg
+      ));
+    };
+
+    socket.on('support:message:new', handleNewMessage);
+    socket.on('support:ticket:updated', handleTicketUpdate);
+    socket.on('support:ticket:assigned', handleTicketAssignment);
+    socket.on('support:message:read', handleMessageRead);
+
+    return () => {
+      socket.off('support:message:new', handleNewMessage);
+      socket.off('support:ticket:updated', handleTicketUpdate);
+      socket.off('support:ticket:assigned', handleTicketAssignment);
+      socket.off('support:message:read', handleMessageRead);
+    };
+  }, [socket, activeTicket, authState.hasSupportAccess, markMessagesAsRead]);
+
   // Умное обновление сообщений: только когда страница активна и только проверка новых
   useEffect(() => {
     if (!activeTicket || !authState.hasSupportAccess) return;
@@ -484,7 +670,8 @@ export default function SupportPanel() {
 
     const checkForNewMessages = async () => {
       // Проверяем только если страница видима и тикет не изменился
-      if (document.hidden || !activeTicket || currentTicketIdRef.current !== activeTicket.id) return;
+      // Если WebSocket подключен, он будет обновлять сообщения в реальном времени
+      if (document.hidden || !activeTicket || currentTicketIdRef.current !== activeTicket.id || isConnected) return;
 
       try {
         const response = await fetchWithRateLimit(
@@ -586,38 +773,6 @@ export default function SupportPanel() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTicket?.id, authState.hasSupportAccess, messages.length]);
-
-  // Отметка сообщений как прочитанных с debounce
-  const markMessagesAsRead = async (ticketId: string) => {
-    // Очищаем предыдущий таймер
-    if (markReadTimeoutRef.current) {
-      clearTimeout(markReadTimeoutRef.current);
-    }
-    
-    // Устанавливаем новый таймер (debounce 2 секунды)
-    markReadTimeoutRef.current = setTimeout(async () => {
-      // Проверяем, что тикет не изменился
-      if (currentTicketIdRef.current !== ticketId) {
-        return;
-      }
-      
-      try {
-        await fetchWithRateLimit(
-          `/api/support/tickets/${ticketId}/messages/read`,
-          {
-            method: 'POST',
-            credentials: 'include'
-          },
-          () => markMessagesAsRead(ticketId) // Retry callback
-        );
-      } catch (error) {
-        // Не логируем RATE_LIMIT_EXCEEDED, так как это обрабатывается через капчу
-        if (error instanceof Error && error.message !== 'RATE_LIMIT_EXCEEDED') {
-          console.error('Error marking messages as read:', error);
-        }
-      }
-    }, 2000);
-  };
 
   useEffect(() => {
     if (activeTicket) {
@@ -791,6 +946,13 @@ export default function SupportPanel() {
             username: string;
             user_id: string;
           } | null;
+          last_message?: {
+            id: string;
+            message_text: string;
+            sender_type: 'user' | 'support' | 'system';
+            created_at: string;
+            is_read: boolean;
+          } | null;
         }) => ({
           id: t.id,
           subject: t.subject,
@@ -802,7 +964,8 @@ export default function SupportPanel() {
           closed_at: t.closed_at,
           user: t.user,
           assigned_to: t.assigned_to,
-          assigned_user: t.assigned_user
+          assigned_user: t.assigned_user,
+          last_message: t.last_message || null
         }));
         
         // Для архива сортируем по дате обновления/закрытия (убывание - новые сверху)
@@ -888,6 +1051,13 @@ export default function SupportPanel() {
             username: string;
             user_id: string;
           } | null;
+          last_message?: {
+            id: string;
+            message_text: string;
+            sender_type: 'user' | 'support' | 'system';
+            created_at: string;
+            is_read: boolean;
+          } | null;
         }) => ({
           id: t.id,
           subject: t.subject,
@@ -899,7 +1069,8 @@ export default function SupportPanel() {
           closed_at: t.closed_at,
           user: t.user,
           assigned_to: t.assigned_to,
-          assigned_user: t.assigned_user
+          assigned_user: t.assigned_user,
+          last_message: t.last_message || null
         }));
         
         // Для активных сортируем по давности последнего ответа (убывание - старые сверху)
@@ -1552,7 +1723,7 @@ export default function SupportPanel() {
             </div>
             <h1 className="text-2xl font-bold text-white mb-2">Доступ ограничен</h1>
             <p className="text-neutral-400 mb-6">
-              У вас нет доступа к панели поддержки. Обратитесь к администратору для получения прав доступа или попробуйте позже.
+              У вас нет доступа к панели поддержки. Возможно произошла ошибка или вы не авторизованы.
             </p>
             <Link
               href="/ui/panel"
@@ -1852,6 +2023,28 @@ export default function SupportPanel() {
                       )}
                     </div>
                   </div>
+                  {ticket.last_message && ticket.status !== 'closed' && statusFilter !== 'archive' && (() => {
+                    const SYSTEM_MESSAGE_TEXT = 'Спасибо за ваше обращение. Мы получили ваш запрос и ответим в ближайшее время.';
+                    const isStatusChangeMessage = ticket.last_message.message_text.includes('Статус тикета изменен') || 
+                      ticket.last_message.message_text.includes('Ваше обращение приняли в обработку') ||
+                      ticket.last_message.message_text.includes('Ваше обращение было закрыто');
+                    // Используем trim() для надежного сравнения
+                    const isSystemMessage = ticket.last_message.message_text.trim() === SYSTEM_MESSAGE_TEXT.trim() || isStatusChangeMessage;
+                    
+                    return (
+                      <div className="text-xs text-neutral-500 mt-1.5 truncate flex items-center gap-2">
+                        <span className="flex-shrink-0 text-neutral-600">
+                          {isSystemMessage ? 'Система:' : ticket.last_message.sender_type === 'user' ? 'Пользователь:' : 'Поддержка:'}
+                        </span>
+                        <span className="truncate flex-1 min-w-0">
+                          {ticket.last_message.message_text}
+                        </span>
+                        {ticket.last_message.is_read === false && ticket.last_message.sender_type === 'user' && !isSystemMessage && (
+                          <span className="flex-shrink-0 w-2 h-2 bg-blue-500 rounded-full"></span>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               );
             })
@@ -1994,12 +2187,13 @@ export default function SupportPanel() {
                 ) : (
                   messages.map((message, index) => {
                     // Проверяем, является ли сообщение системным (автоматическим или о смене статуса)
-                    const SYSTEM_MESSAGE_TEXT = 'Спасибо за ваше сообщение. Мы получили ваш запрос и ответим в ближайшее время.';
+                    const SYSTEM_MESSAGE_TEXT = 'Спасибо за ваше обращение. Мы получили ваш запрос и ответим в ближайшее время.';
                     const isStatusChangeMessage = message.message_text.includes('Статус тикета изменен') || 
                       message.message_text.includes('Ваше обращение приняли в обработку') ||
                       message.message_text.includes('Ваше обращение было закрыто');
-                    const isSystemMessage = (message.message_text === SYSTEM_MESSAGE_TEXT || isStatusChangeMessage) && 
-                      message.sender_type === 'support';
+                    // Системное сообщение определяется по тексту, независимо от sender_type
+                    // Используем trim() для надежного сравнения
+                    const isSystemMessage = message.message_text.trim() === SYSTEM_MESSAGE_TEXT.trim() || isStatusChangeMessage;
                     
                     // Показываем дату если это первое сообщение или дата изменилась
                     const showDate = index === 0 || 

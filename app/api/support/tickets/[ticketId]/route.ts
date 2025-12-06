@@ -7,6 +7,7 @@ import { getUserByToken } from '@/lib/auth/index';
 import { hasUserRole } from '@/lib/auth/user-roles';
 import { supabaseAdmin } from '@/lib/database/supabase';
 import { ERROR_INTERNAL_SERVER_ERROR, ERROR_NOT_AUTHENTICATED, ERROR_INVALID_REQUEST_DATA, ERROR_TICKET_NOT_FOUND, ERROR_ACCESS_DENIED, ERROR_TOO_MANY_REQUESTS, ERROR_INVALID_STATUS_TRANSITION, ERROR_TICKET_NOT_ASSIGNED } from '@/lib/utils/constants';
+import { broadcastTicketUpdate, broadcastTicketAssignment, broadcastNewMessage } from '@/lib/websocket/server';
 
 export async function OPTIONS() {
   return handleCorsPreflight();
@@ -361,7 +362,7 @@ export async function PUT(
       .select(`
         *,
         user:users!support_tickets_user_id_fkey(id, username, user_id),
-        assigned_user:users!support_tickets_assigned_to_fkey(id, username, user_id)
+        assigned_user:users!support_tickets_assigned_to_fkey(id, username, user_id, avatar_gradient)
       `)
       .single();
 
@@ -376,6 +377,25 @@ export async function PUT(
           { status: 500 }
         )
       );
+    }
+
+    // Отправляем обновление тикета через WebSocket
+    if (ticket) {
+      broadcastTicketUpdate(ticketId, {
+        id: ticketId,
+        status: ticket.status,
+        updated_at: ticket.updated_at,
+        closed_at: ticket.closed_at || null,
+      });
+
+      // Если изменилось назначение, отправляем событие
+      if (assignedTo !== undefined && assignedTo !== oldAssignedTo) {
+        broadcastTicketAssignment(
+          ticketId,
+          assignedTo || null,
+          ticket.assigned_user || null
+        );
+      }
     }
 
     // Если статус изменился, создаем системное сообщение
@@ -402,14 +422,19 @@ export async function PUT(
 
       // Создаем системное сообщение о смене статуса
       // Используем sender_id саппорта, который меняет статус, но sender_type: 'support' для отображения как системное
-      const { error: messageError } = await supabaseAdmin
+      const { data: statusMessage, error: messageError } = await supabaseAdmin
         .from('support_messages')
         .insert({
           ticket_id: ticketId,
           sender_id: user.id, // ID саппорта, который меняет статус
           sender_type: 'support', // Тип 'support' для отображения как системное сообщение
           message_text: messageText
-        });
+        })
+        .select(`
+          *,
+          sender:users!support_messages_sender_id_fkey(id, username, user_id, avatar_gradient)
+        `)
+        .single();
 
       if (messageError) {
         // Логируем ошибку, но не прерываем выполнение, так как тикет уже обновлен
@@ -423,6 +448,11 @@ export async function PUT(
           .from('support_tickets')
           .update({ last_message_at: new Date().toISOString() })
           .eq('id', ticketId);
+
+        // Отправляем системное сообщение через WebSocket
+        if (statusMessage) {
+          broadcastNewMessage(ticketId, statusMessage);
+        }
       }
     }
 

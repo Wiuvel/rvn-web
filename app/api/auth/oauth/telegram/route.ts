@@ -4,7 +4,8 @@ import { getEnv } from '@/lib/validation/env-validation';
 import { setCorsHeaders, handleCorsPreflight } from '@/lib/security/cors';
 import { logger } from '@/lib/utils/secure-logger';
 import { authRateLimit } from '@/lib/security/rate-limit';
-import { getErrorRedirectUrl, getOAuthErrorMessage } from '@/lib/utils/oauth-errors';
+import { getErrorRedirectUrl } from '@/lib/utils/oauth-errors';
+import { getTelegramBotId } from '@/lib/utils/telegram-bot';
 
 // Handle CORS preflight
 export async function OPTIONS() {
@@ -29,18 +30,33 @@ export async function GET(request: NextRequest) {
       ? env.PUBLIC_DOMAIN.slice(0, -1) 
       : env.PUBLIC_DOMAIN;
 
+    // Check if request is from popup (oauth-handler page opens in popup)
+    // This must be determined early as it's used in error handling
+    const referer = request.headers.get('referer') || '';
+    const isPopup = referer.includes('/auth/oauth-handler') || 
+                    referer.includes('popup') ||
+                    request.nextUrl.searchParams.get('popup') === 'true';
+
     // Rate limiting
     const rateLimitResult = await authRateLimit.check(request);
     if (!rateLimitResult.allowed) {
-      logger.warn('rate limit exceeded');
-      const errorUrl = getErrorRedirectUrl('rate_limit', origin, false);
+      logger.warn('rate limit exceeded', { ip: request.headers.get('x-forwarded-for') });
+      const errorUrl = getErrorRedirectUrl('rate_limit', origin, isPopup);
       return setCorsHeaders(NextResponse.redirect(errorUrl));
     }
 
     // Check Telegram OAuth credentials
     if (!env.TELEGRAM_BOT_TOKEN) {
       logger.error('telegram oauth not configured');
-      const errorUrl = getErrorRedirectUrl('oauth_not_configured', origin, false);
+      const errorUrl = getErrorRedirectUrl('oauth_not_configured', origin, isPopup);
+      return setCorsHeaders(NextResponse.redirect(errorUrl));
+    }
+
+    // Get bot ID from bot token
+    const botId = await getTelegramBotId(env.TELEGRAM_BOT_TOKEN);
+    if (!botId) {
+      logger.error('failed to get telegram bot id');
+      const errorUrl = getErrorRedirectUrl('oauth_not_configured', origin, isPopup);
       return setCorsHeaders(NextResponse.redirect(errorUrl));
     }
 
@@ -51,32 +67,26 @@ export async function GET(request: NextRequest) {
 
     const hostname = request.nextUrl.hostname;
     const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
-
-    // Telegram Login Widget works via JavaScript widget on client-side
-    // Telegram Login Widget requires bot username (e.g., "@my_bot"), not bot ID
-    // Bot username should be set in TELEGRAM_BOT_USERNAME env variable
-    if (!env.TELEGRAM_BOT_USERNAME) {
-      logger.error('TELEGRAM_BOT_USERNAME not configured');
-      return setCorsHeaders(
-        NextResponse.json(
-          { 
-            error: 'oauth_not_configured',
-            message: getOAuthErrorMessage('oauth_not_configured')
-          },
-          { status: 503 }
-        )
-      );
-    }
     
-    // Remove @ if present (Telegram widget expects username without @)
-    const botUsername = env.TELEGRAM_BOT_USERNAME.replace(/^@/, '');
-    
-    // Return bot_username as JSON for client-side widget initialization
-    // Client will load Telegram Login Widget and send data to POST endpoint
-    const response = NextResponse.json({ botUsername, state });
+    // Store popup flag in state cookie for callback
+    const stateWithPopup = isPopup ? `${state}:popup` : state;
 
-    // Store state in cookie for CSRF protection
-    response.cookies.set('oauth_state', state, {
+    // Build callback URL
+    const callbackUrl = `${origin}/api/auth/oauth/telegram/callback`;
+
+    // Redirect to Telegram OAuth
+    const telegramOAuthUrl = `https://oauth.telegram.org/auth?${new URLSearchParams({
+      bot_id: botId.toString(),
+      origin: origin,
+      request_access: 'write',
+      return_to: callbackUrl,
+      state: stateWithPopup,
+    }).toString()}`;
+
+    const response = NextResponse.redirect(telegramOAuthUrl);
+
+    // Store state in cookie for CSRF protection (with popup flag if needed)
+    response.cookies.set('oauth_state', stateWithPopup, {
       maxAge: 10 * 60,
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production' && !isLocalhost,
@@ -96,7 +106,12 @@ export async function GET(request: NextRequest) {
         const origin = env.PUBLIC_DOMAIN.endsWith('/') 
           ? env.PUBLIC_DOMAIN.slice(0, -1) 
           : env.PUBLIC_DOMAIN;
-        const errorUrl = getErrorRedirectUrl('oauth_init_error', origin, false);
+        // Determine if popup from error context
+        const referer = request.headers.get('referer') || '';
+        const isPopup = referer.includes('/auth/oauth-handler') || 
+                        referer.includes('popup') ||
+                        request.nextUrl.searchParams.get('popup') === 'true';
+        const errorUrl = getErrorRedirectUrl('oauth_init_error', origin, isPopup);
         return setCorsHeaders(NextResponse.redirect(errorUrl));
       }
     } catch {

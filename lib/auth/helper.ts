@@ -38,6 +38,8 @@ export async function checkAuth(request?: { headers: Headers }): Promise<AuthRes
         error: ERROR_NOT_AUTHENTICATED
       };
     }
+    // Сессия валидна - getSession уже обновил время истечения в памяти
+    // Cookie будет обновлен в API route через refreshSessionCookie
   }
 
   if (!isAuthenticated || !dashboardToken) {

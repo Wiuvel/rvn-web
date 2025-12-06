@@ -529,4 +529,3 @@ win.onUnsupportedCallback = onUnsupportedCallback;
 win.checkExistingCookie = checkExistingCookie;
 win.resetTitleFill = resetTitleFill;
 win.updateStatusText = updateStatusText;
-

@@ -81,7 +81,7 @@ export default function RateLimitCaptcha({ isOpen, onSuccess, onClose }: RateLim
 
     try {
       const widgetId = window.turnstile.render(containerRef.current, {
-        sitekey: '0x4AAAAAACDQkGbAxIWAKp08',
+        sitekey: '3x00000000000000000000FF',
         theme: 'dark',
         callback: async (token: string) => {
 

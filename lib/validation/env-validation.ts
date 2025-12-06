@@ -5,12 +5,10 @@ import { z } from 'zod';
  * Все обязательные переменные должны быть установлены и валидны
  */
 const envSchema = z.object({
-  // Supabase
   SUPABASE_URL: z.string().url('SUPABASE_URL must be a valid URL'),
   SUPABASE_ANON_KEY: z.string().min(20, 'SUPABASE_ANON_KEY must be at least 20 characters'),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(20, 'SUPABASE_SERVICE_ROLE_KEY must be at least 20 characters'),
   
-  // CSRF
   CSRF_SECRET: z.string()
     .min(32, 'CSRF_SECRET must be at least 32 characters')
     .refine(
@@ -28,7 +26,6 @@ const envSchema = z.object({
   
   // Telegram OAuth
   TELEGRAM_BOT_TOKEN: z.string().optional(),
-  TELEGRAM_BOT_USERNAME: z.string().optional(),
   
   // Public domain for OAuth redirects (optional, falls back to host header)
   PUBLIC_DOMAIN: z.string().url().optional(),
@@ -50,12 +47,10 @@ export function validateEnv(): Env {
     return validatedEnv;
   }
 
-  // Получаем значения с fallback
   const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
   
   try {
     validatedEnv = envSchema.parse({
-      // Поддержка NEXT_PUBLIC_SUPABASE_URL для обратной совместимости с dockerfile
       SUPABASE_URL: supabaseUrl,
       SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
       SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
@@ -65,7 +60,6 @@ export function validateEnv(): Env {
       GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
       GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
       TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN,
-      TELEGRAM_BOT_USERNAME: process.env.TELEGRAM_BOT_USERNAME,
       PUBLIC_DOMAIN: process.env.PUBLIC_DOMAIN,
       NODE_ENV: process.env.NODE_ENV || 'development',
     });
@@ -92,7 +86,6 @@ export function validateEnv(): Env {
       
       const errorMessage = `Env validation failed: ${errorParts.join(' | ')}`;
       
-      // В development показываем подробности, в production - кратко
       if (process.env.NODE_ENV === 'development') {
         console.error(`❌ ${errorMessage}`);
       } else {
@@ -107,10 +100,6 @@ export function validateEnv(): Env {
   }
 }
 
-/**
- * Получение валидированных environment variables
- * Используйте эту функцию вместо прямого доступа к process.env
- */
 export function getEnv(): Env {
   if (!validatedEnv) {
     return validateEnv();
@@ -118,27 +107,15 @@ export function getEnv(): Env {
   return validatedEnv;
 }
 
-// В Edge Runtime не валидируем при импорте - валидация происходит лениво при первом вызове getEnv()
-// Валидация при импорте происходит только на сервере (не в Edge Runtime)
-// Проверяем, что мы не в Edge Runtime через проверку доступности process (без process.exit)
 const canValidateOnImport = typeof window === 'undefined' && typeof process !== 'undefined';
-
-// Проверяем, происходит ли сборка (build-time)
-// Во время сборки Next.js переменные окружения могут быть недоступны (например, в CapRover)
-// В этом случае валидация будет отложена до runtime
 const isBuildTime = process.env.NEXT_PHASE === 'phase-production-build' || 
                     process.env.NEXT_PHASE === 'phase-development-build';
-
 if (canValidateOnImport && !isBuildTime) {
   try {
     validateEnv();
   } catch (error: unknown) {
-    // В development режиме можем продолжить с предупреждением
     if (process.env?.NODE_ENV === 'development') {
-      // Тихий режим - не логируем, так как ошибка уже была выведена выше
     } else {
-      // Просто выбрасываем ошибку - завершение процесса будет на уровне выше
-      // (например, в startup-validation.ts, который не импортируется в Edge Runtime)
       throw error;
     }
   }

@@ -7,6 +7,7 @@ import { getUserByToken } from '@/lib/auth/index';
 import { hasUserRole } from '@/lib/auth/user-roles';
 import { supabaseAdmin } from '@/lib/database/supabase';
 import { ERROR_INTERNAL_SERVER_ERROR, ERROR_NOT_AUTHENTICATED, ERROR_INVALID_REQUEST_DATA, MESSAGE_MAX_LENGTH, ERROR_TICKET_NOT_FOUND, ERROR_ACCESS_DENIED, ERROR_CANNOT_SEND_TO_CLOSED_TICKET, ERROR_MESSAGE_TOO_LONG, ERROR_TOO_MANY_REQUESTS } from '@/lib/utils/constants';
+import { broadcastNewMessage, broadcastTicketUpdate } from '@/lib/websocket/server';
 
 export async function OPTIONS() {
   return handleCorsPreflight();
@@ -135,10 +136,22 @@ export async function POST(
 
     // Если тикет был закрыт, но ответил поддержка - открываем его
     if (isSupport && ticket.status === 'closed') {
-      await supabaseAdmin
+      const { data: updatedTicket } = await supabaseAdmin
         .from('support_tickets')
         .update({ status: 'open', closed_at: null })
-        .eq('id', ticketId);
+        .eq('id', ticketId)
+        .select('status, updated_at, closed_at')
+        .single();
+      
+      if (updatedTicket) {
+        // Отправляем обновление через WebSocket
+        broadcastTicketUpdate(ticketId, {
+          id: ticketId,
+          status: updatedTicket.status,
+          updated_at: updatedTicket.updated_at,
+          closed_at: updatedTicket.closed_at,
+        });
+      }
     }
 
     // Создаем сообщение
@@ -170,6 +183,50 @@ export async function POST(
       );
     }
 
+    // Отправляем новое сообщение через WebSocket
+    if (newMessage) {
+      // Убеждаемся, что структура данных соответствует ожидаемой
+      // Важно: sender может быть массивом или объектом в зависимости от Supabase запроса
+      let senderData = undefined;
+      if (newMessage.sender) {
+        // Если sender - массив, берем первый элемент
+        if (Array.isArray(newMessage.sender)) {
+          senderData = newMessage.sender[0] || undefined;
+        } else {
+          senderData = newMessage.sender;
+        }
+      }
+      
+      const messageForBroadcast = {
+        id: newMessage.id,
+        ticket_id: newMessage.ticket_id,
+        sender_id: newMessage.sender_id,
+        sender_type: newMessage.sender_type,
+        message_text: newMessage.message_text,
+        is_read: newMessage.is_read || false,
+        created_at: newMessage.created_at,
+        sender: senderData,
+      };
+      
+      logger.info('Broadcasting new message via WebSocket', {
+        ticketId,
+        messageId: newMessage.id,
+        senderType: newMessage.sender_type,
+        hasSender: !!senderData,
+        messageText: messageForBroadcast.message_text.substring(0, 50)
+      });
+      
+      try {
+        broadcastNewMessage(ticketId, messageForBroadcast);
+      } catch (error) {
+        logger.error('Error broadcasting new message', {
+          error: error instanceof Error ? error.message : 'Unknown error',
+          ticketId,
+          messageId: newMessage.id
+        });
+      }
+    }
+
     // Если это первое сообщение от пользователя, добавляем автоматический ответ от поддержки
     if (!isSupport) {
       const { data: existingMessages } = await supabaseAdmin
@@ -182,13 +239,14 @@ export async function POST(
       if (!existingMessages || existingMessages.length === 0) {
         // Автоматическое системное сообщение
         // Используем sender_id пользователя, но в UI будем определять системное сообщение по тексту
+        // Добавляем специальный префикс для идентификации системного сообщения
         const { error: autoMessageError } = await supabaseAdmin
           .from('support_messages')
           .insert({
             ticket_id: ticketId,
             sender_id: user.id, // Используем ID пользователя (требуется NOT NULL)
-            sender_type: 'support',
-            message_text: 'Спасибо за ваше сообщение. Мы получили ваш запрос и ответим в ближайшее время.'
+            sender_type: 'support', // Оставляем 'support', но в UI определяем системное сообщение по тексту
+            message_text: 'Спасибо за ваше обращение. Мы получили ваш запрос и ответим в ближайшее время.'
           });
 
         // Логируем ошибку, но не прерываем выполнение, так как основное сообщение уже создано

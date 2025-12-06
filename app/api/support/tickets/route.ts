@@ -8,6 +8,14 @@ import { hasUserRole } from '@/lib/auth/user-roles';
 import { supabaseAdmin } from '@/lib/database/supabase';
 import { ERROR_INTERNAL_SERVER_ERROR, ERROR_NOT_AUTHENTICATED, ERROR_INVALID_REQUEST_DATA, ERROR_MAXIMUM_TICKET_LIMIT_REACHED, ERROR_TOO_MANY_REQUESTS, TICKET_SUBJECT_MAX_LENGTH, MESSAGE_MAX_LENGTH, ERROR_MESSAGE_TOO_LONG, ERROR_SUBJECT_TOO_LONG, MAX_TICKETS_PER_USER } from '@/lib/utils/constants';
 
+interface LastMessage {
+  id: string;
+  message_text: string;
+  sender_type: 'user' | 'support' | 'system';
+  created_at: string;
+  is_read: boolean;
+}
+
 export async function OPTIONS() {
   return handleCorsPreflight();
 }
@@ -118,8 +126,91 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Получаем последние сообщения для каждого тикета
+    // Оптимизация: используем один запрос для всех тикетов через IN и оконную функцию
+    const ticketIds = (tickets || []).map(t => t.id);
+    let lastMessagesMap: Record<string, LastMessage | null> = {};
+    
+    if (ticketIds.length > 0 && supabaseAdmin) {
+      // Сохраняем supabaseAdmin в локальную переменную для TypeScript
+      const supabase = supabaseAdmin;
+      
+      try {
+        // Оптимизация: получаем все последние сообщения одним запросом
+        // Получаем все сообщения для всех тикетов, затем фильтруем на клиенте
+        // Это лучше чем N запросов, но не идеально - можно улучшить через RPC функцию в будущем
+        const { data: allMessages, error: lastMessagesError } = await supabase
+          .from('support_messages')
+          .select('ticket_id, id, message_text, sender_type, created_at, is_read')
+          .in('ticket_id', ticketIds)
+          .order('created_at', { ascending: false });
+        
+        if (lastMessagesError) {
+          logger.warn('Error fetching last messages in batch, falling back to individual queries', {
+            error: lastMessagesError.message,
+            ticketCount: ticketIds.length
+          });
+          // Fallback: используем отдельные запросы при ошибке, но с ограничением параллелизма
+          const BATCH_SIZE = 10; // Ограничиваем параллелизм
+          for (let i = 0; i < ticketIds.length; i += BATCH_SIZE) {
+            const batch = ticketIds.slice(i, i + BATCH_SIZE);
+            const batchPromises = batch.map(async (ticketId) => {
+              const { data: lastMessage } = await supabase
+                .from('support_messages')
+                .select('id, message_text, sender_type, created_at, is_read')
+                .eq('ticket_id', ticketId)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+              return { ticketId, lastMessage: lastMessage || null };
+            });
+            
+            const batchResults = await Promise.all(batchPromises);
+            batchResults.forEach(({ ticketId, lastMessage }) => {
+              lastMessagesMap[ticketId] = lastMessage;
+            });
+          }
+        } else if (allMessages) {
+          // Группируем сообщения по ticket_id и берем первое (самое последнее) для каждого тикета
+          const messagesByTicket = new Map<string, LastMessage>();
+          for (const msg of allMessages) {
+            if (!messagesByTicket.has(msg.ticket_id)) {
+              messagesByTicket.set(msg.ticket_id, {
+                id: msg.id,
+                message_text: msg.message_text,
+                sender_type: msg.sender_type,
+                created_at: msg.created_at,
+                is_read: msg.is_read
+              });
+            }
+          }
+          
+          // Создаем map для быстрого доступа
+          lastMessagesMap = Object.fromEntries(messagesByTicket);
+          
+          // Заполняем null для тикетов без сообщений
+          for (const ticketId of ticketIds) {
+            if (!lastMessagesMap[ticketId]) {
+              lastMessagesMap[ticketId] = null;
+            }
+          }
+        }
+      } catch (error) {
+        logger.error('Error in batch last messages fetch', {
+          error: error instanceof Error ? error.message : 'Unknown error',
+          ticketCount: ticketIds.length
+        });
+        // В случае ошибки возвращаем пустой map
+      }
+    }
+
+    const ticketsWithLastMessage = (tickets || []).map(ticket => ({
+      ...ticket,
+      last_message: lastMessagesMap[ticket.id] || null
+    }));
+
     return setCorsHeaders(
-      NextResponse.json({ tickets: tickets || [] })
+      NextResponse.json({ tickets: ticketsWithLastMessage })
     );
   } catch (error) {
     logger.error('Error in GET /api/support/tickets', {

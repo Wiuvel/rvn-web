@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, startTransition } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -9,6 +9,7 @@ import { gsap } from 'gsap';
 import { MESSAGE_MAX_LENGTH, TICKET_SUBJECT_MAX_LENGTH, MAX_TICKETS_PER_USER, MESSAGE_TIMEOUT, AUTH_FETCH_TIMEOUT, GSAP_DEFAULT_DURATION, GSAP_DEFAULT_EASE, MARK_AS_READ_DEBOUNCE } from '@/lib/utils/constants';
 import { translateError } from '@/lib/utils/error-translations';
 import { getGradientClasses } from '@/lib/utils/avatar-gradients';
+import { useWebSocket } from '@/hooks/useWebSocket';
 
 // Lazy load RateLimitCaptcha для оптимизации bundle size
 const RateLimitCaptcha = dynamic(() => import('@/components/auth/RateLimitCaptcha'), {
@@ -45,6 +46,14 @@ interface Ticket {
   status: 'open' | 'closed' | 'pending';
   createdAt: Date;
   messages: Message[];
+  last_message?: {
+    id: string;
+    message_text: string;
+    sender_type: 'user' | 'support' | 'system';
+    created_at: string;
+    is_read: boolean;
+  } | null;
+  unread_count?: number;
 }
 
 // Компонент для сообщения
@@ -86,12 +95,13 @@ function MessageItem({
   }, [message.id, isInitialLoad]);
 
   // Определяем, является ли сообщение системным
-  const SYSTEM_MESSAGE_TEXT = 'Спасибо за ваше сообщение. Мы получили ваш запрос и ответим в ближайшее время.';
+  const SYSTEM_MESSAGE_TEXT = 'Спасибо за ваше обращение. Мы получили ваш запрос и ответим в ближайшее время.';
   const isStatusChangeMessage = message.text.includes('Статус тикета изменен') || 
     message.text.includes('Ваше обращение приняли в обработку') ||
     message.text.includes('Ваше обращение было закрыто');
-  const isSystemMessage = (message.text === SYSTEM_MESSAGE_TEXT || isStatusChangeMessage) && 
-    message.sender === 'support';
+  // Системное сообщение определяется по тексту, независимо от sender_type
+  // Используем trim() для надежного сравнения
+  const isSystemMessage = message.text.trim() === SYSTEM_MESSAGE_TEXT.trim() || isStatusChangeMessage;
 
   return (
     <div ref={messageRef}>
@@ -189,7 +199,7 @@ export default function SupportPage() {
   const [isCreatingTicket, setIsCreatingTicket] = useState(false); // Флаг для блокировки кнопки создания тикета
   const [isSendingMessage, setIsSendingMessage] = useState(false); // Флаг для блокировки повторной отправки сообщений
   const [messagesSentCount, setMessagesSentCount] = useState<number>(0);
-  const [notification, setNotification] = useState<{ message: string; show: boolean }>({ message: '', show: false });
+  const [notification, setNotification] = useState<{ message: string; show: boolean; type?: 'error' | 'info' }>({ message: '', show: false, type: 'error' });
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   
@@ -206,6 +216,7 @@ export default function SupportPage() {
   const fetchingTicketIdRef = useRef<string | null>(null);
   const loadedMessagesRef = useRef<Set<string>>(new Set());
   const initialLoadRef = useRef<boolean>(false);
+  const activeTicketMessagesRef = useRef<Message[]>([]); // Ref для актуальных сообщений активного тикета
   const [showRateLimitCaptcha, setShowRateLimitCaptcha] = useState(false);
   const isCaptchaOpenRef = useRef(false);
   // Очередь запросов вместо одного callback - исправляет race condition
@@ -277,8 +288,8 @@ export default function SupportPage() {
   };
   
   // Функция для показа notification
-  const showNotification = (message: string) => {
-    setNotification({ message, show: true });
+  const showNotification = (message: string, type: 'error' | 'info' = 'error') => {
+    setNotification({ message, show: true, type });
     setTimeout(() => {
       // Анимация исчезновения
       if (notificationRef.current) {
@@ -408,13 +419,207 @@ export default function SupportPage() {
     };
   }, [router]);
 
+  // Инициализация WebSocket
+  const { socket, joinTicket, leaveTicket } = useWebSocket({
+    enabled: !!userData,
+    userId: userData?.id,
+    ticketId: activeTicket?.id,
+    isSupport: false,
+  });
+
+  // Отметка сообщений как прочитанных с улучшенным debounce
+  // Используем useCallback для мемоизации функции и предотвращения лишних пересозданий
+  const markMessagesAsRead = useCallback(async (ticketId: string) => {
+    // Очищаем предыдущий таймер, если он существует
+    if (markReadTimeoutRef.current) {
+      clearTimeout(markReadTimeoutRef.current);
+      markReadTimeoutRef.current = null;
+    }
+    
+    // Устанавливаем новый таймер с debounce
+    markReadTimeoutRef.current = setTimeout(async () => {
+      // Очищаем ref после выполнения
+      markReadTimeoutRef.current = null;
+      
+      try {
+        await fetchWithRateLimit(
+          `/api/support/tickets/${ticketId}/messages/read`,
+          {
+            method: 'POST',
+            credentials: 'include'
+          },
+          () => markMessagesAsRead(ticketId) // Retry callback
+        );
+      } catch (error) {
+        // Не логируем RATE_LIMIT_EXCEEDED, так как это обрабатывается через капчу
+        if (error instanceof Error && error.message !== 'RATE_LIMIT_EXCEEDED') {
+          console.error('Error marking messages as read:', error);
+        }
+      }
+    }, MARK_AS_READ_DEBOUNCE);
+  }, []); // Пустой массив зависимостей, так как функция не зависит от состояния
+
   // Загрузка тикетов при монтировании
   useEffect(() => {
     if (userData) {
       fetchTickets();
     }
+    
+    // Очистка таймера при размонтировании
+    return () => {
+      if (markReadTimeoutRef.current) {
+        clearTimeout(markReadTimeoutRef.current);
+        markReadTimeoutRef.current = null;
+      }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userData]);
+
+  // WebSocket: присоединение/отсоединение от тикета
+  useEffect(() => {
+    if (!socket || !activeTicket || !userData) {
+      // Очищаем ref при отсутствии активного тикета
+      activeTicketMessagesRef.current = [];
+      return;
+    }
+
+    joinTicket(activeTicket.id, userData.id, false);
+
+    return () => {
+      leaveTicket(activeTicket.id);
+      // Очищаем ref при выходе из тикета
+      activeTicketMessagesRef.current = [];
+    };
+  }, [socket, activeTicket, userData, joinTicket, leaveTicket]);
+
+  // WebSocket: обработка новых сообщений
+  useEffect(() => {
+    if (!socket || !activeTicket) return;
+
+    const handleNewMessage = (data: {
+      ticketId: string;
+      message: {
+        id: string;
+        message_text: string;
+        sender_type: 'user' | 'support';
+        created_at: string;
+        is_read: boolean;
+        sender?: {
+          id: string;
+          username: string;
+          user_id: string;
+        };
+      };
+    }) => {
+      if (data.ticketId !== activeTicket.id) return;
+
+      // Проверяем, что сообщение еще не добавлено (используем ref для актуальных данных)
+      const messageExists = activeTicketMessagesRef.current.some(m => m.id === data.message.id);
+      if (messageExists) return;
+
+      // Оптимизация: объединяем обновления состояния в один переход
+      const newMessage = {
+        id: data.message.id,
+        text: data.message.message_text,
+        sender: data.message.sender_type,
+        timestamp: new Date(data.message.created_at),
+        isRead: data.message.is_read,
+        senderData: data.message.sender,
+      };
+
+      const lastMessageData = {
+        id: data.message.id,
+        message_text: data.message.message_text,
+        sender_type: data.message.sender_type,
+        created_at: data.message.created_at,
+        is_read: data.message.is_read
+      };
+
+      // Используем startTransition для неблокирующих обновлений
+      startTransition(() => {
+        // Добавляем новое сообщение
+        setActiveTicket(prev => {
+          if (!prev || prev.id !== data.ticketId) return prev;
+
+          const updatedMessages = [...(prev.messages || []), newMessage];
+          activeTicketMessagesRef.current = updatedMessages; // Обновляем ref сразу
+
+          return {
+            ...prev,
+            messages: updatedMessages,
+          };
+        });
+
+        // Обновляем last_message в списке тикетов
+        setTickets(prev => prev.map(t => 
+          t.id === data.ticketId 
+            ? { 
+                ...t, 
+                last_message: lastMessageData
+              }
+            : t
+        ));
+      });
+
+      // Отмечаем сообщение как прочитанное
+      markMessagesAsRead(data.ticketId);
+    };
+
+    const handleTicketUpdate = (data: {
+      ticketId: string;
+      ticket: {
+        status: 'open' | 'closed' | 'pending';
+      };
+    }) => {
+      if (data.ticketId !== activeTicket.id) return;
+
+      setActiveTicket(prev => {
+        if (!prev || prev.id !== data.ticketId) return prev;
+        return {
+          ...prev,
+          status: data.ticket.status,
+        };
+      });
+
+      // Обновляем тикет в списке
+      setTickets(prev => prev.map(t => 
+        t.id === data.ticketId 
+          ? { ...t, status: data.ticket.status }
+          : t
+      ));
+    };
+
+    const handleMessageRead = (data: {
+      ticketId: string;
+      messageIds: string[];
+      readBy: 'user' | 'support';
+    }) => {
+      if (data.ticketId !== activeTicket.id) return;
+
+      // Обновляем статус прочитанности сообщений
+      setActiveTicket(prev => {
+        if (!prev || prev.id !== data.ticketId) return prev;
+        return {
+          ...prev,
+          messages: (prev.messages || []).map(msg => 
+            data.messageIds.includes(msg.id)
+              ? { ...msg, isRead: true }
+              : msg
+          ),
+        };
+      });
+    };
+
+    socket.on('support:message:new', handleNewMessage);
+    socket.on('support:ticket:updated', handleTicketUpdate);
+    socket.on('support:message:read', handleMessageRead);
+
+    return () => {
+      socket.off('support:message:new', handleNewMessage);
+      socket.off('support:ticket:updated', handleTicketUpdate);
+      socket.off('support:message:read', handleMessageRead);
+    };
+  }, [socket, activeTicket, markMessagesAsRead]);
 
   // Анимация появления/исчезновения формы создания тикета
   useEffect(() => {
@@ -581,38 +786,6 @@ export default function SupportPage() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTicket?.id, userData, activeTicket?.status]);
-
-  // Отметка сообщений как прочитанных с улучшенным debounce
-  // Используем useCallback для мемоизации функции и предотвращения лишних пересозданий
-  const markMessagesAsRead = useCallback(async (ticketId: string) => {
-    // Очищаем предыдущий таймер, если он существует
-    if (markReadTimeoutRef.current) {
-      clearTimeout(markReadTimeoutRef.current);
-      markReadTimeoutRef.current = null;
-    }
-    
-    // Устанавливаем новый таймер с debounce
-    markReadTimeoutRef.current = setTimeout(async () => {
-      // Очищаем ref после выполнения
-      markReadTimeoutRef.current = null;
-      
-      try {
-        await fetchWithRateLimit(
-          `/api/support/tickets/${ticketId}/messages/read`,
-          {
-            method: 'POST',
-            credentials: 'include'
-          },
-          () => markMessagesAsRead(ticketId) // Retry callback
-        );
-      } catch (error) {
-        // Не логируем RATE_LIMIT_EXCEEDED, так как это обрабатывается через капчу
-        if (error instanceof Error && error.message !== 'RATE_LIMIT_EXCEEDED') {
-          console.error('Error marking messages as read:', error);
-        }
-      }
-    }, MARK_AS_READ_DEBOUNCE);
-  }, []); // Пустой массив зависимостей, так как функция не зависит от состояния
 
   // Очистка таймера при размонтировании компонента
   useEffect(() => {
@@ -847,7 +1020,7 @@ export default function SupportPage() {
         setNewTicketSubject('');
         setNewTicketMessage('');
         setShowNewTicketForm(false);
-        showNotification('Обращение создано');
+        showNotification('Обращение создано', 'info');
       } else {
         const errorMessage = data.error || 'Ошибка создания обращения';
         showNotification(translateError(errorMessage));
@@ -1009,7 +1182,7 @@ export default function SupportPage() {
     }
   };
 
-  const fetchTickets = async () => {
+  const fetchTickets = useCallback(async () => {
     setTicketsLoading(true);
     try {
       const response = await fetchWithRateLimit(
@@ -1017,17 +1190,30 @@ export default function SupportPage() {
         {
           credentials: 'include'
         },
-        fetchTickets // Retry callback
+        () => fetchTickets() // Retry callback
       );
       const data = await response.json();
       
       if (response.ok) {
-        const mappedTickets = (data.tickets || []).map((t: { id: string; subject: string; status: string; created_at: string }) => ({
+        const mappedTickets = (data.tickets || []).map((t: { 
+          id: string; 
+          subject: string; 
+          status: string; 
+          created_at: string;
+          last_message?: {
+            id: string;
+            message_text: string;
+            sender_type: 'user' | 'support' | 'system';
+            created_at: string;
+            is_read: boolean;
+          } | null;
+        }) => ({
           id: t.id,
           subject: t.subject,
           status: t.status,
           createdAt: new Date(t.created_at),
-          messages: []
+          messages: [],
+          last_message: t.last_message || null
         }));
         setTickets(mappedTickets);
         
@@ -1061,7 +1247,8 @@ export default function SupportPage() {
     } finally {
       setTicketsLoading(false);
     }
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTicket, showNotification]);
 
   const fetchTicketMessages = async (ticketId: string) => {
     // Предотвращаем дублирующиеся запросы
@@ -1111,6 +1298,9 @@ export default function SupportPage() {
             createdAt: new Date(data.ticket.created_at),
             messages: mappedMessages
           };
+          
+          // Обновляем ref с актуальными сообщениями
+          activeTicketMessagesRef.current = mappedMessages;
           
           // Сохраняем ID последнего открытого тикета
           if (typeof window !== 'undefined') {
@@ -1525,8 +1715,9 @@ export default function SupportPage() {
                       Нет открытых тикетов.
                     </div>
                   ) : (
-                    tickets.map((ticket) => (
-                      <button
+                    <div className="flex flex-col gap-2">
+                      {tickets.map((ticket) => (
+                        <button
                         key={ticket.id}
                         onClick={async () => {
                           // Предотвращаем клик на уже выбранный тикет
@@ -1575,16 +1766,37 @@ export default function SupportPage() {
                             {ticket.status === 'open' ? 'Открыт' : ticket.status === 'pending' ? 'В работе' : 'Закрыт'}
                           </span>
                         </div>
-                        <div className="text-xs text-neutral-400">
-                          {formatDate(ticket.createdAt)}, {formatTime(ticket.createdAt)}
-                        </div>
-                        {ticket.messages && Array.isArray(ticket.messages) && ticket.messages.length > 0 && (
-                          <div className="text-xs text-neutral-500 mt-1 truncate">
-                            {ticket.messages[ticket.messages.length - 1].text}
+                        <div className="flex items-center justify-between mt-1">
+                          <div className="text-xs text-neutral-400 flex-1 min-w-0">
+                            {formatDate(ticket.createdAt)}, {formatTime(ticket.createdAt)}
                           </div>
-                        )}
-                      </button>
-                    ))
+                        </div>
+                        {ticket.last_message && ticket.status !== 'closed' && (() => {
+                          const SYSTEM_MESSAGE_TEXT = 'Спасибо за ваше обращение. Мы получили ваш запрос и ответим в ближайшее время.';
+                          const isStatusChangeMessage = ticket.last_message.message_text.includes('Статус тикета изменен') || 
+                            ticket.last_message.message_text.includes('Ваше обращение приняли в обработку') ||
+                            ticket.last_message.message_text.includes('Ваше обращение было закрыто');
+                          // Используем trim() для надежного сравнения
+                          const isSystemMessage = ticket.last_message.message_text.trim() === SYSTEM_MESSAGE_TEXT.trim() || isStatusChangeMessage;
+                          
+                          return (
+                            <div className="text-xs text-neutral-500 mt-1.5 truncate flex items-center gap-2">
+                              <span className="flex-shrink-0 text-neutral-600">
+                                {isSystemMessage ? 'Система:' : ticket.last_message.sender_type === 'user' ? 'Вы:' : 'Поддержка:'}
+                              </span>
+                              <span className="truncate flex-1 min-w-0">
+                                {ticket.last_message.message_text}
+                              </span>
+                              {ticket.last_message.is_read === false && ticket.last_message.sender_type === 'support' && !isSystemMessage && (
+                                <span className="flex-shrink-0 w-2 h-2 bg-blue-500 rounded-full"></span>
+                              )}
+                            </div>
+                          );
+                        })()}
+                        </button>
+                      ))
+                    }
+                    </div>
                   )}
                 </div>
               </div>
@@ -1735,8 +1947,23 @@ export default function SupportPage() {
       {/* Notification */}
       {notification.show && (
         <div ref={notificationRef} className="fixed bottom-4 left-4 z-[1000]">
-          <div className="bg-neutral-900 border border-red-500/50 rounded-xl px-4 py-3 shadow-xl backdrop-blur-xl">
-            <p className="text-sm text-white">{notification.message}</p>
+          <div className={`rounded-xl px-4 py-3 shadow-xl backdrop-blur-xl border ${
+            notification.type === 'error' 
+              ? 'bg-red-500/90 border-red-400/50 text-white' 
+              : 'bg-blue-500/90 border-blue-400/50 text-white'
+          }`}>
+            <div className="flex items-center gap-2">
+              {notification.type === 'error' ? (
+                <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              ) : (
+                <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              )}
+              <p className="text-sm font-medium">{notification.message}</p>
+            </div>
           </div>
         </div>
       )}
