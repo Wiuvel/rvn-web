@@ -27,37 +27,88 @@ if (!dev) {
   const fs = require('fs');
   
   // Пытаемся использовать готовый сервер из standalone
+  // После копирования в Dockerfile структура: .next/standalone/ содержит содержимое standalone сборки
   const standaloneServerPath = path.join(process.cwd(), '.next/standalone/server.js');
   const standaloneNextPath = path.join(process.cwd(), '.next/standalone/.next');
+  const standaloneDir = path.join(process.cwd(), '.next/standalone');
   
-  if (fs.existsSync(standaloneServerPath)) {
-    // Используем готовый сервер из standalone
-    try {
-      delete require.cache[require.resolve(standaloneServerPath)];
-      const standaloneServer = require(standaloneServerPath);
-      
-      if (standaloneServer && typeof standaloneServer.getRequestHandler === 'function') {
-        handle = standaloneServer.getRequestHandler();
-        app = { prepare: () => Promise.resolve() };
-        console.log('✓ Using standalone server handler');
-      } else {
-        throw new Error('Standalone server does not have getRequestHandler');
+  // Проверяем, существует ли standalone директория
+  if (fs.existsSync(standaloneDir)) {
+    console.log('✓ Standalone build found');
+    
+    if (fs.existsSync(standaloneServerPath)) {
+      // Используем готовый сервер из standalone
+      try {
+        delete require.cache[require.resolve(standaloneServerPath)];
+        const standaloneServer = require(standaloneServerPath);
+        
+        if (standaloneServer && typeof standaloneServer.getRequestHandler === 'function') {
+          handle = standaloneServer.getRequestHandler();
+          app = { prepare: () => Promise.resolve() };
+          console.log('✓ Using standalone server handler');
+        } else {
+          throw new Error('Standalone server does not have getRequestHandler');
+        }
+      } catch (err) {
+        console.warn('⚠ Failed to use standalone server:', err.message);
+        // Fallback к использованию Next.js из node_modules
+        throw err;
       }
-    } catch (err) {
-      console.warn('⚠ Failed to use standalone server:', err.message);
-      throw new Error('Cannot use standalone server: ' + err.message);
+    } else if (fs.existsSync(standaloneNextPath)) {
+      // Standalone сборка найдена, но нет готового server.js
+      // Используем Next.js из standalone node_modules с правильной конфигурацией
+      const nextPath = fs.existsSync(path.join(process.cwd(), 'node_modules/next'))
+        ? path.join(process.cwd(), 'node_modules/next')
+        : 'next';
+      
+      try {
+        const next = require(nextPath);
+        // В standalone режиме Next.js должен автоматически определять режим
+        // и не загружать webpack, если он не нужен
+        app = next({ 
+          dev: false,
+          hostname,
+          port,
+          dir: process.cwd()
+        });
+        handle = app.getRequestHandler();
+        console.log('✓ Using Next.js from standalone node_modules');
+      } catch (err) {
+        console.error('❌ Failed to initialize Next.js:', err.message);
+        throw err;
+      }
+    } else {
+      // Standalone директория найдена, но структура неожиданная
+      console.warn('⚠ Standalone directory found but structure is unexpected');
+      // Fallback: используем Next.js из node_modules
+      const nextPath = fs.existsSync(path.join(process.cwd(), 'node_modules/next'))
+        ? path.join(process.cwd(), 'node_modules/next')
+        : 'next';
+      
+      try {
+        const next = require(nextPath);
+        app = next({ 
+          dev: false,
+          hostname,
+          port,
+          dir: process.cwd()
+        });
+        handle = app.getRequestHandler();
+        console.log('✓ Using Next.js from node_modules (fallback)');
+      } catch (err) {
+        console.error('❌ Failed to initialize Next.js:', err.message);
+        throw err;
+      }
     }
-  } else if (fs.existsSync(standaloneNextPath)) {
-    // Standalone сборка найдена, но нет готового server.js
-    // Используем Next.js из standalone node_modules с правильной конфигурацией
+  } else {
+    // Standalone сборка не найдена - используем fallback
+    console.warn('⚠ Standalone build not found, using fallback');
     const nextPath = fs.existsSync(path.join(process.cwd(), 'node_modules/next'))
       ? path.join(process.cwd(), 'node_modules/next')
       : 'next';
     
     try {
       const next = require(nextPath);
-      // В standalone режиме Next.js должен автоматически определять режим
-      // и не загружать webpack, если он не нужен
       app = next({ 
         dev: false,
         hostname,
@@ -65,14 +116,11 @@ if (!dev) {
         dir: process.cwd()
       });
       handle = app.getRequestHandler();
-      console.log('✓ Using Next.js from standalone node_modules');
+      console.log('✓ Using Next.js from node_modules (fallback, may require webpack)');
     } catch (err) {
       console.error('❌ Failed to initialize Next.js:', err.message);
-      throw err;
+      throw new Error('Cannot initialize Next.js server: ' + err.message);
     }
-  } else {
-    // Standalone сборка не найдена
-    throw new Error('Standalone build not found. Make sure you built with output: "standalone"');
   }
 } else {
   // В dev режиме используем обычный next
