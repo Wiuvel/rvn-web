@@ -38,6 +38,9 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/server.js ./
+RUN if [ -d ".next/standalone/node_modules" ]; then \
+      cp -r .next/standalone/node_modules ./node_modules; \
+    fi
 
 USER nextjs
 
