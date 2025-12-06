@@ -38,8 +38,14 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/server.js ./
+# В standalone режиме Next.js создает node_modules в .next/standalone/node_modules
+# Копируем их в корень для доступа к Next.js и другим зависимостям
+# Также копируем Next.js модуль из builder, если он не был скопирован из standalone
 RUN if [ -d ".next/standalone/node_modules" ]; then \
       cp -r .next/standalone/node_modules ./node_modules; \
+    fi && \
+    if [ ! -d "node_modules/next" ]; then \
+      echo "⚠ Next.js not found in standalone, this may cause issues"; \
     fi
 
 USER nextjs

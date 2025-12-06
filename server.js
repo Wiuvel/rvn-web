@@ -14,78 +14,65 @@ let app, handle;
 
 // В production standalone режиме не используем next({ dev: false }), так как это требует webpack
 if (!dev) {
-  // В standalone режиме Next.js создает готовый сервер
+  // В standalone режиме Next.js создает готовую сборку в .next/standalone
+  // которая не требует webpack. Но нам нужен кастомный сервер для WebSocket.
+  // 
   // Проблема: next({ dev: false }) требует webpack, которого нет в standalone
-  // Решение: используем готовый сервер из standalone или создаем свой HTTP сервер
-  
-  // В standalone режиме Next.js компилирует все в .next/standalone
-  // и создает готовый сервер, который не требует webpack
-  // Но нам нужен кастомный сервер для WebSocket
-  
-  // Правильное решение: в standalone режиме не вызываем next() вообще
-  // Вместо этого используем готовый сервер из standalone или создаем свой
-  // и загружаем handler из standalone сборки
-  
-  // Но проще всего: проверить, есть ли в standalone готовый сервер
-  // и если да, использовать его. Если нет, создать свой HTTP сервер
-  
-  // В Next.js 15 standalone режиме можно использовать готовый сервер
-  // который находится в .next/standalone/server.js
-  // Но структура может быть разной
-  
-  // Временное решение: используем стандартный Next.js, но с правильной конфигурацией
-  // В production standalone режиме Next.js должен работать без webpack
-  // если правильно настроен
-  
-  // В standalone режиме Next.js создает готовый сервер в .next/standalone
-  // который не требует webpack. Но нам нужен кастомный сервер для WebSocket.
-  // Проблема: next({ dev: false }) требует webpack, которого нет в standalone
-  // Решение: используем готовый сервер из standalone или создаем свой HTTP сервер
+  // 
+  // Решение: используем готовый сервер из standalone или загружаем handler напрямую
+  // В Next.js 15 standalone режиме можно использовать готовый сервер из .next/standalone/server.js
+  // или загрузить handler из .next/standalone/.next/server
   
   const path = require('path');
   const fs = require('fs');
   
-  // В standalone режиме Next.js компилирует все в .next/standalone
-  // и создает готовый сервер, который не требует webpack
-  // Но нам нужен кастомный сервер для WebSocket
+  // Пытаемся использовать готовый сервер из standalone
+  const standaloneServerPath = path.join(process.cwd(), '.next/standalone/server.js');
+  const standaloneNextPath = path.join(process.cwd(), '.next/standalone/.next');
   
-  // Правильное решение: используем готовый сервер из standalone
-  // который находится в .next/standalone/server.js
-  // Но структура может быть разной, поэтому используем универсальный подход
-  
-  // Проверяем, есть ли Next.js в standalone node_modules (скопированы в корень)
-  const nextPath = fs.existsSync(path.join(process.cwd(), 'node_modules/next'))
-    ? path.join(process.cwd(), 'node_modules/next')
-    : 'next';
-  
-  try {
-    const next = require(nextPath);
-    
-    // В standalone режиме Next.js должен работать без webpack
-    // если правильно настроен. Но next({ dev: false }) все равно требует webpack.
-    // Поэтому используем другой подход: указываем, что мы в production
-    // и Next.js должен использовать готовую сборку из .next/standalone
-    
-    // В Next.js 15 standalone режиме можно использовать минимальную конфигурацию
-    // которая не требует webpack, если правильно настроена
-    app = next({ 
-      dev: false,
-      hostname,
-      port,
-      // Указываем, что мы в standalone режиме
-      // Это должно предотвратить загрузку webpack
-      conf: {
-        // Минимальная конфигурация для standalone
-        output: 'standalone'
+  if (fs.existsSync(standaloneServerPath)) {
+    // Используем готовый сервер из standalone
+    try {
+      delete require.cache[require.resolve(standaloneServerPath)];
+      const standaloneServer = require(standaloneServerPath);
+      
+      if (standaloneServer && typeof standaloneServer.getRequestHandler === 'function') {
+        handle = standaloneServer.getRequestHandler();
+        app = { prepare: () => Promise.resolve() };
+        console.log('✓ Using standalone server handler');
+      } else {
+        throw new Error('Standalone server does not have getRequestHandler');
       }
-    });
-    handle = app.getRequestHandler();
-  } catch (err) {
-    // Если не удалось инициализировать Next.js, значит проблема в конфигурации
-    console.error('❌ Failed to initialize Next.js:', err.message);
-    console.error('⚠ Error details:', err.stack);
-    console.error('⚠ Make sure node_modules from standalone are copied to root');
-    throw err;
+    } catch (err) {
+      console.warn('⚠ Failed to use standalone server:', err.message);
+      throw new Error('Cannot use standalone server: ' + err.message);
+    }
+  } else if (fs.existsSync(standaloneNextPath)) {
+    // Standalone сборка найдена, но нет готового server.js
+    // Используем Next.js из standalone node_modules с правильной конфигурацией
+    const nextPath = fs.existsSync(path.join(process.cwd(), 'node_modules/next'))
+      ? path.join(process.cwd(), 'node_modules/next')
+      : 'next';
+    
+    try {
+      const next = require(nextPath);
+      // В standalone режиме Next.js должен автоматически определять режим
+      // и не загружать webpack, если он не нужен
+      app = next({ 
+        dev: false,
+        hostname,
+        port,
+        dir: process.cwd()
+      });
+      handle = app.getRequestHandler();
+      console.log('✓ Using Next.js from standalone node_modules');
+    } catch (err) {
+      console.error('❌ Failed to initialize Next.js:', err.message);
+      throw err;
+    }
+  } else {
+    // Standalone сборка не найдена
+    throw new Error('Standalone build not found. Make sure you built with output: "standalone"');
   }
 } else {
   // В dev режиме используем обычный next
