@@ -58,6 +58,14 @@ export function generateMetadata({
       description: fullDescription,
       url: fullUrl,
       locale: 'ru_RU',
+      images: [
+        {
+          url: `${baseUrl}/og-image.png`,
+          width: 1200,
+          height: 630,
+          alt: fullTitle,
+        }
+      ],
       ...(publishedTime && { publishedTime }),
       ...(modifiedTime && { modifiedTime }),
       ...(author && { authors: [author] }),
@@ -65,11 +73,12 @@ export function generateMetadata({
       ...(tags.length > 0 && { tags })
     },
     twitter: {
-      card: 'summary',
+      card: 'summary_large_image',
       title: fullTitle,
       description: fullDescription,
       creator: '@rvnprivate',
-      site: '@rvnprivate'
+      site: '@rvnprivate',
+      images: [`${baseUrl}/og-image.png`]
     },
     robots: {
       index: !noindex,
@@ -82,8 +91,8 @@ export function generateMetadata({
       canonical: fullUrl,
     },
     verification: {
-      google: 'your-google-verification-code',
-      yandex: 'your-yandex-verification-code',
+      google: 'Aw4Z8Ag_IMoxI8dQObubbiRdtKedpWyYYLdgW2og6Gg',
+      yandex: '9fa13ce9cd4df963',
     },
     category: 'Technology',
     classification: 'VPN Service',
@@ -95,6 +104,10 @@ export function generateMetadata({
       'application-name': siteName,
       'msapplication-TileColor': '#0f7fdb',
       'theme-color': '#0f7fdb',
+      'format-detection': 'telephone=no',
+      'geo.region': 'RU',
+      'geo.placename': 'Russia',
+      'language': 'Russian',
     }
   };
 

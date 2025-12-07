@@ -11,7 +11,9 @@ export default function robots(): MetadataRoute.Robots {
           '/',
           '/auth',
           '/legal/',
-          '/support'
+          '/support',
+          '/sitemap.xml',
+          '/robots.txt'
         ],
         disallow: [
           '/api/',
@@ -22,7 +24,9 @@ export default function robots(): MetadataRoute.Robots {
           '/ui/',
           '/error/',
           '/support/help',
-          '/ui/panel/'
+          '/ui/panel/',
+          '/auth/oauth-handler',
+          '/ui/panel/admin/oauth-handler'
         ],
       },
       {
@@ -30,7 +34,9 @@ export default function robots(): MetadataRoute.Robots {
         allow: [
           '/',
           '/auth',
-          '/legal/'
+          '/legal/',
+          '/support',
+          '/sitemap.xml'
         ],
         disallow: [
           '/api/',
@@ -38,7 +44,9 @@ export default function robots(): MetadataRoute.Robots {
           '/protection/',
           '/_next/',
           '/ui/',
-          '/error/'
+          '/error/',
+          '/auth/oauth-handler',
+          '/ui/panel/admin/oauth-handler'
         ],
       },
       {
@@ -46,7 +54,9 @@ export default function robots(): MetadataRoute.Robots {
         allow: [
           '/',
           '/auth',
-          '/legal/'
+          '/legal/',
+          '/support',
+          '/sitemap.xml'
         ],
         disallow: [
           '/api/',
@@ -54,7 +64,9 @@ export default function robots(): MetadataRoute.Robots {
           '/protection/',
           '/_next/',
           '/ui/',
-          '/error/'
+          '/error/',
+          '/auth/oauth-handler',
+          '/ui/panel/admin/oauth-handler'
         ],
       },
     ],

@@ -9,6 +9,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
       lastModified: currentDate,
       changeFrequency: 'daily' as const,
       priority: 1.0,
+      alternates: {
+        languages: {
+          ru: `${baseUrl}`,
+          'x-default': `${baseUrl}`,
+        },
+      },
     },
     {
       url: `${baseUrl}/auth`,
