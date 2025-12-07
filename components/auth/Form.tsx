@@ -34,6 +34,7 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
   const [isPopupOpen, setIsPopupOpen] = useState(false);
   const [activeProvider, setActiveProvider] = useState<string | null>(null);
   const [showRateLimitCaptcha, setShowRateLimitCaptcha] = useState(false);
+  const [isTransitioning, setIsTransitioning] = useState(false);
   const isCaptchaOpenRef = useRef(false);
   const pendingRequestsQueueRef = useRef<Array<() => Promise<void>>>([]);
   const isProcessingCaptchaRef = useRef(false);
@@ -232,9 +233,9 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
         // Если запрос снова получил rate limit после иммунитета - это критическая ошибка
         // НЕ добавляем обратно в очередь и НЕ показываем капчу снова
         if (error instanceof Error && error.message === 'RATE_LIMIT_EXCEEDED') {
-          console.error('Rate limit still active after CAPTCHA - immunity may not be working');
+          // Rate limit все еще активен - не логируем
         } else {
-          console.error('Error retrying request after rate limit clear:', error);
+          // Ошибка при повторном запросе - не логируем
         }
       }
     }
@@ -432,7 +433,7 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
     
     try {
       // Open OAuth handler page in popup window
-      // This page has immunity to protection middleware and handles the OAuth flow
+      // This page has immunity to protection proxy and handles the OAuth flow
       const width = 500;
       const height = 600;
       const left = (window.screen.width - width) / 2;
@@ -524,8 +525,14 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
   };
 
   const switchTab = (tab: 'login' | 'register') => {
-    setCurrentTab(tab);
-    resetForm();
+    if (tab === currentTab) return; // Don't switch if already on this tab
+    
+    setIsTransitioning(true);
+    setTimeout(() => {
+      setCurrentTab(tab);
+      resetForm();
+      setIsTransitioning(false);
+    }, 150);
   };
 
   useEffect(() => {
@@ -546,14 +553,20 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
   return (
     <>
       <div className="w-full max-w-md mx-auto">
-        <div className="bg-neutral-900/80 backdrop-blur-md p-8 rounded-2xl border border-neutral-800 shadow-lg animate-fadeIn overflow-hidden">
-        <h2 className="text-2xl font-semibold mb-6 text-center">
+        <div className={`bg-neutral-900/80 backdrop-blur-md p-8 rounded-2xl border border-neutral-800 shadow-lg animate-fadeIn overflow-hidden transition-all duration-150 ease-out ${
+          isTransitioning ? 'opacity-50 scale-95' : ''
+        }`}>
+        <h2 className={`text-2xl font-semibold mb-6 text-center transition-all duration-150 ease-in-out ${
+          isTransitioning ? 'opacity-0 transform scale-95' : 'opacity-100 transform scale-100'
+        }`}>
           {currentTab === 'register' ? 'Регистрация' : 'Вход'}
         </h2>
 
         {/* Registration Form */}
         {currentTab === 'register' && (
-          <form onSubmit={registerForm.handleSubmit(handleRegister)} className="space-y-4 animate-formSwitch">
+          <form onSubmit={registerForm.handleSubmit(handleRegister)} className={`space-y-4 transition-all duration-150 ease-in-out ${
+            isTransitioning ? 'opacity-0 transform translate-y-4' : 'opacity-100 transform translate-y-0'
+          }`}>
             <label className="block">
               <span className="sr-only">Логин</span>
               <input
@@ -801,7 +814,9 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
 
         {/* Authorization Form */}
         {currentTab === 'login' && (
-          <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-4 animate-formSwitch">
+          <form onSubmit={loginForm.handleSubmit(handleLogin)} className={`space-y-4 transition-all duration-150 ease-in-out ${
+            isTransitioning ? 'opacity-0 transform translate-y-4' : 'opacity-100 transform translate-y-0'
+          }`}>
             <label className="block">
               <span className="sr-only">Логин</span>
                 <input

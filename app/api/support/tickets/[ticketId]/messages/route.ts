@@ -165,7 +165,7 @@ export async function POST(
       })
       .select(`
         *,
-        sender:users!support_messages_sender_id_fkey(id, username, user_id, avatar_gradient)
+        sender:users!support_messages_sender_id_fkey(id, username, user_id, avatar)
       `)
       .single();
 
@@ -208,22 +208,16 @@ export async function POST(
         sender: senderData,
       };
       
-      logger.info('Message created and broadcasting via WebSocket', {
-        ticketId,
-        messageId: newMessage.id,
-        senderType: newMessage.sender_type,
-        senderId: newMessage.sender_id,
-        messageLength: newMessage.message_text.length,
-        hasSender: !!senderData
-      });
+      // Успешное создание сообщения не логируется
       
       // Трекинг аналитики
       try {
         const { trackMessageSent } = await import('@/lib/analytics/support-analytics');
         await trackMessageSent(ticketId, newMessage.sender_id, newMessage.sender_type);
       } catch (error) {
-        logger.warn('Failed to track message analytics', {
-          error: error instanceof Error ? error.message : 'Unknown error'
+        logger.error('Error tracking message sent', {
+          error: error instanceof Error ? error.message : 'Unknown error',
+          ticketId
         });
       }
       
@@ -232,8 +226,7 @@ export async function POST(
       } catch (error) {
         logger.error('Error broadcasting new message', {
           error: error instanceof Error ? error.message : 'Unknown error',
-          ticketId,
-          messageId: newMessage.id
+          ticketId
         });
       }
     }

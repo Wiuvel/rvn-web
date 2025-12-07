@@ -280,6 +280,20 @@ function OAuthHandlerContent() {
       if (typeof window !== 'undefined') {
         window.location.href = '/api/auth/oauth/telegram';
       }
+    } else if (provider === 'yandex') {
+      setStatus('redirecting');
+      // Ensure popup flag is saved before redirect
+      try {
+        if (typeof sessionStorage !== 'undefined' && isPopupWindow()) {
+          sessionStorage.setItem('oauth_popup', 'true');
+        }
+      } catch {
+        // sessionStorage may be unavailable
+      }
+      // Redirect to Yandex OAuth endpoint
+      if (typeof window !== 'undefined') {
+        window.location.href = '/api/auth/oauth/yandex';
+      }
     } else {
       setHandled(true);
       const errorMsg = getOAuthErrorMessage('invalid_provider');

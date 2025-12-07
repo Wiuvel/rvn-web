@@ -71,10 +71,7 @@ export function withApiHandler(
       if (rateLimit) {
         const rateLimitResult = await rateLimit.check(request);
         if (!rateLimitResult.allowed) {
-          logger.warn(`RATE LIMIT EXCEEDED FOR ${method.toUpperCase()} REQUEST`, {
-            ip: request.headers.get('x-forwarded-for'),
-            userAgent: request.headers.get('user-agent')
-          });
+          // Rate limit - не логируем
           return setCorsHeaders(
             NextResponse.json(
               { error: 'Too many requests. Please try again later.' },

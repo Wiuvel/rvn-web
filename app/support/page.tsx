@@ -24,7 +24,7 @@ interface UserData {
   dashboard_token: string;
   created_at: string;
   last_login?: string;
-  avatar_gradient?: string | null;
+  avatar?: string | null;
 }
 
 interface Message {
@@ -276,9 +276,9 @@ export default function SupportPage() {
         // Если запрос снова получил rate limit после иммунитета - это критическая ошибка
         // НЕ добавляем обратно в очередь и НЕ показываем капчу снова
         if (error instanceof Error && error.message === 'RATE_LIMIT_EXCEEDED') {
-          console.error('Rate limit still active after CAPTCHA - immunity may not be working');
+          // Rate limit все еще активен - не логируем
         } else {
-          console.error('Error retrying request after rate limit clear:', error);
+          // Ошибка при повторном запросе - не логируем
         }
       }
     }
@@ -397,6 +397,7 @@ export default function SupportPage() {
         }
       } catch (error) {
         if (!isMounted) return;
+        // Ошибка получения данных пользователя
         console.error('Failed to fetch user data:', error);
         setUserData(null);
       } finally {
@@ -453,7 +454,7 @@ export default function SupportPage() {
       } catch (error) {
         // Не логируем RATE_LIMIT_EXCEEDED, так как это обрабатывается через капчу
         if (error instanceof Error && error.message !== 'RATE_LIMIT_EXCEEDED') {
-          console.error('Error marking messages as read:', error);
+          // Ошибка отметки сообщений - не логируем
         }
       }
     }, MARK_AS_READ_DEBOUNCE);
@@ -763,6 +764,7 @@ export default function SupportPage() {
           }
         }
       } catch (error) {
+        // Ошибка проверки новых сообщений
         console.error('Error checking for new messages:', error);
       }
     };
@@ -862,6 +864,7 @@ export default function SupportPage() {
         router.push('/auth');
       }
     } catch (error) {
+      // Ошибка выхода
       console.error('Logout error:', error);
     }
   };
@@ -1034,7 +1037,7 @@ export default function SupportPage() {
         // НЕ сбрасываем флаг, так как после капчи запрос повторится
         return;
       }
-      console.error('Error creating ticket:', error);
+      // Ошибка создания тикета - не логируем
       showNotification('Ошибка создания обращения');
     } finally {
       // Сбрасываем флаг создания тикета в любом случае
@@ -1174,7 +1177,7 @@ export default function SupportPage() {
         // Rate limit обрабатывается через капчу, не показываем ошибку
         return;
       }
-      console.error('Error sending message:', error);
+      // Ошибка отправки сообщения - не логируем
       showNotification('Ошибка отправки сообщения');
     } finally {
       // Сбрасываем флаг отправки в любом случае
@@ -1242,7 +1245,7 @@ export default function SupportPage() {
         setTicketsLoading(false);
         return;
       }
-      console.error('Error fetching tickets:', error);
+      // Ошибка получения тикетов - не логируем
       showNotification('Ошибка загрузки обращений');
     } finally {
       setTicketsLoading(false);
@@ -1323,6 +1326,7 @@ export default function SupportPage() {
         showNotification(translateError(errorMessage));
       }
     } catch (error) {
+      // Ошибка получения сообщений
       console.error('Error fetching ticket messages:', error);
       showNotification('Ошибка загрузки сообщений');
     }
@@ -1379,36 +1383,26 @@ export default function SupportPage() {
   if (!userData) {
     // Показываем заглушку с предложением авторизации
     return (
-      <div className="min-h-screen bg-neutral-950 text-neutral-100 flex items-center justify-center py-8 px-4">
-        <div className="max-w-md w-full mx-auto text-center">
-          <h1 className="text-xl sm:text-2xl font-semibold mb-4 sm:mb-6 text-white">Требуется авторизация</h1>
-          <p className="text-sm sm:text-base text-neutral-400 mb-6 sm:mb-8 px-2">
-            Не можете войти в аккаунт? Проблемы с оплатой? Мы также предоставляем поддержку в Telegram.
-          </p>
-          <div className="flex flex-col gap-3">
-            <a
-              href="https://t.me/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3 bg-neutral-800/60 hover:bg-neutral-700/60 border border-white/10 rounded-xl text-white transition-colors text-sm sm:text-base"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M9.999 15.17l-.394 5.556c.562 0 .805-.241 1.099-.529l2.635-2.516 5.461 4.043c1.001.551 1.716.264 1.96-.924l3.555-16.725c.314-1.46-.527-2.03-1.49-1.675L1.51 9.043c-1.438.56-1.416 1.364-.245 1.733l5.688 1.769L18.631 5.59c.6-.394 1.149-.176.698.217"/>
+      <div className="min-h-screen flex items-center justify-center bg-neutral-950 p-4">
+        <div className="max-w-md w-full text-center">
+          <div className="mb-6">
+            <div className="w-20 h-20 mx-auto rounded-full bg-red-500/20 flex items-center justify-center mb-4">
+              <svg className="w-10 h-10 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
-              <span>Телеграм</span>
-            </a>
+            </div>
+            <h1 className="text-2xl font-bold text-white mb-2">Требуется авторизация</h1>
+            <p className="text-neutral-400 mb-6">
+              Для доступа к данной странице требуется авторизация. Войдите в аккаунт или обратитесь в Telegram Bot'а.
+            </p>
             <Link
               href={`/auth?retpatch=${encodeURIComponent('/support/')}`}
-              className="flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3 bg-primary-500 hover:bg-primary-400 rounded-xl text-white transition-colors text-sm sm:text-base"
+              className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
             >
-              <Image 
-                src="/static/icons/accounts/log-in.svg" 
-                alt="Авторизация" 
-                width={18} 
-                height={18} 
-                className="w-[18px] h-[18px] flex-shrink-0"
-              />
-              <span>Авторизация</span>
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+              </svg>
+              Войти в аккаунт
             </Link>
           </div>
         </div>
@@ -1434,7 +1428,7 @@ export default function SupportPage() {
               <div className="hidden lg:flex items-center gap-2 relative" ref={userMenuRef}>
                 <button
                   onClick={() => setUserMenuOpen(!userMenuOpen)}
-                  className={`w-10 h-10 rounded-full ${getGradientClasses(userData.avatar_gradient)} flex items-center justify-center text-white font-semibold text-sm shadow-glow transition-transform duration-200 hover:scale-110 cursor-pointer`}
+                  className={`w-10 h-10 rounded-full ${getGradientClasses(userData.avatar)} flex items-center justify-center text-white font-semibold text-sm shadow-glow transition-transform duration-200 hover:scale-110 cursor-pointer`}
                   title={userData.username}
                   aria-label="Меню пользователя"
                   aria-expanded={userMenuOpen}
@@ -1452,7 +1446,7 @@ export default function SupportPage() {
                       className="block p-4 border-b border-white/10 hover:bg-white/5 transition-colors duration-200 cursor-pointer mx-2 my-1 rounded-xl"
                     >
                       <div className="flex items-center gap-3">
-                        <div className={`w-12 h-12 rounded-full ${getGradientClasses(userData.avatar_gradient)} flex items-center justify-center text-white font-semibold text-base flex-shrink-0`}>
+                        <div className={`w-12 h-12 rounded-full ${getGradientClasses(userData.avatar)} flex items-center justify-center text-white font-semibold text-base flex-shrink-0`}>
                           {getInitial(userData.username)}
                         </div>
                         <div className="min-w-0 flex-1">
@@ -1538,7 +1532,7 @@ export default function SupportPage() {
                   className="block p-4 border-b border-white/10 hover:bg-white/5 transition-colors duration-200 cursor-pointer mx-2 my-1 rounded-xl"
                 >
                   <div className="flex items-center gap-3">
-                    <div className={`w-12 h-12 rounded-full ${getGradientClasses(userData.avatar_gradient)} flex items-center justify-center text-white font-semibold text-base flex-shrink-0`}>
+                    <div className={`w-12 h-12 rounded-full ${getGradientClasses(userData.avatar)} flex items-center justify-center text-white font-semibold text-base flex-shrink-0`}>
                       {getInitial(userData.username)}
                     </div>
                     <div className="min-w-0 flex-1">

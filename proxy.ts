@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 /**
- * Static file detection - bypasses all middleware checks
+ * Static file detection - bypasses all proxy checks
  * @param pathname - The request pathname
  * @returns True if the pathname is a static file
  */
@@ -30,9 +30,9 @@ function isStaticFile(pathname: string): boolean {
  * Early exit for static files, API routes, and bots
  * @param pathname - The request pathname
  * @param userAgent - The request user agent
- * @returns True if the request should bypass all middleware checks
+ * @returns True if the request should bypass all proxy checks
  */
-function shouldBypassMiddleware(pathname: string, userAgent: string): boolean {
+function shouldBypassProxy(pathname: string, userAgent: string): boolean {
   if (isStaticFile(pathname)) {
     return true;
   }
@@ -47,7 +47,7 @@ function shouldBypassMiddleware(pathname: string, userAgent: string): boolean {
 }
 
 /**
- * Protection Middleware - checks if user passed protection screen
+ * Protection Proxy - checks if user passed protection screen
  * @param request - The Next.js request object
  * @param pathname - The request pathname
  * @returns NextResponse with redirect to protection page, or null to allow access
@@ -114,7 +114,7 @@ function handleProtection(request: NextRequest, pathname: string): NextResponse 
 }
 
 /**
- * Auth Middleware - handles authentication and authorization
+ * Auth Proxy - handles authentication and authorization
  * @param request - The Next.js request object
  * @param pathname - The request pathname
  * @returns NextResponse with redirect or null to allow/deny access
@@ -196,26 +196,26 @@ function handleAuth(request: NextRequest, pathname: string): NextResponse | null
 }
 
 /**
- * Main middleware function - handles all request routing and protection
+ * Main proxy function - handles all request routing and protection
  * @param request - The Next.js request object
  * @returns NextResponse with appropriate redirect or next() to continue
  */
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const userAgent = request.headers.get('user-agent') || '';
 
   /** Early exit for static files, API routes, and bots */
-  if (shouldBypassMiddleware(pathname, userAgent)) {
+  if (shouldBypassProxy(pathname, userAgent)) {
     return NextResponse.next();
   }
 
-  /** 1. Protection Middleware - checks protection cookies */
+  /** 1. Protection Proxy - checks protection cookies */
   const protectionResponse = handleProtection(request, pathname);
   if (protectionResponse) {
     return protectionResponse;
   }
 
-  /** 2. Auth Middleware - checks authentication and authorization */
+  /** 2. Auth Proxy - checks authentication and authorization */
   const authResponse = handleAuth(request, pathname);
   if (authResponse) {
     return authResponse;
@@ -238,3 +238,4 @@ export const config = {
     '/((?!api|_next/static|_next/image|favicon.ico|public|static|robots.txt|sitemap.xml).*)',
   ],
 };
+

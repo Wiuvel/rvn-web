@@ -5,8 +5,67 @@
 
 const { createServer } = require('http');
 const { parse } = require('url');
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
 
+// Динамический импорт logger с поддержкой TypeScript в dev режиме
+let logger;
 const dev = process.env.NODE_ENV !== 'production';
+
+if (dev) {
+  // В dev режиме используем простой logger, так как TypeScript файлы не компилируются для require()
+  logger = {
+    error: (msg, ctx) => console.error(`[ERROR] ${msg}`, ctx || ''),
+    warn: (msg, ctx) => console.warn(`[WARN] ${msg}`, ctx || ''),
+    info: (msg, ctx) => {
+      if (msg === 'Server: Ready.') {
+        const network = ctx?.network;
+        console.log('\n  ✓ Server started. Access the application at:');
+        console.log(`  Local:   ${ctx?.local || 'N/A'}`);
+        if (network && network !== ctx?.local) {
+          console.log(`  Network: ${network}`);
+        }
+      } else {
+        console.log(`[INFO] ${msg}`, ctx || '');
+      }
+    },
+    debug: (msg, ctx) => console.log(`[DEBUG] ${msg}`, ctx || '')
+  };
+} else {
+  // В production пробуем разные пути
+  const possiblePaths = [
+    './lib/utils/secure-logger',
+    './.next/standalone/lib/utils/secure-logger',
+    path.join(process.cwd(), 'lib/utils/secure-logger'),
+    path.join(process.cwd(), '.next/standalone/lib/utils/secure-logger')
+  ];
+  
+  let loaded = false;
+  for (const modulePath of possiblePaths) {
+    try {
+      const jsPath = modulePath.endsWith('.js') ? modulePath : modulePath + '.js';
+      if (fs.existsSync(jsPath) || fs.existsSync(modulePath + '.mjs')) {
+        logger = require(modulePath).logger;
+        loaded = true;
+        break;
+      }
+    } catch (e) {
+      continue;
+    }
+  }
+  
+  if (!loaded) {
+    // Fallback logger
+    logger = {
+      error: (msg, ctx) => console.error(`[ERROR] ${msg}`, ctx || ''),
+      warn: (msg, ctx) => console.warn(`[WARN] ${msg}`, ctx || ''),
+      info: (msg, ctx) => console.log(`[INFO] ${msg}`, ctx || ''),
+      debug: (msg, ctx) => console.log(`[DEBUG] ${msg}`, ctx || '')
+    };
+  }
+}
+
 const hostname = '0.0.0.0';
 const port = parseInt(process.env.PORT || '3001', 10);
 
@@ -14,27 +73,16 @@ let app, handle;
 
 // В production standalone режиме не используем next({ dev: false }), так как это требует webpack
 if (!dev) {
-  // В standalone режиме Next.js создает готовую сборку в .next/standalone
-  // которая не требует webpack. Но нам нужен кастомный сервер для WebSocket.
-  // 
-  // Проблема: next({ dev: false }) требует webpack, которого нет в standalone
-  // 
-  // Решение: используем готовый сервер из standalone или загружаем handler напрямую
-  // В Next.js 15 standalone режиме можно использовать готовый сервер из .next/standalone/server.js
-  // или загрузить handler из .next/standalone/.next/server
-  
+
   const path = require('path');
   const fs = require('fs');
-  
-  // Пытаемся использовать готовый сервер из standalone
-  // После копирования в Dockerfile структура: .next/standalone/ содержит содержимое standalone сборки
   const standaloneServerPath = path.join(process.cwd(), '.next/standalone/server.js');
   const standaloneNextPath = path.join(process.cwd(), '.next/standalone/.next');
   const standaloneDir = path.join(process.cwd(), '.next/standalone');
   
   // Проверяем, существует ли standalone директория
   if (fs.existsSync(standaloneDir)) {
-    console.log('✓ Standalone build found');
+    // Standalone build найден - не логируем
     
     if (fs.existsSync(standaloneServerPath)) {
       // Используем готовый сервер из standalone
@@ -45,12 +93,12 @@ if (!dev) {
         if (standaloneServer && typeof standaloneServer.getRequestHandler === 'function') {
           handle = standaloneServer.getRequestHandler();
           app = { prepare: () => Promise.resolve() };
-          console.log('✓ Using standalone server handler');
+          // Используем standalone handler - не логируем
         } else {
           throw new Error('Standalone server does not have getRequestHandler');
         }
       } catch (err) {
-        console.warn('⚠ Failed to use standalone server:', err.message);
+        // Ошибка standalone - пробуем fallback
         // Fallback к использованию Next.js из node_modules
         throw err;
       }
@@ -72,14 +120,14 @@ if (!dev) {
           dir: process.cwd()
         });
         handle = app.getRequestHandler();
-        console.log('✓ Using Next.js from standalone node_modules');
+        // Используем Next.js из standalone - не логируем
       } catch (err) {
-        console.error('❌ Failed to initialize Next.js:', err.message);
+        // Критическая ошибка инициализации
         throw err;
       }
     } else {
       // Standalone директория найдена, но структура неожиданная
-      console.warn('⚠ Standalone directory found but structure is unexpected');
+      // Неожиданная структура - используем fallback
       // Fallback: используем Next.js из node_modules
       const nextPath = fs.existsSync(path.join(process.cwd(), 'node_modules/next'))
         ? path.join(process.cwd(), 'node_modules/next')
@@ -94,15 +142,15 @@ if (!dev) {
           dir: process.cwd()
         });
         handle = app.getRequestHandler();
-        console.log('✓ Using Next.js from node_modules (fallback)');
+        // Используем fallback - не логируем
       } catch (err) {
-        console.error('❌ Failed to initialize Next.js:', err.message);
+        // Критическая ошибка инициализации
         throw err;
       }
     }
   } else {
     // Standalone сборка не найдена - используем fallback
-    console.warn('⚠ Standalone build not found, using fallback');
+    // Standalone не найден - используем fallback
     const nextPath = fs.existsSync(path.join(process.cwd(), 'node_modules/next'))
       ? path.join(process.cwd(), 'node_modules/next')
       : 'next';
@@ -116,7 +164,7 @@ if (!dev) {
         dir: process.cwd()
       });
       handle = app.getRequestHandler();
-      console.log('✓ Using Next.js from node_modules (fallback, may require webpack)');
+      // Используем fallback - не логируем
     } catch (err) {
       console.error('❌ Failed to initialize Next.js:', err.message);
       throw new Error('Cannot initialize Next.js server: ' + err.message);
@@ -140,7 +188,7 @@ initPromise.then(() => {
       const parsedUrl = parse(req.url, true);
       await handle(req, res, parsedUrl);
     } catch (err) {
-      console.error('Error occurred handling', req.url, err);
+      logger.error('Error handling request', { url: req.url, error: err instanceof Error ? err.message : 'Unknown error' });
       res.statusCode = 500;
       res.end('internal server error');
     }
@@ -270,11 +318,59 @@ initPromise.then(() => {
 
   httpServer
     .once('error', (err) => {
-      console.error(err);
+      logger.error('Server error', { error: err instanceof Error ? err.message : 'Unknown error' });
       process.exit(1);
     })
-    .listen(port, () => {
-      console.log(`> Ready on http://${hostname}:${port}`);
+    .listen(port, hostname, () => {
+      const protocol = 'http';
+      const localUrl = `${protocol}://localhost:${port}`;
+      
+      // Получаем все сетевые интерфейсы для отображения доступных IP
+      const networkInterfaces = os.networkInterfaces();
+      const addresses = [];
+      const seenAddresses = new Set();
+      
+      // Приоритет интерфейсов (предпочитаем Ethernet и Wi-Fi)
+      const interfacePriority = ['eth0', 'en0', 'wlan0', 'Wi-Fi', 'Ethernet'];
+      
+      // Сначала собираем все адреса с приоритетами
+      const allAddresses = [];
+      Object.keys(networkInterfaces).forEach((interfaceName) => {
+        const interfaces = networkInterfaces[interfaceName];
+        if (interfaces) {
+          interfaces.forEach((iface) => {
+            // Показываем только IPv4 адреса, исключая внутренние
+            if (iface.family === 'IPv4' && !iface.internal) {
+              // Проверяем, содержит ли имя интерфейса приоритетное значение
+              const priority = interfacePriority.findIndex(p => interfaceName.includes(p));
+              allAddresses.push({
+                address: `${protocol}://${iface.address}:${port}`,
+                interface: interfaceName,
+                priority: priority >= 0 ? priority : 999
+              });
+            }
+          });
+        }
+      });
+      
+      // Сортируем по приоритету и убираем дубликаты
+      allAddresses.sort((a, b) => a.priority - b.priority);
+      allAddresses.forEach((item) => {
+        if (!seenAddresses.has(item.address)) {
+          addresses.push(item.address);
+          seenAddresses.add(item.address);
+        }
+      });
+      
+      // Показываем только первый (наиболее приоритетный) адрес
+      const primaryAddress = addresses.length > 0 ? addresses[0] : localUrl;
+      
+      logger.info('Server: Ready.', { 
+        local: localUrl,
+        network: primaryAddress,
+        port,
+        hostname
+      });
       
       if (dev) {
         setTimeout(async () => {

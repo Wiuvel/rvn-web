@@ -7,6 +7,7 @@ import { useFadeIn } from '@/hooks/useGSAP';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import LightRays from "@/components/LightRays";
 
 export default function HeroSection() {
   const [ping, setPing] = useState(0);
@@ -58,7 +59,24 @@ export default function HeroSection() {
   };
 
   return (
-    <section id="home" className="relative">
+    <section id="home" className="relative overflow-visible bg-neutral-950">
+      <div className="absolute inset-0 w-full h-full pointer-events-none" style={{ overflow: 'visible' }}>
+        <LightRays
+          raysOrigin="top-center"
+          raysColor="#45beff"
+          raysSpeed={1.0}
+          lightSpread={0.8}
+          rayLength={3.0}
+          followMouse={false}
+          mouseInfluence={0.1}
+          noiseAmount={0.1}
+          distortion={0.05}
+          fadeDistance={2.0}
+          className="custom-rays"
+        />
+      </div>
+      {/* Градиентная маска для плавного затухания внизу */}
+      <div className="absolute bottom-0 left-0 right-0 h-32 pointer-events-none z-10 bg-gradient-to-t from-neutral-950 to-transparent" />
       <div className="mx-auto max-w-7xl px-6 sm:px-8 lg:px-12 xl:px-16 pt-24 pb-24 md:pt-32 md:pb-36 relative z-10">
         <div className="flex flex-col lg:grid lg:grid-cols-2 gap-8 md:gap-12 items-center">
           <div className="order-2 lg:order-1 text-center lg:text-left">

@@ -11,12 +11,12 @@ export async function OPTIONS() {
   return handleCorsPreflight();
 }
 
-// Initiate Google OAuth flow
+// Initiate Yandex OAuth flow
 export async function GET(request: NextRequest) {
   try {
     const env = getEnv();
     if (!env.PUBLIC_DOMAIN) {
-      logger.error('Public domain not configured');
+      logger.error('OAuth: PUBLIC_DOMAIN not configured.');
       return setCorsHeaders(
         NextResponse.json(
           { error: 'OAuth service not configured' },
@@ -30,7 +30,6 @@ export async function GET(request: NextRequest) {
       : env.PUBLIC_DOMAIN;
 
     // Check if request is from popup (oauth-handler page opens in popup)
-    // This must be determined early as it's used in error handling
     const referer = request.headers.get('referer') || '';
     const isPopup = referer.includes('/auth/oauth-handler') || 
                     referer.includes('popup') ||
@@ -39,23 +38,20 @@ export async function GET(request: NextRequest) {
     // Rate limiting
     const rateLimitResult = await authRateLimit.check(request);
     if (!rateLimitResult.allowed) {
-      // Rate limit - не логируем
       const errorUrl = getErrorRedirectUrl('rate_limit', origin, isPopup);
       return setCorsHeaders(NextResponse.redirect(errorUrl));
     }
 
-    // Check Google OAuth credentials
-    if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) {
-      logger.error('Google OAuth not configured');
+    // Check Yandex OAuth credentials
+    if (!env.YANDEX_CLIENT_ID || !env.YANDEX_CLIENT_SECRET) {
+      logger.error('OAuth: Yandex not configured.');
       const errorUrl = getErrorRedirectUrl('oauth_not_configured', origin, isPopup);
       return setCorsHeaders(NextResponse.redirect(errorUrl));
     }
 
     // Generate CSRF state token
     const state = randomBytes(32).toString('hex');
-    const redirectUri = `${origin}/api/auth/oauth/google/callback`;
-
-    // OAuth инициирован - не логируем
+    const redirectUri = `${origin}/api/auth/oauth/yandex/callback`;
 
     const hostname = request.nextUrl.hostname;
     const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
@@ -63,16 +59,15 @@ export async function GET(request: NextRequest) {
     // Store popup flag in state cookie for callback
     const stateWithPopup = isPopup ? `${state}:popup` : state;
 
-    // Redirect to Google OAuth
+    // Redirect to Yandex OAuth
+    // Request access to: login:info (login, name, surname, gender), login:avatar (portrait), login:email (email)
     const response = NextResponse.redirect(
-      `https://accounts.google.com/o/oauth2/v2/auth?${new URLSearchParams({
-        client_id: env.GOOGLE_CLIENT_ID,
-        redirect_uri: redirectUri,
+      `https://oauth.yandex.ru/authorize?${new URLSearchParams({
         response_type: 'code',
-        scope: 'openid email profile',
-        access_type: 'offline',
-        prompt: 'consent',
+        client_id: env.YANDEX_CLIENT_ID,
+        redirect_uri: redirectUri,
         state: stateWithPopup,
+        scope: 'login:info login:avatar login:email',
       }).toString()}`
     );
 
@@ -87,7 +82,7 @@ export async function GET(request: NextRequest) {
 
     return setCorsHeaders(response);
   } catch (error) {
-    logger.error('OAuth initiation error', {
+    logger.error('OAuth: Yandex initiation error.', {
       error: error instanceof Error ? error.message : 'Unknown error'
     });
     
@@ -111,3 +106,4 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+

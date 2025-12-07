@@ -50,11 +50,7 @@ export async function POST(request: NextRequest) {
 
     const currentSessionId = request.cookies.get(ADMIN_SESSION_COOKIE)?.value;
     if (currentSessionId && csrfToken && !verifyCSRFToken(csrfToken, currentSessionId)) {
-      logger.warn('Invalid CSRF token for admin registration attempt', {
-        ip: request.headers.get('x-forwarded-for'),
-        hasSessionId: !!currentSessionId,
-        hasCsrfToken: !!csrfToken,
-      });
+      // Невалидный CSRF токен - не логируем
       return setCorsHeaders(
         NextResponse.json({ error: 'Invalid request' }, { status: 403 }),
       );

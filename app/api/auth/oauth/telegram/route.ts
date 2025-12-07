@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
   try {
     const env = getEnv();
     if (!env.PUBLIC_DOMAIN) {
-      logger.error('public_domain not configured');
+      logger.error('Public domain not configured');
       return setCorsHeaders(
         NextResponse.json(
           { error: 'OAuth service not configured' },
@@ -40,14 +40,14 @@ export async function GET(request: NextRequest) {
     // Rate limiting
     const rateLimitResult = await authRateLimit.check(request);
     if (!rateLimitResult.allowed) {
-      logger.warn('rate limit exceeded', { ip: request.headers.get('x-forwarded-for') });
+      // Rate limit - не логируем
       const errorUrl = getErrorRedirectUrl('rate_limit', origin, isPopup);
       return setCorsHeaders(NextResponse.redirect(errorUrl));
     }
 
     // Check Telegram OAuth credentials
     if (!env.TELEGRAM_BOT_TOKEN) {
-      logger.error('telegram oauth not configured');
+      logger.error('Telegram OAuth not configured');
       const errorUrl = getErrorRedirectUrl('oauth_not_configured', origin, isPopup);
       return setCorsHeaders(NextResponse.redirect(errorUrl));
     }
@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
     // Get bot ID from bot token
     const botId = await getTelegramBotId(env.TELEGRAM_BOT_TOKEN);
     if (!botId) {
-      logger.error('failed to get telegram bot id');
+      logger.error('Failed to get Telegram bot ID');
       const errorUrl = getErrorRedirectUrl('oauth_not_configured', origin, isPopup);
       return setCorsHeaders(NextResponse.redirect(errorUrl));
     }
@@ -63,7 +63,7 @@ export async function GET(request: NextRequest) {
     // Generate CSRF state token
     const state = randomBytes(32).toString('hex');
 
-    logger.info('telegram oauth initiated');
+    // OAuth инициирован - не логируем
 
     const hostname = request.nextUrl.hostname;
     const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
@@ -96,8 +96,8 @@ export async function GET(request: NextRequest) {
 
     return setCorsHeaders(response);
   } catch (error) {
-    logger.error('telegram oauth initiation error', {
-      error: error instanceof Error ? error.message : 'unknown error'
+    logger.error('Telegram OAuth initiation error', {
+      error: error instanceof Error ? error.message : 'Unknown error'
     });
     
     try {

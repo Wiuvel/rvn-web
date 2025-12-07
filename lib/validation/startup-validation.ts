@@ -3,9 +3,9 @@ import { logger } from '../utils/secure-logger';
 
 /**
  * Валидация всех критических компонентов при старте приложения
- * Не вызывается в Edge Runtime (middleware)
+ * Не вызывается в Edge Runtime (proxy)
  * 
- * ВАЖНО: Этот файл НЕ должен импортироваться в Edge Runtime (middleware)
+ * ВАЖНО: Этот файл НЕ должен импортироваться в Edge Runtime (proxy)
  */
 export function validateStartup(): void {
   // Пропускаем валидацию в Edge Runtime (process.exit недоступен)

@@ -6,8 +6,8 @@ import { z } from 'zod';
  */
 const envSchema = z.object({
   SUPABASE_URL: z.string().url('SUPABASE_URL must be a valid URL'),
-  SUPABASE_ANON_KEY: z.string().min(20, 'SUPABASE_ANON_KEY must be at least 20 characters'),
-  SUPABASE_SERVICE_ROLE_KEY: z.string().min(20, 'SUPABASE_SERVICE_ROLE_KEY must be at least 20 characters'),
+  SUPABASE_PUBLISHABLE_KEY: z.string().min(20, 'SUPABASE_PUBLISHABLE_KEY must be at least 20 characters'),
+  SUPABASE_SECRET_KEY: z.string().min(20, 'SUPABASE_SECRET_KEY must be at least 20 characters'),
   
   CSRF_SECRET: z.string()
     .min(32, 'CSRF_SECRET must be at least 32 characters')
@@ -26,6 +26,15 @@ const envSchema = z.object({
   
   // Telegram OAuth
   TELEGRAM_BOT_TOKEN: z.string().optional(),
+  
+  // Yandex OAuth
+  YANDEX_CLIENT_ID: z.string().optional(),
+  YANDEX_CLIENT_SECRET: z.string().optional(),
+  
+  // GitHub OAuth for Admin Panel
+  GITHUB_CLIENT_ID: z.string().optional(),
+  GITHUB_CLIENT_SECRET: z.string().optional(),
+  GITHUB_TRUSTED_DEVELOPERS: z.string().optional(), // Comma-separated list of GitHub usernames
   
   // Public domain for OAuth redirects (optional, falls back to host header)
   PUBLIC_DOMAIN: z.string().url().optional(),
@@ -52,14 +61,19 @@ export function validateEnv(): Env {
   try {
     validatedEnv = envSchema.parse({
       SUPABASE_URL: supabaseUrl,
-      SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-      SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
+      SUPABASE_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+      SUPABASE_SECRET_KEY: process.env.SUPABASE_SECRET_KEY,
       CSRF_SECRET: process.env.CSRF_SECRET,
       TURNSTILE_SECRET_KEY: process.env.TURNSTILE_SECRET_KEY,
       ALLOWED_ORIGINS: process.env.ALLOWED_ORIGINS,
       GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
       GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
       TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN,
+      YANDEX_CLIENT_ID: process.env.YANDEX_CLIENT_ID,
+      YANDEX_CLIENT_SECRET: process.env.YANDEX_CLIENT_SECRET,
+      GITHUB_CLIENT_ID: process.env.GITHUB_CLIENT_ID,
+      GITHUB_CLIENT_SECRET: process.env.GITHUB_CLIENT_SECRET,
+      GITHUB_TRUSTED_DEVELOPERS: process.env.GITHUB_TRUSTED_DEVELOPERS,
       PUBLIC_DOMAIN: process.env.PUBLIC_DOMAIN,
       NODE_ENV: process.env.NODE_ENV || 'development',
     });
@@ -86,11 +100,7 @@ export function validateEnv(): Env {
       
       const errorMessage = `Env validation failed: ${errorParts.join(' | ')}`;
       
-      if (process.env.NODE_ENV === 'development') {
-        console.error(`❌ ${errorMessage}`);
-      } else {
-        console.error(errorMessage);
-      }
+      // Ошибка валидации env переменных логируется через throw
       
       const envError = new Error(errorMessage) as Error & { isEnvValidationError: boolean };
       envError.isEnvValidationError = true;

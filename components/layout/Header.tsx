@@ -267,7 +267,7 @@ export default function Header() {
                     e.stopPropagation();
                     setUserMenuOpen(!userMenuOpen);
                   }}
-                  className={`w-10 h-10 rounded-full ${getGradientClasses(userData.avatar_gradient)} flex items-center justify-center text-white font-semibold text-sm shadow-glow transition-transform duration-200 hover:scale-110 cursor-pointer`}
+                  className={`w-10 h-10 rounded-full ${getGradientClasses(userData.avatar)} flex items-center justify-center text-white font-semibold text-sm shadow-glow transition-transform duration-200 hover:scale-110 cursor-pointer`}
                   title={userData.username}
                   aria-label="Меню пользователя"
                   aria-expanded={userMenuOpen}
@@ -333,7 +333,7 @@ export default function Header() {
                     className="block p-4 border-b border-white/10 hover:bg-white/5 transition-colors duration-200 cursor-pointer mx-2 my-1 rounded-xl"
                   >
                     <div className="flex items-center gap-3">
-                      <div className={`w-12 h-12 rounded-full ${getGradientClasses(userData.avatar_gradient)} flex items-center justify-center text-white font-semibold text-base flex-shrink-0`}>
+                      <div className={`w-12 h-12 rounded-full ${getGradientClasses(userData.avatar)} flex items-center justify-center text-white font-semibold text-base flex-shrink-0`}>
                         {getInitial(userData.username)}
                       </div>
                       <div className="min-w-0 flex-1">

@@ -51,7 +51,7 @@ export interface UserData {
   dashboard_token: string;
   created_at: string;
   last_login?: string | null;
-  avatar_gradient?: string | null;
+  avatar?: string | null;
   isSupport?: boolean;
   isAdmin?: boolean;
 }
@@ -82,13 +82,13 @@ export interface Ticket {
     id: string;
     username: string;
     user_id: string;
-    avatar_gradient?: string | null;
+    avatar?: string | null;
   };
   assigned_user?: {
     id: string;
     username: string;
     user_id: string;
-    avatar_gradient?: string | null;
+    avatar?: string | null;
   } | null;
 }
 
@@ -103,7 +103,7 @@ export interface SupportMessage {
     id: string;
     username: string;
     user_id: string;
-    avatar_gradient?: string | null;
+    avatar?: string | null;
   };
 }
 

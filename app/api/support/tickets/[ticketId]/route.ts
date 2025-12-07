@@ -83,8 +83,8 @@ export async function GET(
       .from('support_tickets')
       .select(`
         *,
-        user:users!support_tickets_user_id_fkey(id, username, user_id, avatar_gradient),
-        assigned_user:users!support_tickets_assigned_to_fkey(id, username, user_id, avatar_gradient)
+        user:users!support_tickets_user_id_fkey(id, username, user_id, avatar),
+        assigned_user:users!support_tickets_assigned_to_fkey(id, username, user_id, avatar)
       `)
       .eq('id', ticketId)
       .single();
@@ -117,7 +117,7 @@ export async function GET(
       .from('support_messages')
       .select(`
         *,
-        sender:users!support_messages_sender_id_fkey(id, username, user_id, avatar_gradient)
+        sender:users!support_messages_sender_id_fkey(id, username, user_id, avatar)
       `)
       .eq('ticket_id', ticketId)
       .order('created_at', { ascending: true });
@@ -268,12 +268,7 @@ export async function PUT(
       const allowedNextStatuses = allowedTransitions[oldStatus] || [];
       
       if (!allowedNextStatuses.includes(status)) {
-        logger.warn('Invalid status transition attempt', {
-          ticketId,
-          oldStatus,
-          newStatus: status,
-          userId: user.id
-        });
+        // Невалидный переход статуса - не логируем
         return setCorsHeaders(
           NextResponse.json(
             { error: ERROR_INVALID_STATUS_TRANSITION },
@@ -288,13 +283,7 @@ export async function PUT(
       if (status !== 'pending' || oldStatus !== 'open') {
         // Если это не взятие тикета, проверяем назначение
         if (oldAssignedTo !== user.id) {
-          logger.warn('Status change attempt by non-assigned support', {
-            ticketId,
-            oldStatus,
-            newStatus: status,
-            assignedTo: oldAssignedTo,
-            userId: user.id
-          });
+          // Попытка изменения статуса не назначенным поддержкой - не логируем
           return setCorsHeaders(
             NextResponse.json(
               { error: ERROR_TICKET_NOT_ASSIGNED },
@@ -362,7 +351,7 @@ export async function PUT(
       .select(`
         *,
         user:users!support_tickets_user_id_fkey(id, username, user_id),
-        assigned_user:users!support_tickets_assigned_to_fkey(id, username, user_id, avatar_gradient)
+        assigned_user:users!support_tickets_assigned_to_fkey(id, username, user_id, avatar)
       `)
       .single();
 
@@ -381,15 +370,7 @@ export async function PUT(
 
     // Отправляем обновление тикета через WebSocket
     if (ticket) {
-      logger.info('Ticket updated', {
-        ticketId,
-        status: ticket.status,
-        oldStatus,
-        assignedTo: ticket.assigned_to,
-        oldAssignedTo,
-        updatedBy: user.id,
-        isSupport
-      });
+      // Успешное обновление тикета не логируется
       
       broadcastTicketUpdate(ticketId, {
         id: ticketId,
@@ -400,12 +381,7 @@ export async function PUT(
 
       // Если изменилось назначение, отправляем событие
       if (assignedTo !== undefined && assignedTo !== oldAssignedTo) {
-        logger.info('Ticket assignment changed', {
-          ticketId,
-          oldAssignedTo,
-          newAssignedTo: assignedTo,
-          assignedBy: user.id
-        });
+        // Назначение тикета изменено - не логируем
         
         broadcastTicketAssignment(
           ticketId,
@@ -427,8 +403,9 @@ export async function PUT(
           const { trackTicketClosed } = await import('@/lib/analytics/support-analytics');
           await trackTicketClosed(ticketId, user.id, status);
         } catch (error) {
-          logger.warn('Failed to track ticket closure analytics', {
-            error: error instanceof Error ? error.message : 'Unknown error'
+          logger.error('Error tracking ticket closure', {
+            error: error instanceof Error ? error.message : 'Unknown error',
+            ticketId
           });
         }
         
@@ -459,7 +436,7 @@ export async function PUT(
         })
         .select(`
           *,
-          sender:users!support_messages_sender_id_fkey(id, username, user_id, avatar_gradient)
+          sender:users!support_messages_sender_id_fkey(id, username, user_id, avatar)
         `)
         .single();
 

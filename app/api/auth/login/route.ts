@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateUser } from '@/lib/auth/index';
 import { authRateLimit } from '@/lib/security/rate-limit';
-import { verifyCSRFToken, revokeCSRFToken, getCSRFTokenInfo, getCSRFStoreSize } from '@/lib/security/csrf';
+import { verifyCSRFToken, revokeCSRFToken } from '@/lib/security/csrf';
 import { validateRequestBody } from '@/lib/api/validation';
 import { loginSchema } from '@/lib/validation/schemas';
 import { sanitizeInput } from '@/lib/security/sanitize';
@@ -17,10 +17,7 @@ export async function POST(request: NextRequest) {
   try {
     const rateLimitResult = await authRateLimit.check(request);
     if (!rateLimitResult.allowed) {
-      logger.warn('RATE LIMIT EXCEEDED FOR LOGIN ATTEMPT', {
-        ip: request.headers.get('x-forwarded-for'),
-        userAgent: request.headers.get('user-agent')
-      });
+      // Rate limit - не логируем
       return setCorsHeaders(
         NextResponse.json(
           { error: 'Too many login attempts. Please try again later.' },
@@ -43,10 +40,7 @@ export async function POST(request: NextRequest) {
     // Если session_id нет, CSRF токен не требуется (первый запрос, но все равно проверяем если передан)
     if (currentSessionId) {
       if (!csrfToken) {
-        logger.warn('MISSING CSRF TOKEN FOR LOGIN ATTEMPT WITH EXISTING SESSION', {
-          ip: request.headers.get('x-forwarded-for'),
-          hasSessionId: true
-        });
+        // Отсутствует CSRF токен - не логируем (нормальная валидация)
         return setCorsHeaders(
           NextResponse.json(
             { error: 'Invalid request. Please refresh the page.' },
@@ -55,29 +49,11 @@ export async function POST(request: NextRequest) {
         );
       }
       
-      // Логируем информацию о токене перед проверкой
-      const tokenInfo = getCSRFTokenInfo(currentSessionId);
-      logger.info('CSRF TOKEN VERIFICATION ATTEMPT', {
-        sessionIdPrefix: currentSessionId?.substring(0, 8),
-        tokenExistsInStore: tokenInfo.exists,
-        tokenLength: csrfToken?.length || 0,
-        storeSize: getCSRFStoreSize(),
-        ip: request.headers.get('x-forwarded-for')
-      });
+      // Проверка CSRF токена - не логируем
       
       const csrfValidation = verifyCSRFToken(csrfToken, currentSessionId, true);
       if (!csrfValidation.valid) {
-        logger.warn('INVALID CSRF TOKEN FOR LOGIN ATTEMPT', {
-          ip: request.headers.get('x-forwarded-for'),
-          hasSessionId: true,
-          hasCsrfToken: !!csrfToken,
-          tokenLength: csrfToken?.length || 0,
-          sessionIdLength: currentSessionId?.length || 0,
-          reason: csrfValidation.reason,
-          sessionIdPrefix: currentSessionId?.substring(0, 8),
-          tokenExistsInStore: tokenInfo.exists,
-          storeSize: getCSRFStoreSize()
-        });
+        // Невалидный CSRF токен - не логируем (нормальная валидация)
         return setCorsHeaders(
           NextResponse.json(
             { error: 'Invalid request. Please refresh the page and try again.' },
@@ -88,20 +64,13 @@ export async function POST(request: NextRequest) {
     } else if (csrfToken) {
       // Если session_id нет, но CSRF токен передан - это подозрительно
       // Но не блокируем, так как это может быть первый запрос после очистки cookies
-      logger.info('CSRF TOKEN PROVIDED WITHOUT SESSION_ID FOR LOGIN ATTEMPT', {
-        ip: request.headers.get('x-forwarded-for'),
-        hasCsrfToken: true
-      });
+      // CSRF токен без session_id - не логируем
     }
 
     const result = await authenticateUser(username, password);
 
     if (!result.success) {
-      logger.warn('FAILED LOGIN ATTEMPT', {
-        username: sanitizeInput(username),
-        ip: request.headers.get('x-forwarded-for'),
-        userAgent: request.headers.get('user-agent')
-      });
+      // Неудачная попытка входа - не логируем (безопасность)
       return setCorsHeaders(
         NextResponse.json(
           { error: result.error || 'Authentication failed' },
@@ -134,11 +103,7 @@ export async function POST(request: NextRequest) {
     revokeCSRFToken(sessionId);
     await SessionManager.setSessionCookie(sessionId, isLocalhost);
 
-    logger.info('SUCCESSFUL LOGIN', {
-      username: sanitizeInput(username),
-      sessionId: sessionId.substring(0, 8) + '...',
-      ip: ipAddress
-    });
+    // Успешный вход - не логируем
 
     // Set authentication cookies
     const response = NextResponse.json(
@@ -175,7 +140,7 @@ export async function POST(request: NextRequest) {
 
     return setCorsHeaders(response);
   } catch (error) {
-    logger.error('LOGIN ERROR', {
+    logger.error('Login error', {
       error: error instanceof Error ? error.message : 'Unknown error',
       ip: request.headers.get('x-forwarded-for')
     });

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { generateCSRFToken, getCSRFStoreSize } from '@/lib/security/csrf';
+import { generateCSRFToken } from '@/lib/security/csrf';
 import { generateSessionId } from '@/lib/utils/index';
 import { generalRateLimit } from '@/lib/security/rate-limit';
 import { logger } from '@/lib/utils/secure-logger';
@@ -14,10 +14,7 @@ export async function GET(request: NextRequest) {
     // Rate limiting
     const rateLimitResult = await generalRateLimit.check(request);
     if (!rateLimitResult.allowed) {
-      logger.warn('RATE LIMIT EXCEEDED FOR CSRF TOKEN REQUEST', {
-        ip: request.headers.get('x-forwarded-for'),
-        userAgent: request.headers.get('user-agent')
-      });
+      // Rate limit - не логируем
       return setCorsHeaders(
         NextResponse.json(
           { error: 'Too many requests' },
@@ -33,21 +30,13 @@ export async function GET(request: NextRequest) {
     // Если session ID не существует, создаем новый
     if (!sessionId) {
       sessionId = generateSessionId();
-      logger.info('CREATED NEW SESSION_ID FOR CSRF TOKEN', {
-        sessionId: sessionId.substring(0, 8) + '...',
-        ip: request.headers.get('x-forwarded-for')
-      });
+      // Создана новая сессия - не логируем
     }
 
     const csrfToken = generateCSRFToken(sessionId);
     
     // Логируем для отладки
-    logger.info('CSRF TOKEN GENERATED', {
-      sessionId: sessionId.substring(0, 8) + '...',
-      tokenLength: csrfToken.length,
-      storeSize: getCSRFStoreSize(),
-      ip: request.headers.get('x-forwarded-for')
-    });
+    // CSRF токен сгенерирован - не логируем
 
     // Создаем response
     const response = NextResponse.json({
@@ -67,7 +56,7 @@ export async function GET(request: NextRequest) {
 
     return setCorsHeaders(response);
   } catch (error) {
-    logger.error('CSRF TOKEN GENERATION ERROR', {
+    logger.error('CSRF token generation error', {
       error: error instanceof Error ? error.message : 'Unknown error',
       ip: request.headers.get('x-forwarded-for')
     });

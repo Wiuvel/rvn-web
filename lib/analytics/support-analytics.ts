@@ -228,12 +228,17 @@ export interface SupportAnalytics {
   // WebSocket метрики
   websocketConnections: number;
   websocketMessages: number;
+  
+  // Период аналитики
+  period: AnalyticsPeriod;
 }
 
-export async function getSupportAnalytics(days: number = 30): Promise<SupportAnalytics> {
+export type AnalyticsPeriod = 'hour' | 'day' | 'week' | 'month';
+
+export async function getSupportAnalytics(period: AnalyticsPeriod = 'month'): Promise<SupportAnalytics> {
   const client = getRedisClient();
   if (!client) {
-    logger.warn('Redis client not available, returning empty analytics');
+    // Redis необязателен - не логируем
     // Возвращаем пустую аналитику вместо null, если Redis не подключен
     return {
       totalTicketsCreated: 0,
@@ -249,12 +254,13 @@ export async function getSupportAnalytics(days: number = 30): Promise<SupportAna
       messagesSentHourly: [],
       websocketConnections: 0,
       websocketMessages: 0,
+      period,
     };
   }
 
   // Проверяем состояние соединения
   if (client.status !== 'ready') {
-    logger.warn('Redis connection not ready, attempting to reconnect');
+    // Автоматическое переподключение не логируется
     try {
       await client.connect();
     } catch (error) {
@@ -276,6 +282,7 @@ export async function getSupportAnalytics(days: number = 30): Promise<SupportAna
         messagesSentHourly: [],
         websocketConnections: 0,
         websocketMessages: 0,
+        period,
       };
     }
   }
@@ -311,43 +318,87 @@ export async function getSupportAnalytics(days: number = 30): Promise<SupportAna
     const websocketConnections = websocketConnectionsRaw || '0';
     const websocketMessages = websocketMessagesRaw || '0';
 
-    // Получаем данные за последние N дней
+    // Определяем количество дней/часов в зависимости от периода
+    let daysToFetch = 30;
+    let hoursToFetch = 24;
+    
+    switch (period) {
+      case 'hour':
+        daysToFetch = 0;
+        hoursToFetch = 1;
+        break;
+      case 'day':
+        daysToFetch = 1;
+        hoursToFetch = 24;
+        break;
+      case 'week':
+        daysToFetch = 7;
+        hoursToFetch = 24;
+        break;
+      case 'month':
+        daysToFetch = 30;
+        hoursToFetch = 24;
+        break;
+    }
+
+    // Получаем данные за период (по дням)
     const ticketsCreatedDaily: Array<{ date: string; count: number }> = [];
     const ticketsClosedDaily: Array<{ date: string; count: number }> = [];
     const messagesSentDaily: Array<{ date: string; count: number }> = [];
 
-    for (let i = days - 1; i >= 0; i--) {
-      const date = new Date();
-      date.setDate(date.getDate() - i);
-      const dateStr = date.toISOString().split('T')[0];
+    if (daysToFetch > 0) {
+      for (let i = daysToFetch - 1; i >= 0; i--) {
+        const date = new Date();
+        date.setDate(date.getDate() - i);
+        const dateStr = date.toISOString().split('T')[0];
 
-      const [created, closed, messages] = await Promise.all([
-        client.get(getDailyKey(REDIS_KEYS.TICKETS_CREATED_DAILY, date)),
-        client.get(getDailyKey(REDIS_KEYS.TICKETS_CLOSED_DAILY, date)),
-        client.get(getDailyKey(REDIS_KEYS.MESSAGES_SENT_DAILY, date)),
-      ]);
+        const [created, closed, messages] = await Promise.all([
+          client.get(getDailyKey(REDIS_KEYS.TICKETS_CREATED_DAILY, date)),
+          client.get(getDailyKey(REDIS_KEYS.TICKETS_CLOSED_DAILY, date)),
+          client.get(getDailyKey(REDIS_KEYS.MESSAGES_SENT_DAILY, date)),
+        ]);
 
-      ticketsCreatedDaily.push({ date: dateStr, count: parseInt(created || '0', 10) });
-      ticketsClosedDaily.push({ date: dateStr, count: parseInt(closed || '0', 10) });
-      messagesSentDaily.push({ date: dateStr, count: parseInt(messages || '0', 10) });
+        ticketsCreatedDaily.push({ date: dateStr, count: parseInt(created || '0', 10) });
+        ticketsClosedDaily.push({ date: dateStr, count: parseInt(closed || '0', 10) });
+        messagesSentDaily.push({ date: dateStr, count: parseInt(messages || '0', 10) });
+      }
     }
 
-    // Получаем данные за последние 24 часа
+    // Получаем данные за период (по часам)
     const ticketsCreatedHourly: Array<{ hour: number; count: number }> = [];
     const messagesSentHourly: Array<{ hour: number; count: number }> = [];
 
-    const today = new Date();
-    for (let hour = 0; hour < 24; hour++) {
-      const date = new Date(today);
-      date.setUTCHours(hour, 0, 0, 0);
+    if (hoursToFetch > 0) {
+      const now = new Date();
+      
+      if (period === 'hour') {
+        // Для периода "1 час" получаем данные только за текущий час
+        const currentHour = now.getUTCHours();
+        const date = new Date(now);
+        date.setUTCHours(currentHour, 0, 0, 0);
 
-      const [created, messages] = await Promise.all([
-        client.get(getHourlyKey(REDIS_KEYS.TICKETS_CREATED_HOURLY, date)),
-        client.get(getHourlyKey(REDIS_KEYS.MESSAGES_SENT_HOURLY, date)),
-      ]);
+        const [created, messages] = await Promise.all([
+          client.get(getHourlyKey(REDIS_KEYS.TICKETS_CREATED_HOURLY, date)),
+          client.get(getHourlyKey(REDIS_KEYS.MESSAGES_SENT_HOURLY, date)),
+        ]);
 
-      ticketsCreatedHourly.push({ hour, count: parseInt(created || '0', 10) });
-      messagesSentHourly.push({ hour, count: parseInt(messages || '0', 10) });
+        ticketsCreatedHourly.push({ hour: currentHour, count: parseInt(created || '0', 10) });
+        messagesSentHourly.push({ hour: currentHour, count: parseInt(messages || '0', 10) });
+      } else {
+        // Для остальных периодов получаем данные за последние 24 часа
+        for (let hour = 0; hour < 24; hour++) {
+          const date = new Date(now);
+          date.setUTCHours(hour, 0, 0, 0);
+
+          const [created, messages] = await Promise.all([
+            client.get(getHourlyKey(REDIS_KEYS.TICKETS_CREATED_HOURLY, date)),
+            client.get(getHourlyKey(REDIS_KEYS.MESSAGES_SENT_HOURLY, date)),
+          ]);
+
+          ticketsCreatedHourly.push({ hour, count: parseInt(created || '0', 10) });
+          messagesSentHourly.push({ hour, count: parseInt(messages || '0', 10) });
+        }
+      }
     }
 
     // Преобразуем ticketsByStatus в объект
@@ -370,9 +421,10 @@ export async function getSupportAnalytics(days: number = 30): Promise<SupportAna
       messagesSentHourly,
       websocketConnections: parseInt(websocketConnections, 10),
       websocketMessages: parseInt(websocketMessages, 10),
+      period,
     };
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : 'Unknown error';
     
     // Если ошибка связана с закрытым соединением, логируем как предупреждение
     if (errorMessage.includes('Connection is closed') || errorMessage.includes('Connection closed')) {
@@ -382,7 +434,7 @@ export async function getSupportAnalytics(days: number = 30): Promise<SupportAna
     } else {
       logger.error('Error getting support analytics', {
         error: errorMessage,
-        stack: error instanceof Error ? error.stack : undefined
+        stack: err instanceof Error ? err.stack : undefined
       });
     }
     
@@ -401,6 +453,7 @@ export async function getSupportAnalytics(days: number = 30): Promise<SupportAna
       messagesSentHourly: [],
       websocketConnections: 0,
       websocketMessages: 0,
+      period,
     };
   }
 }

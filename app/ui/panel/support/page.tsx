@@ -32,14 +32,14 @@ interface Ticket {
     id: string;
     username: string;
     user_id: string;
-    avatar_gradient?: string | null;
+    avatar?: string | null;
   };
   assigned_to?: string | null;
   assigned_user?: {
     id: string;
     username: string;
     user_id: string;
-    avatar_gradient?: string | null;
+    avatar?: string | null;
   } | null;
   last_message?: {
     id: string;
@@ -63,7 +63,7 @@ interface Message {
     id: string;
     username: string;
     user_id: string;
-    avatar_gradient?: string | null;
+    avatar?: string | null;
   };
 }
 
@@ -162,7 +162,7 @@ function MessageItem({
           <div className={`flex items-end gap-3 ${isSupport ? 'flex-row-reverse' : 'flex-row'} ${isSupport ? 'w-full' : 'w-full'}`}>
             {/* Аватарка для пользователя (слева) */}
             {isUser && message.sender && (
-              <div className={`w-10 h-10 rounded-full ${getGradientClasses(message.sender.avatar_gradient)} flex items-center justify-center text-white font-semibold text-sm flex-shrink-0 mb-1`}>
+              <div className={`w-10 h-10 rounded-full ${getGradientClasses(message.sender.avatar)} flex items-center justify-center text-white font-semibold text-sm flex-shrink-0 mb-1`}>
                 {getInitial(message.sender.username)}
               </div>
             )}
@@ -410,9 +410,9 @@ export default function SupportPanel() {
         // Если запрос снова получил rate limit после иммунитета - это критическая ошибка
         // НЕ добавляем обратно в очередь и НЕ показываем капчу снова
         if (error instanceof Error && error.message === 'RATE_LIMIT_EXCEEDED') {
-          console.error('Rate limit still active after CAPTCHA - immunity may not be working');
+          // Rate limit все еще активен - не логируем
         } else {
-          console.error('Error retrying request after rate limit clear:', error);
+          // Ошибка при повторном запросе - не логируем
         }
       }
     }
@@ -503,7 +503,7 @@ export default function SupportPanel() {
       } catch (error) {
         // Не логируем RATE_LIMIT_EXCEEDED, так как это обрабатывается через капчу
         if (error instanceof Error && error.message !== 'RATE_LIMIT_EXCEEDED') {
-          console.error('Error marking messages as read:', error);
+          // Ошибка отметки сообщений - не логируем
         }
       }
     }, 2000);
@@ -597,7 +597,7 @@ export default function SupportPanel() {
         id: string;
         username: string;
         user_id: string;
-        avatar_gradient?: string | null;
+        avatar?: string | null;
       } | null;
     }) => {
       if (data.ticketId !== activeTicket.id) return;
@@ -748,7 +748,7 @@ export default function SupportPanel() {
           // Rate limit обрабатывается через капчу, не показываем ошибку
           return;
         }
-        console.error('Error checking for new messages:', error);
+        // Ошибка проверки новых сообщений - не логируем
       }
     };
 
@@ -874,7 +874,7 @@ export default function SupportPanel() {
         setLoading(false);
         return;
       }
-      console.error('Error checking auth status:', error);
+      // Ошибка проверки авторизации - не логируем
       // При ошибке сети тоже показываем сообщение, а не редиректим
       setAuthState({
         isAuthenticated: true,
@@ -1127,7 +1127,7 @@ export default function SupportPanel() {
         setTicketsLoading(false);
         return;
       }
-      console.error('Error fetching tickets:', error);
+      // Ошибка получения тикетов - не логируем
       setTicketsLoading(false);
       // Устанавливаем пустой список и сбрасываем скелетон
       setTickets([]);
@@ -1240,7 +1240,7 @@ export default function SupportPanel() {
         setMessagesLoading(false);
         return;
       }
-      console.error('Error fetching messages:', error);
+      // Ошибка получения сообщений - не логируем
       showNotification(translateError('Ошибка загрузки сообщений'), 'error');
     } finally {
       setMessagesLoading(false);
@@ -1310,7 +1310,7 @@ export default function SupportPanel() {
         // Rate limit обрабатывается через капчу, не показываем ошибку
         return;
       }
-      console.error('Error sending message:', error);
+      // Ошибка отправки сообщения - не логируем
       showNotification(translateError('Ошибка отправки сообщения'), 'error');
     }
   };
@@ -1433,7 +1433,7 @@ export default function SupportPanel() {
       if (error instanceof Error && error.message === 'RATE_LIMIT_EXCEEDED') {
         return;
       }
-      console.error('Error assigning ticket:', error);
+      // Ошибка назначения тикета - не логируем
       showNotification('Ошибка при взятии тикета', 'error');
     }
   };
@@ -1576,7 +1576,7 @@ export default function SupportPanel() {
         // Rate limit обрабатывается через капчу, не показываем ошибку
         return;
       }
-      console.error('Error updating ticket status:', error);
+      // Ошибка обновления статуса тикета - не логируем
       showNotification(translateError('Ошибка обновления статуса'), 'error');
     }
   };
@@ -1723,7 +1723,7 @@ export default function SupportPanel() {
             </div>
             <h1 className="text-2xl font-bold text-white mb-2">Доступ ограничен</h1>
             <p className="text-neutral-400 mb-6">
-              У вас нет доступа к панели поддержки. Возможно произошла ошибка или вы не авторизованы.
+              У вас нет доступа к данной странице. Возможно произошла ошибка или вы не авторизованы в системе.
             </p>
             <Link
               href="/ui/panel"
@@ -2149,7 +2149,7 @@ export default function SupportPanel() {
                 {activeTicket.user && (
                   <div className="border-b border-neutral-800 p-3 bg-neutral-900/50 flex-shrink-0">
                   <div className="flex items-center gap-3 mb-3">
-                    <div className={`w-10 h-10 rounded-full ${getGradientClasses(activeTicket.user.avatar_gradient)} flex items-center justify-center text-white font-semibold text-sm flex-shrink-0 shadow-glow`}>
+                    <div className={`w-10 h-10 rounded-full ${getGradientClasses(activeTicket.user.avatar)} flex items-center justify-center text-white font-semibold text-sm flex-shrink-0 shadow-glow`}>
                       {getInitial(activeTicket.user.username)}
                     </div>
                     <div>

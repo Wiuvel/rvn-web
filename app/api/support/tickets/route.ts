@@ -29,10 +29,7 @@ export async function GET(request: NextRequest) {
   try {
     const rateLimitResult = await generalRateLimit.check(request);
     if (!rateLimitResult.allowed) {
-      logger.warn('Rate limit exceeded for tickets request', {
-        ip: request.headers.get('x-forwarded-for'),
-        userAgent: request.headers.get('user-agent')
-      });
+      // Rate limit - не логируем (нормальная ситуация)
       return setCorsHeaders(
         NextResponse.json(
           { error: ERROR_TOO_MANY_REQUESTS },
@@ -87,8 +84,8 @@ export async function GET(request: NextRequest) {
       .from('support_tickets')
       .select(`
         *,
-        user:users!support_tickets_user_id_fkey(id, username, user_id, avatar_gradient),
-        assigned_user:users!support_tickets_assigned_to_fkey(id, username, user_id, avatar_gradient)
+        user:users!support_tickets_user_id_fkey(id, username, user_id, avatar),
+        assigned_user:users!support_tickets_assigned_to_fkey(id, username, user_id, avatar)
       `)
       .order('last_message_at', { ascending: false });
 
@@ -146,10 +143,7 @@ export async function GET(request: NextRequest) {
           .order('created_at', { ascending: false });
         
         if (lastMessagesError) {
-          logger.warn('Error fetching last messages in batch, falling back to individual queries', {
-            error: lastMessagesError.message,
-            ticketCount: ticketIds.length
-          });
+          // Fallback на индивидуальные запросы - не логируем
           // Fallback: используем отдельные запросы при ошибке, но с ограничением параллелизма
           const BATCH_SIZE = 10; // Ограничиваем параллелизм
           for (let i = 0; i < ticketIds.length; i += BATCH_SIZE) {
@@ -233,10 +227,7 @@ export async function POST(request: NextRequest) {
   try {
     const rateLimitResult = await generalRateLimit.check(request);
     if (!rateLimitResult.allowed) {
-      logger.warn('Rate limit exceeded for create ticket', {
-        ip: request.headers.get('x-forwarded-for'),
-        userAgent: request.headers.get('user-agent')
-      });
+      // Rate limit - не логируем
       return setCorsHeaders(
         NextResponse.json(
           { error: ERROR_TOO_MANY_REQUESTS },
@@ -378,20 +369,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    logger.info('Ticket created', {
-      ticketId: ticket.id,
-      userId: user.id,
-      subject: subject.trim().substring(0, 50)
-    });
+    // Успешное создание тикета не логируется
 
     // Трекинг аналитики
     try {
       const { trackTicketCreated } = await import('@/lib/analytics/support-analytics');
       await trackTicketCreated(ticket.id, user.id, ticket.status);
     } catch (error) {
-      // Игнорируем ошибки аналитики, чтобы не блокировать создание тикета
-      logger.warn('Failed to track ticket creation analytics', {
-        error: error instanceof Error ? error.message : 'Unknown error'
+      logger.error('Error tracking ticket creation', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        ticketId: ticket.id
       });
     }
 
@@ -421,20 +408,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    logger.info('Ticket message created', {
-      ticketId: ticket.id,
-      userId: user.id,
-      messageLength: message.trim().length
-    });
+        // Успешное создание сообщения не логируется
 
     // Трекинг аналитики для первого сообщения
     try {
       const { trackMessageSent } = await import('@/lib/analytics/support-analytics');
       await trackMessageSent(ticket.id, user.id, 'user');
     } catch (error) {
-      // Игнорируем ошибки аналитики
-      logger.warn('Failed to track message analytics', {
-        error: error instanceof Error ? error.message : 'Unknown error'
+      logger.error('Error tracking message sent', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        ticketId: ticket.id
       });
     }
 

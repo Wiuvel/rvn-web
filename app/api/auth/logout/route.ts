@@ -29,11 +29,7 @@ export async function POST(request: NextRequest) {
 
     // Log successful logout
     if (userId) {
-      logger.info('User logout', {
-        userId: userId,
-        sessionId: sessionId ? sessionId.substring(0, 8) + '...' : 'none',
-        ip: request.headers.get('x-forwarded-for')
-      });
+      // Выход пользователя - не логируем
     }
 
     return setCorsHeaders(

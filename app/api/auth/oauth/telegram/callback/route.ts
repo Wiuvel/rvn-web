@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
   try {
     const env = getEnv();
     if (!env.PUBLIC_DOMAIN) {
-      logger.error('public_domain not configured');
+      logger.error('Public domain not configured');
       return setCorsHeaders(
         NextResponse.json(
           { error: 'OAuth service not configured' },
@@ -54,14 +54,14 @@ export async function GET(request: NextRequest) {
     // Rate limiting
     const rateLimitResult = await authRateLimit.check(request);
     if (!rateLimitResult.allowed) {
-      logger.warn('rate limit exceeded');
+      // Rate limit - не логируем
       const errorUrl = getErrorRedirectUrl('rate_limit', origin, isPopup);
       return setCorsHeaders(NextResponse.redirect(errorUrl));
     }
 
     // Check Telegram OAuth credentials
     if (!env.TELEGRAM_BOT_TOKEN) {
-      logger.error('telegram oauth not configured');
+      logger.error('Telegram OAuth not configured');
       const errorUrl = getErrorRedirectUrl('oauth_not_configured', origin, isPopup);
       return setCorsHeaders(NextResponse.redirect(errorUrl));
     }
@@ -77,7 +77,7 @@ export async function GET(request: NextRequest) {
 
     // Validate required parameters
     if (!id || !authDate || !hash) {
-      logger.warn('telegram oauth missing parameters', { hasId: !!id, hasAuthDate: !!authDate, hasHash: !!hash });
+      // Отсутствуют параметры - не логируем (валидация)
       const errorUrl = getErrorRedirectUrl('invalid_request', origin, isPopup);
       return setCorsHeaders(NextResponse.redirect(errorUrl));
     }
@@ -88,7 +88,7 @@ export async function GET(request: NextRequest) {
     const cleanStoredState = storedState?.includes(':popup') ? storedState.split(':')[0] : storedState;
     
     if (!cleanStoredState || cleanStoredState !== cleanState) {
-      logger.warn('telegram oauth state mismatch');
+      // Несоответствие state - не логируем (валидация)
       const errorUrl = getErrorRedirectUrl('invalid_state', origin, isPopup);
       return setCorsHeaders(NextResponse.redirect(errorUrl));
     }
@@ -117,10 +117,7 @@ export async function GET(request: NextRequest) {
       .digest('hex');
 
     if (calculatedHash !== hash) {
-      logger.warn('telegram oauth hash mismatch', { 
-        calculatedHash: calculatedHash.substring(0, 8) + '...', 
-        receivedHash: hash.substring(0, 8) + '...' 
-      });
+      // Несоответствие hash - не логируем (валидация)
       const errorUrl = getErrorRedirectUrl('invalid_hash', origin, isPopup);
       return setCorsHeaders(NextResponse.redirect(errorUrl));
     }
@@ -131,11 +128,7 @@ export async function GET(request: NextRequest) {
     const maxAge = 24 * 60 * 60; // 24 hours
 
     if (now - authTimestamp > maxAge) {
-      logger.warn('telegram oauth expired', { 
-        authTimestamp, 
-        now, 
-        age: now - authTimestamp 
-      });
+      // OAuth истек - не логируем (валидация)
       const errorUrl = getErrorRedirectUrl('auth_expired', origin, isPopup);
       return setCorsHeaders(NextResponse.redirect(errorUrl));
     }
@@ -146,7 +139,6 @@ export async function GET(request: NextRequest) {
 
     // Get or create user
     let user = await getUserByEmail(telegramEmail);
-    let isNewUser = false;
 
     if (!user) {
       const telegramUsernameFromEmail = `telegram_${id}`;
@@ -172,17 +164,16 @@ export async function GET(request: NextRequest) {
       const createResult = await createUserFromOAuth(telegramEmail, sanitizedUsername);
       
       if (!createResult.success || !createResult.user) {
-        logger.error('failed to create user', { error: createResult.error });
+        logger.error('Failed to create user', { error: createResult.error });
         const errorUrl = getErrorRedirectUrl('user_creation_failed', origin, isPopup);
         return setCorsHeaders(NextResponse.redirect(errorUrl));
       }
       user = createResult.user;
-      isNewUser = true;
     }
 
     // Check user activity
     if (!user.is_active) {
-      logger.warn('login attempt for inactive user', { userId: user.id });
+      // Попытка входа неактивного пользователя - не логируем
       const errorUrl = getErrorRedirectUrl('account_disabled', origin, isPopup);
       return setCorsHeaders(NextResponse.redirect(errorUrl));
     }
@@ -324,12 +315,12 @@ export async function GET(request: NextRequest) {
     // Clear OAuth state cookie
     response.cookies.delete('oauth_state');
 
-    logger.info('telegram oauth login successful', { userId: user.id, isNewUser });
+    // Успешный OAuth вход - не логируем
 
     return setCorsHeaders(response);
   } catch (error) {
-    logger.error('telegram oauth callback error', {
-      error: error instanceof Error ? error.message : 'unknown error'
+    logger.error('Telegram OAuth callback error', {
+      error: error instanceof Error ? error.message : 'Unknown error'
     });
     
     try {

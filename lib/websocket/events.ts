@@ -23,7 +23,7 @@ export interface SupportWebSocketEvents {
         id: string;
         username: string;
         user_id: string;
-        avatar_gradient?: string | null;
+        avatar?: string | null;
       };
     };
   }) => void;
@@ -44,7 +44,7 @@ export interface SupportWebSocketEvents {
       id: string;
       username: string;
       user_id: string;
-      avatar_gradient?: string | null;
+      avatar?: string | null;
     } | null;
   }) => void;
   'support:typing:status': (data: {

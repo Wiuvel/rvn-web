@@ -106,10 +106,7 @@ export async function POST(request: NextRequest) {
     // grantImmunity возвращает время истечения для синхронизации с cookie
     const immunityExpiry = await generalRateLimit.grantImmunity(request);
 
-    logger.info('Rate limit cleared and immunity granted (CAPTCHA)', {
-      ip: request.headers.get('x-forwarded-for'),
-      immunityExpiry
-    });
+    // Rate limit очищен - не логируем
 
     // Создаем response с данными об иммунитете
     const response = NextResponse.json({

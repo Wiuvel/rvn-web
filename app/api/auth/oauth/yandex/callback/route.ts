@@ -12,12 +12,12 @@ export async function OPTIONS() {
   return handleCorsPreflight();
 }
 
-// Handle Google OAuth callback
+// Handle Yandex OAuth callback
 export async function GET(request: NextRequest) {
   try {
     const env = getEnv();
     if (!env.PUBLIC_DOMAIN) {
-      logger.error('Public domain not configured');
+      logger.error('OAuth: PUBLIC_DOMAIN not configured.');
       return setCorsHeaders(
         NextResponse.json(
           { error: 'OAuth service not configured' },
@@ -33,19 +33,15 @@ export async function GET(request: NextRequest) {
     // Get state early to determine if this is a popup request
     const { searchParams } = request.nextUrl;
     const state = searchParams.get('state');
-    // Check stored state cookie to determine if this is a popup request
-    // This is more reliable than checking the state parameter from URL
     const storedState = request.cookies.get('oauth_state')?.value;
     const referer = request.headers.get('referer') || '';
     let isPopup = false;
     if (storedState) {
       isPopup = storedState.includes(':popup');
     }
-    // Fallback: check referer if cookie check didn't work
     if (!isPopup && referer.includes('/auth/oauth-handler')) {
       isPopup = true;
     }
-    // Additional fallback: check if state parameter contains popup flag
     if (!isPopup && state && state.includes(':popup')) {
       isPopup = true;
     }
@@ -53,68 +49,61 @@ export async function GET(request: NextRequest) {
     // Rate limiting
     const rateLimitResult = await authRateLimit.check(request);
     if (!rateLimitResult.allowed) {
-      // Rate limit - не логируем
       const errorUrl = getErrorRedirectUrl('rate_limit', origin, isPopup);
       return setCorsHeaders(NextResponse.redirect(errorUrl));
     }
 
-    // Check Google OAuth credentials
-    if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) {
-      logger.error('Google OAuth not configured');
+    // Check Yandex OAuth credentials
+    if (!env.YANDEX_CLIENT_ID || !env.YANDEX_CLIENT_SECRET) {
+      logger.error('OAuth: Yandex not configured.');
       const errorUrl = getErrorRedirectUrl('oauth_not_configured', origin, isPopup);
       return setCorsHeaders(NextResponse.redirect(errorUrl));
     }
 
     // Get OAuth parameters
     const code = searchParams.get('code');
-    const googleError = searchParams.get('error');
+    const yandexError = searchParams.get('error');
 
-    // Check for Google errors (e.g., ?error=access_denied, ?error=rate_limit)
-    if (googleError) {
-      // Ошибка от Google - не логируем (валидация)
-      // Map Google error to generic error code
-      const errorCode = GOOGLE_ERROR_MAP[googleError] || 'oauth_denied';
+    // Check for Yandex errors
+    if (yandexError) {
+      const errorCode = GOOGLE_ERROR_MAP[yandexError] || 'oauth_denied';
       const errorUrl = getErrorRedirectUrl(errorCode, origin, isPopup);
       return setCorsHeaders(NextResponse.redirect(errorUrl));
     }
 
     // Validate required parameters
     if (!code || !state) {
-      // Отсутствуют параметры - не логируем (валидация)
       const errorUrl = getErrorRedirectUrl('invalid_request', origin, isPopup);
       return setCorsHeaders(NextResponse.redirect(errorUrl));
     }
 
     // Verify CSRF state token
-    // storedState already retrieved above for isPopup determination
     const cleanState = isPopup ? state.split(':')[0] : state;
     const cleanStoredState = storedState?.includes(':popup') ? storedState.split(':')[0] : storedState;
     
     if (!cleanStoredState || cleanStoredState !== cleanState) {
-      // Несоответствие state - не логируем (валидация)
       const errorUrl = getErrorRedirectUrl('invalid_state', origin, isPopup);
       return setCorsHeaders(NextResponse.redirect(errorUrl));
     }
     
-    const redirectUri = `${origin}/api/auth/oauth/google/callback`;
+    const redirectUri = `${origin}/api/auth/oauth/yandex/callback`;
 
     // Exchange authorization code for access token
-    const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+    const tokenResponse = await fetch('https://oauth.yandex.ru/token', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
       body: new URLSearchParams({
-        client_id: env.GOOGLE_CLIENT_ID,
-        client_secret: env.GOOGLE_CLIENT_SECRET,
-        code,
         grant_type: 'authorization_code',
-        redirect_uri: redirectUri,
+        code,
+        client_id: env.YANDEX_CLIENT_ID,
+        client_secret: env.YANDEX_CLIENT_SECRET,
       }),
     });
 
     if (!tokenResponse.ok) {
-      logger.error('Failed to exchange OAuth code', {
+      logger.error('OAuth: Failed to exchange Yandex code.', {
         status: tokenResponse.status
       });
       const errorUrl = getErrorRedirectUrl('token_exchange_failed', origin, isPopup);
@@ -125,39 +114,35 @@ export async function GET(request: NextRequest) {
     const { access_token } = tokenData;
 
     if (!access_token) {
-      logger.error('No access token in OAuth response');
+      logger.error('OAuth: No access token in Yandex response.');
       const errorUrl = getErrorRedirectUrl('no_access_token', origin, isPopup);
       return setCorsHeaders(NextResponse.redirect(errorUrl));
     }
 
-    // Fetch user info from Google
-    const userInfoResponse = await fetch(
-      'https://www.googleapis.com/oauth2/v2/userinfo',
-      {
-        headers: {
-          Authorization: `Bearer ${access_token}`,
-        },
-      }
-    );
+    // Fetch user info from Yandex
+    const userInfoResponse = await fetch('https://login.yandex.ru/info', {
+      headers: {
+        Authorization: `OAuth ${access_token}`,
+      },
+    });
 
     if (!userInfoResponse.ok) {
-      logger.error('Failed to fetch user info', { status: userInfoResponse.status });
+      logger.error('OAuth: Failed to fetch Yandex user info.', { 
+        status: userInfoResponse.status 
+      });
       const errorUrl = getErrorRedirectUrl('user_info_failed', origin, isPopup);
       return setCorsHeaders(NextResponse.redirect(errorUrl));
     }
 
     const userInfo = await userInfoResponse.json();
-    const { email, verified_email } = userInfo;
+    const { default_email, emails } = userInfo;
+
+    // Yandex может вернуть email в default_email или в массиве emails
+    const email = default_email || (emails && Array.isArray(emails) && emails.length > 0 ? emails[0] : null);
 
     if (!email) {
-      logger.error('No email in user info');
+      logger.error('OAuth: No email in Yandex user info.');
       const errorUrl = getErrorRedirectUrl('no_email', origin, isPopup);
-      return setCorsHeaders(NextResponse.redirect(errorUrl));
-    }
-
-    if (!verified_email) {
-      // Email не подтвержден - не логируем (валидация)
-      const errorUrl = getErrorRedirectUrl('email_not_verified', origin, isPopup);
       return setCorsHeaders(NextResponse.redirect(errorUrl));
     }
 
@@ -168,7 +153,7 @@ export async function GET(request: NextRequest) {
       const createResult = await createUserFromOAuth(email);
       
       if (!createResult.success || !createResult.user) {
-        logger.error('Failed to create user', { error: createResult.error });
+        logger.error('OAuth: Failed to create user.', { error: createResult.error });
         const errorUrl = getErrorRedirectUrl('user_creation_failed', origin, isPopup);
         return setCorsHeaders(NextResponse.redirect(errorUrl));
       }
@@ -177,7 +162,6 @@ export async function GET(request: NextRequest) {
 
     // Check user activity
     if (!user.is_active) {
-      // Попытка входа неактивного пользователя - не логируем
       const errorUrl = getErrorRedirectUrl('account_disabled', origin, isPopup);
       return setCorsHeaders(NextResponse.redirect(errorUrl));
     }
@@ -204,22 +188,16 @@ export async function GET(request: NextRequest) {
     await SessionManager.setSessionCookie(sessionId, isLocalhost);
 
     // Create redirect response
-    // If popup, redirect to oauth-handler which will communicate with parent
-    // Otherwise, redirect directly to dashboard
     const redirectUrl = isPopup 
-      ? new URL(`/auth/oauth-handler?provider=google&success=true&dashboard_token=${user.dashboard_token}&popup=true`, origin)
+      ? new URL(`/auth/oauth-handler?provider=yandex&success=true&dashboard_token=${user.dashboard_token}&popup=true`, origin)
       : new URL(`/dashboard/${user.dashboard_token}`, origin);
     const response = NextResponse.redirect(redirectUrl);
 
     // Copy protection cookies from request if they exist, or set temporary ones
-    // Note: Due to SameSite=Strict, protection cookies may not be sent in cross-site OAuth callback
-    // If they don't exist, we set temporary ones to avoid redirect to /protection/
-    // User has already passed OAuth verification, so we can grant temporary access
     const accessGranted = request.cookies.get('access_granted')?.value;
     const accessHash = request.cookies.get('access_hash')?.value;
     const accessTime = request.cookies.get('access_time')?.value;
 
-    // Determine cookie domain based on hostname (matching protection script logic)
     const isVercel = hostname.includes('vercel.app');
     let cookieDomain: string | undefined;
     if (!isLocalhost && !isVercel && hostname.includes('rvn.market')) {
@@ -227,69 +205,63 @@ export async function GET(request: NextRequest) {
     }
 
     if (accessGranted && accessHash) {
-      // Preserve existing protection cookies
-      // Use sameSite: 'lax' to ensure cookies work in cross-site OAuth scenarios
       response.cookies.set('access_granted', accessGranted, {
-        maxAge: 60 * 60 * 2, // 2 hours
-        httpOnly: false, // Must match client-side setting
+        maxAge: 60 * 60 * 2,
+        httpOnly: false,
         secure: process.env.NODE_ENV === 'production' && !isLocalhost,
-        sameSite: 'lax', // Changed from 'strict' to 'lax' for OAuth redirects
+        sameSite: 'lax',
         path: '/',
         ...(cookieDomain && { domain: cookieDomain })
       });
 
       response.cookies.set('access_hash', accessHash, {
-        maxAge: 60 * 60 * 2, // 2 hours
-        httpOnly: false, // Must match client-side setting
+        maxAge: 60 * 60 * 2,
+        httpOnly: false,
         secure: process.env.NODE_ENV === 'production' && !isLocalhost,
-        sameSite: 'lax', // Changed from 'strict' to 'lax' for OAuth redirects
+        sameSite: 'lax',
         path: '/',
         ...(cookieDomain && { domain: cookieDomain })
       });
 
       if (accessTime) {
         response.cookies.set('access_time', accessTime, {
-          maxAge: 60 * 60 * 2, // 2 hours
-          httpOnly: false, // Must match client-side setting
+          maxAge: 60 * 60 * 2,
+          httpOnly: false,
           secure: process.env.NODE_ENV === 'production' && !isLocalhost,
-          sameSite: 'lax', // Changed from 'strict' to 'lax' for OAuth redirects
+          sameSite: 'lax',
           path: '/',
           ...(cookieDomain && { domain: cookieDomain })
         });
       }
     } else {
-      // Set temporary protection cookies for OAuth users
-      // OAuth verification is sufficient for temporary access
-      // User can complete full protection later if needed
       const { createHash } = await import('crypto');
       const tempHash = createHash('sha256')
         .update(`${user.id}-${Date.now()}-oauth-temp`)
         .digest('hex');
       
-      // Set cookies with sameSite: 'lax' to ensure they're sent on redirect
       response.cookies.set('access_granted', 'true', {
-        maxAge: 60 * 60 * 2, // 2 hours
+        maxAge: 60 * 60 * 2,
         httpOnly: false,
         secure: process.env.NODE_ENV === 'production' && !isLocalhost,
-        sameSite: 'lax', // Changed from 'strict' to 'lax' for OAuth redirects
+        sameSite: 'lax',
         path: '/',
         ...(cookieDomain && { domain: cookieDomain })
       });
 
       response.cookies.set('access_hash', tempHash, {
-        maxAge: 60 * 60 * 2, // 2 hours
+        maxAge: 60 * 60 * 2,
         httpOnly: false,
         secure: process.env.NODE_ENV === 'production' && !isLocalhost,
-        sameSite: 'lax', // Changed from 'strict' to 'lax' for OAuth redirects
+        sameSite: 'lax',
         path: '/',
         ...(cookieDomain && { domain: cookieDomain })
       });
 
       response.cookies.set('access_time', Date.now().toString(), {
-        maxAge: 60 * 60 * 2, // 2 hours
+        maxAge: 60 * 60 * 2,
         httpOnly: false,
         secure: process.env.NODE_ENV === 'production' && !isLocalhost,
-        sameSite: 'lax', // Changed from 'strict' to 'lax' for OAuth redirects
+        sameSite: 'lax',
         path: '/',
         ...(cookieDomain && { domain: cookieDomain })
       });
@@ -323,15 +295,12 @@ export async function GET(request: NextRequest) {
     // Clear OAuth state cookie
     response.cookies.delete('oauth_state');
 
-    // Успешный OAuth вход - не логируем
-
     return setCorsHeaders(response);
   } catch (error) {
-    logger.error('OAuth callback error', {
-      error: error instanceof Error ? error.message : 'unknown error'
+    logger.error('OAuth: Yandex callback error.', {
+      error: error instanceof Error ? error.message : 'Unknown error'
     });
     
-    // Get origin for error redirect
     try {
       const env = getEnv();
       if (env.PUBLIC_DOMAIN) {
@@ -342,7 +311,6 @@ export async function GET(request: NextRequest) {
         return setCorsHeaders(NextResponse.redirect(errorUrl));
       }
     } catch {
-      // Fallback to JSON error if env unavailable
     }
     
     return setCorsHeaders(
@@ -353,3 +321,4 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+

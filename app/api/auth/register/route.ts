@@ -18,10 +18,7 @@ export async function POST(request: NextRequest) {
     // Rate limiting
     const rateLimitResult = await authRateLimit.check(request);
     if (!rateLimitResult.allowed) {
-      logger.warn('RATE LIMIT EXCEEDED FOR REGISTRATION ATTEMPT', {
-        ip: request.headers.get('x-forwarded-for'),
-        userAgent: request.headers.get('user-agent')
-      });
+      // Rate limit - не логируем
       return setCorsHeaders(
         NextResponse.json(
           { error: 'Too many registration attempts. Please try again later.' },
@@ -41,11 +38,7 @@ export async function POST(request: NextRequest) {
     // CSRF защита - упрощенная для регистрации
     const currentSessionId = request.cookies.get('session_id')?.value;
     if (currentSessionId && csrfToken && !verifyCSRFToken(csrfToken, currentSessionId)) {
-      logger.warn('INVALID CSRF TOKEN FOR REGISTRATION ATTEMPT', {
-        ip: request.headers.get('x-forwarded-for'),
-        hasSessionId: !!currentSessionId,
-        hasCsrfToken: !!csrfToken
-      });
+      // Невалидный CSRF токен - не логируем
       return setCorsHeaders(
         NextResponse.json(
           { error: 'Invalid request' },
@@ -57,12 +50,7 @@ export async function POST(request: NextRequest) {
     const result = await createUser(username, password);
 
     if (!result.success) {
-      logger.warn('FAILED USER CREATION ATTEMPT', {
-        username: sanitizeInput(username),
-        ip: request.headers.get('x-forwarded-for'),
-        userAgent: request.headers.get('user-agent'),
-        error: result.error
-      });
+      // Неудачная попытка создания - не логируем
       return setCorsHeaders(
         NextResponse.json(
           { error: result.error || 'Failed to create account' },
@@ -120,14 +108,11 @@ export async function POST(request: NextRequest) {
     });
 
     // Successful registration
-    logger.info('SUCCESSFUL USER REGISTRATION', {
-      username: sanitizeInput(username),
-      ip: request.headers.get('x-forwarded-for')
-    });
+    // Успешная регистрация - не логируем
 
     return setCorsHeaders(response);
   } catch (error) {
-    logger.error('REGISTRATION ERROR', {
+    logger.error('Registration error', {
       error: error instanceof Error ? error.message : 'Unknown error',
       ip: request.headers.get('x-forwarded-for')
     });

@@ -1,10 +1,9 @@
 import bcrypt from 'bcryptjs';
 import { supabaseAdmin, Admin } from '../database/supabase';
 import { logger } from '../utils/secure-logger';
-import { sanitizeInput } from '../security/sanitize';
 import { timingSafePasswordVerify, addRandomDelay } from '../security/timing-safe';
 import { ERROR_DATABASE_NOT_CONFIGURED } from '../utils/constants';
-import { generateRandomGradient } from '../utils/avatar-gradients';
+import { generateRandomAvatar } from '../utils/avatar-gradients';
 
 // Hash password with bcrypt
 export async function hashPassword(password: string): Promise<string> {
@@ -20,9 +19,9 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
 export async function createAdmin(username: string, password: string): Promise<{ success: boolean; error?: string }> {
   try {
     if (!supabaseAdmin) {
-      logger.error('DATABASE NOT CONFIGURED - SUPABASEADMIN IS NULL', {
+      logger.error('Database not configured', {
         hasSupabaseUrl: !!process.env.SUPABASE_URL || !!process.env.NEXT_PUBLIC_SUPABASE_URL,
-        hasServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY
+        hasServiceKey: !!process.env.SUPABASE_SECRET_KEY
       });
       return { success: false, error: ERROR_DATABASE_NOT_CONFIGURED };
     }
@@ -34,7 +33,7 @@ export async function createAdmin(username: string, password: string): Promise<{
       .single();
 
     if (checkError && checkError.code !== 'PGRST116') {
-      logger.error('ERROR CHECKING EXISTING ADMIN', {
+      logger.error('Error checking existing admin', {
         error: checkError.message,
         code: checkError.code
       });
@@ -54,7 +53,7 @@ export async function createAdmin(username: string, password: string): Promise<{
       });
 
     if (insertError) {
-      logger.error('ERROR CREATING ADMIN', {
+      logger.error('Error creating admin', {
         error: insertError.message,
         code: insertError.code
       });
@@ -63,7 +62,7 @@ export async function createAdmin(username: string, password: string): Promise<{
 
     return { success: true };
   } catch (error) {
-    logger.error('UNEXPECTED ERROR CREATING ADMIN', {
+    logger.error('Unexpected error creating admin', {
       error: error instanceof Error ? error.message : 'Unknown error'
     });
     return { success: false, error: 'Непредвиденная ошибка' };
@@ -73,9 +72,9 @@ export async function createAdmin(username: string, password: string): Promise<{
 export async function authenticateAdmin(username: string, password: string): Promise<{ success: boolean; admin?: Admin; error?: string }> {
   try {
     if (!supabaseAdmin) {
-      logger.error('DATABASE NOT CONFIGURED - SUPABASEADMIN IS NULL', {
+      logger.error('Database not configured', {
         hasSupabaseUrl: !!process.env.SUPABASE_URL || !!process.env.NEXT_PUBLIC_SUPABASE_URL,
-        hasServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY
+        hasServiceKey: !!process.env.SUPABASE_SECRET_KEY
       });
       return { success: false, error: ERROR_DATABASE_NOT_CONFIGURED };
     }
@@ -91,11 +90,7 @@ export async function authenticateAdmin(username: string, password: string): Pro
     await addRandomDelay(50, 150);
 
     if (fetchError) {
-      logger.error('ERROR FETCHING ADMIN', {
-        error: fetchError.message,
-        code: fetchError.code,
-        username: sanitizeInput(username)
-      });
+      // Не логируем ошибки аутентификации для безопасности
       return { success: false, error: 'Invalid credentials' };
     }
 
@@ -112,9 +107,8 @@ export async function authenticateAdmin(username: string, password: string): Pro
 
     return { success: true, admin };
   } catch (error) {
-    logger.error('UNEXPECTED ERROR AUTHENTICATING ADMIN', {
-      error: error instanceof Error ? error.message : 'Unknown error',
-      username: sanitizeInput(username)
+    logger.error('Unexpected error authenticating admin', {
+      error: error instanceof Error ? error.message : 'Unknown error'
     });
     return { success: false, error: 'Unexpected error' };
   }
@@ -132,7 +126,7 @@ export async function checkAdminExists(): Promise<boolean> {
       .limit(1);
 
     if (error) {
-      logger.error('ERROR CHECKING ADMIN EXISTENCE', {
+      logger.error('Error checking admin existence', {
         error: error.message,
         code: error.code
       });
@@ -141,7 +135,7 @@ export async function checkAdminExists(): Promise<boolean> {
 
     return data && data.length > 0;
   } catch (error) {
-    logger.error('UNEXPECTED ERROR CHECKING ADMIN EXISTENCE', {
+    logger.error('Unexpected error checking admin existence', {
       error: error instanceof Error ? error.message : 'Unknown error'
     });
     return false;
@@ -154,7 +148,7 @@ export interface User {
   user_id: string;
   username: string;
   password_hash: string | null;
-  avatar_gradient?: string | null;
+  avatar?: string | null;
   dashboard_token: string;
   is_active: boolean;
   last_login?: string;
@@ -192,9 +186,9 @@ export function generateUserId(): string {
 export async function createUser(username: string, password: string): Promise<{ success: boolean; user?: User; error?: string }> {
   try {
     if (!supabaseAdmin) {
-      logger.error('DATABASE NOT CONFIGURED - SUPABASEADMIN IS NULL', {
+      logger.error('Database not configured', {
         hasSupabaseUrl: !!process.env.SUPABASE_URL || !!process.env.NEXT_PUBLIC_SUPABASE_URL,
-        hasServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY
+        hasServiceKey: !!process.env.SUPABASE_SECRET_KEY
       });
       return { success: false, error: ERROR_DATABASE_NOT_CONFIGURED };
     }
@@ -209,7 +203,7 @@ export async function createUser(username: string, password: string): Promise<{ 
       .ilike('username', normalizedUsername);
 
     if (checkError) {
-      logger.error('ERROR CHECKING EXISTING USER', {
+      logger.error('Error checking existing user', {
         error: checkError.message,
         code: checkError.code
       });
@@ -245,8 +239,8 @@ export async function createUser(username: string, password: string): Promise<{ 
       retryCount++;
     }
 
-    // Generate random avatar gradient
-    const avatarGradient = generateRandomGradient();
+    // Generate random avatar
+    const avatar = generateRandomAvatar();
 
     // Save username in original case, but check by lowercase
     const { data: newUser, error: insertError } = await supabaseAdmin
@@ -256,13 +250,13 @@ export async function createUser(username: string, password: string): Promise<{ 
         username: username,
         password_hash: passwordHash,
         dashboard_token: dashboardToken,
-        avatar_gradient: avatarGradient
+        avatar: avatar
       })
       .select()
       .single();
 
     if (insertError) {
-      logger.error('ERROR CREATING USER', {
+      logger.error('Error creating user', {
         error: insertError.message,
         code: insertError.code
       });
@@ -271,7 +265,7 @@ export async function createUser(username: string, password: string): Promise<{ 
 
     return { success: true, user: newUser as User };
   } catch (error) {
-    logger.error('UNEXPECTED ERROR CREATING USER', {
+    logger.error('Unexpected error creating user', {
       error: error instanceof Error ? error.message : 'Unknown error'
     });
     return { success: false, error: 'Unexpected error' };
@@ -282,9 +276,9 @@ export async function createUser(username: string, password: string): Promise<{ 
 export async function authenticateUser(username: string, password: string): Promise<{ success: boolean; user?: User; error?: string }> {
   try {
     if (!supabaseAdmin) {
-      logger.error('DATABASE NOT CONFIGURED - SUPABASEADMIN IS NULL', {
+      logger.error('Database not configured', {
         hasSupabaseUrl: !!process.env.SUPABASE_URL || !!process.env.NEXT_PUBLIC_SUPABASE_URL,
-        hasServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY
+        hasServiceKey: !!process.env.SUPABASE_SECRET_KEY
       });
       return { success: false, error: ERROR_DATABASE_NOT_CONFIGURED };
     }
@@ -302,11 +296,7 @@ export async function authenticateUser(username: string, password: string): Prom
     await addRandomDelay(50, 150);
 
     if (fetchError) {
-      logger.error('ERROR FETCHING USER', {
-        error: fetchError.message,
-        code: fetchError.code,
-        username: sanitizeInput(username)
-      });
+      // Не логируем ошибки аутентификации для безопасности
       return { success: false, error: 'Invalid credentials' };
     }
 
@@ -343,9 +333,8 @@ export async function authenticateUser(username: string, password: string): Prom
 
     return { success: true, user: user as User };
   } catch (error) {
-    logger.error('UNEXPECTED ERROR AUTHENTICATING USER', {
-      error: error instanceof Error ? error.message : 'Unknown error',
-      username: sanitizeInput(username)
+    logger.error('Unexpected error authenticating user', {
+      error: error instanceof Error ? error.message : 'Unknown error'
     });
     return { success: false, error: 'Unexpected error' };
   }
@@ -370,7 +359,7 @@ export async function getUserByToken(dashboardToken: string): Promise<User | nul
 
     return user as User;
   } catch (error) {
-    logger.error('ERROR FETCHING USER BY TOKEN', {
+    logger.error('Error getting user by token', {
       error: error instanceof Error ? error.message : 'Unknown error'
     });
     return null;
@@ -384,7 +373,7 @@ export async function getUserByToken(dashboardToken: string): Promise<User | nul
 export async function getUserByEmail(email: string): Promise<User | null> {
   try {
     if (!supabaseAdmin) {
-      logger.warn('supabase admin is null');
+      // Не логируем - это нормальная ситуация при отсутствии конфигурации
       return null;
     }
 
@@ -398,7 +387,7 @@ export async function getUserByEmail(email: string): Promise<User | null> {
       .ilike('username', username);
 
     if (error) {
-      logger.error('error fetching user by email', { error: error.message, code: error.code });
+      logger.error('Error fetching user by email', { error: error.message, code: error.code });
       return null;
     }
 
@@ -407,8 +396,8 @@ export async function getUserByEmail(email: string): Promise<User | null> {
     }
     return users[0] as User;
   } catch (error) {
-    logger.error('exception in getUserByEmail', {
-      error: error instanceof Error ? error.message : 'unknown error'
+    logger.error('Exception in getUserByEmail', {
+      error: error instanceof Error ? error.message : 'Unknown error'
     });
     return null;
   }
@@ -418,7 +407,7 @@ export async function getUserByEmail(email: string): Promise<User | null> {
 export async function createUserFromOAuth(email: string, preferredUsername?: string): Promise<{ success: boolean; user?: User; error?: string }> {
   try {
     if (!supabaseAdmin) {
-      logger.error('DATABASE NOT CONFIGURED - SUPABASEADMIN IS NULL');
+      logger.error('Database not configured');
       return { success: false, error: ERROR_DATABASE_NOT_CONFIGURED };
     }
 
@@ -457,7 +446,7 @@ export async function createUserFromOAuth(email: string, preferredUsername?: str
       .ilike('username', normalizedUsername);
 
     if (checkError) {
-      logger.error('error checking existing user', {
+      logger.error('Error checking existing user', {
         error: checkError.message,
         code: checkError.code
       });
@@ -513,9 +502,9 @@ export async function createUserFromOAuth(email: string, preferredUsername?: str
       retryCount++;
     }
 
-    // Generate dashboard token and avatar gradient
+    // Generate dashboard token and avatar
     const dashboardToken = generateDashboardToken();
-    const avatarGradient = generateRandomGradient();
+    const avatar = generateRandomAvatar();
 
     // OAuth users don't need password - set password_hash to null
     // This distinguishes OAuth users from password-based users
@@ -528,14 +517,14 @@ export async function createUserFromOAuth(email: string, preferredUsername?: str
         username: username,
         password_hash: null, // OAuth users don't have passwords
         dashboard_token: dashboardToken,
-        avatar_gradient: avatarGradient,
+        avatar: avatar,
         is_active: true
       })
       .select()
       .single();
 
     if (insertError) {
-      logger.error('error creating user from oauth', {
+      logger.error('Error creating user from OAuth', {
         error: insertError.message,
         code: insertError.code
       });
@@ -543,15 +532,15 @@ export async function createUserFromOAuth(email: string, preferredUsername?: str
     }
 
     if (!newUser) {
-      logger.error('user creation returned null');
+      logger.error('User creation returned null');
       return { success: false, error: 'User creation returned null' };
     }
 
 
     return { success: true, user: newUser as User };
   } catch (error) {
-    logger.error('unexpected error creating user from oauth', {
-      error: error instanceof Error ? error.message : 'unknown error'
+    logger.error('Unexpected error creating user from OAuth', {
+      error: error instanceof Error ? error.message : 'Unknown error'
     });
     return { success: false, error: 'Unexpected error' };
   }

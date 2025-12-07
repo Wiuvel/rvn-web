@@ -16,10 +16,7 @@ export async function GET(request: Request) {
   try {
     const rateLimitResult = await generalRateLimit.check(request);
     if (!rateLimitResult.allowed) {
-      logger.warn('Rate limit exceeded for admin CSRF token request', {
-        ip: request.headers.get('x-forwarded-for'),
-        userAgent: request.headers.get('user-agent'),
-      });
+      // Rate limit - не логируем
       return setCorsHeaders(
         NextResponse.json({ error: 'Too many requests' }, { status: 429 }),
       );

@@ -66,10 +66,7 @@ export function initWebSocketServer(httpServer: HTTPServer): SocketIOServer<Supp
   });
 
   io.on('connection', async (socket) => {
-    logger.info('WebSocket client connected', { 
-      socketId: socket.id,
-      totalConnections: io!.sockets.sockets.size 
-    });
+    // Автоматическое подключение не логируем
 
     // Трекинг аналитики WebSocket подключения
     try {
@@ -85,7 +82,7 @@ export function initWebSocketServer(httpServer: HTTPServer): SocketIOServer<Supp
       
       // Валидация входных данных
       if (!ticketId || !userId || typeof isSupport !== 'boolean') {
-        logger.warn('Invalid join request', { socketId: socket.id, data });
+        // Не логируем валидационные ошибки - это нормальная ситуация
         socket.emit('support:error', { message: 'Invalid join request', code: 'INVALID_DATA' });
         return;
       }
@@ -93,14 +90,14 @@ export function initWebSocketServer(httpServer: HTTPServer): SocketIOServer<Supp
       // Валидация UUID формата ticketId
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
       if (!uuidRegex.test(ticketId)) {
-        logger.warn('Invalid ticket ID format', { socketId: socket.id, ticketId });
+        // Не логируем валидационные ошибки
         socket.emit('support:error', { message: 'Invalid ticket ID', code: 'INVALID_TICKET_ID' });
         return;
       }
 
       // Проверка существования тикета (базовая валидация)
       // Примечание: Полная проверка прав доступа требует токена, который передается через cookies
-      // Для полной валидации нужно использовать middleware аутентификации Socket.IO
+      // Для полной валидации нужно использовать proxy аутентификации Socket.IO
       if (supabaseAdmin) {
         try {
           const { data: ticket, error: ticketError } = await supabaseAdmin
@@ -110,25 +107,19 @@ export function initWebSocketServer(httpServer: HTTPServer): SocketIOServer<Supp
             .single();
 
           if (ticketError || !ticket) {
-            logger.warn('Ticket not found', { socketId: socket.id, ticketId, error: ticketError?.message });
+            // Не логируем - тикет может быть удален или недоступен
             socket.emit('support:error', { message: 'Ticket not found', code: 'TICKET_NOT_FOUND' });
             return;
           }
         } catch (error) {
-          logger.error('Error validating ticket', { socketId: socket.id, ticketId, error: error instanceof Error ? error.message : 'Unknown error' });
+          logger.error('Error validating ticket', { ticketId, error: error instanceof Error ? error.message : 'Unknown error' });
           // Не блокируем присоединение при ошибке валидации, но логируем
         }
       }
 
       const room = `ticket:${ticketId}`;
       socket.join(room);
-      logger.info('Client joined ticket room', { 
-        socketId: socket.id, 
-        ticketId, 
-        userId, 
-        isSupport,
-        roomSize: io!.sockets.adapter.rooms.get(room)?.size || 0
-      });
+      // Не логируем успешные присоединения к комнатам
     });
 
     // Обработка выхода из тикета
@@ -136,10 +127,7 @@ export function initWebSocketServer(httpServer: HTTPServer): SocketIOServer<Supp
       const { ticketId } = data;
       const room = `ticket:${ticketId}`;
       socket.leave(room);
-      logger.info('Client left ticket room', { 
-        socketId: socket.id, 
-        ticketId 
-      });
+      // Не логируем выходы из комнат
     });
 
     // Обработка статуса печати с rate limiting
@@ -192,10 +180,7 @@ export function initWebSocketServer(httpServer: HTTPServer): SocketIOServer<Supp
     });
 
     socket.on('disconnect', () => {
-      logger.info('WebSocket client disconnected', { 
-        socketId: socket.id,
-        remainingConnections: io!.sockets.sockets.size - 1
-      });
+      // Автоматическое отключение не логируем
       
       // Очищаем rate limiting для этого соединения
       for (const [key] of typingRateLimits.entries()) {
@@ -209,15 +194,12 @@ export function initWebSocketServer(httpServer: HTTPServer): SocketIOServer<Supp
       // Логируем только критические ошибки, не все ошибки подключения
       // Игнорируем ошибки транспорта, которые нормальны при переподключении
       if (error.message && !error.message.includes('transport close') && !error.message.includes('transport error')) {
-        logger.error('WebSocket error', { socketId: socket.id, error: error.message });
+        logger.error('WebSocket error', { error: error.message });
       }
     });
   });
 
-  logger.info('WebSocket server initialized', {
-    totalConnections: io!.sockets.sockets.size,
-    queueSize: messageQueue.length
-  });
+  // Инициализация не логируется
   
   // Обрабатываем очередь сообщений после инициализации
   processMessageQueue();
@@ -232,12 +214,7 @@ export function initWebSocketServer(httpServer: HTTPServer): SocketIOServer<Supp
         }
       });
       
-      logger.info('WebSocket server statistics', {
-        totalConnections: io.sockets.sockets.size,
-        activeRooms: rooms.size,
-        queueSize: messageQueue.length,
-        typingRateLimits: typingRateLimits.size
-      });
+      // Автоматическая статистика не логируется
     }
   }, 5 * 60 * 1000); // 5 минут
   
@@ -287,9 +264,7 @@ function processMessageQueue(): void {
       processedMessages.push(queuedMessage);
     } catch (error) {
       logger.error('Error processing queued message', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-        type: queuedMessage.type,
-        ticketId: queuedMessage.ticketId
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
     }
   }
@@ -302,12 +277,7 @@ function processMessageQueue(): void {
     }
   }
 
-  if (processedMessages.length > 0) {
-    logger.info('Processed queued messages', {
-      count: processedMessages.length,
-      remainingInQueue: messageQueue.length
-    });
-  }
+  // Не логируем успешную обработку очереди
 }
 
 /**
@@ -322,9 +292,7 @@ function queueMessage(type: QueuedMessage['type'], ticketId: string, data: Queue
     messageQueue.splice(0, removedCount);
     logger.warn('Message queue overflow, removed old messages', {
       removedCount,
-      queueSize: messageQueue.length,
-      type,
-      ticketId
+      queueSize: messageQueue.length
     });
   }
 
@@ -354,7 +322,7 @@ export function broadcastNewMessage(
     // Пытаемся инициализировать, если сервер еще не инициализирован
     const httpServer = global.__httpServer;
     if (httpServer && !initializationAttempted) {
-      logger.warn('WebSocket server not initialized, attempting to initialize...');
+      // Не логируем попытки инициализации
       try {
         initWebSocketServer(httpServer);
       } catch (error) {
@@ -373,18 +341,12 @@ export function broadcastNewMessage(
   }
 
   const room = `ticket:${ticketId}`;
-  const roomSize = io!.sockets.adapter.rooms.get(room)?.size || 0;
   io!.to(room).emit('support:message:new', {
     ticketId,
     message,
   });
   
-  logger.info('Broadcasted new message', {
-    ticketId,
-    messageId: message.id,
-    senderType: message.sender_type,
-    roomSize
-  });
+  // Успешные broadcast не логируются
 
   // Трекинг аналитики WebSocket сообщений (неблокирующий)
   import('@/lib/analytics/support-analytics')
@@ -407,17 +369,12 @@ export function broadcastTicketUpdate(
   }
 
   const room = `ticket:${ticketId}`;
-  const roomSize = io!.sockets.adapter.rooms.get(room)?.size || 0;
   io!.to(room).emit('support:ticket:updated', {
     ticketId,
     ticket,
   });
   
-  logger.info('Broadcasted ticket update', {
-    ticketId,
-    status: ticket.status,
-    roomSize
-  });
+  // Успешные broadcast не логируются
 }
 
 /**
@@ -434,18 +391,13 @@ export function broadcastTicketAssignment(
   }
 
   const room = `ticket:${ticketId}`;
-  const roomSize = io!.sockets.adapter.rooms.get(room)?.size || 0;
   io!.to(room).emit('support:ticket:assigned', {
     ticketId,
     assignedTo,
     assignedUser,
   });
   
-  logger.info('Broadcasted ticket assignment', {
-    ticketId,
-    assignedTo,
-    roomSize
-  });
+  // Успешные broadcast не логируются
 }
 
 /**
@@ -471,15 +423,9 @@ export function broadcastMessageRead(
   }
 
   const room = `ticket:${ticketId}`;
-  const roomSize = io!.sockets.adapter.rooms.get(room)?.size || 0;
   io!.to(room).emit('support:message:read', { ticketId, messageIds, readBy });
   
-  logger.info('Broadcasted message read status', {
-    ticketId,
-    messageCount: messageIds.length,
-    readBy,
-    roomSize
-  });
+  // Успешные broadcast не логируются
 }
 
 

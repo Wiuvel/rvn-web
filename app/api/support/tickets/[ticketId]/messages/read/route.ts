@@ -159,12 +159,7 @@ export async function POST(
       // Отправляем WebSocket событие об обновлении статуса прочитанности
       broadcastMessageRead(ticketId, messageIds, isSupport ? 'support' : 'user');
       
-      logger.info('Messages marked as read', {
-        ticketId,
-        messageCount: messageIds.length,
-        readBy: isSupport ? 'support' : 'user',
-        userId: user.id
-      });
+      // Сообщения отмечены как прочитанные - не логируем
     }
 
     return setCorsHeaders(

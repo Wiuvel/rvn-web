@@ -17,7 +17,7 @@ interface UserData {
   dashboard_token: string;
   created_at: string;
   last_login?: string;
-  avatar_gradient?: string | null;
+  avatar?: string | null;
 }
 
 interface Notification {
@@ -116,7 +116,7 @@ export default function DashboardPage() {
       } catch (error) {
         if (!isMounted) return;
 
-        console.error('Failed to fetch user data:', error);
+        // Ошибка получения данных пользователя - не логируем
         // Проверяем, не является ли это таймаутом
         if (error instanceof Error && error.name === 'AbortError') {
           router.push('/error/500');
@@ -153,6 +153,7 @@ export default function DashboardPage() {
         router.push('/auth');
       }
     } catch (error) {
+      // Ошибка выхода
       console.error('Logout error:', error);
     }
   };
@@ -434,7 +435,7 @@ export default function DashboardPage() {
                 </div>
                 <button
                   onClick={() => setUserMenuOpen(!userMenuOpen)}
-                  className={`w-10 h-10 rounded-full ${getGradientClasses(userData?.avatar_gradient)} flex items-center justify-center text-white font-semibold text-sm shadow-glow transition-transform duration-200 hover:scale-110 cursor-pointer`}
+                  className={`w-10 h-10 rounded-full ${getGradientClasses(userData?.avatar)} flex items-center justify-center text-white font-semibold text-sm shadow-glow transition-transform duration-200 hover:scale-110 cursor-pointer`}
                   title={userData.username}
                   aria-label="Меню пользователя"
                   aria-expanded={userMenuOpen}
@@ -452,7 +453,7 @@ export default function DashboardPage() {
                       className="block p-4 border-b border-white/10 hover:bg-white/5 transition-colors duration-200 cursor-pointer mx-2 my-1 rounded-xl"
                     >
                       <div className="flex items-center gap-3">
-                        <div className={`w-12 h-12 rounded-full ${getGradientClasses(userData?.avatar_gradient)} flex items-center justify-center text-white font-semibold text-base flex-shrink-0`}>
+                        <div className={`w-12 h-12 rounded-full ${getGradientClasses(userData?.avatar)} flex items-center justify-center text-white font-semibold text-base flex-shrink-0`}>
                           {getInitial(userData.username)}
                         </div>
                         <div className="min-w-0 flex-1">
@@ -535,7 +536,7 @@ export default function DashboardPage() {
                   className="block p-4 border-b border-white/10 hover:bg-white/5 transition-colors duration-200 cursor-pointer mx-2 my-1 rounded-xl"
                 >
                   <div className="flex items-center gap-3">
-                    <div className={`w-12 h-12 rounded-full ${getGradientClasses(userData?.avatar_gradient)} flex items-center justify-center text-white font-semibold text-base flex-shrink-0`}>
+                    <div className={`w-12 h-12 rounded-full ${getGradientClasses(userData?.avatar)} flex items-center justify-center text-white font-semibold text-base flex-shrink-0`}>
                       {getInitial(userData.username)}
                     </div>
                     <div className="min-w-0 flex-1">
@@ -622,7 +623,7 @@ export default function DashboardPage() {
           {/* Profile section */}
           <section ref={profileRef} className="mt-6 rounded-2xl border border-neutral-800 bg-neutral-900 p-5">
             <div className="flex items-center gap-4">
-              <div className={`shrink-0 h-14 w-14 rounded-full ${getGradientClasses(userData?.avatar_gradient)} flex items-center justify-center text-white font-semibold text-lg border border-white/10`}>
+              <div className={`shrink-0 h-14 w-14 rounded-full ${getGradientClasses(userData?.avatar)} flex items-center justify-center text-white font-semibold text-lg border border-white/10`}>
                 {userData?.username ? userData.username.charAt(0).toUpperCase() : '—'}
               </div>
               <div className="flex-1">

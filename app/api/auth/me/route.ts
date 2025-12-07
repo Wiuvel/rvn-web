@@ -28,12 +28,7 @@ export async function GET(request: NextRequest) {
       const validation = SessionManager.validateSession(sessionId, ipAddress, userAgent);
       
       if (!validation.valid) {
-        logger.warn('INVALID SESSION IN /api/auth/me', {
-          sessionId: sessionId.substring(0, 8) + '...',
-          reason: validation.reason,
-          ip: ipAddress,
-          hasAuthCookies: !!isAuthenticated && !!dashboardToken
-        });
+        // Невалидная сессия - не логируем (нормальная ситуация)
         
         // Если сессия невалидна, но есть другие auth cookies - это может быть временная проблема
         // Не удаляем cookies сразу, если есть другие признаки авторизации
@@ -107,10 +102,7 @@ export async function GET(request: NextRequest) {
         ipAddress,
         userAgent
       );
-      logger.info('Recreated session for authenticated user', {
-        userId: user.id,
-        sessionId: currentSessionId.substring(0, 8) + '...'
-      });
+      // Сессия пересоздана - не логируем
     }
 
     // Проверяем роли пользователя
@@ -120,8 +112,7 @@ export async function GET(request: NextRequest) {
       isSupport = await hasUserRole(user.id, 'support');
       isAdmin = await hasUserRole(user.id, 'admin');
     } catch (error) {
-      // Игнорируем ошибки проверки ролей, просто не устанавливаем флаги
-      logger.warn('Error checking user roles', {
+      logger.error('Error checking user roles', {
         error: error instanceof Error ? error.message : 'Unknown error',
         userId: user.id
       });
@@ -136,7 +127,7 @@ export async function GET(request: NextRequest) {
       dashboard_token: user.dashboard_token,
       created_at: user.created_at,
       last_login: user.last_login,
-      avatar_gradient: user.avatar_gradient,
+      avatar: user.avatar,
       isSupport,
       isAdmin
     });
@@ -154,7 +145,7 @@ export async function GET(request: NextRequest) {
 
     return setCorsHeaders(response);
   } catch (error) {
-    logger.error('Get user error', {
+    logger.error('Error getting user', {
       error: error instanceof Error ? error.message : 'Unknown error',
       ip: request.headers.get('x-forwarded-for')
     });

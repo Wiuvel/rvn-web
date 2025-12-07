@@ -33,14 +33,14 @@ export async function GET() {
     // Инициализируем WebSocket сервер
     initWebSocketServer(httpServer);
     
-    logger.info('WebSocket server initialized via API route');
+    // WebSocket сервер инициализирован - не логируем
     
     return NextResponse.json({
       initialized: true,
       message: 'WebSocket server initialized successfully',
     });
   } catch (error) {
-    logger.error('Failed to initialize WebSocket server via API route', {
+    logger.error('Failed to initialize WebSocket server', {
       error: error instanceof Error ? error.message : 'Unknown error',
     });
     

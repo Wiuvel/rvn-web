@@ -5,7 +5,7 @@ export interface UserData {
   dashboard_token: string;
   created_at: string;
   last_login?: string;
-  avatar_gradient?: string | null;
+  avatar?: string | null;
 }
 
 export interface Notification {
@@ -40,13 +40,13 @@ export interface Ticket {
     id: string;
     username: string;
     user_id: string;
-    avatar_gradient?: string | null;
+    avatar?: string | null;
   };
   assigned_user?: {
     id: string;
     username: string;
     user_id: string;
-    avatar_gradient?: string | null;
+    avatar?: string | null;
   } | null;
 }
 
@@ -61,7 +61,7 @@ export interface SupportMessage {
     id: string;
     username: string;
     user_id: string;
-    avatar_gradient?: string | null;
+    avatar?: string | null;
   };
 }
 

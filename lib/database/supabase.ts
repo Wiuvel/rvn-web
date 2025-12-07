@@ -1,18 +1,32 @@
 import { createClient } from '@supabase/supabase-js';
-import { logger } from '../utils/secure-logger';
+
+/**
+ * Supabase клиенты с новыми API ключами
+ * 
+ * Требуемые переменные окружения:
+ * - NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY (Publishable Key: sb_publishable_...)
+ * - SUPABASE_SECRET_KEY (Secret Key: sb_secret_...)
+ * 
+ * См. SUPABASE_MIGRATION.md для инструкций
+ */
 
 // Server-only environment variables (not exposed to client)
 const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  logger.warn('SUPABASE ENVIRONMENT VARIABLES ARE NOT SET');
+// Новый Publishable Key (sb_publishable_...)
+const supabasePublishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || '';
+
+// Новый Secret Key (sb_secret_...)
+const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY || '';
+
+if (!supabaseUrl || !supabasePublishableKey) {
+  // Не логируем отсутствие переменных при инициализации модуля
 }
 
 // Client-side Supabase (limited access)
-export const supabase = supabaseUrl && supabaseAnonKey 
-  ? createClient(supabaseUrl, supabaseAnonKey, {
+// Использует Publishable Key - безопасен при включенном RLS
+export const supabase = supabaseUrl && supabasePublishableKey 
+  ? createClient(supabaseUrl, supabasePublishableKey, {
       auth: {
         persistSession: false,
         autoRefreshToken: false
@@ -21,8 +35,9 @@ export const supabase = supabaseUrl && supabaseAnonKey
   : null;
 
 // Server-side Supabase (full access with SSL verification)
-export const supabaseAdmin = supabaseUrl && supabaseServiceKey
-  ? createClient(supabaseUrl, supabaseServiceKey, {
+// Использует Secret Key - обходит RLS, только для сервера!
+export const supabaseAdmin = supabaseUrl && supabaseSecretKey
+  ? createClient(supabaseUrl, supabaseSecretKey, {
       auth: {
         autoRefreshToken: false,
         persistSession: false

@@ -48,9 +48,7 @@ export async function hasUserRole(userId: string, role: UserRole): Promise<boole
         if (error.code !== 'PGRST116') {
           logger.error('Error checking user role', {
             error: error.message,
-            code: error.code,
-            userId,
-            role
+            code: error.code
           });
         }
         return false;
@@ -59,9 +57,7 @@ export async function hasUserRole(userId: string, role: UserRole): Promise<boole
       return !!data;
     } catch (error) {
       logger.error('Unexpected error checking user role', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-        userId,
-        role
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
       return false;
     }
@@ -86,11 +82,7 @@ export async function getUserRoles(userId: string): Promise<UserRole[]> {
 
     if (error) {
       if (error.code !== 'PGRST116') {
-        logger.warn('Error fetching user roles (non-critical)', {
-          error: error.message,
-          code: error.code,
-          userId
-        });
+        // Ошибка получения ролей не критична
       }
       return ['user'];
     }
@@ -171,11 +163,7 @@ export async function grantUserRole(
       }
     }
 
-    logger.info('User role granted', {
-      userId,
-      role,
-      grantedBy
-    });
+    // Роль выдана - не логируем
 
     return { success: true };
   } catch (error) {
@@ -226,10 +214,7 @@ export async function revokeUserRole(
       return { success: false, error: 'Failed to revoke role' };
     }
 
-    logger.info('User role revoked', {
-      userId,
-      role
-    });
+    // Роль отозвана - не логируем
 
     return { success: true };
   } catch (error) {

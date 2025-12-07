@@ -14,7 +14,7 @@ export function getRedisClient(): Redis | null {
   const redisUrl = process.env.REDIS_URL;
   
   if (!redisUrl) {
-    logger.warn('REDIS_URL not set, Redis features will be disabled');
+    // Не логируем отсутствие Redis - это опциональная функция
     return null;
   }
 
@@ -58,26 +58,22 @@ export function getRedisClient(): Redis | null {
       lazyConnect: false,
     });
 
-    redis.on('connect', () => {
-      logger.info('Redis connected');
-    });
-
-    redis.on('ready', () => {
-      logger.info('Redis ready');
-    });
+    // Автоматические события подключения не логируются
 
     redis.on('error', (err) => {
-      logger.error('Redis error', { error: err.message });
+      // Логируем только критические ошибки
+      if (!err.message.includes('ECONNREFUSED') && !err.message.includes('Connection is closed')) {
+        logger.error('Redis error', { error: err.message });
+      }
     });
 
     redis.on('close', () => {
-      logger.warn('Redis connection closed');
-      // Сбрасываем соединение при закрытии
+      // Автоматическое закрытие не логируется
       redis = null;
     });
 
     redis.on('end', () => {
-      logger.warn('Redis connection ended');
+      // Автоматическое завершение не логируется
       redis = null;
     });
 

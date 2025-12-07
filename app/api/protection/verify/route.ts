@@ -24,11 +24,7 @@ export async function POST(request: NextRequest) {
 
     const secretKey = process.env.TURNSTILE_SECRET_KEY;
     if (!secretKey || secretKey === '1x0000000000000000000000000000000AA') {
-      logger.error('Turnstile secret key not configured for protection', {
-        ip: request.headers.get('x-forwarded-for'),
-        hasKey: !!secretKey,
-        isTestKey: secretKey === '1x0000000000000000000000000000000AA'
-      });
+      logger.error('Turnstile secret key not configured for protection');
       return setCorsHeaders(
         NextResponse.json(
           { error: 'CAPTCHA service not configured' },
@@ -53,18 +49,11 @@ export async function POST(request: NextRequest) {
 
     if (!verifyData.success) {
       const errorCodes = verifyData['error-codes'] || [];
-      logger.warn('Turnstile verification failed for protection', {
-        ip: request.headers.get('x-forwarded-for'),
-        errors: errorCodes,
-        captchaToken: captchaToken.substring(0, 20) + '...'
-      });
+      // Ошибка верификации Turnstile - не логируем (валидация)
       
       let errorMessage = 'CAPTCHA verification failed';
       if (errorCodes.includes('invalid-input-secret')) {
-        logger.error('Turnstile secret key is invalid or not configured for protection', {
-          ip: request.headers.get('x-forwarded-for'),
-          errorCodes
-        });
+        logger.error('Turnstile secret key is invalid or not configured');
         errorMessage = 'CAPTCHA service configuration error';
       } else if (errorCodes.includes('invalid-input-response')) {
         errorMessage = 'CAPTCHA verification failed: Invalid token (may be already used)';
@@ -80,9 +69,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    logger.info('Turnstile verification successful for protection', {
-      ip: request.headers.get('x-forwarded-for')
-    });
+    // Успешная верификация Turnstile - не логируем
 
     return setCorsHeaders(
       NextResponse.json({
@@ -91,7 +78,7 @@ export async function POST(request: NextRequest) {
       })
     );
   } catch (error) {
-    logger.error('Error verifying Turnstile token for protection', {
+    logger.error('Error verifying Turnstile token', {
       error: error instanceof Error ? error.message : 'Unknown error',
       ip: request.headers.get('x-forwarded-for')
     });

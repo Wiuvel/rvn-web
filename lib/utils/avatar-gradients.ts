@@ -1,9 +1,11 @@
 /**
- * Утилиты для работы с градиентами аватарок
+ * Утилиты для работы с аватарками
+ * Использует короткие идентификаторы (0-9) вместо длинных градиентов
  */
 
 // Предопределенные градиенты для аватарок (подобраны под стилистику сайта с синим свечением)
-export const AVATAR_GRADIENTS = [
+// Индекс соответствует короткому идентификатору
+const AVATAR_GRADIENTS = [
   'from-blue-500 to-purple-600',
   'from-cyan-500 to-blue-600',
   'from-indigo-500 to-purple-600',
@@ -14,24 +16,23 @@ export const AVATAR_GRADIENTS = [
   'from-cyan-600 to-teal-600',
   'from-emerald-500 to-teal-600',
   'from-green-500 to-emerald-600',
-  'from-green-600 to-emerald-600',
 ] as const;
 
-export type AvatarGradient = typeof AVATAR_GRADIENTS[number];
+export type AvatarId = '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9';
 
 /**
- * Генерирует случайный градиент для аватарки
+ * Генерирует случайный идентификатор аватарки (0-9)
  */
-export function generateRandomGradient(): AvatarGradient {
+export function generateRandomAvatar(): AvatarId {
   const randomIndex = Math.floor(Math.random() * AVATAR_GRADIENTS.length);
-  return AVATAR_GRADIENTS[randomIndex];
+  return String(randomIndex) as AvatarId;
 }
 
 /**
- * Генерирует детерминированный градиент на основе строки (например, username или user_id)
- * Это гарантирует, что один и тот же пользователь всегда будет иметь один и тот же градиент
+ * Генерирует детерминированный идентификатор аватарки на основе строки
+ * Это гарантирует, что один и тот же пользователь всегда будет иметь один и тот же аватар
  */
-export function generateGradientFromString(str: string): AvatarGradient {
+export function generateAvatarFromString(str: string): AvatarId {
   // Простая хеш-функция для преобразования строки в число
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
@@ -40,30 +41,52 @@ export function generateGradientFromString(str: string): AvatarGradient {
     hash = hash & hash; // Convert to 32bit integer
   }
   
-  // Используем абсолютное значение хеша для выбора градиента
+  // Используем абсолютное значение хеша для выбора аватара
   const index = Math.abs(hash) % AVATAR_GRADIENTS.length;
-  return AVATAR_GRADIENTS[index];
+  return String(index) as AvatarId;
 }
 
 /**
- * Получает классы Tailwind для применения градиента
+ * Получает классы Tailwind для применения градиента по идентификатору аватарки
  */
-export function getGradientClasses(gradient: string | null | undefined, fallback: AvatarGradient = 'from-blue-500 to-purple-600'): string {
-  if (!gradient) {
-    return `bg-gradient-to-r ${fallback}`;
-  }
-  // Валидируем градиент, если он невалидный - используем fallback
-  if (isValidGradient(gradient)) {
+export function getGradientClasses(avatarId: string | null | undefined, fallback: AvatarId = '0'): string {
+  if (!avatarId) {
+    const gradient = AVATAR_GRADIENTS[parseInt(fallback) || 0];
     return `bg-gradient-to-r ${gradient}`;
   }
-  return `bg-gradient-to-r ${fallback}`;
+  
+  // Валидируем идентификатор
+  const id = parseInt(avatarId);
+  if (isNaN(id) || id < 0 || id >= AVATAR_GRADIENTS.length) {
+    const gradient = AVATAR_GRADIENTS[parseInt(fallback) || 0];
+    return `bg-gradient-to-r ${gradient}`;
+  }
+  
+  const gradient = AVATAR_GRADIENTS[id];
+  return `bg-gradient-to-r ${gradient}`;
 }
 
 /**
- * Валидирует градиент
+ * Валидирует идентификатор аватарки
  */
-export function isValidGradient(gradient: string | null | undefined): gradient is AvatarGradient {
-  if (!gradient) return false;
-  return AVATAR_GRADIENTS.includes(gradient as AvatarGradient);
+export function isValidAvatar(avatarId: string | null | undefined): avatarId is AvatarId {
+  if (!avatarId) return false;
+  const id = parseInt(avatarId);
+  return !isNaN(id) && id >= 0 && id < AVATAR_GRADIENTS.length;
+}
+
+// Обратная совместимость (для миграции)
+/**
+ * @deprecated Используйте generateRandomAvatar() вместо этого
+ */
+export function generateRandomGradient(): string {
+  return generateRandomAvatar();
+}
+
+/**
+ * @deprecated Используйте generateAvatarFromString() вместо этого
+ */
+export function generateGradientFromString(str: string): string {
+  return generateAvatarFromString(str);
 }
 

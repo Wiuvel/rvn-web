@@ -93,8 +93,9 @@ class SecureLogger {
                        entry.level === 'info' ? console.info :
                        console.log;
       
+      const levelLabel = entry.level.charAt(0).toUpperCase() + entry.level.slice(1);
       logMethod(
-        `[${entry.timestamp}] ${entry.level.toUpperCase()}: ${entry.message}`,
+        `[${entry.timestamp}] ${levelLabel}: ${entry.message}`,
         entry.context ? entry.context : ''
       );
     } else {

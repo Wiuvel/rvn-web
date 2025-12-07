@@ -51,13 +51,18 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Получаем параметр days из query string
+    // Получаем параметр period из query string
     const { searchParams } = new URL(request.url);
-    const days = parseInt(searchParams.get('days') || '30', 10);
-    const validDays = Math.min(Math.max(days, 1), 90); // От 1 до 90 дней
+    const period = searchParams.get('period') || 'month';
+    
+    // Валидация периода
+    const validPeriods = ['hour', 'day', 'week', 'month'] as const;
+    const validPeriod = validPeriods.includes(period as typeof validPeriods[number]) 
+      ? (period as typeof validPeriods[number])
+      : 'month';
 
     // Получаем аналитику
-    const analytics = await getSupportAnalytics(validDays);
+    const analytics = await getSupportAnalytics(validPeriod);
 
     // Теперь getSupportAnalytics всегда возвращает объект (не null)
     // Если Redis не подключен, возвращается пустая аналитика
