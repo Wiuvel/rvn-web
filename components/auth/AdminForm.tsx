@@ -149,7 +149,7 @@ export default function AdminAuthForm({ onAuthSuccess }: AdminAuthFormProps) {
     return (
       <div className="min-h-screen flex items-center justify-center relative px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#060010' }}>
         <AuroraBackground 
-          colorStops={['#14b8a6', '#10b981', '#059669']} 
+          colorStops={['#3B82F6', '#6366F1', '#4F46E5']} 
           amplitude={0.3} 
           blend={0.5}
           speed={1.0}
@@ -238,7 +238,7 @@ export default function AdminAuthForm({ onAuthSuccess }: AdminAuthFormProps) {
               </div>
             )}
 
-            <div>
+            <div className="space-y-3">
               <button
                 type="submit"
                 disabled={loading || isSubmitting}
@@ -254,6 +254,71 @@ export default function AdminAuthForm({ onAuthSuccess }: AdminAuthFormProps) {
                 ) : (
                   'Войти'
                 )}
+              </button>
+
+              <div className="relative flex items-center">
+                <div className="flex-grow border-t border-neutral-600"></div>
+                <span className="px-3 text-sm text-neutral-400">или</span>
+                <div className="flex-grow border-t border-neutral-600"></div>
+              </div>
+              
+              <button
+                type="button"
+                onClick={() => {
+                  const width = 600;
+                  const height = 700;
+                  const left = (window.screen.width - width) / 2;
+                  const top = (window.screen.height - height) / 2;
+                  
+                  const popup = window.open(
+                    '/api/admin/oauth/github?popup=true',
+                    'GitHub OAuth',
+                    `width=${width},height=${height},left=${left},top=${top},toolbar=no,menubar=no,scrollbars=yes,resizable=yes`
+                  );
+                  
+                  if (!popup) {
+                    setError('Всплывающие окна заблокированы. Разрешите всплывающие окна для этого сайта.');
+                    return;
+                  }
+                  
+                  // Listen for OAuth success
+                  const checkClosed = setInterval(() => {
+                    if (popup.closed) {
+                      clearInterval(checkClosed);
+                      // Check auth status after popup closes
+                      setTimeout(() => {
+                        checkAuthStatus();
+                      }, 500);
+                    }
+                  }, 500);
+                  
+                  // Listen for messages from popup
+                  const messageHandler = (event: MessageEvent) => {
+                    if (event.origin !== window.location.origin) return;
+                    if (event.data.type === 'oauth-success') {
+                      window.removeEventListener('message', messageHandler);
+                      clearInterval(checkClosed);
+                      setLoginSuccess(true);
+                      setTimeout(() => {
+                        checkAuthStatus();
+                        if (onAuthSuccess) {
+                          onAuthSuccess();
+                        }
+                      }, 500);
+                    } else if (event.data.type === 'oauth-error') {
+                      window.removeEventListener('message', messageHandler);
+                      setError(translateError(event.data.error || 'oauth_error'));
+                    }
+                  };
+                  window.addEventListener('message', messageHandler);
+                }}
+                disabled={loading || isSubmitting}
+                className="w-full flex justify-center items-center gap-2 py-3 px-4 text-sm font-medium text-white bg-neutral-800/60 border border-neutral-700/60 rounded-xl hover:bg-neutral-700/60 hover:border-neutral-600/60 transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
+              >
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path fillRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.532 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clipRule="evenodd" />
+                </svg>
+                Войти через GitHub
               </button>
             </div>
           </form>
@@ -395,7 +460,7 @@ export default function AdminAuthForm({ onAuthSuccess }: AdminAuthFormProps) {
               )}
             </button>
             
-            {isLogin && (
+            {isLogin && authState.adminExists && (
               <>
                 <div className="relative flex items-center">
                   <div className="flex-grow border-t border-neutral-600"></div>
