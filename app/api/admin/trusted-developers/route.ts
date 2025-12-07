@@ -32,11 +32,17 @@ async function getCurrentAdminId(request: NextRequest): Promise<string | null> {
   const userAgent = request.headers.get('user-agent') || 'unknown';
   const validation = SessionManager.validateSession(sessionId, ipAddress, userAgent);
   
-  if (!validation.valid || !validation.session) {
+  if (!validation.valid) {
     return null;
   }
 
-  return validation.session.userId;
+  // Get session data after validation
+  const session = SessionManager.getSession(sessionId);
+  if (!session) {
+    return null;
+  }
+
+  return session.userId;
 }
 
 // GET - List all trusted developers
