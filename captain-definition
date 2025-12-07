@@ -1,5 +1,14 @@
 {
   "schemaVersion": 2,
-  "dockerfilePath": "./dockerfile"
+  "dockerfilePath": "./dockerfile",
+  "preDeployFunctions": [
+    {
+      "name": "docker_login",
+      "execute": "bash",
+      "args": [
+        "-c",
+        "echo \"$DOCKERHUB_PASSWORD\" | docker login -u \"$DOCKERHUB_USERNAME\" --password-stdin"
+      ]
+    }
+  ]
 }
-
