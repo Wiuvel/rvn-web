@@ -8,6 +8,7 @@ import AdminAuthForm from '@/components/auth/AdminForm';
 import MagicBentoGrid from '@/components/ui/MagicBentoGrid';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import SupportAnalytics from '@/components/admin/SupportAnalytics';
+import TrustedDevelopersSettings from '@/components/admin/TrustedDevelopersSettings';
 import { GSAP_DEFAULT_DURATION, GSAP_DEFAULT_EASE, APP_VERSION } from '@/lib/utils/constants';
 
 interface AuthState {
@@ -880,8 +881,8 @@ export default function AdminPanelContent({ teamCount }: AdminPanelContentProps)
                     )}
 
                     {activeTab === 'settings' && (
-                        <div className="flex items-center justify-center h-64 text-neutral-500">
-                            Раздел &quot;Настройки&quot; в разработке
+                        <div className="space-y-6">
+                            <TrustedDevelopersSettings />
                         </div>
                     )}
                 </main>

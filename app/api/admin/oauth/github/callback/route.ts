@@ -15,19 +15,42 @@ export async function OPTIONS() {
 }
 
 /**
- * Check if GitHub username is in the trusted developers list
+ * Check if GitHub email or username is in the trusted developers list from database
  */
-function isTrustedDeveloper(username: string, trustedList?: string): boolean {
-  if (!trustedList) {
+async function isTrustedDeveloper(
+  email: string | null | undefined,
+  username: string,
+  supabaseAdmin: any
+): Promise<boolean> {
+  if (!supabaseAdmin) {
     return false;
   }
-  
-  const trusted = trustedList
-    .split(',')
-    .map(u => u.trim().toLowerCase())
-    .filter(u => u.length > 0);
-  
-  return trusted.includes(username.toLowerCase());
+
+  // Check by email first (preferred method)
+  if (email) {
+    const normalizedEmail = email.toLowerCase().trim();
+    const { data: emailMatch } = await supabaseAdmin
+      .from('trusted_github_developers')
+      .select('id')
+      .eq('email', normalizedEmail)
+      .limit(1)
+      .single();
+
+    if (emailMatch) {
+      return true;
+    }
+  }
+
+  // Check by username
+  const normalizedUsername = username.toLowerCase().trim();
+  const { data: usernameMatch } = await supabaseAdmin
+    .from('trusted_github_developers')
+    .select('id')
+    .eq('github_username', normalizedUsername)
+    .limit(1)
+    .single();
+
+  return !!usernameMatch;
 }
 
 // Handle GitHub OAuth callback for admin panel
@@ -163,15 +186,6 @@ export async function GET(request: NextRequest) {
       return setCorsHeaders(NextResponse.redirect(errorUrl));
     }
 
-    // Check if user is a trusted developer
-    if (!isTrustedDeveloper(githubUsername, env.GITHUB_TRUSTED_DEVELOPERS)) {
-      logger.warn('OAuth: Untrusted GitHub developer attempted admin login.', {
-        username: githubUsername
-      });
-      const errorUrl = getErrorRedirectUrl('oauth_denied', origin, isPopup);
-      return setCorsHeaders(NextResponse.redirect(errorUrl));
-    }
-
     // Get email if not provided in user info
     let email = githubEmail;
     if (!email) {
@@ -188,6 +202,12 @@ export async function GET(request: NextRequest) {
         const primaryEmail = emails.find((e: { primary: boolean }) => e.primary);
         if (primaryEmail && primaryEmail.verified) {
           email = primaryEmail.email;
+        } else if (emails.length > 0) {
+          // Use first verified email if no primary email found
+          const verifiedEmail = emails.find((e: { verified: boolean }) => e.verified);
+          if (verifiedEmail) {
+            email = verifiedEmail.email;
+          }
         }
       }
     }
@@ -202,7 +222,19 @@ export async function GET(request: NextRequest) {
       return setCorsHeaders(NextResponse.redirect(errorUrl));
     }
 
+    // Check if user is a trusted developer (by email or username) from database
+    const isTrusted = await isTrustedDeveloper(email, githubUsername, supabaseAdmin);
+    if (!isTrusted) {
+      logger.warn('OAuth: Untrusted GitHub developer attempted admin login.', {
+        username: githubUsername,
+        email: email || 'not provided'
+      });
+      const errorUrl = getErrorRedirectUrl('oauth_denied', origin, isPopup);
+      return setCorsHeaders(NextResponse.redirect(errorUrl));
+    }
+
     // Check if admin exists with this username
+    // Admin must be created manually by Founder before developer can login via GitHub
     const { data: admin, error: adminError } = await supabaseAdmin
       .from('admins')
       .select('*')
@@ -210,8 +242,10 @@ export async function GET(request: NextRequest) {
       .single();
 
     if (adminError || !admin) {
-      logger.warn('OAuth: Admin not found for GitHub username.', {
-        username: githubUsername
+      logger.warn('OAuth: Admin not found for GitHub username. Admin must be created manually before GitHub OAuth login.', {
+        username: githubUsername,
+        email: email || 'not provided',
+        error: adminError?.message || 'Admin not found'
       });
       const errorUrl = getErrorRedirectUrl('oauth_denied', origin, isPopup);
       return setCorsHeaders(NextResponse.redirect(errorUrl));

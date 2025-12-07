@@ -34,7 +34,6 @@ const envSchema = z.object({
   // GitHub OAuth for Admin Panel
   GITHUB_CLIENT_ID: z.string().optional(),
   GITHUB_CLIENT_SECRET: z.string().optional(),
-  GITHUB_TRUSTED_DEVELOPERS: z.string().optional(), // Comma-separated list of GitHub usernames
   
   // Public domain for OAuth redirects (optional, falls back to host header)
   PUBLIC_DOMAIN: z.string().url().optional(),
@@ -73,7 +72,6 @@ export function validateEnv(): Env {
       YANDEX_CLIENT_SECRET: process.env.YANDEX_CLIENT_SECRET,
       GITHUB_CLIENT_ID: process.env.GITHUB_CLIENT_ID,
       GITHUB_CLIENT_SECRET: process.env.GITHUB_CLIENT_SECRET,
-      GITHUB_TRUSTED_DEVELOPERS: process.env.GITHUB_TRUSTED_DEVELOPERS,
       PUBLIC_DOMAIN: process.env.PUBLIC_DOMAIN,
       NODE_ENV: process.env.NODE_ENV || 'development',
     });
