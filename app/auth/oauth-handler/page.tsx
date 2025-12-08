@@ -294,6 +294,20 @@ function OAuthHandlerContent() {
       if (typeof window !== 'undefined') {
         window.location.href = '/api/auth/oauth/yandex';
       }
+    } else if (provider === 'vk') {
+      setStatus('redirecting');
+      // Ensure popup flag is saved before redirect
+      try {
+        if (typeof sessionStorage !== 'undefined' && isPopupWindow()) {
+          sessionStorage.setItem('oauth_popup', 'true');
+        }
+      } catch {
+        // sessionStorage may be unavailable
+      }
+      // Redirect to VK OAuth endpoint
+      if (typeof window !== 'undefined') {
+        window.location.href = '/api/auth/oauth/vk';
+      }
     } else {
       setHandled(true);
       const errorMsg = getOAuthErrorMessage('invalid_provider');

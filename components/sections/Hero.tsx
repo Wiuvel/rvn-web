@@ -1,9 +1,8 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useFadeIn } from '@/hooks/useGSAP';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -12,11 +11,7 @@ import LightRays from "@/components/LightRays";
 export default function HeroSection() {
   const [ping, setPing] = useState(0);
   const [connected, setConnected] = useState(false);
-  const [serverInfo, setServerInfo] = useState<{country: string, code: string, flag: string} | null>(null);
-  const titleRef = useFadeIn(0.1);
-  const subtitleRef = useFadeIn(0.2);
-  const buttonsRef = useFadeIn(0.3);
-  const dashboardRef = useRef<HTMLDivElement>(null);
+  const [serverInfo, setServerInfo] = useState<{ country: string, code: string, flag: string } | null>(null);
 
   useEffect(() => {
     const servers = [
@@ -80,13 +75,13 @@ export default function HeroSection() {
       <div className="mx-auto max-w-7xl px-6 sm:px-8 lg:px-12 xl:px-16 pt-24 pb-24 md:pt-32 md:pb-36 relative z-10">
         <div className="flex flex-col lg:grid lg:grid-cols-2 gap-8 md:gap-12 items-center">
           <div className="order-2 lg:order-1 text-center lg:text-left">
-            <h1 ref={titleRef} className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-semibold tracking-tight leading-tight">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-semibold tracking-tight leading-tight">
               Свобода и безопасность в <br className="hidden sm:block" />один <u>клик</u>
             </h1>
-            <p ref={subtitleRef} className="mt-3 md:mt-4 text-neutral-300 text-base md:text-lg max-w-xl mx-auto lg:mx-0">
+            <p className="mt-3 md:mt-4 text-neutral-300 text-base md:text-lg max-w-xl mx-auto lg:mx-0">
               Быстрое и надежное решение с низкими тарифами и доступными серверами. Выбирайте лучшее для себя.
             </p>
-            <div ref={buttonsRef} className="mt-6 md:mt-8 flex flex-col sm:flex-row gap-3 justify-center lg:justify-start">
+            <div className="mt-6 md:mt-8 flex flex-col sm:flex-row gap-3 justify-center lg:justify-start">
               <Button asChild size="lg" className="bg-primary-400 text-black hover:bg-primary-500 shadow-lg hover:shadow-blue-500/50 hover:scale-105 disabled:bg-neutral-800 disabled:text-neutral-500 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:scale-100 disabled:hover:shadow-lg">
                 <Link href="#pricing">Выбрать тариф</Link>
               </Button>
@@ -104,7 +99,7 @@ export default function HeroSection() {
             </div>
           </div>
           <div className="hidden sm:flex order-2 lg:order-1 w-full max-w-md mx-auto lg:mx-0 lg:ml-auto flex justify-center lg:justify-end">
-            <div ref={dashboardRef} className="relative w-full">
+            <div className="relative w-full">
               <div className="absolute -inset-4 md:-inset-8 rounded-full bg-gradient-to-br from-primary-500/20 to-transparent blur-2xl md:blur-3xl"></div>
               <Card className="relative border-neutral-800/50 bg-neutral-900/50 backdrop-blur-sm shadow-soft">
                 <CardHeader className="p-4 md:p-6">
@@ -113,7 +108,7 @@ export default function HeroSection() {
                       {connected ? "Сеанс защищён" : "Подключение…"}
                     </span>
                     <Badge variant={connected ? "default" : "secondary"} className={`${connected ? "bg-green-500/20 text-green-400 border-green-500/30 hover:!bg-green-500/20" : "bg-yellow-500/20 text-yellow-400 border-yellow-500/30 hover:!bg-yellow-500/20"} flex items-center gap-1`}>
-                      <span className={`h-2 w-2 rounded-full ${connected ? "bg-green-400" : "bg-yellow-400"} ${connected ? "" : "animate-ping"}`}></span> 
+                      <span className={`h-2 w-2 rounded-full ${connected ? "bg-green-400" : "bg-yellow-400"} ${connected ? "" : "animate-ping"}`}></span>
                       {connected ? "Подключено" : "Проверка"}
                     </Badge>
                   </div>
@@ -121,15 +116,15 @@ export default function HeroSection() {
                 <CardContent className="p-4 md:p-6 pt-0">
                   <div className="grid grid-cols-2 gap-3 md:gap-4">
                     <div className="rounded-xl border border-neutral-800 p-3 md:p-4">
-                    <div className="text-neutral-400 text-xs">Макс. скорость</div>
-                    <div className="mt-1 text-xl md:text-2xl font-semibold">1 Гбит/с</div>
-                  </div>
-                  <div className="rounded-xl border border-neutral-800 p-3 md:p-4">
-                    <div className="text-neutral-400 text-xs">Пинг</div>
-                    <div className={`mt-1 text-xl md:text-2xl font-semibold ${getPingColor(ping)}`}>
-                      {connected ? `${Math.round(ping)} ms` : "– ms"}
+                      <div className="text-neutral-400 text-xs">Макс. скорость</div>
+                      <div className="mt-1 text-xl md:text-2xl font-semibold">1 Гбит/с</div>
                     </div>
-                  </div>
+                    <div className="rounded-xl border border-neutral-800 p-3 md:p-4">
+                      <div className="text-neutral-400 text-xs">Пинг</div>
+                      <div className={`mt-1 text-xl md:text-2xl font-semibold ${getPingColor(ping)}`}>
+                        {connected ? `${Math.round(ping)} ms` : "– ms"}
+                      </div>
+                    </div>
                     <div className="rounded-xl border border-neutral-800 p-3 md:p-4 col-span-2">
                       <div className="text-neutral-400 text-xs">Текущий сервер</div>
                       {!connected ? (
@@ -138,12 +133,12 @@ export default function HeroSection() {
                         </div>
                       ) : serverInfo ? (
                         <div className="mt-1 flex items-center gap-2">
-                          <Image 
-                            src={serverInfo.flag} 
-                            alt={serverInfo.country} 
-                            width={24} 
-                            height={16} 
-                            className="h-4 w-6 rounded-sm border border-neutral-700" 
+                          <Image
+                            src={serverInfo.flag}
+                            alt={serverInfo.country}
+                            width={24}
+                            height={16}
+                            className="h-4 w-6 rounded-sm border border-neutral-700"
                           />
                           <span className="font-medium text-sm md:text-base">
                             {serverInfo.country} · {serverInfo.code}
@@ -152,8 +147,8 @@ export default function HeroSection() {
                       ) : null}
                     </div>
                   </div>
-                  <Button 
-                    className="mt-4 md:mt-6 w-full bg-white text-neutral-900 hover:bg-white/90 hover:shadow-glow" 
+                  <Button
+                    className="mt-4 md:mt-6 w-full bg-white text-neutral-900 hover:bg-white/90 hover:shadow-glow"
                     disabled
                   >
                     Отключить

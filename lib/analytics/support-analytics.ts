@@ -59,6 +59,16 @@ export async function trackTicketCreated(ticketId: string, userId: string, statu
   if (!client) return;
 
   try {
+    // Проверяем состояние соединения и переподключаемся при необходимости
+    if (client.status !== 'ready') {
+      try {
+        await client.connect();
+      } catch (connectError) {
+        // Redis необязателен - не логируем ошибки переподключения
+        return;
+      }
+    }
+
     const now = new Date();
     
     // Увеличиваем счетчики
@@ -72,8 +82,18 @@ export async function trackTicketCreated(ticketId: string, userId: string, statu
     // Сохраняем информацию о тикете для расчета времени ответа
     await client.setex(`analytics:support:ticket:${ticketId}:created`, 86400 * 30, now.toISOString()); // 30 дней
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    
+    // Если ошибка связана с закрытым соединением, не логируем как ошибку
+    // Redis необязателен для работы системы
+    if (errorMessage.includes('Connection is closed') || errorMessage.includes('Connection closed')) {
+      // Не логируем - Redis необязателен
+      return;
+    }
+    
+    // Логируем только другие ошибки
     logger.error('Error tracking ticket creation', {
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: errorMessage,
       ticketId
     });
   }
@@ -87,6 +107,16 @@ export async function trackTicketClosed(ticketId: string, userId: string, status
   if (!client) return;
 
   try {
+    // Проверяем состояние соединения и переподключаемся при необходимости
+    if (client.status !== 'ready') {
+      try {
+        await client.connect();
+      } catch (connectError) {
+        // Redis необязателен - не логируем ошибки переподключения
+        return;
+      }
+    }
+
     const now = new Date();
     
     // Увеличиваем счетчики
@@ -114,8 +144,18 @@ export async function trackTicketClosed(ticketId: string, userId: string, status
       }
     }
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    
+    // Если ошибка связана с закрытым соединением, не логируем как ошибку
+    // Redis необязателен для работы системы
+    if (errorMessage.includes('Connection is closed') || errorMessage.includes('Connection closed')) {
+      // Не логируем - Redis необязателен
+      return;
+    }
+    
+    // Логируем только другие ошибки
     logger.error('Error tracking ticket closure', {
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: errorMessage,
       ticketId
     });
   }
@@ -133,6 +173,16 @@ export async function trackMessageSent(
   if (!client) return;
 
   try {
+    // Проверяем состояние соединения и переподключаемся при необходимости
+    if (client.status !== 'ready') {
+      try {
+        await client.connect();
+      } catch (connectError) {
+        // Redis необязателен - не логируем ошибки переподключения
+        return;
+      }
+    }
+
     const now = new Date();
     
     // Увеличиваем счетчики
@@ -161,8 +211,18 @@ export async function trackMessageSent(
       }
     }
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    
+    // Если ошибка связана с закрытым соединением, не логируем как ошибку
+    // Redis необязателен для работы системы
+    if (errorMessage.includes('Connection is closed') || errorMessage.includes('Connection closed')) {
+      // Не логируем - Redis необязателен
+      return;
+    }
+    
+    // Логируем только другие ошибки
     logger.error('Error tracking message sent', {
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: errorMessage,
       ticketId
     });
   }

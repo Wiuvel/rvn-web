@@ -14,7 +14,16 @@ import { useWebSocket } from '@/hooks/useWebSocket';
 // Lazy load RateLimitCaptcha для оптимизации bundle size
 const RateLimitCaptcha = dynamic(() => import('@/components/auth/RateLimitCaptcha'), {
   ssr: false,
-  loading: () => null
+  loading: () => (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+      <div className="bg-neutral-900 rounded-2xl p-6 sm:p-8 max-w-md w-full mx-4 border border-neutral-800 shadow-2xl">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-white/20 border-t-white rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-sm text-neutral-400">Загрузка капчи..</p>
+        </div>
+      </div>
+    </div>
+  )
 });
 
 interface UserData {

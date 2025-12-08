@@ -516,7 +516,7 @@ export default function AdminPanelContent({ teamCount }: AdminPanelContentProps)
                     <div className="flex items-center space-x-3">
                         <div>
                             <h1 className="text-lg font-semibold text-white">Raven Private</h1>
-                            <p className="text-xs text-neutral-400">NextJS 15.5.3 / React 19.1.0</p>
+                            <p className="text-xs text-neutral-400">NextJS 16.0.7 / React 19.1.0</p>
                         </div>
                     </div>
                 </div>

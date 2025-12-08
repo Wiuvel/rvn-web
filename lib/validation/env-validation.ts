@@ -31,6 +31,10 @@ const envSchema = z.object({
   YANDEX_CLIENT_ID: z.string().optional(),
   YANDEX_CLIENT_SECRET: z.string().optional(),
   
+  // VK OAuth
+  VK_CLIENT_ID: z.string().optional(),
+  VK_CLIENT_SECRET: z.string().optional(),
+  
   // GitHub OAuth for Admin Panel
   GITHUB_CLIENT_ID: z.string().optional(),
   GITHUB_CLIENT_SECRET: z.string().optional(),
@@ -70,6 +74,8 @@ export function validateEnv(): Env {
       TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN,
       YANDEX_CLIENT_ID: process.env.YANDEX_CLIENT_ID,
       YANDEX_CLIENT_SECRET: process.env.YANDEX_CLIENT_SECRET,
+      VK_CLIENT_ID: process.env.VK_CLIENT_ID,
+      VK_CLIENT_SECRET: process.env.VK_CLIENT_SECRET,
       GITHUB_CLIENT_ID: process.env.GITHUB_CLIENT_ID,
       GITHUB_CLIENT_SECRET: process.env.GITHUB_CLIENT_SECRET,
       PUBLIC_DOMAIN: process.env.PUBLIC_DOMAIN,

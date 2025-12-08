@@ -391,7 +391,7 @@ void main() {
   return (
     <div
       ref={containerRef}
-      className={`w-full h-full pointer-events-none z-[3] overflow-hidden relative ${className}`.trim()}
+      className={`w-full h-full pointer-events-none z-[3] overflow-hidden relative transition-opacity duration-1000 ${isVisible ? 'opacity-100' : 'opacity-0'} ${className}`.trim()}
     />
   );
 };

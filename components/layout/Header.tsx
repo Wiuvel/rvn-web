@@ -25,6 +25,7 @@ export default function Header() {
   const spinnerRef = useRef<HTMLDivElement>(null);
   const mobileSpinnerRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
+  const authContainerRef = useRef<HTMLDivElement>(null);
   
   // Используем новый хук useAuth
   const { userData, loading } = useAuth({ silent: true });
@@ -39,6 +40,7 @@ export default function Header() {
       return;
     }
     
+    // Плавная анимация появления header без влияния на layout
     gsap.fromTo('.header-container', 
       { 
         opacity: 0, 
@@ -49,10 +51,26 @@ export default function Header() {
         y: 0, 
         duration: GSAP_DEFAULT_DURATION, 
         ease: GSAP_DEFAULT_EASE,
-        delay: 0.1
+        delay: 0.1,
+        // Используем will-change для оптимизации, но не влияем на layout
+        force3D: true
       }
     );
   }, []);
+
+  // Плавный переход между состояниями auth контейнера
+  useEffect(() => {
+    if (typeof window === 'undefined' || !authContainerRef.current) return;
+    
+    // Плавное появление контента после загрузки
+    if (!loading) {
+      gsap.to(authContainerRef.current, {
+        opacity: 1,
+        duration: 0.2,
+        ease: "power2.out"
+      });
+    }
+  }, [loading]);
 
   // useAuth хук теперь обрабатывает всю логику авторизации
 
@@ -69,44 +87,7 @@ export default function Header() {
     setNotifications([]);
   }, []);
 
-  // GSAP анимация для спиннера
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    
-    if (loading) {
-      const elements = [spinnerRef.current, mobileSpinnerRef.current].filter(Boolean);
-      
-      elements.forEach((element) => {
-        if (!element) return;
-        
-        // Анимация появления с плавным fade-in и scale
-        gsap.fromTo(element,
-          { opacity: 0, scale: 0.85 },
-          { 
-            opacity: 0.7, 
-            scale: 1, 
-            duration: 0.4, 
-            ease: "power2.out"
-          }
-        );
-      });
-    } else {
-      // Плавное исчезновение при завершении загрузки
-      [spinnerRef.current, mobileSpinnerRef.current].forEach((element) => {
-        if (element) {
-          gsap.to(element, {
-            opacity: 0,
-            scale: 0.9,
-            duration: 0.2,
-            ease: "power2.in",
-            onComplete: () => {
-              gsap.set(element, { clearProps: "all" });
-            }
-          });
-        }
-      });
-    }
-  }, [loading]);
+  // Убрали GSAP анимации для спиннера, чтобы избежать прыжков layout
 
   // Блокировка скролла при открытом меню
   useEffect(() => {
@@ -225,81 +206,88 @@ export default function Header() {
             <Link href="#faq" className="hover:text-white transition">FAQ</Link>
           </nav>
           <div className="hidden lg:flex items-center gap-2 relative" ref={userMenuRef}>
-            {loading ? (
-              <div 
-                ref={spinnerRef}
-                className="w-10 h-10 rounded-full bg-gradient-to-r from-neutral-700 via-neutral-600 to-neutral-700 bg-[length:200%_100%] animate-[shimmer_1.5s_ease-in-out_infinite]"
-              ></div>
-            ) : userData ? (
-              <>
-                <div className="relative" ref={notificationsMenuRef}>
+            {/* Единый контейнер с фиксированной минимальной шириной для предотвращения прыжков */}
+            <div 
+              ref={authContainerRef}
+              className="h-10 min-w-[100px] flex items-center justify-end transition-opacity duration-300"
+              style={{ opacity: loading ? 0.7 : 1 }}
+            >
+              {loading ? (
+                <div 
+                  ref={spinnerRef}
+                  className="w-10 h-10 rounded-full bg-gradient-to-r from-neutral-700 via-neutral-600 to-neutral-700 bg-[length:200%_100%] animate-[shimmer_1.5s_ease-in-out_infinite] flex-shrink-0"
+                ></div>
+              ) : userData ? (
+                <div className="flex items-center gap-2">
+                  <div className="relative" ref={notificationsMenuRef}>
+                    <button
+                      ref={notificationsButtonRef}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setNotificationsOpen(!notificationsOpen);
+                      }}
+                      className="w-10 h-10 rounded-full bg-neutral-800/60 hover:bg-neutral-700/60 flex items-center justify-center text-white/80 hover:text-white transition-all duration-200 hover:scale-110 cursor-pointer flex-shrink-0"
+                      title="Уведомления"
+                      aria-label="Уведомления"
+                      aria-expanded={notificationsOpen}
+                    >
+                      <Image 
+                        src={hasUnreadNotifications ? "/static/icons/accounts/bell-dot.svg" : "/static/icons/accounts/bell.svg"} 
+                        alt="Уведомления" 
+                        width={18} 
+                        height={18} 
+                        className="w-[18px] h-[18px]"
+                      />
+                    </button>
+                    <NotificationsMenu
+                      notifications={notifications}
+                      readNotifications={readNotifications}
+                      isOpen={notificationsOpen}
+                      onClose={() => setNotificationsOpen(false)}
+                      onMarkAsRead={markNotificationAsRead}
+                      menuRef={notificationsMenuRef}
+                    />
+                  </div>
                   <button
-                    ref={notificationsButtonRef}
+                    ref={userMenuButtonRef}
                     onClick={(e) => {
                       e.stopPropagation();
-                      setNotificationsOpen(!notificationsOpen);
+                      setUserMenuOpen(!userMenuOpen);
                     }}
-                    className="w-10 h-10 rounded-full bg-neutral-800/60 hover:bg-neutral-700/60 flex items-center justify-center text-white/80 hover:text-white transition-all duration-200 hover:scale-110 cursor-pointer mr-2"
-                    title="Уведомления"
-                    aria-label="Уведомления"
-                    aria-expanded={notificationsOpen}
+                    className={`w-10 h-10 rounded-full ${getGradientClasses(userData.avatar)} flex items-center justify-center text-white font-semibold text-sm shadow-glow transition-transform duration-200 hover:scale-110 cursor-pointer flex-shrink-0`}
+                    title={userData.username}
+                    aria-label="Меню пользователя"
+                    aria-expanded={userMenuOpen}
                   >
-                    <Image 
-                      src={hasUnreadNotifications ? "/static/icons/accounts/bell-dot.svg" : "/static/icons/accounts/bell.svg"} 
-                      alt="Уведомления" 
-                      width={18} 
-                      height={18} 
-                      className="w-[18px] h-[18px]"
-                    />
+                    {getInitial(userData.username)}
                   </button>
-                  <NotificationsMenu
-                    notifications={notifications}
-                    readNotifications={readNotifications}
-                    isOpen={notificationsOpen}
-                    onClose={() => setNotificationsOpen(false)}
-                    onMarkAsRead={markNotificationAsRead}
-                    menuRef={notificationsMenuRef}
-                  />
+                  {userData && (
+                    <UserMenu
+                      userData={userData}
+                      isOpen={userMenuOpen}
+                      onClose={() => setUserMenuOpen(false)}
+                      showProfile={true}
+                      showUserId={true}
+                      menuRef={userMenuRef}
+                    />
+                  )}
                 </div>
-                <button
-                  ref={userMenuButtonRef}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setUserMenuOpen(!userMenuOpen);
-                  }}
-                  className={`w-10 h-10 rounded-full ${getGradientClasses(userData.avatar)} flex items-center justify-center text-white font-semibold text-sm shadow-glow transition-transform duration-200 hover:scale-110 cursor-pointer`}
-                  title={userData.username}
-                  aria-label="Меню пользователя"
-                  aria-expanded={userMenuOpen}
+              ) : (
+                <Link 
+                  href="/auth" 
+                  className="rounded-xl bg-primary-500 hover:bg-primary-400 px-4 py-2 text-sm font-medium text-white shadow-glow transition flex items-center gap-2 h-10 flex-shrink-0"
                 >
-                  {getInitial(userData.username)}
-                </button>
-                {userData && (
-                  <UserMenu
-                    userData={userData}
-                    isOpen={userMenuOpen}
-                    onClose={() => setUserMenuOpen(false)}
-                    showProfile={true}
-                    showUserId={true}
-                    menuRef={userMenuRef}
+                  <Image 
+                    src="/static/icons/accounts/log-in.svg" 
+                    alt="Войти" 
+                    width={24} 
+                    height={24} 
+                    className="w-5 h-5"
                   />
-                )}
-              </>
-            ) : (
-              <Link 
-                href="/auth" 
-                className="rounded-xl bg-primary-500 hover:bg-primary-400 px-4 py-2 text-sm font-medium text-white shadow-glow transition flex items-center gap-2"
-              >
-                <Image 
-                  src="/static/icons/accounts/log-in.svg" 
-                  alt="Войти" 
-                  width={24} 
-                  height={24} 
-                  className="w-5 h-5"
-                />
-                <span>Войти</span>
-              </Link>
-            )}
+                  <span>Войти</span>
+                </Link>
+              )}
+            </div>
           </div>
           <button 
             onClick={() => setOpen(!open)} 
@@ -321,10 +309,12 @@ export default function Header() {
           <div className="lg:hidden mt-4 py-4 bg-black/50 backdrop-blur-xl rounded-2xl border border-white/10">
             <div className="px-4 space-y-2">
               {loading ? (
-                <div 
-                  ref={mobileSpinnerRef}
-                  className="w-10 h-10 rounded-full bg-gradient-to-r from-neutral-700 via-neutral-600 to-neutral-700 bg-[length:200%_100%] animate-[shimmer_1.5s_ease-in-out_infinite]"
-                ></div>
+                <div className="h-12 flex items-center">
+                  <div 
+                    ref={mobileSpinnerRef}
+                    className="w-10 h-10 rounded-full bg-gradient-to-r from-neutral-700 via-neutral-600 to-neutral-700 bg-[length:200%_100%] animate-[shimmer_1.5s_ease-in-out_infinite] flex-shrink-0"
+                  ></div>
+                </div>
               ) : userData ? (
                 <>
                   <Link

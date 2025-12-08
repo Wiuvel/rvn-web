@@ -120,7 +120,13 @@ export default function Footer() {
             </div>
             <div className="hidden md:flex items-center gap-3 md:gap-4 flex-wrap justify-center order-1 md:order-2 select-none drop-shadow-[0_0_50px_rgba(22,163,255,0.8)]">
               <Link href="/payments" prefetch={false} className="flex items-center gap-1 text-neutral-300 hover:text-neutral-200 transition-colors duration-200">
-                <span>PAYMENT_PROVIDER</span>
+                <span>CRYPTOBOT</span>
+                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" className="w-5 h-5 flex shrink-0 items-center justify-center">
+                  <path d="M16.0037 9.41421L7.39712 18.0208L5.98291 16.6066L14.5895 8H7.00373V6H18.0037V17H16.0037V9.41421Z"></path>
+                </svg>
+              </Link>
+              <Link href="/payments" prefetch={false} className="flex items-center gap-1 text-neutral-300 hover:text-neutral-200 transition-colors duration-200">
+                <span>HELEKET</span>
                 <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" className="w-5 h-5 flex shrink-0 items-center justify-center">
                   <path d="M16.0037 9.41421L7.39712 18.0208L5.98291 16.6066L14.5895 8H7.00373V6H18.0037V17H16.0037V9.41421Z"></path>
                 </svg>

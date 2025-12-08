@@ -17,9 +17,19 @@ interface WindowWithPopup extends Window {
 }
 
 // Lazy load RateLimitCaptcha для оптимизации bundle size
+// Используем eager loading для капчи, чтобы она была готова при открытии
 const RateLimitCaptcha = dynamic(() => import('@/components/auth/RateLimitCaptcha'), {
   ssr: false,
-  loading: () => null
+  loading: () => (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+      <div className="bg-neutral-900 rounded-2xl p-6 sm:p-8 max-w-md w-full mx-4 border border-neutral-800 shadow-2xl">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-white/20 border-t-white rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-sm text-neutral-400">Загрузка капчи..</p>
+        </div>
+      </div>
+    </div>
+  )
 });
 
 
@@ -770,6 +780,20 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
               <button
                 type="button"
                 className="oauth-btn"
+                onClick={() => oauthLogin('vk')}
+                disabled={isLoading || isPopupOpen}
+                title="Войти через VK ID"
+                aria-label="Войти через VK ID"
+              >
+                {activeProvider === 'vk' ? (
+                  <div className="w-5 h-5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+                ) : (
+                  <Image src="/static/icons/oauth/vk.svg" alt="VK" width={20} height={20} className="oauth-icon" />
+                )}
+              </button>
+              <button
+                type="button"
+                className="oauth-btn"
                 onClick={() => oauthLogin('google')}
                 disabled={isLoading || isPopupOpen}
                 title="Войти через Google"
@@ -978,6 +1002,20 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
                   <div className="w-5 h-5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
                 ) : (
                   <Image src="/static/icons/oauth/telegram.svg" alt="Telegram" width={20} height={20} className="oauth-icon" />
+                )}
+              </button>
+              <button
+                type="button"
+                className="oauth-btn"
+                onClick={() => oauthLogin('vk')}
+                disabled={isLoading || isPopupOpen}
+                title="Войти через VK ID"
+                aria-label="Войти через VK ID"
+              >
+                {activeProvider === 'vk' ? (
+                  <div className="w-5 h-5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+                ) : (
+                  <Image src="/static/icons/oauth/vk.svg" alt="VK" width={20} height={20} className="oauth-icon" />
                 )}
               </button>
               <button

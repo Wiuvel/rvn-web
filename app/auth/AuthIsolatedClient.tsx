@@ -93,9 +93,9 @@ export default function AuthIsolatedClient() {
               <span className="font-semibold text-white">Raven Private</span>
             </Link>
             <div className="hidden lg:flex">
-              <Link href="/support/" className="rounded-xl bg-primary-500 hover:bg-primary-400 px-4 py-2 text-sm font-medium text-white shadow-glow transition">
-                Помощь
-              </Link>
+            <Link href="/support/" prefetch={false} className="rounded-xl bg-primary-500 hover:bg-primary-400 px-4 py-2 text-sm font-medium text-white shadow-glow transition">
+              Помощь
+            </Link>
             </div>
           </div>
         </div>

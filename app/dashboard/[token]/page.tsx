@@ -146,15 +146,17 @@ export default function DashboardPage() {
 
   const handleLogout = async () => {
     try {
-      const response = await fetch('/api/auth/logout', {
-        method: 'POST'
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include'
       });
-      // Всегда выполняем редирект, даже если запрос не успешен
-      router.push('/auth/');
     } catch (error) {
       // Ошибка выхода - все равно редиректим на страницу авторизации
       console.error('Logout error:', error);
-      router.push('/auth/');
+    } finally {
+      // Всегда выполняем редирект, даже если запрос не успешен
+      // Используем window.location для гарантированного редиректа
+      window.location.href = '/auth/';
     }
   };
 
@@ -647,7 +649,7 @@ export default function DashboardPage() {
             </section>
             <section className="rounded-2xl border border-neutral-800 bg-neutral-900 p-5">
               <div className="text-sm text-neutral-400">Поддержка</div>
-              <Link href="/support" className="mt-2 inline-block text-primary-400 hover:underline hover:text-primary-300 transition-colors">
+              <Link href="/support" prefetch={false} className="mt-2 inline-block text-primary-400 hover:underline hover:text-primary-300 transition-colors">
                 Связаться с нами
               </Link>
             </section>
