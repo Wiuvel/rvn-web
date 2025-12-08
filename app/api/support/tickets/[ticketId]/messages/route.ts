@@ -160,7 +160,7 @@ export async function POST(
       .insert({
         ticket_id: ticketId,
         sender_id: user.id,
-        message: message.trim()
+        message_text: message.trim()
       })
       .select(`
         *,
@@ -201,7 +201,7 @@ export async function POST(
         ticket_id: newMessage.ticket_id,
         sender_id: newMessage.sender_id,
         sender_type: isSupport ? 'support' : 'user' as 'user' | 'support',
-        message: newMessage.message,
+        message_text: newMessage.message_text,
         is_read: newMessage.is_read || false,
         created_at: newMessage.created_at,
         sender: senderData,
@@ -260,7 +260,7 @@ export async function POST(
           .insert({
             ticket_id: ticketId,
             sender_id: user.id, // Используем ID пользователя (требуется NOT NULL)
-            message: 'Спасибо за ваше обращение. Мы получили ваш запрос и ответим в ближайшее время.'
+            message_text: 'Спасибо за ваше обращение. Мы получили ваш запрос и ответим в ближайшее время.'
           });
 
         // Логируем ошибку, но не прерываем выполнение, так как основное сообщение уже создано

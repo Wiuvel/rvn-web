@@ -10,7 +10,7 @@ import { ERROR_INTERNAL_SERVER_ERROR, ERROR_NOT_AUTHENTICATED, ERROR_INVALID_REQ
 
 interface LastMessage {
   id: string;
-  message: string;
+  message_text: string;
   sender_id: string;
   created_at: string;
   is_read: boolean;
@@ -138,7 +138,7 @@ export async function GET(request: NextRequest) {
         // Это лучше чем N запросов, но не идеально - можно улучшить через RPC функцию в будущем
         const { data: allMessages, error: lastMessagesError } = await supabase
           .from('support_messages')
-          .select('ticket_id, id, message, sender_id, created_at, is_read')
+          .select('ticket_id, id, message_text, sender_id, created_at, is_read')
           .in('ticket_id', ticketIds)
           .order('created_at', { ascending: false });
         
@@ -151,7 +151,7 @@ export async function GET(request: NextRequest) {
             const batchPromises = batch.map(async (ticketId) => {
               const { data: lastMessage } = await supabase
                 .from('support_messages')
-                .select('id, message, sender_id, created_at, is_read')
+                .select('id, message_text, sender_id, created_at, is_read')
                 .eq('ticket_id', ticketId)
                 .order('created_at', { ascending: false })
                 .limit(1)
@@ -164,7 +164,7 @@ export async function GET(request: NextRequest) {
               if (lastMessage) {
                 lastMessagesMap[ticketId] = {
                   id: lastMessage.id,
-                  message: lastMessage.message,
+                  message_text: lastMessage.message_text,
                   sender_id: lastMessage.sender_id,
                   created_at: lastMessage.created_at,
                   is_read: lastMessage.is_read
@@ -179,7 +179,7 @@ export async function GET(request: NextRequest) {
             if (!messagesByTicket.has(msg.ticket_id)) {
               messagesByTicket.set(msg.ticket_id, {
                 id: msg.id,
-                message: msg.message,
+                message_text: msg.message_text,
                 sender_id: msg.sender_id,
                 created_at: msg.created_at,
                 is_read: msg.is_read
@@ -396,7 +396,7 @@ export async function POST(request: NextRequest) {
       .insert({
         ticket_id: ticket.id,
         sender_id: user.id,
-        message: message.trim()
+        message_text: message.trim()
       });
 
     if (messageError) {

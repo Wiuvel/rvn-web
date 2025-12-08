@@ -16,7 +16,7 @@ export interface SupportWebSocketEvents {
       ticket_id: string;
       sender_id: string;
       sender_type: 'user' | 'support';
-      message: string;
+      message_text: string;
       is_read: boolean;
       created_at: string;
       sender?: {

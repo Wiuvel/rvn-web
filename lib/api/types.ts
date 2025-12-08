@@ -97,7 +97,7 @@ export interface SupportMessage {
   ticket_id: string;
   sender_id: string;
   sender_type: 'user' | 'support';
-  message: string;
+  message_text: string;
   created_at: string;
   sender?: {
     id: string;

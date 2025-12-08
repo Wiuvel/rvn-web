@@ -431,7 +431,7 @@ export async function PUT(
         .insert({
           ticket_id: ticketId,
           sender_id: user.id, // ID саппорта, который меняет статус
-          message: messageText
+          message_text: messageText
         })
         .select(`
           *,
