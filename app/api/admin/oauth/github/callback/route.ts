@@ -29,12 +29,17 @@ async function isTrustedDeveloper(
   // Check by email first (preferred method)
   if (email) {
     const normalizedEmail = email.toLowerCase().trim();
-    const { data: emailMatch } = await supabaseAdmin
+    const { data: emailMatch, error: emailError } = await supabaseAdmin
       .from('trusted_github_developers')
       .select('id')
       .eq('email', normalizedEmail)
       .limit(1)
-      .single();
+      .maybeSingle();
+
+    // If error is not a "not found" error, log it
+    if (emailError && emailError.code !== 'PGRST116') {
+      console.error('Error checking trusted developer by email:', emailError);
+    }
 
     if (emailMatch) {
       return true;
@@ -43,12 +48,17 @@ async function isTrustedDeveloper(
 
   // Check by username
   const normalizedUsername = username.toLowerCase().trim();
-  const { data: usernameMatch } = await supabaseAdmin
+  const { data: usernameMatch, error: usernameError } = await supabaseAdmin
     .from('trusted_github_developers')
     .select('id')
     .eq('github_username', normalizedUsername)
     .limit(1)
-    .single();
+    .maybeSingle();
+
+  // If error is not a "not found" error, log it
+  if (usernameError && usernameError.code !== 'PGRST116') {
+    console.error('Error checking trusted developer by username:', usernameError);
+  }
 
   return !!usernameMatch;
 }
@@ -234,21 +244,49 @@ export async function GET(request: NextRequest) {
     }
 
     // Check if admin exists with this username
-    // Admin must be created manually by Founder before developer can login via GitHub
-    const { data: admin, error: adminError } = await supabaseAdmin
+    // If not, create it automatically (for trusted developers)
+    let { data: admin, error: adminError } = await supabaseAdmin
       .from('admins')
       .select('*')
       .eq('username', githubUsername)
-      .single();
+      .maybeSingle();
 
-    if (adminError || !admin) {
-      logger.warn('OAuth: Admin not found for GitHub username. Admin must be created manually before GitHub OAuth login.', {
+    // Log non-"not found" errors
+    if (adminError && adminError.code !== 'PGRST116') {
+      logger.error('OAuth: Error checking admin existence.', {
         username: githubUsername,
         email: email || 'not provided',
-        error: adminError?.message || 'Admin not found'
+        error: adminError.message
       });
-      const errorUrl = getErrorRedirectUrl('oauth_denied', origin, isPopup);
-      return setCorsHeaders(NextResponse.redirect(errorUrl));
+    }
+
+    // If admin doesn't exist, create it automatically
+    if (!admin) {
+      const { data: newAdmin, error: createError } = await supabaseAdmin
+        .from('admins')
+        .insert({
+          username: githubUsername,
+          password_hash: null, // No password for GitHub OAuth admins
+          is_root: false // Only Root admin is created via login/password
+        })
+        .select()
+        .single();
+
+      if (createError || !newAdmin) {
+        logger.error('OAuth: Failed to create admin for trusted developer.', {
+          username: githubUsername,
+          email: email || 'not provided',
+          error: createError?.message || 'Unknown error'
+        });
+        const errorUrl = getErrorRedirectUrl('internal_error', origin, isPopup);
+        return setCorsHeaders(NextResponse.redirect(errorUrl));
+      }
+
+      admin = newAdmin;
+      logger.info('OAuth: Admin created automatically for trusted developer.', {
+        username: githubUsername,
+        email: email || 'not provided'
+      });
     }
 
     // Create admin session

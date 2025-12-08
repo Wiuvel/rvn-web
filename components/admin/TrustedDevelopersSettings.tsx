@@ -22,10 +22,30 @@ export default function TrustedDevelopersSettings() {
   const [formData, setFormData] = useState({ email: '', github_username: '' });
   const [submitting, setSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [isRootAdmin, setIsRootAdmin] = useState(false);
+  const [checkingRoot, setCheckingRoot] = useState(true);
 
   useEffect(() => {
+    checkRootAccess();
     fetchDevelopers();
   }, []);
+
+  const checkRootAccess = async () => {
+    setCheckingRoot(true);
+    try {
+      const response = await fetch('/api/admin/check-root', {
+        credentials: 'include',
+      });
+      const data = await response.json();
+      if (response.ok && data.isRoot) {
+        setIsRootAdmin(true);
+      }
+    } catch (err) {
+      console.error('Error checking root access:', err);
+    } finally {
+      setCheckingRoot(false);
+    }
+  };
 
   useEffect(() => {
     if (successMessage) {
@@ -151,18 +171,27 @@ export default function TrustedDevelopersSettings() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h3 className="text-xl font-semibold text-white mb-2">
-              Trusted Developers
+              Способы авторизации
             </h3>
             <p className="text-sm text-neutral-400">
-              Управление списком разработчиков, которым разрешен доступ к админ-панели через GitHub OAuth
+              Управление списком разработчиков, которым разрешен доступ к панели управления
             </p>
+            {!checkingRoot && !isRootAdmin && (
+              <div className="mt-2 p-2 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+                <p className="text-xs text-yellow-400">
+                  Только Root администратор может управлять доверенными разработчиками
+                </p>
+              </div>
+            )}
           </div>
-          <button
-            onClick={() => setShowAddForm(!showAddForm)}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-colors font-medium text-sm"
-          >
-            {showAddForm ? 'Отмена' : '+ Добавить'}
-          </button>
+          {isRootAdmin && (
+            <button
+              onClick={() => setShowAddForm(!showAddForm)}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-colors font-medium text-sm"
+            >
+              {showAddForm ? 'Отмена' : '+ Добавить'}
+            </button>
+          )}
         </div>
 
         {error && (
@@ -177,7 +206,7 @@ export default function TrustedDevelopersSettings() {
           </div>
         )}
 
-        {showAddForm && (
+        {isRootAdmin && showAddForm && (
           <div className="mb-6 p-6 bg-gradient-to-br from-neutral-950 via-neutral-950 to-neutral-900 border border-neutral-800 rounded-xl shadow-lg">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center">
@@ -328,12 +357,13 @@ export default function TrustedDevelopersSettings() {
                       )}
                     </div>
                   </div>
-                  <button
-                    onClick={() => handleDelete(developer.id)}
-                    disabled={deletingId === developer.id}
-                    className="ml-2 p-2 bg-red-500/10 text-red-400 border border-red-500/20 rounded-lg hover:bg-red-500/20 transition-all text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-                    title="Удалить разработчика"
-                  >
+                  {isRootAdmin && (
+                    <button
+                      onClick={() => handleDelete(developer.id)}
+                      disabled={deletingId === developer.id}
+                      className="ml-2 p-2 bg-red-500/10 text-red-400 border border-red-500/20 rounded-lg hover:bg-red-500/20 transition-all text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                      title="Удалить разработчика"
+                    >
                     {deletingId === developer.id ? (
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-400"></div>
                     ) : (
@@ -341,7 +371,8 @@ export default function TrustedDevelopersSettings() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                       </svg>
                     )}
-                  </button>
+                    </button>
+                  )}
                 </div>
                 <div className="flex items-center gap-2 text-xs text-neutral-500 pt-3 border-t border-neutral-800">
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

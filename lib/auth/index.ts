@@ -30,7 +30,7 @@ export async function createAdmin(username: string, password: string): Promise<{
       .from('admins')
       .select('id')
       .eq('username', username)
-      .single();
+      .maybeSingle();
 
     if (checkError && checkError.code !== 'PGRST116') {
       logger.error('Error checking existing admin', {
@@ -44,12 +44,32 @@ export async function createAdmin(username: string, password: string): Promise<{
       return { success: false, error: 'Администратор с таким именем уже существует' };
     }
 
+    // Check if any root admin exists
+    const { data: rootAdmin, error: rootCheckError } = await supabaseAdmin
+      .from('admins')
+      .select('id')
+      .eq('is_root', true)
+      .limit(1)
+      .maybeSingle();
+
+    if (rootCheckError && rootCheckError.code !== 'PGRST116') {
+      logger.error('Error checking root admin', {
+        error: rootCheckError.message,
+        code: rootCheckError.code
+      });
+      return { success: false, error: 'Database ERROR' };
+    }
+
+    // If no root admin exists, this will be the root admin
+    const isRoot = !rootAdmin;
+
     const passwordHash = await hashPassword(password);
     const { error: insertError } = await supabaseAdmin
       .from('admins')
       .insert({
         username,
-        password_hash: passwordHash
+        password_hash: passwordHash,
+        is_root: isRoot
       });
 
     if (insertError) {

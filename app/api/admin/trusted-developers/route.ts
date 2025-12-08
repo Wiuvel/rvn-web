@@ -45,6 +45,25 @@ async function getCurrentAdminId(request: NextRequest): Promise<string | null> {
   return session.userId;
 }
 
+// Check if current admin is Root
+async function isRootAdmin(adminId: string): Promise<boolean> {
+  if (!supabaseAdmin) {
+    return false;
+  }
+
+  const { data: admin, error } = await supabaseAdmin
+    .from('admins')
+    .select('is_root')
+    .eq('id', adminId)
+    .maybeSingle();
+
+  if (error || !admin) {
+    return false;
+  }
+
+  return admin.is_root === true;
+}
+
 // GET - List all trusted developers
 export async function GET(request: NextRequest) {
   try {
@@ -137,6 +156,21 @@ export async function POST(request: NextRequest) {
     if (!adminId) {
       return setCorsHeaders(
         NextResponse.json({ error: 'Invalid session' }, { status: 401 }),
+      );
+    }
+
+    // Check if admin is Root - only Root can add trusted developers
+    const isRoot = await isRootAdmin(adminId);
+    if (!isRoot) {
+      logger.warn('Non-root admin attempted to add trusted developer', {
+        adminId,
+        ip: request.headers.get('x-forwarded-for'),
+      });
+      return setCorsHeaders(
+        NextResponse.json(
+          { error: 'Only Root admin can manage trusted developers' },
+          { status: 403 },
+        ),
       );
     }
 
@@ -242,6 +276,28 @@ export async function DELETE(request: NextRequest) {
     if (!isAuthenticated) {
       return setCorsHeaders(
         NextResponse.json({ error: 'Unauthorized' }, { status: 401 }),
+      );
+    }
+
+    const adminId = await getCurrentAdminId(request);
+    if (!adminId) {
+      return setCorsHeaders(
+        NextResponse.json({ error: 'Invalid session' }, { status: 401 }),
+      );
+    }
+
+    // Check if admin is Root - only Root can delete trusted developers
+    const isRoot = await isRootAdmin(adminId);
+    if (!isRoot) {
+      logger.warn('Non-root admin attempted to delete trusted developer', {
+        adminId,
+        ip: request.headers.get('x-forwarded-for'),
+      });
+      return setCorsHeaders(
+        NextResponse.json(
+          { error: 'Only Root admin can manage trusted developers' },
+          { status: 403 },
+        ),
       );
     }
 
