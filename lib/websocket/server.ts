@@ -52,21 +52,112 @@ export function initWebSocketServer(httpServer: HTTPServer): SocketIOServer<Supp
   
   initializationAttempted = true;
 
+  // Определяем разрешенные origins для CORS
+  const getAllowedOrigins = (): string[] | string | ((origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => void) => {
+    const origins: string[] = [];
+    
+    // Добавляем PUBLIC_DOMAIN если указан
+    if (process.env.PUBLIC_DOMAIN) {
+      const domain = process.env.PUBLIC_DOMAIN.trim();
+      // Убираем trailing slash
+      const cleanDomain = domain.replace(/\/$/, '');
+      // Добавляем с http и https
+      if (!cleanDomain.startsWith('http')) {
+        origins.push(`https://${cleanDomain}`);
+        origins.push(`http://${cleanDomain}`);
+      } else {
+        origins.push(cleanDomain);
+        // Также добавляем противоположный протокол
+        if (cleanDomain.startsWith('https://')) {
+          origins.push(cleanDomain.replace('https://', 'http://'));
+        } else if (cleanDomain.startsWith('http://')) {
+          origins.push(cleanDomain.replace('http://', 'https://'));
+        }
+      }
+    }
+    
+    // Добавляем localhost для разработки
+    if (process.env.NODE_ENV === 'development') {
+      origins.push('http://localhost:3001');
+      origins.push('http://localhost:3000');
+      origins.push('http://127.0.0.1:3001');
+      origins.push('http://127.0.0.1:3000');
+    }
+    
+    // Если origins пустой, разрешаем все (только для разработки)
+    if (origins.length === 0) {
+      return process.env.NODE_ENV === 'development' ? '*' : [];
+    }
+    
+    // Функция для динамической проверки origin
+    const originChecker = (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+      if (!origin) {
+        // Если origin не указан, разрешаем (для некоторых клиентов)
+        return callback(null, true);
+      }
+      
+      // Проверяем точное совпадение
+      if (origins.includes(origin)) {
+        return callback(null, true);
+      }
+      
+      // Проверяем без протокола (для гибкости)
+      const originWithoutProtocol = origin.replace(/^https?:\/\//, '');
+      const allowedWithoutProtocol = origins.map(o => o.replace(/^https?:\/\//, ''));
+      if (allowedWithoutProtocol.includes(originWithoutProtocol)) {
+        return callback(null, true);
+      }
+      
+      // В development разрешаем все
+      if (process.env.NODE_ENV === 'development') {
+        return callback(null, true);
+      }
+      
+      // Отклоняем
+      callback(null, false);
+    };
+    
+    return originChecker;
+  };
+  
+  const allowedOrigins = getAllowedOrigins();
+
   io = new SocketIOServer<SupportWebSocketEvents>(httpServer, {
     path: '/api/socket',
     cors: {
-      origin: process.env.PUBLIC_DOMAIN || process.env.NEXT_PUBLIC_SUPABASE_URL || '*',
+      origin: allowedOrigins,
       methods: ['GET', 'POST'],
       credentials: true,
+      allowedHeaders: ['Content-Type', 'Authorization'],
     },
     transports: ['websocket', 'polling'],
     // Отключаем perMessageDeflate для избежания ошибок с bufferUtil
     // bufferutil и utf-8-validate установлены как опциональные зависимости
     perMessageDeflate: false,
+    // Разрешаем подключения только через WebSocket и polling
+    allowEIO3: false,
+    // Увеличиваем таймауты для медленных соединений
+    connectTimeout: 45000,
+    pingTimeout: 20000,
+    pingInterval: 25000,
+  });
+  
+  // Обработка ошибок подключения
+  io.engine.on('connection_error', (err) => {
+    logger.error('WebSocket: Connection error', {
+      error: err.message,
+      code: err.code,
+      context: err.context
+    });
   });
 
   io.on('connection', async (socket) => {
-    // Автоматическое подключение не логируем
+    // Логируем подключение для диагностики
+    logger.info('WebSocket: Client connected', {
+      id: socket.id,
+      origin: socket.handshake.headers.origin,
+      transport: socket.conn.transport.name
+    });
 
     // Трекинг аналитики WebSocket подключения
     try {
@@ -75,6 +166,13 @@ export function initWebSocketServer(httpServer: HTTPServer): SocketIOServer<Supp
     } catch {
       // Игнорируем ошибки аналитики
     }
+    
+    socket.on('disconnect', (reason) => {
+      logger.info('WebSocket: Client disconnected', {
+        id: socket.id,
+        reason: reason
+      });
+    });
 
     // Обработка присоединения к тикету с валидацией
     socket.on('support:join', async (data) => {

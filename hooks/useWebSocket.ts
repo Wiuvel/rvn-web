@@ -58,6 +58,10 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
       reconnection: true,
       reconnectionDelay: 1000,
       reconnectionAttempts: 5,
+      reconnectionDelayMax: 5000,
+      timeout: 20000,
+      forceNew: false,
+      autoConnect: true,
     });
 
     socketRef.current = socket;
@@ -80,11 +84,17 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
 
     socket.on('connect_error', (error: Error) => {
       setIsConnected(false);
-      // Не показываем ошибки подключения в консоль, так как Socket.IO автоматически переподключается
-      // Ошибки подключения - это нормально при временных проблемах сети
-      // Логируем только в dev режиме для отладки
-      if (process.env.NODE_ENV === 'development') {
-        console.warn('WebSocket connection error (will retry):', error.message);
+      // Логируем ошибки подключения для диагностики
+      console.error('WebSocket connection error:', {
+        message: error.message,
+        type: error.name,
+        url: wsUrl,
+        path: '/api/socket'
+      });
+      
+      // Если ошибка связана с CORS или origin, показываем более детальную информацию
+      if (error.message.includes('CORS') || error.message.includes('origin')) {
+        console.error('WebSocket CORS error - check server CORS configuration');
       }
     });
 
