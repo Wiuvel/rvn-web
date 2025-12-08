@@ -17,7 +17,15 @@ if (dev) {
   // В dev режиме используем простой logger, так как TypeScript файлы не компилируются для require()
   logger = {
     error: (msg, ctx) => console.error(`[ERROR] ${msg}`, ctx || ''),
-    warn: (msg, ctx) => console.warn(`[WARN] ${msg}`, ctx || ''),
+    warn: (msg, ctx) => {
+      if (msg.startsWith('Redis:')) {
+        const status = ctx?.status || 'unknown';
+        const icon = status === 'connected' ? '✓' : status === 'disconnected' ? '✗' : '⚠';
+        console.log(`  ${icon} ${msg}`, ctx || '');
+      } else {
+        console.warn(`[WARN] ${msg}`, ctx || '');
+      }
+    },
     info: (msg, ctx) => {
       if (msg === 'Server: Ready.') {
         const network = ctx?.network;
@@ -26,6 +34,10 @@ if (dev) {
         if (network && network !== ctx?.local) {
           console.log(`  Network: ${network}`);
         }
+      } else if (msg.startsWith('Redis:')) {
+        const status = ctx?.status || 'unknown';
+        const icon = status === 'connected' ? '✓' : '⚠';
+        console.log(`  ${icon} ${msg}`, ctx || '');
       } else {
         console.log(`[INFO] ${msg}`, ctx || '');
       }
@@ -371,6 +383,98 @@ initPromise.then(() => {
         port,
         hostname
       });
+      
+      // Проверка подключения к Redis
+      const checkRedis = async () => {
+        try {
+          // Пробуем загрузить модуль Redis
+          let redisModule;
+          const redisPaths = [
+            './lib/database/redis',
+            './.next/standalone/lib/database/redis',
+            path.join(process.cwd(), 'lib/database/redis'),
+            path.join(process.cwd(), '.next/standalone/lib/database/redis')
+          ];
+          
+          for (const modulePath of redisPaths) {
+            try {
+              const jsPath = modulePath.endsWith('.js') ? modulePath : modulePath + '.js';
+              if (fs.existsSync(jsPath) || fs.existsSync(modulePath + '.mjs')) {
+                redisModule = require(modulePath);
+                break;
+              }
+            } catch (e) {
+              continue;
+            }
+          }
+          
+          if (!redisModule || !redisModule.getRedisClient) {
+            logger.warn('Redis: Module not found or getRedisClient not available');
+            return;
+          }
+          
+          const client = redisModule.getRedisClient();
+          
+          if (!client) {
+            logger.warn('Redis: Client not initialized. REDIS_URL may not be set.');
+            return;
+          }
+          
+          // Проверяем подключение
+          const pingResult = await Promise.race([
+            client.ping(),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 5000))
+          ]);
+          
+          if (pingResult === 'PONG') {
+            // Дополнительная проверка SET/GET
+            await client.set('server:health:check', 'ok', 'EX', 10);
+            const testValue = await client.get('server:health:check');
+            
+            if (testValue === 'ok') {
+              logger.info('Redis: Connected and operational', {
+                status: 'connected',
+                ping: 'ok',
+                operations: 'ok'
+              });
+            } else {
+              logger.warn('Redis: Connected but operations failed', {
+                status: 'connected',
+                ping: 'ok',
+                operations: 'failed'
+              });
+            }
+          } else {
+            logger.warn('Redis: Unexpected ping response', {
+              status: 'connected',
+              ping: pingResult
+            });
+          }
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          if (errorMessage.includes('Timeout')) {
+            logger.warn('Redis: Connection timeout (5s)', {
+              status: 'timeout',
+              message: 'Redis server did not respond in time'
+            });
+          } else if (errorMessage.includes('ECONNREFUSED') || errorMessage.includes('ENOTFOUND')) {
+            logger.warn('Redis: Connection refused or host not found', {
+              status: 'disconnected',
+              message: errorMessage
+            });
+          } else {
+            logger.warn('Redis: Connection check failed', {
+              status: 'error',
+              message: errorMessage
+            });
+          }
+        }
+      };
+      
+      // Выполняем проверку Redis после небольшой задержки
+      setTimeout(() => {
+        checkRedis();
+      }, 500);
       
       if (dev) {
         setTimeout(async () => {
