@@ -41,8 +41,11 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/server.js ./
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/next ./node_modules/next
+# Копируем ioredis и его зависимости явно
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/ioredis ./node_modules/ioredis
 RUN [ -d ".next/standalone/node_modules" ] && cp -r .next/standalone/node_modules/* ./node_modules/ 2>/dev/null || true; \
-    [ -d "node_modules/next" ] || (echo "❌ NextJS not found." && exit 1)
+    [ -d "node_modules/next" ] || (echo "❌ NextJS not found." && exit 1); \
+    [ -d "node_modules/ioredis" ] || (echo "⚠️ ioredis not found, but continuing..." && true)
 
 USER nextjs
 

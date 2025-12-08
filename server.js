@@ -416,106 +416,112 @@ initPromise.then(() => {
         const maskedUrl = redisUrl.replace(/:[^:@]+@/, ':****@');
         
         try {
-          // Используем ioredis напрямую из node_modules
-          const Redis = require('ioredis');
+          // Используем существующий модуль Redis, который правильно настроен
+          // Этот модуль уже включен в standalone сборку через outputFileTracingIncludes
+          let redisModule;
+          let moduleError = null;
+          const redisPaths = [
+            './lib/database/redis',
+            './.next/standalone/lib/database/redis',
+            path.join(process.cwd(), 'lib/database/redis'),
+            path.join(process.cwd(), '.next/standalone/lib/database/redis')
+          ];
           
-          // Создаем временный клиент для проверки
-          const testClient = new Redis(redisUrl, {
-            maxRetriesPerRequest: 1,
-            retryStrategy: () => null, // Не повторять попытки
-            connectTimeout: 5000,
-            lazyConnect: false,
-            enableReadyCheck: true,
-            showFriendlyErrorStack: true,
-          });
-          
-          let connectionError = null;
-          let connectionStatus = 'connecting';
-          
-          // Обработка событий для диагностики
-          testClient.on('connect', () => {
-            connectionStatus = 'connected';
-          });
-          
-          testClient.on('ready', () => {
-            connectionStatus = 'ready';
-          });
-          
-          testClient.on('error', (err) => {
-            connectionError = err;
-            connectionStatus = 'error';
-          });
-          
-          // Ждем подключения или ошибки
-          await new Promise((resolve) => {
-            if (testClient.status === 'ready') {
-              resolve();
-            } else {
-              const timeout = setTimeout(() => {
-                connectionStatus = 'timeout';
-                resolve();
-              }, 5000);
-              
-              testClient.once('ready', () => {
-                clearTimeout(timeout);
-                resolve();
-              });
-              
-              testClient.once('error', () => {
-                clearTimeout(timeout);
-                resolve();
-              });
-            }
-          });
-          
-          if (connectionError) {
-            const errorMessage = connectionError.message || 'Unknown error';
-            
-            if (errorMessage.includes('NOAUTH') || errorMessage.includes('invalid password') || errorMessage.includes('WRONGPASS')) {
-              logger.warn('Redis: Authentication failed', {
-                status: 'auth_failed',
-                message: 'Redis password is incorrect or authentication required',
-                url: maskedUrl
-              });
-            } else if (errorMessage.includes('ECONNREFUSED')) {
-              logger.warn('Redis: Connection refused', {
-                status: 'disconnected',
-                message: 'Cannot connect to Redis server. Check if Redis is running on port 6379.',
-                url: maskedUrl
-              });
-            } else if (errorMessage.includes('ENOTFOUND')) {
-              logger.warn('Redis: Host not found', {
-                status: 'disconnected',
-                message: `Redis host not found: ${redisUrl.split('@')[1]?.split(':')[0] || 'unknown'}`,
-                url: maskedUrl
-              });
-            } else {
-              logger.warn('Redis: Connection error', {
-                status: 'error',
-                message: errorMessage,
-                url: maskedUrl
-              });
-            }
-            
+          for (const modulePath of redisPaths) {
             try {
-              await testClient.quit();
-            } catch {
-              // Игнорируем ошибки при закрытии
+              const jsPath = modulePath.endsWith('.js') ? modulePath : modulePath + '.js';
+              const exists = fs.existsSync(jsPath) || fs.existsSync(modulePath + '.mjs');
+              
+              if (exists) {
+                try {
+                  redisModule = require(modulePath);
+                  if (redisModule && redisModule.getRedisClient) {
+                    break;
+                  }
+                } catch (requireError) {
+                  moduleError = requireError;
+                  // Продолжаем поиск
+                  continue;
+                }
+              }
+            } catch (e) {
+              moduleError = e;
+              continue;
             }
-            return;
           }
           
-          if (connectionStatus === 'timeout' || testClient.status !== 'ready') {
-            logger.warn('Redis: Connection timeout', {
-              status: 'timeout',
-              message: 'Redis server did not respond in time (5s)',
+          if (!redisModule || !redisModule.getRedisClient) {
+            // Пробуем загрузить ioredis напрямую как fallback
+            try {
+              const Redis = require('ioredis');
+              // Если ioredis доступен, создаем клиент напрямую
+              const testClient = new Redis(redisUrl, {
+                maxRetriesPerRequest: 1,
+                retryStrategy: () => null,
+                connectTimeout: 5000,
+                lazyConnect: false,
+                enableReadyCheck: true,
+                showFriendlyErrorStack: true,
+              });
+              
+              // Используем прямой клиент для проверки
+              const pingResult = await Promise.race([
+                testClient.ping(),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('Ping timeout')), 3000))
+              ]);
+              
+              if (pingResult === 'PONG') {
+                try {
+                  await testClient.set('server:health:check', 'ok', 'EX', 10);
+                  const testValue = await testClient.get('server:health:check');
+                  
+                  if (testValue === 'ok') {
+                    logger.info('Redis: Connected and operational (direct ioredis)', {
+                      status: 'connected',
+                      ping: 'ok',
+                      operations: 'ok',
+                      url: maskedUrl
+                    });
+                  }
+                } catch (opError) {
+                  logger.warn('Redis: Connected but operations failed', {
+                    status: 'connected',
+                    ping: 'ok',
+                    operations: 'error',
+                    error: opError instanceof Error ? opError.message : 'Unknown',
+                    url: maskedUrl
+                  });
+                }
+              }
+              
+              try {
+                await testClient.quit();
+              } catch {
+                // Игнорируем ошибки при закрытии
+              }
+              return;
+            } catch (ioredisError) {
+              logger.warn('Redis: Module not found', {
+                status: 'error',
+                message: 'Redis module (lib/database/redis) not found and ioredis not available.',
+                moduleError: moduleError instanceof Error ? moduleError.message : 'Unknown',
+                ioredisError: ioredisError instanceof Error ? ioredisError.message : 'Unknown',
+                searchedPaths: redisPaths,
+                url: maskedUrl
+              });
+              return;
+            }
+          }
+          
+          // Используем существующий модуль
+          const testClient = redisModule.getRedisClient();
+          
+          if (!testClient) {
+            logger.warn('Redis: Client not initialized', {
+              status: 'not_initialized',
+              message: 'Redis client returned null. Check REDIS_URL environment variable.',
               url: maskedUrl
             });
-            try {
-              await testClient.quit();
-            } catch {
-              // Игнорируем ошибки при закрытии
-            }
             return;
           }
           
@@ -561,13 +567,6 @@ initPromise.then(() => {
               ping: pingResult,
               url: maskedUrl
             });
-          }
-          
-          // Закрываем тестовое соединение
-          try {
-            await testClient.quit();
-          } catch {
-            // Игнорируем ошибки при закрытии
           }
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : 'Unknown error';
