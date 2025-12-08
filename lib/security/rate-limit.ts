@@ -192,8 +192,8 @@ export class RateLimiter {
 }
 
 export const authRateLimit = new RateLimiter({
-  windowMs: 5 * 60 * 1000,
-  maxRequests: 5,
+  windowMs: 5 * 60 * 1000, // 5 минут
+  maxRequests: 10, // 10 запросов
   keyGenerator: (request) => {
     const ip = getClientIP(request);
     const userAgent = request.headers.get('user-agent') || '';
@@ -202,7 +202,7 @@ export const authRateLimit = new RateLimiter({
 });
 
 export const generalRateLimit = new RateLimiter({
-  windowMs: 5 * 60 * 1000,
-  maxRequests: 100,
+  windowMs: 5 * 60 * 1000, // 5 минут
+  maxRequests: 100, // 100 запросов
 });
 

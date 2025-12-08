@@ -149,12 +149,12 @@ export default function DashboardPage() {
       const response = await fetch('/api/auth/logout', {
         method: 'POST'
       });
-      if (response.ok) {
-        router.push('/auth');
-      }
+      // Всегда выполняем редирект, даже если запрос не успешен
+      router.push('/auth/');
     } catch (error) {
-      // Ошибка выхода
+      // Ошибка выхода - все равно редиректим на страницу авторизации
       console.error('Logout error:', error);
+      router.push('/auth/');
     }
   };
 

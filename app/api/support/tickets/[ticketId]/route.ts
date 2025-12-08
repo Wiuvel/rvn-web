@@ -431,8 +431,7 @@ export async function PUT(
         .insert({
           ticket_id: ticketId,
           sender_id: user.id, // ID саппорта, который меняет статус
-          sender_type: 'support', // Тип 'support' для отображения как системное сообщение
-          message_text: messageText
+          message: messageText
         })
         .select(`
           *,

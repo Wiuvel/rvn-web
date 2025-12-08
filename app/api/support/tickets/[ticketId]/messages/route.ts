@@ -160,8 +160,7 @@ export async function POST(
       .insert({
         ticket_id: ticketId,
         sender_id: user.id,
-        sender_type: isSupport ? 'support' : 'user',
-        message_text: message.trim()
+        message: message.trim()
       })
       .select(`
         *,
@@ -201,8 +200,9 @@ export async function POST(
         id: newMessage.id,
         ticket_id: newMessage.ticket_id,
         sender_id: newMessage.sender_id,
-        sender_type: newMessage.sender_type,
-        message_text: newMessage.message_text,
+        sender_type: isSupport ? 'support' : 'user' as 'user' | 'support',
+        message_text: newMessage.message, // Для обратной совместимости с фронтендом
+        message: newMessage.message,
         is_read: newMessage.is_read || false,
         created_at: newMessage.created_at,
         sender: senderData,
@@ -233,24 +233,35 @@ export async function POST(
 
     // Если это первое сообщение от пользователя, добавляем автоматический ответ от поддержки
     if (!isSupport) {
+      // Проверяем, есть ли уже сообщения от поддержки
+      // Определяем это через проверку ролей отправителей
       const { data: existingMessages } = await supabaseAdmin
         .from('support_messages')
-        .select('id')
+        .select('sender_id')
         .eq('ticket_id', ticketId)
-        .eq('sender_type', 'support')
-        .limit(1);
+        .limit(10);
 
-      if (!existingMessages || existingMessages.length === 0) {
+      // Проверяем, есть ли среди отправителей пользователи с ролью support
+      let hasSupportMessage = false;
+      if (existingMessages && existingMessages.length > 0) {
+        for (const msg of existingMessages) {
+          const isSupportSender = await hasUserRole(msg.sender_id, 'support');
+          if (isSupportSender) {
+            hasSupportMessage = true;
+            break;
+          }
+        }
+      }
+
+      if (!hasSupportMessage) {
         // Автоматическое системное сообщение
         // Используем sender_id пользователя, но в UI будем определять системное сообщение по тексту
-        // Добавляем специальный префикс для идентификации системного сообщения
         const { error: autoMessageError } = await supabaseAdmin
           .from('support_messages')
           .insert({
             ticket_id: ticketId,
             sender_id: user.id, // Используем ID пользователя (требуется NOT NULL)
-            sender_type: 'support', // Оставляем 'support', но в UI определяем системное сообщение по тексту
-            message_text: 'Спасибо за ваше обращение. Мы получили ваш запрос и ответим в ближайшее время.'
+            message: 'Спасибо за ваше обращение. Мы получили ваш запрос и ответим в ближайшее время.'
           });
 
         // Логируем ошибку, но не прерываем выполнение, так как основное сообщение уже создано

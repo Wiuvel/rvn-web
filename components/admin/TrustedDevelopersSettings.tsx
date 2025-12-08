@@ -179,7 +179,7 @@ export default function TrustedDevelopersSettings() {
             {!checkingRoot && !isRootAdmin && (
               <div className="mt-2 p-2 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
                 <p className="text-xs text-yellow-400">
-                  Только Root администратор может управлять доверенными разработчиками
+                  Нет прав для редактирования данного списка. Только для администраторов системы сервиса.
                 </p>
               </div>
             )}
@@ -270,7 +270,7 @@ export default function TrustedDevelopersSettings() {
                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  Email используется для проверки при авторизации (приоритет над username)
+                  Почта используется для проверки при авторизации (приоритет над логином)
                 </p>
               </div>
 
@@ -322,7 +322,6 @@ export default function TrustedDevelopersSettings() {
         ) : developers.length === 0 ? (
           <div className="text-center py-12 text-neutral-500">
             <p className="text-lg mb-2">Нет доверенных разработчиков</p>
-            <p className="text-sm">Добавьте первого разработчика, чтобы разрешить доступ через GitHub OAuth</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

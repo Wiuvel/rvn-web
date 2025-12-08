@@ -106,14 +106,12 @@ export async function POST(
     // Отмечаем непрочитанные сообщения как прочитанные
     // Пользователь видит прочитанными сообщения от поддержки
     // Поддержка видит прочитанными сообщения от пользователя
-    const senderTypeToMark = isSupport ? 'user' : 'support';
-
-    // Сначала получаем ID сообщений, которые будут отмечены как прочитанные
-    const { data: messagesToMark, error: selectError } = await supabaseAdmin
+    
+    // Получаем все непрочитанные сообщения для тикета
+    const { data: allUnreadMessages, error: selectError } = await supabaseAdmin
       .from('support_messages')
-      .select('id')
+      .select('id, sender_id')
       .eq('ticket_id', ticketId)
-      .eq('sender_type', senderTypeToMark)
       .eq('is_read', false);
 
     if (selectError) {
@@ -129,19 +127,26 @@ export async function POST(
       );
     }
 
-    const messageIds = messagesToMark?.map(m => m.id) || [];
+    // Фильтруем сообщения по типу отправителя (support или user)
+    const messageIds: string[] = [];
+    if (allUnreadMessages) {
+      for (const msg of allUnreadMessages) {
+        const isSenderSupport = await hasUserRole(msg.sender_id, 'support');
+        // Пользователь отмечает сообщения от поддержки, поддержка - от пользователей
+        if ((isSupport && !isSenderSupport) || (!isSupport && isSenderSupport)) {
+          messageIds.push(msg.id);
+        }
+      }
+    }
 
     // Если есть сообщения для отметки
     if (messageIds.length > 0) {
       const { error: updateError } = await supabaseAdmin
         .from('support_messages')
         .update({
-          is_read: true,
-          read_at: new Date().toISOString()
+          is_read: true
         })
-        .eq('ticket_id', ticketId)
-        .eq('sender_type', senderTypeToMark)
-        .eq('is_read', false);
+        .in('id', messageIds);
 
       if (updateError) {
         logger.error('Error marking messages as read', {

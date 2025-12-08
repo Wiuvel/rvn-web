@@ -8,11 +8,11 @@ export const appConfig = {
   rateLimit: {
     auth: {
       windowMs: 5 * 60 * 1000, // 5 минут
-      maxRequests: 5
+      maxRequests: 10 // 10 запросов
     },
     general: {
       windowMs: 5 * 60 * 1000, // 5 минут
-      maxRequests: 100
+      maxRequests: 100 // 100 запросов
     },
     immunityDuration: 15 * 60 * 1000 // 15 минут - иммунитет после прохождения капчи
   },
