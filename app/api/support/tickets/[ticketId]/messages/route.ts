@@ -256,23 +256,33 @@ export async function POST(
       }
 
       if (!hasSupportMessage) {
-        // Автоматическое системное сообщение
-        // Используем sender_id пользователя, но в UI будем определять системное сообщение по тексту
-        const { error: autoMessageError } = await supabaseAdmin
+        // Проверяем, не было ли уже создано системное сообщение
+        const SYSTEM_MESSAGE_TEXT = 'Спасибо за ваше обращение. Мы получили ваш запрос и ответим в ближайшее время.';
+        const { data: existingSystemMessage } = await supabaseAdmin
           .from('support_messages')
-          .insert({
-            ticket_id: ticketId,
-            sender_id: user.id, // Используем ID пользователя (требуется NOT NULL)
-            message_text: 'Спасибо за ваше обращение. Мы получили ваш запрос и ответим в ближайшее время.'
-          });
+          .select('id')
+          .eq('ticket_id', ticketId)
+          .eq('message_text', SYSTEM_MESSAGE_TEXT)
+          .limit(1);
 
-        // Логируем ошибку, но не прерываем выполнение, так как основное сообщение уже создано
-        if (autoMessageError) {
-          logger.error('Error creating automatic support message', {
-            error: autoMessageError.message,
-            code: autoMessageError.code,
-            ticketId
-          });
+        // Создаем системное сообщение только если его еще нет
+        if (!existingSystemMessage || existingSystemMessage.length === 0) {
+          const { error: autoMessageError } = await supabaseAdmin
+            .from('support_messages')
+            .insert({
+              ticket_id: ticketId,
+              sender_id: user.id, // Используем ID пользователя (требуется NOT NULL)
+              message_text: SYSTEM_MESSAGE_TEXT
+            });
+
+          // Логируем ошибку, но не прерываем выполнение, так как основное сообщение уже создано
+          if (autoMessageError) {
+            logger.error('Error creating automatic support message', {
+              error: autoMessageError.message,
+              code: autoMessageError.code,
+              ticketId
+            });
+          }
         }
       }
     }

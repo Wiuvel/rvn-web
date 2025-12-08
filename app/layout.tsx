@@ -5,6 +5,7 @@ import ConditionalLayout from "@/components/layout/Conditional";
 import { pageMetadata } from "@/lib/utils/seo";
 import { exo2 } from "./fonts";
 import HomeStructuredData from "@/components/seo/HomeStructuredData";
+import ServiceWorkerRegistration from "@/components/pwa/ServiceWorkerRegistration";
 
 export const metadata: Metadata = {
   ...pageMetadata.home,
@@ -53,6 +54,7 @@ export default function RootLayout({
     <html lang="ru" className={`h-full scroll-smooth dark ${exo2.variable}`} data-scroll-behavior="smooth">
       <body className={`h-full bg-neutral-950 text-neutral-100 antialiased relative ${exo2.className}`}>
         <HomeStructuredData />
+        <ServiceWorkerRegistration />
         <SmoothScroll />
         <ConditionalLayout>
           {children}

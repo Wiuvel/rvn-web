@@ -10,6 +10,7 @@ import type { SupportWebSocketEvents } from './events';
 import { supabaseAdmin } from '@/lib/database/supabase';
 import { getUserByToken } from '@/lib/auth/index';
 import { hasUserRole } from '@/lib/auth/user-roles';
+import { isValidUUID } from '@/lib/utils/uuid-validation';
 
 // Вспомогательные типы для извлечения типов данных из событий
 type MessageNewData = Parameters<SupportWebSocketEvents['support:message:new']>[0];
@@ -43,6 +44,12 @@ const MAX_QUEUE_AGE = 60000; // Максимальный возраст сооб
 const typingRateLimits = new Map<string, { lastEmit: number; count: number }>();
 const TYPING_RATE_LIMIT_MS = 1000; // Минимум 1 секунда между событиями
 const TYPING_RATE_LIMIT_COUNT = 10; // Максимум 10 событий в минуту
+
+// Rate limiting для попыток подключения без токена (защита от брутфорса)
+const connectionAttempts = new Map<string, { count: number; firstAttempt: number; lastAttempt: number }>();
+const MAX_CONNECTION_ATTEMPTS = 5; // Максимум 5 попыток
+const CONNECTION_ATTEMPT_WINDOW = 60000; // За 1 минуту
+const CONNECTION_ATTEMPT_BAN_TIME = 300000; // Бан на 5 минут при превышении лимита
 
 /**
  * Инициализация WebSocket сервера
@@ -147,14 +154,64 @@ export function initWebSocketServer(httpServer: HTTPServer): SocketIOServer<Supp
   // Middleware для аутентификации при подключении
   io.use(async (socket, next) => {
     try {
+      // Получаем IP адрес для rate limiting
+      const clientIP = socket.handshake.address || 
+                      socket.handshake.headers['x-forwarded-for']?.toString().split(',')[0]?.trim() ||
+                      socket.handshake.headers['x-real-ip']?.toString() ||
+                      'unknown';
+      
       // Получаем токен из auth параметра (передается клиентом)
       const token = socket.handshake.auth?.token;
       
       if (!token) {
-        logger.warn('WebSocket: Connection attempt without token', {
-          id: socket.id,
-          origin: socket.handshake.headers.origin
-        });
+        // Rate limiting для попыток подключения без токена
+        const now = Date.now();
+        const attemptKey = `no-token:${clientIP}`;
+        const attempts = connectionAttempts.get(attemptKey);
+        
+        if (attempts) {
+          // Проверяем, не забанен ли IP
+          if (now - attempts.firstAttempt < CONNECTION_ATTEMPT_BAN_TIME && attempts.count >= MAX_CONNECTION_ATTEMPTS) {
+            // IP забанен, отклоняем подключение без логирования
+            return next(new Error('Too many connection attempts'));
+          }
+          
+          // Сбрасываем счетчик, если прошло окно времени
+          if (now - attempts.firstAttempt > CONNECTION_ATTEMPT_WINDOW) {
+            connectionAttempts.delete(attemptKey);
+          } else {
+            attempts.count++;
+            attempts.lastAttempt = now;
+          }
+        } else {
+          connectionAttempts.set(attemptKey, {
+            count: 1,
+            firstAttempt: now,
+            lastAttempt: now
+          });
+        }
+        
+        const currentAttempts = connectionAttempts.get(attemptKey);
+        
+        // Логируем только подозрительные попытки (много попыток за короткое время)
+        if (currentAttempts && currentAttempts.count >= 3) {
+          logger.warn('WebSocket: Multiple connection attempts without token', {
+            id: socket.id,
+            origin: socket.handshake.headers.origin,
+            ip: clientIP,
+            attempts: currentAttempts.count
+          });
+        }
+        
+        // Очищаем старые записи rate limiting
+        if (connectionAttempts.size > 1000) {
+          for (const [key, value] of connectionAttempts.entries()) {
+            if (now - value.lastAttempt > CONNECTION_ATTEMPT_WINDOW * 2) {
+              connectionAttempts.delete(key);
+            }
+          }
+        }
+        
         return next(new Error('Authentication required'));
       }
 
@@ -162,12 +219,48 @@ export function initWebSocketServer(httpServer: HTTPServer): SocketIOServer<Supp
       const user = await getUserByToken(token);
       
       if (!user) {
-        logger.warn('WebSocket: Invalid token', {
-          id: socket.id,
-          origin: socket.handshake.headers.origin
-        });
+        // Rate limiting для невалидных токенов
+        const now = Date.now();
+        const attemptKey = `invalid-token:${clientIP}`;
+        const attempts = connectionAttempts.get(attemptKey);
+        
+        if (attempts) {
+          if (now - attempts.firstAttempt < CONNECTION_ATTEMPT_BAN_TIME && attempts.count >= MAX_CONNECTION_ATTEMPTS) {
+            return next(new Error('Too many invalid token attempts'));
+          }
+          
+          if (now - attempts.firstAttempt > CONNECTION_ATTEMPT_WINDOW) {
+            connectionAttempts.delete(attemptKey);
+          } else {
+            attempts.count++;
+            attempts.lastAttempt = now;
+          }
+        } else {
+          connectionAttempts.set(attemptKey, {
+            count: 1,
+            firstAttempt: now,
+            lastAttempt: now
+          });
+        }
+        
+        const currentAttempts = connectionAttempts.get(attemptKey);
+        
+        // Логируем только подозрительные попытки
+        if (currentAttempts && currentAttempts.count >= 3) {
+          logger.warn('WebSocket: Multiple invalid token attempts', {
+            id: socket.id,
+            origin: socket.handshake.headers.origin,
+            ip: clientIP,
+            attempts: currentAttempts.count
+          });
+        }
+        
         return next(new Error('Invalid token'));
       }
+
+      // Успешная аутентификация - очищаем счетчики для этого IP
+      connectionAttempts.delete(`no-token:${clientIP}`);
+      connectionAttempts.delete(`invalid-token:${clientIP}`);
 
       // Сохраняем пользователя в socket.data для использования в обработчиках
       socket.data.user = user;
@@ -232,8 +325,12 @@ export function initWebSocketServer(httpServer: HTTPServer): SocketIOServer<Supp
       }
 
       // Валидация UUID формата ticketId
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-      if (!uuidRegex.test(ticketId)) {
+      if (!isValidUUID(ticketId)) {
+        logger.warn('WebSocket: Invalid ticket ID format', {
+          ticketId,
+          userId,
+          socketId: socket.id
+        });
         socket.emit('support:error', { message: 'Invalid ticket ID', code: 'INVALID_TICKET_ID' });
         return;
       }
@@ -285,6 +382,12 @@ export function initWebSocketServer(httpServer: HTTPServer): SocketIOServer<Supp
     // Обработка выхода из тикета
     socket.on('support:leave', (data) => {
       const { ticketId } = data;
+      
+      // Валидация входных данных
+      if (!ticketId || !isValidUUID(ticketId)) {
+        return; // Игнорируем невалидные запросы
+      }
+      
       const room = `ticket:${ticketId}`;
       socket.leave(room);
       // Не логируем выходы из комнат
@@ -298,6 +401,11 @@ export function initWebSocketServer(httpServer: HTTPServer): SocketIOServer<Supp
       // Валидация входных данных
       if (!ticketId || typeof isTyping !== 'boolean' || !userId) {
         return;
+      }
+
+      // Валидация UUID формата ticketId
+      if (!isValidUUID(ticketId)) {
+        return; // Игнорируем невалидные UUID
       }
 
       // Проверяем, что пользователь присоединен к тикету
