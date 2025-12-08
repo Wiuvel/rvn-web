@@ -11,10 +11,7 @@ const nextConfig: NextConfig = {
     '/lib/websocket/**/*': ['./lib/websocket/**/*'],
     '/lib/database/redis': ['./lib/database/redis.ts'],
   },
-  serverExternalPackages: [],
-  experimental: {
-    serverComponentsExternalPackages: ['ioredis'],
-  },
+  serverExternalPackages: ['ioredis'],
   devIndicators: {
     position: 'top-right',
   },

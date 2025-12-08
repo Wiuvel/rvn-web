@@ -2,9 +2,9 @@ import { MetadataRoute } from 'next';
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'Raven Private — безопасный доступ в сеть',
+    name: 'Raven Private - безопасный доступ в сеть',
     short_name: 'Raven Private',
-    description: 'RVN.MARKET — современный сервис приватного доступа в сеть. Высокая скорость и полная анонимность.',
+    description: 'RVN.MARKET - современный сервис приватного доступа в сеть. Высокая скорость и полная анонимность.',
     start_url: '/',
     display: 'standalone',
     background_color: '#0a0a0a',

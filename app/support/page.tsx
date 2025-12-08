@@ -96,12 +96,13 @@ function MessageItem({
 
   // Определяем, является ли сообщение системным
   const SYSTEM_MESSAGE_TEXT = 'Спасибо за ваше обращение. Мы получили ваш запрос и ответим в ближайшее время.';
-  const isStatusChangeMessage = message.text.includes('Статус тикета изменен') || 
-    message.text.includes('Ваше обращение приняли в обработку') ||
-    message.text.includes('Ваше обращение было закрыто');
+  const messageText = message.text || '';
+  const isStatusChangeMessage = messageText.includes('Статус тикета изменен') || 
+    messageText.includes('Ваше обращение приняли в обработку') ||
+    messageText.includes('Ваше обращение было закрыто');
   // Системное сообщение определяется по тексту, независимо от sender_type
   // Используем trim() для надежного сравнения
-  const isSystemMessage = message.text.trim() === SYSTEM_MESSAGE_TEXT.trim() || isStatusChangeMessage;
+  const isSystemMessage = messageText.trim() === SYSTEM_MESSAGE_TEXT.trim() || isStatusChangeMessage;
 
   return (
     <div ref={messageRef}>
@@ -600,10 +601,11 @@ export default function SupportPage() {
       // Обновляем статус прочитанности сообщений
       setActiveTicket(prev => {
         if (!prev || prev.id !== data.ticketId) return prev;
+        const messageIds = data.messageIds || [];
         return {
           ...prev,
           messages: (prev.messages || []).map(msg => 
-            data.messageIds.includes(msg.id)
+            messageIds.includes(msg.id)
               ? { ...msg, isRead: true }
               : msg
           ),
@@ -1767,11 +1769,12 @@ export default function SupportPage() {
                         </div>
                         {ticket.last_message && ticket.status !== 'closed' && (() => {
                           const SYSTEM_MESSAGE_TEXT = 'Спасибо за ваше обращение. Мы получили ваш запрос и ответим в ближайшее время.';
-                          const isStatusChangeMessage = ticket.last_message.message_text.includes('Статус тикета изменен') || 
-                            ticket.last_message.message_text.includes('Ваше обращение приняли в обработку') ||
-                            ticket.last_message.message_text.includes('Ваше обращение было закрыто');
+                          const lastMessageText = ticket.last_message.message_text || '';
+                          const isStatusChangeMessage = lastMessageText.includes('Статус тикета изменен') || 
+                            lastMessageText.includes('Ваше обращение приняли в обработку') ||
+                            lastMessageText.includes('Ваше обращение было закрыто');
                           // Используем trim() для надежного сравнения
-                          const isSystemMessage = ticket.last_message.message_text.trim() === SYSTEM_MESSAGE_TEXT.trim() || isStatusChangeMessage;
+                          const isSystemMessage = lastMessageText.trim() === SYSTEM_MESSAGE_TEXT.trim() || isStatusChangeMessage;
                           
                           return (
                             <div className="text-xs text-neutral-500 mt-1.5 truncate flex items-center gap-2">
