@@ -97,11 +97,6 @@ export function generateMetadata({
     category: 'Technology',
     classification: 'VPN Service',
     other: {
-      'mobile-web-app-capable': 'yes',
-      'apple-mobile-web-app-capable': 'yes',
-      'apple-mobile-web-app-status-bar-style': 'black-translucent',
-      'apple-mobile-web-app-title': siteName,
-      'application-name': siteName,
       'msapplication-TileColor': '#0f7fdb',
       'theme-color': '#0f7fdb',
       'format-detection': 'telephone=no',

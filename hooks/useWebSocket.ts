@@ -54,15 +54,16 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
     // Создаем новое соединение (используем текущий домен)
     const wsUrl = process.env.NEXT_PUBLIC_WS_URL || (typeof window !== 'undefined' ? window.location.origin : '');
     
-    // Получаем токен из параметров или из cookies
-    let authToken = token;
-    if (!authToken && typeof document !== 'undefined') {
-      // Пытаемся получить токен из cookies
-      const cookies = document.cookie.split(';');
-      const tokenCookie = cookies.find(c => c.trim().startsWith('dashboard_token='));
-      if (tokenCookie) {
-        authToken = tokenCookie.split('=')[1]?.trim();
+    // Получаем токен из параметров
+    // ВАЖНО: dashboard_token установлен как httpOnly cookie, поэтому JavaScript не может его прочитать
+    // Токен должен быть передан через параметр token из компонента, который получает его из API ответа
+    const authToken = token;
+    
+    if (!authToken) {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('WebSocket: No token available, skipping connection');
       }
+      return;
     }
     
     const socket = io(wsUrl, {
@@ -111,7 +112,9 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
       // Специальная обработка ошибок аутентификации
       if (error.message.includes('Authentication') || error.message.includes('Invalid token') || error.message.includes('Authentication required')) {
         console.error('WebSocket authentication failed - token may be invalid or expired');
-        // Можно добавить логику для обновления токена или перенаправления на страницу входа
+        // Токен может быть невалидным или истекшим
+        // В этом случае нужно обновить токен через API или перенаправить на страницу входа
+        // НЕ пытаемся переподключиться автоматически с невалидным токеном
       }
       
       // Если ошибка связана с CORS или origin, показываем более детальную информацию
@@ -162,7 +165,9 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
     cleanupRef.current = cleanup;
 
     return cleanup;
-  }, [enabled, ticketId, userId, isSupport]);
+    // ВАЖНО: token в зависимостях - при изменении токена WebSocket переподключится
+    // Это важно для обновления токена после истечения или изменения
+  }, [enabled, ticketId, userId, isSupport, token]);
 
   const joinTicket = useCallback((ticketId: string) => {
     if (socketRef.current) {

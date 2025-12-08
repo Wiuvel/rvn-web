@@ -421,12 +421,19 @@ export default function SupportPanel() {
     isProcessingCaptchaRef.current = false;
   };
 
+  // Получаем токен из ответа API для WebSocket
+  // ВАЖНО: dashboard_token установлен как httpOnly cookie, поэтому JavaScript не может его прочитать из cookies
+  // Токен получается из API ответа и хранится только в памяти компонента (React state)
+  // НЕ сохраняем токен в localStorage/sessionStorage для безопасности
+  const [dashboardToken, setDashboardToken] = useState<string | undefined>(undefined);
+
   // Инициализация WebSocket
   const { socket, isConnected, joinTicket, leaveTicket } = useWebSocket({
-    enabled: authState.hasSupportAccess,
+    enabled: authState.hasSupportAccess && !!dashboardToken,
     userId: authState.userId || undefined,
     ticketId: activeTicket?.id,
     isSupport: true,
+    token: dashboardToken,
   });
 
   useEffect(() => {
@@ -847,6 +854,13 @@ export default function SupportPanel() {
           userId: data.userId || null,
           user_id: data.user_id || null
         });
+        // Сохраняем токен для WebSocket (если он есть в ответе)
+        // ВАЖНО: Токен хранится только в памяти компонента, не в localStorage/sessionStorage
+        if (data.dashboard_token) {
+          setDashboardToken(data.dashboard_token);
+        } else {
+          setDashboardToken(undefined);
+        }
         setLoading(false);
         return; // Не редиректим, показываем сообщение на странице
       }
@@ -859,6 +873,13 @@ export default function SupportPanel() {
           userId: data.userId || null,
           user_id: data.user_id || null
         });
+        // Сохраняем токен для WebSocket (если он есть в ответе)
+        // ВАЖНО: Токен хранится только в памяти компонента, не в localStorage/sessionStorage
+        if (data.dashboard_token) {
+          setDashboardToken(data.dashboard_token);
+        } else {
+          setDashboardToken(undefined);
+        }
         setLoading(false);
         return; // Не редиректим, показываем сообщение на странице
       }
@@ -870,6 +891,16 @@ export default function SupportPanel() {
         userId: data.userId,
         user_id: data.user_id || null
       });
+      
+      // Сохраняем токен для WebSocket (если он есть в ответе)
+      // ВАЖНО: Токен хранится только в памяти компонента, не в localStorage/sessionStorage
+      if (data.dashboard_token) {
+        setDashboardToken(data.dashboard_token);
+      } else {
+        // Если токен отсутствует, сбрасываем его
+        setDashboardToken(undefined);
+      }
+      
       setLoading(false);
     } catch (error) {
       if (error instanceof Error && error.message === 'RATE_LIMIT_EXCEEDED') {

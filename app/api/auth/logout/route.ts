@@ -46,23 +46,9 @@ export async function POST(request: NextRequest) {
     // Delete OAuth state cookie if exists
     response.cookies.delete('oauth_state');
     
-    // Delete protection cookies (may have domain set)
-    // For cookies with domain, we need to explicitly set them to expire
-    const protectionCookies = ['access_granted', 'access_hash', 'access_time'];
-    protectionCookies.forEach(cookieName => {
-      response.cookies.delete(cookieName);
-      // Also try to delete with domain if applicable
-      if (cookieDomain) {
-        response.cookies.set(cookieName, '', {
-          maxAge: 0,
-          path: '/',
-          domain: cookieDomain,
-          httpOnly: false,
-          secure: process.env.NODE_ENV === 'production' && !isLocalhost,
-          sameSite: 'lax'
-        });
-      }
-    });
+    // ВАЖНО: НЕ удаляем protection cookies (access_granted, access_hash, access_time)
+    // Эти куки дают иммунитет на 2 часа от Bot Challenge и не связаны с авторизацией пользователя
+    // Они должны сохраняться при выходе из аккаунта для удобства пользователя
 
     // Also delete from cookieStore for immediate effect
     await SessionManager.clearSessionCookie();
@@ -70,9 +56,7 @@ export async function POST(request: NextRequest) {
     cookieStore.delete('user_id');
     cookieStore.delete('dashboard_token');
     cookieStore.delete('oauth_state');
-    protectionCookies.forEach(cookieName => {
-      cookieStore.delete(cookieName);
-    });
+    // НЕ удаляем protection cookies из cookieStore
 
     // Log successful logout
     if (userId) {

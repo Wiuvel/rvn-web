@@ -65,16 +65,17 @@ export async function GET(request: NextRequest) {
         error: dbError instanceof Error ? dbError.message : 'Unknown error',
         userId: user.id
       });
-        return setCorsHeaders(
-          NextResponse.json({
-            isAuthenticated: true,
-            hasSupportAccess: false,
-            username: user.username,
-            userId: user.id,
-            user_id: user.user_id,
-            error: 'Database not configured'
-          })
-        );
+      return setCorsHeaders(
+        NextResponse.json({
+          isAuthenticated: true,
+          hasSupportAccess: false,
+          username: user.username,
+          userId: user.id,
+          user_id: user.user_id,
+          dashboard_token: dashboardToken, // Возвращаем токен для WebSocket
+          error: 'Database not configured'
+        })
+      );
     }
 
     return setCorsHeaders(
@@ -83,7 +84,11 @@ export async function GET(request: NextRequest) {
         hasSupportAccess,
         username: user.username,
         userId: user.id,
-        user_id: user.user_id // Добавляем user_id для отображения
+        user_id: user.user_id, // Добавляем user_id для отображения
+        // ВАЖНО: Возвращаем токен только для WebSocket аутентификации
+        // Токен должен использоваться только в памяти компонента, не сохраняться в localStorage/sessionStorage
+        // Это обходит защиту httpOnly cookie, но необходимо для WebSocket подключения
+        dashboard_token: dashboardToken
       })
     );
   } catch (error) {
@@ -100,16 +105,17 @@ export async function GET(request: NextRequest) {
     if (isAuthenticated && dashboardToken) {
       const user = await getUserByToken(dashboardToken);
       if (user) {
-        return setCorsHeaders(
-          NextResponse.json({
-            isAuthenticated: true,
-            hasSupportAccess: false,
-            username: user.username,
-            userId: user.id,
-            user_id: user.user_id,
-            error: 'Database not configured'
-          })
-        );
+      return setCorsHeaders(
+        NextResponse.json({
+          isAuthenticated: true,
+          hasSupportAccess: false,
+          username: user.username,
+          userId: user.id,
+          user_id: user.user_id,
+          dashboard_token: dashboardToken, // Возвращаем токен для WebSocket
+          error: 'Database not configured'
+        })
+      );
       }
     }
     
