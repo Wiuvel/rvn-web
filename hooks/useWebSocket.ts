@@ -30,26 +30,55 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
   const [isConnected, setIsConnected] = useState(false);
   const socketRef = useRef<SocketType | null>(null);
   const cleanupRef = useRef<(() => void) | null>(null);
+  const currentTokenRef = useRef<string | undefined>(undefined); // Отслеживаем текущий токен
 
   useEffect(() => {
     if (!enabled || typeof window === 'undefined') {
+      // Если WebSocket отключен, очищаем соединение
+      if (cleanupRef.current) {
+        cleanupRef.current();
+        cleanupRef.current = null;
+      }
+      currentTokenRef.current = undefined;
       return;
     }
 
-    // Очищаем предыдущее соединение, если оно существует
+    // Если токен еще не получен, не создаем соединение
+    // Это предотвращает множественные подключения при изменении token с undefined на значение
+    if (!token) {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('WebSocket: No token available, skipping connection');
+      }
+      // Очищаем предыдущее соединение, если токен был удален
+      if (cleanupRef.current) {
+        cleanupRef.current();
+        cleanupRef.current = null;
+      }
+      currentTokenRef.current = undefined;
+      return;
+    }
+
+    // Если соединение уже существует, активно и токен не изменился - переиспользуем его
+    if (socketRef.current && socketRef.current.connected && currentTokenRef.current === token) {
+      // Соединение уже активно с тем же токеном, просто обновляем присоединение к тикету
+      if (ticketId) {
+        socketRef.current.emit('support:join', { ticketId });
+      }
+      // Возвращаем пустую cleanup функцию, чтобы не пересоздавать соединение
+      return () => {
+        // Cleanup не нужен, так как соединение переиспользуется
+      };
+    }
+
+    // Если токен изменился или соединение не активно - переподключаемся
+    // Очищаем предыдущее соединение перед созданием нового
     if (cleanupRef.current) {
       cleanupRef.current();
       cleanupRef.current = null;
     }
-
-    // Если соединение уже существует и активно, переиспользуем его
-    if (socketRef.current && socketRef.current.connected) {
-      // Соединение уже активно, просто обновляем присоединение к тикету
-      if (ticketId) {
-        socketRef.current.emit('support:join', { ticketId });
-      }
-      return;
-    }
+    
+    // Сохраняем текущий токен для проверки в следующий раз
+    currentTokenRef.current = token;
 
     // Создаем новое соединение (используем текущий домен)
     const wsUrl = process.env.NEXT_PUBLIC_WS_URL || (typeof window !== 'undefined' ? window.location.origin : '');
@@ -58,13 +87,6 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
     // ВАЖНО: dashboard_token установлен как httpOnly cookie, поэтому JavaScript не может его прочитать
     // Токен должен быть передан через параметр token из компонента, который получает его из API ответа
     const authToken = token;
-    
-    if (!authToken) {
-      if (process.env.NODE_ENV === 'development') {
-        console.warn('WebSocket: No token available, skipping connection');
-      }
-      return;
-    }
     
     const socket = io(wsUrl, {
       path: '/api/socket',

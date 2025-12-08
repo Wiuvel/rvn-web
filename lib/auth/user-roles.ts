@@ -201,6 +201,7 @@ export async function getUserRoles(userId: string): Promise<UserRole[]> {
 
 /**
  * Выдает роль пользователю (только для админов)
+ * ИСПРАВЛЕНО: Предотвращает дубликаты и правильно обрабатывает существующие записи
  */
 export async function grantUserRole(
   userId: string,
@@ -216,28 +217,84 @@ export async function grantUserRole(
       return { success: false, error: 'Cannot grant default user role' };
     }
 
-    // Проверяем, не имеет ли пользователь уже эту роль
-    const hasRole = await hasUserRole(userId, role);
-    if (hasRole) {
+    // ИСПРАВЛЕНО: Проверяем напрямую в БД, минуя кэш, чтобы избежать race condition
+    const { data: existingRoles, error: checkError } = await supabaseAdmin
+      .from('user_roles')
+      .select('id, is_active')
+      .eq('user_id', userId)
+      .eq('role', role);
+
+    if (checkError && checkError.code !== 'PGRST116') {
+      logger.error('Error checking existing roles', {
+        error: checkError.message,
+        code: checkError.code,
+        userId,
+        role
+      });
+      return { success: false, error: 'Failed to check existing role' };
+    }
+
+    // Проверяем, есть ли уже активная роль
+    const hasActiveRole = existingRoles?.some(r => r.is_active === true) || false;
+    if (hasActiveRole) {
+      // Инвалидируем кэш на всякий случай
+      cache.delete(`user_role:${userId}:${role}`);
       return { success: false, error: 'User already has this role' };
     }
 
-    // Отзываем старую роль, если она была отозвана
-    const { error: updateError } = await supabaseAdmin
-      .from('user_roles')
-      .update({
-        is_active: true,
-        revoked_at: null,
-        granted_by: grantedBy,
-        granted_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      })
-      .eq('user_id', userId)
-      .eq('role', role)
-      .eq('is_active', false);
+    // ИСПРАВЛЕНО: Очищаем все дубликаты (неактивные записи) перед созданием новой
+    if (existingRoles && existingRoles.length > 0) {
+      // Обновляем самую последнюю неактивную запись (если есть)
+      const inactiveRoles = existingRoles.filter(r => r.is_active === false);
+      if (inactiveRoles.length > 0) {
+        // Берем последнюю по ID (самую новую)
+        const latestInactive = inactiveRoles.sort((a, b) => b.id.localeCompare(a.id))[0];
+        
+        const { error: updateError } = await supabaseAdmin
+          .from('user_roles')
+          .update({
+            is_active: true,
+            revoked_at: null,
+            granted_by: grantedBy,
+            granted_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', latestInactive.id);
 
-    // Если не было старой записи, создаем новую
-    if (!updateError || updateError.code === 'PGRST116') {
+        if (updateError) {
+          logger.error('Error reactivating role', {
+            error: updateError.message,
+            code: updateError.code,
+            userId,
+            role
+          });
+          return { success: false, error: 'Failed to reactivate role' };
+        }
+
+        // Удаляем остальные дубликаты (если есть)
+        if (inactiveRoles.length > 1) {
+          const idsToDelete = inactiveRoles.slice(1).map(r => r.id);
+          await supabaseAdmin
+            .from('user_roles')
+            .delete()
+            .in('id', idsToDelete);
+        }
+      } else {
+        // Если все записи активны (не должно быть, но на всякий случай)
+        // Удаляем все кроме первой
+        if (existingRoles.length > 1) {
+          const idsToDelete = existingRoles.slice(1).map(r => r.id);
+          await supabaseAdmin
+            .from('user_roles')
+            .delete()
+            .in('id', idsToDelete);
+        }
+        // Инвалидируем кэш
+        cache.delete(`user_role:${userId}:${role}`);
+        return { success: false, error: 'User already has this role' };
+      }
+    } else {
+      // Создаем новую запись, если нет существующих
       const { error: insertError } = await supabaseAdmin
         .from('user_roles')
         .insert({
@@ -248,6 +305,12 @@ export async function grantUserRole(
         });
 
       if (insertError) {
+        // Если ошибка уникальности - значит роль уже есть (race condition)
+        if (insertError.code === '23505') {
+          cache.delete(`user_role:${userId}:${role}`);
+          return { success: false, error: 'User already has this role' };
+        }
+        
         logger.error('Error granting user role', {
           error: insertError.message,
           code: insertError.code,
@@ -259,8 +322,12 @@ export async function grantUserRole(
       }
     }
 
-    // Роль выдана - не логируем
+    // ИНВАЛИДАЦИЯ КЭША: Очищаем кэш роли для немедленного обновления
+    cache.delete(`user_role:${userId}:${role}`);
+    // Также очищаем все связанные кэши
+    cache.deleteByPattern(new RegExp(`^user_role:${userId}:.*$`));
 
+    // Роль выдана - не логируем
     return { success: true };
   } catch (error) {
     logger.error('Unexpected error granting user role', {
@@ -275,6 +342,7 @@ export async function grantUserRole(
 
 /**
  * Отзывает роль у пользователя (только для админов)
+ * ИСПРАВЛЕНО: Обновляет все активные записи и очищает дубликаты
  */
 export async function revokeUserRole(
   userId: string,
@@ -289,29 +357,81 @@ export async function revokeUserRole(
       return { success: false, error: 'Cannot revoke default user role' };
     }
 
-    const { error } = await supabaseAdmin
+    // ИСПРАВЛЕНО: Получаем все активные записи для этой роли
+    const { data: activeRoles, error: fetchError } = await supabaseAdmin
+      .from('user_roles')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('role', role)
+      .eq('is_active', true);
+
+    if (fetchError && fetchError.code !== 'PGRST116') {
+      logger.error('Error fetching active roles', {
+        error: fetchError.message,
+        code: fetchError.code,
+        userId,
+        role
+      });
+      return { success: false, error: 'Failed to fetch roles' };
+    }
+
+    // Если нет активных ролей, ничего не делаем
+    if (!activeRoles || activeRoles.length === 0) {
+      // Инвалидируем кэш на всякий случай
+      cache.delete(`user_role:${userId}:${role}`);
+      return { success: false, error: 'User does not have this role' };
+    }
+
+    // ИСПРАВЛЕНО: Обновляем все активные записи
+    // Оставляем только одну запись (самую последнюю), остальные удаляем
+    const sortedRoles = activeRoles.sort((a, b) => b.id.localeCompare(a.id));
+    const keepRoleId = sortedRoles[0].id;
+    const deleteRoleIds = sortedRoles.slice(1).map(r => r.id);
+
+    // Обновляем последнюю запись
+    const { error: updateError } = await supabaseAdmin
       .from('user_roles')
       .update({
         is_active: false,
         revoked_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       })
-      .eq('user_id', userId)
-      .eq('role', role)
-      .eq('is_active', true);
+      .eq('id', keepRoleId);
 
-    if (error) {
+    if (updateError) {
       logger.error('Error revoking user role', {
-        error: error.message,
-        code: error.code,
+        error: updateError.message,
+        code: updateError.code,
         userId,
         role
       });
       return { success: false, error: 'Failed to revoke role' };
     }
 
-    // Роль отозвана - не логируем
+    // Удаляем дубликаты (если есть)
+    if (deleteRoleIds.length > 0) {
+      const { error: deleteError } = await supabaseAdmin
+        .from('user_roles')
+        .delete()
+        .in('id', deleteRoleIds);
 
+      if (deleteError) {
+        logger.error('Error deleting duplicate roles', {
+          error: deleteError.message,
+          code: deleteError.code,
+          userId,
+          role
+        });
+        // Не критично, продолжаем
+      }
+    }
+
+    // ИНВАЛИДАЦИЯ КЭША: Очищаем кэш роли для немедленного обновления
+    cache.delete(`user_role:${userId}:${role}`);
+    // Также очищаем все связанные кэши
+    cache.deleteByPattern(new RegExp(`^user_role:${userId}:.*$`));
+
+    // Роль отозвана - не логируем
     return { success: true };
   } catch (error) {
     logger.error('Unexpected error revoking user role', {

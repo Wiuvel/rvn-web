@@ -426,6 +426,7 @@ export default function SupportPanel() {
   // Токен получается из API ответа и хранится только в памяти компонента (React state)
   // НЕ сохраняем токен в localStorage/sessionStorage для безопасности
   const [dashboardToken, setDashboardToken] = useState<string | undefined>(undefined);
+  const dashboardTokenRef = useRef<string | undefined>(undefined); // Ref для предотвращения лишних обновлений
 
   // Инициализация WebSocket
   const { socket, isConnected, joinTicket, leaveTicket } = useWebSocket({
@@ -875,10 +876,11 @@ export default function SupportPanel() {
         });
         // Сохраняем токен для WebSocket (если он есть в ответе)
         // ВАЖНО: Токен хранится только в памяти компонента, не в localStorage/sessionStorage
-        if (data.dashboard_token) {
-          setDashboardToken(data.dashboard_token);
-        } else {
-          setDashboardToken(undefined);
+        // ОПТИМИЗАЦИЯ: Обновляем токен только если он изменился, чтобы избежать лишних переподключений WebSocket
+        const newToken = data.dashboard_token || undefined;
+        if (dashboardTokenRef.current !== newToken) {
+          dashboardTokenRef.current = newToken;
+          setDashboardToken(newToken);
         }
         setLoading(false);
         return; // Не редиректим, показываем сообщение на странице
@@ -894,10 +896,11 @@ export default function SupportPanel() {
         });
         // Сохраняем токен для WebSocket (если он есть в ответе)
         // ВАЖНО: Токен хранится только в памяти компонента, не в localStorage/sessionStorage
-        if (data.dashboard_token) {
-          setDashboardToken(data.dashboard_token);
-        } else {
-          setDashboardToken(undefined);
+        // ОПТИМИЗАЦИЯ: Обновляем токен только если он изменился, чтобы избежать лишних переподключений WebSocket
+        const newToken = data.dashboard_token || undefined;
+        if (dashboardTokenRef.current !== newToken) {
+          dashboardTokenRef.current = newToken;
+          setDashboardToken(newToken);
         }
         setLoading(false);
         return; // Не редиректим, показываем сообщение на странице
