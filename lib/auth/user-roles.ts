@@ -4,7 +4,7 @@
 
 import { supabaseAdmin } from '../database/supabase';
 import { logger } from '../utils/secure-logger';
-import { cached } from '../database/cache';
+import { cached, cache } from '../database/cache';
 
 export type UserRole = 'user' | 'support' | 'admin';
 
@@ -62,6 +62,102 @@ export async function hasUserRole(userId: string, role: UserRole): Promise<boole
       return false;
     }
   }, 60);
+}
+
+/**
+ * Batch проверка ролей для множества пользователей
+ * Оптимизирует N+1 проблему, выполняя один запрос вместо N
+ */
+export async function batchHasUserRole(
+  userIds: string[],
+  role: UserRole
+): Promise<Map<string, boolean>> {
+  const result = new Map<string, boolean>();
+  
+  // Если нет пользователей, возвращаем пустой результат
+  if (userIds.length === 0) {
+    return result;
+  }
+
+  // Убираем дубликаты
+  const uniqueUserIds = Array.from(new Set(userIds));
+  
+  // Проверяем кэш для каждого пользователя
+  const uncachedUserIds: string[] = [];
+  const cachePromises: Promise<[string, boolean]>[] = [];
+  
+  for (const userId of uniqueUserIds) {
+    const cacheKey = `user_role:${userId}:${role}`;
+    const cached = cache.get<boolean>(cacheKey);
+    
+    if (cached !== null) {
+      result.set(userId, cached);
+    } else {
+      uncachedUserIds.push(userId);
+    }
+  }
+  
+  // Если все в кэше, возвращаем результат
+  if (uncachedUserIds.length === 0) {
+    return result;
+  }
+  
+  try {
+    if (!supabaseAdmin) {
+      // Если БД недоступна, все false
+      for (const userId of uncachedUserIds) {
+        result.set(userId, false);
+      }
+      return result;
+    }
+
+    // Выполняем один batch запрос для всех некэшированных пользователей
+    const { data, error } = await supabaseAdmin
+      .from('user_roles')
+      .select('user_id')
+      .in('user_id', uncachedUserIds)
+      .eq('role', role)
+      .eq('is_active', true)
+      .is('revoked_at', null);
+
+    if (error) {
+      // PGRST116 - No rows returned - это нормально
+      if (error.code !== 'PGRST116') {
+        logger.error('Error batch checking user roles', {
+          error: error.message,
+          code: error.code
+        });
+      }
+      // При ошибке все false
+      for (const userId of uncachedUserIds) {
+        result.set(userId, false);
+      }
+      return result;
+    }
+
+    // Создаем Set для быстрой проверки
+    const usersWithRole = new Set((data || []).map(r => r.user_id));
+    
+    // Заполняем результат и кэш
+    for (const userId of uncachedUserIds) {
+      const hasRole = usersWithRole.has(userId);
+      result.set(userId, hasRole);
+      
+      // Кэшируем результат
+      const cacheKey = `user_role:${userId}:${role}`;
+      cache.set(cacheKey, hasRole, 60);
+    }
+  } catch (error) {
+    logger.error('Unexpected error batch checking user roles', {
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+    // При ошибке все false
+    for (const userId of uncachedUserIds) {
+      result.set(userId, false);
+    }
+  }
+  
+  return result;
 }
 
 /**

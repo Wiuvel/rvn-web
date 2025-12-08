@@ -4,10 +4,11 @@ import { generalRateLimit } from '@/lib/security/rate-limit';
 import { logger } from '@/lib/utils/secure-logger';
 import { setCorsHeaders, handleCorsPreflight } from '@/lib/security/cors';
 import { getUserByToken } from '@/lib/auth/index';
-import { hasUserRole } from '@/lib/auth/user-roles';
+import { hasUserRole, batchHasUserRole } from '@/lib/auth/user-roles';
 import { supabaseAdmin } from '@/lib/database/supabase';
 import { ERROR_INTERNAL_SERVER_ERROR, ERROR_NOT_AUTHENTICATED, ERROR_TICKET_NOT_FOUND, ERROR_ACCESS_DENIED, ERROR_TOO_MANY_REQUESTS, ERROR_INVALID_REQUEST_DATA } from '@/lib/utils/constants';
 import { broadcastMessageRead } from '@/lib/websocket/server';
+import { isValidUUID } from '@/lib/utils/uuid-validation';
 
 export async function OPTIONS() {
   return handleCorsPreflight();
@@ -59,8 +60,7 @@ export async function POST(
     const { ticketId } = await params;
 
     // Валидация UUID формата ticketId
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!uuidRegex.test(ticketId)) {
+    if (!isValidUUID(ticketId)) {
       return setCorsHeaders(
         NextResponse.json(
           { error: ERROR_INVALID_REQUEST_DATA },
@@ -127,11 +127,17 @@ export async function POST(
       );
     }
 
+    // Оптимизация: batch запрос для всех sender_id вместо N запросов
+    const senderIds = allUnreadMessages ? Array.from(new Set(allUnreadMessages.map(msg => msg.sender_id))) : [];
+    const senderRolesMap = senderIds.length > 0 
+      ? await batchHasUserRole(senderIds, 'support')
+      : new Map<string, boolean>();
+    
     // Фильтруем сообщения по типу отправителя (support или user)
     const messageIds: string[] = [];
     if (allUnreadMessages) {
       for (const msg of allUnreadMessages) {
-        const isSenderSupport = await hasUserRole(msg.sender_id, 'support');
+        const isSenderSupport = senderRolesMap.get(msg.sender_id) || false;
         // Пользователь отмечает сообщения от поддержки, поддержка - от пользователей
         if ((isSupport && !isSenderSupport) || (!isSupport && isSenderSupport)) {
           messageIds.push(msg.id);

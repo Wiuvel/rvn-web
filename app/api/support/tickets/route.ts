@@ -4,7 +4,7 @@ import { generalRateLimit } from '@/lib/security/rate-limit';
 import { logger } from '@/lib/utils/secure-logger';
 import { setCorsHeaders, handleCorsPreflight } from '@/lib/security/cors';
 import { getUserByToken } from '@/lib/auth/index';
-import { hasUserRole } from '@/lib/auth/user-roles';
+import { hasUserRole, batchHasUserRole } from '@/lib/auth/user-roles';
 import { supabaseAdmin } from '@/lib/database/supabase';
 import { ERROR_INTERNAL_SERVER_ERROR, ERROR_NOT_AUTHENTICATED, ERROR_INVALID_REQUEST_DATA, ERROR_MAXIMUM_TICKET_LIMIT_REACHED, ERROR_TOO_MANY_REQUESTS, TICKET_SUBJECT_MAX_LENGTH, MESSAGE_MAX_LENGTH, ERROR_MESSAGE_TOO_LONG, ERROR_SUBJECT_TOO_LONG, MAX_TICKETS_PER_USER } from '@/lib/utils/constants';
 
@@ -12,6 +12,7 @@ interface LastMessage {
   id: string;
   message_text: string;
   sender_id: string;
+  sender_type: 'user' | 'support';
   created_at: string;
   is_read: boolean;
 }
@@ -160,12 +161,23 @@ export async function GET(request: NextRequest) {
             });
             
             const batchResults = await Promise.all(batchPromises);
+            
+            // Оптимизация: batch запрос для всех sender_id
+            const senderIds = batchResults
+              .map(({ lastMessage }) => lastMessage?.sender_id)
+              .filter((id): id is string => !!id);
+            const senderRolesMap = senderIds.length > 0 
+              ? await batchHasUserRole(senderIds, 'support')
+              : new Map<string, boolean>();
+            
             batchResults.forEach(({ ticketId, lastMessage }) => {
               if (lastMessage) {
+                const senderIsSupport = senderRolesMap.get(lastMessage.sender_id) || false;
                 lastMessagesMap[ticketId] = {
                   id: lastMessage.id,
                   message_text: lastMessage.message_text,
                   sender_id: lastMessage.sender_id,
+                  sender_type: senderIsSupport ? 'support' : 'user' as 'user' | 'support',
                   created_at: lastMessage.created_at,
                   is_read: lastMessage.is_read
                 };
@@ -174,7 +186,7 @@ export async function GET(request: NextRequest) {
           }
         } else if (allMessages) {
           // Группируем сообщения по ticket_id и берем первое (самое последнее) для каждого тикета
-          const messagesByTicket = new Map<string, LastMessage>();
+          const messagesByTicket = new Map<string, { id: string; message_text: string; sender_id: string; created_at: string; is_read: boolean }>();
           for (const msg of allMessages) {
             if (!messagesByTicket.has(msg.ticket_id)) {
               messagesByTicket.set(msg.ticket_id, {
@@ -187,8 +199,22 @@ export async function GET(request: NextRequest) {
             }
           }
           
+          // Оптимизация: batch запрос для всех sender_id вместо N запросов
+          const senderIds = Array.from(messagesByTicket.values()).map(msg => msg.sender_id);
+          const senderRolesMap = senderIds.length > 0 
+            ? await batchHasUserRole(senderIds, 'support')
+            : new Map<string, boolean>();
+          
+          const lastMessagesWithType = Array.from(messagesByTicket.entries()).map(([ticketId, msg]) => {
+            const senderIsSupport = senderRolesMap.get(msg.sender_id) || false;
+            return [ticketId, {
+              ...msg,
+              sender_type: senderIsSupport ? 'support' : 'user' as 'user' | 'support'
+            }] as [string, LastMessage];
+          });
+          
           // Создаем map для быстрого доступа
-          lastMessagesMap = Object.fromEntries(messagesByTicket);
+          lastMessagesMap = Object.fromEntries(lastMessagesWithType);
           
           // Заполняем null для тикетов без сообщений
           for (const ticketId of ticketIds) {

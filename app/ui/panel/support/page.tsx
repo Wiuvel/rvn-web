@@ -2233,8 +2233,11 @@ export default function SupportPanel() {
                     };
                     
                     // Перевернутая логика: саппорт слева, пользователь справа
-                    const isSupport = message.sender_type === 'support' && !isSystemMessage;
-                    const isUser = message.sender_type === 'user';
+                    // Fallback: если sender_type не определен, определяем по sender_id
+                    // (в админ-панели текущий пользователь всегда саппорт)
+                    const senderType = message.sender_type || (authState.hasSupportAccess ? 'support' : 'user');
+                    const isSupport = senderType === 'support' && !isSystemMessage;
+                    const isUser = senderType === 'user';
                     
                     return (
                       <MessageItem

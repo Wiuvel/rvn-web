@@ -259,7 +259,8 @@ export function initWebSocketServer(httpServer: HTTPServer): SocketIOServer<Supp
       }
 
       // Очищаем старые записи rate limiting (старше 2 минут)
-      if (typingRateLimits.size > 1000) {
+      // Оптимизация: очищаем при достижении 500 записей вместо 1000
+      if (typingRateLimits.size > 500) {
         for (const [k, v] of typingRateLimits.entries()) {
           if (now - v.lastEmit > 120000) {
             typingRateLimits.delete(k);
@@ -319,8 +320,16 @@ export function initWebSocketServer(httpServer: HTTPServer): SocketIOServer<Supp
   return io;
 }
 
+// Интерфейс для сообщений с retry счетчиком
+interface QueuedMessageWithRetry extends QueuedMessage {
+  retryCount?: number;
+}
+
+const MAX_RETRY_ATTEMPTS = 3;
+const RETRY_DELAY_MS = 1000; // 1 секунда
+
 /**
- * Обработать очередь сообщений
+ * Обработать очередь сообщений с retry механизмом
  */
 function processMessageQueue(): void {
   if (!io || messageQueue.length === 0) {
@@ -329,10 +338,25 @@ function processMessageQueue(): void {
 
   const now = Date.now();
   const processedMessages: QueuedMessage[] = [];
+  const failedMessages: QueuedMessageWithRetry[] = [];
 
   for (const queuedMessage of messageQueue) {
     // Пропускаем устаревшие сообщения
     if (now - queuedMessage.timestamp > MAX_QUEUE_AGE) {
+      processedMessages.push(queuedMessage); // Удаляем устаревшие
+      continue;
+    }
+
+    // Проверяем retry счетчик
+    const retryCount = (queuedMessage as QueuedMessageWithRetry).retryCount || 0;
+    if (retryCount >= MAX_RETRY_ATTEMPTS) {
+      // Превышен лимит попыток, удаляем сообщение
+      logger.warn('Message queue: Max retry attempts reached, removing message', {
+        type: queuedMessage.type,
+        ticketId: queuedMessage.ticketId,
+        retryCount
+      });
+      processedMessages.push(queuedMessage);
       continue;
     }
 
@@ -361,8 +385,18 @@ function processMessageQueue(): void {
       }
       processedMessages.push(queuedMessage);
     } catch (error) {
-      logger.error('Error processing queued message', {
-        error: error instanceof Error ? error.message : 'Unknown error'
+      // Увеличиваем retry счетчик и планируем повторную попытку
+      const messageWithRetry: QueuedMessageWithRetry = {
+        ...queuedMessage,
+        retryCount: retryCount + 1
+      };
+      failedMessages.push(messageWithRetry);
+      
+      logger.error('Error processing queued message, will retry', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        type: queuedMessage.type,
+        ticketId: queuedMessage.ticketId,
+        retryCount: retryCount + 1
       });
     }
   }
@@ -375,7 +409,24 @@ function processMessageQueue(): void {
     }
   }
 
-  // Не логируем успешную обработку очереди
+  // Обновляем failed messages с новым retry счетчиком
+  for (const failed of failedMessages) {
+    const index = messageQueue.findIndex(m => 
+      m.type === failed.type && 
+      m.ticketId === failed.ticketId && 
+      m.timestamp === failed.timestamp
+    );
+    if (index > -1) {
+      (messageQueue[index] as QueuedMessageWithRetry).retryCount = failed.retryCount;
+    }
+  }
+
+  // Планируем повторную обработку failed messages через задержку
+  if (failedMessages.length > 0) {
+    setTimeout(() => {
+      processMessageQueue();
+    }, RETRY_DELAY_MS);
+  }
 }
 
 /**

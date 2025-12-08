@@ -131,10 +131,9 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
         socket.emit('support:leave', { ticketId });
       }
       socket.off('connect', onConnect);
-      if (!socket.connected) {
-        socket.disconnect();
-        socketRef.current = null;
-      }
+      // Всегда отключаем socket при cleanup для предотвращения утечек памяти
+      socket.disconnect();
+      socketRef.current = null;
     };
 
     cleanupRef.current = cleanup;

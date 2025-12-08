@@ -4,10 +4,11 @@ import { generalRateLimit } from '@/lib/security/rate-limit';
 import { logger } from '@/lib/utils/secure-logger';
 import { setCorsHeaders, handleCorsPreflight } from '@/lib/security/cors';
 import { getUserByToken } from '@/lib/auth/index';
-import { hasUserRole } from '@/lib/auth/user-roles';
+import { hasUserRole, batchHasUserRole } from '@/lib/auth/user-roles';
 import { supabaseAdmin } from '@/lib/database/supabase';
 import { ERROR_INTERNAL_SERVER_ERROR, ERROR_NOT_AUTHENTICATED, ERROR_INVALID_REQUEST_DATA, MESSAGE_MAX_LENGTH, ERROR_TICKET_NOT_FOUND, ERROR_ACCESS_DENIED, ERROR_CANNOT_SEND_TO_CLOSED_TICKET, ERROR_MESSAGE_TOO_LONG, ERROR_TOO_MANY_REQUESTS } from '@/lib/utils/constants';
 import { broadcastNewMessage, broadcastTicketUpdate } from '@/lib/websocket/server';
+import { isValidUUID } from '@/lib/utils/uuid-validation';
 
 export async function OPTIONS() {
   return handleCorsPreflight();
@@ -59,8 +60,7 @@ export async function POST(
     const { ticketId } = await params;
 
     // Валидация UUID формата ticketId
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!uuidRegex.test(ticketId)) {
+    if (!isValidUUID(ticketId)) {
       return setCorsHeaders(
         NextResponse.json(
           { error: ERROR_INVALID_REQUEST_DATA },
@@ -212,7 +212,7 @@ export async function POST(
       // Трекинг аналитики
       try {
         const { trackMessageSent } = await import('@/lib/analytics/support-analytics');
-        await trackMessageSent(ticketId, newMessage.sender_id, newMessage.sender_type);
+        await trackMessageSent(ticketId, newMessage.sender_id, messageForBroadcast.sender_type);
       } catch (error) {
         logger.error('Error tracking message sent', {
           error: error instanceof Error ? error.message : 'Unknown error',
@@ -240,11 +240,14 @@ export async function POST(
         .eq('ticket_id', ticketId)
         .limit(10);
 
-      // Проверяем, есть ли среди отправителей пользователи с ролью support
+      // Оптимизация: batch запрос для всех sender_id вместо N запросов
       let hasSupportMessage = false;
       if (existingMessages && existingMessages.length > 0) {
+        const senderIds = Array.from(new Set(existingMessages.map(msg => msg.sender_id)));
+        const senderRolesMap = await batchHasUserRole(senderIds, 'support');
+        
         for (const msg of existingMessages) {
-          const isSupportSender = await hasUserRole(msg.sender_id, 'support');
+          const isSupportSender = senderRolesMap.get(msg.sender_id) || false;
           if (isSupportSender) {
             hasSupportMessage = true;
             break;

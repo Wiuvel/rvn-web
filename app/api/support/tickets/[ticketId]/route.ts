@@ -4,10 +4,11 @@ import { generalRateLimit } from '@/lib/security/rate-limit';
 import { logger } from '@/lib/utils/secure-logger';
 import { setCorsHeaders, handleCorsPreflight } from '@/lib/security/cors';
 import { getUserByToken } from '@/lib/auth/index';
-import { hasUserRole } from '@/lib/auth/user-roles';
+import { hasUserRole, batchHasUserRole } from '@/lib/auth/user-roles';
 import { supabaseAdmin } from '@/lib/database/supabase';
 import { ERROR_INTERNAL_SERVER_ERROR, ERROR_NOT_AUTHENTICATED, ERROR_INVALID_REQUEST_DATA, ERROR_TICKET_NOT_FOUND, ERROR_ACCESS_DENIED, ERROR_TOO_MANY_REQUESTS, ERROR_INVALID_STATUS_TRANSITION, ERROR_TICKET_NOT_ASSIGNED } from '@/lib/utils/constants';
 import { broadcastTicketUpdate, broadcastTicketAssignment, broadcastNewMessage } from '@/lib/websocket/server';
+import { isValidUUID } from '@/lib/utils/uuid-validation';
 
 export async function OPTIONS() {
   return handleCorsPreflight();
@@ -59,8 +60,7 @@ export async function GET(
     const { ticketId } = await params;
 
     // Валидация UUID формата ticketId
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!uuidRegex.test(ticketId)) {
+    if (!isValidUUID(ticketId)) {
       return setCorsHeaders(
         NextResponse.json(
           { error: ERROR_INVALID_REQUEST_DATA },
@@ -110,9 +110,17 @@ export async function GET(
       );
     }
 
-    // Получаем сообщения
+    // Получаем сообщения с пагинацией
     // Для оптимизации рекомендуется применить индекс idx_support_messages_ticket_created
     // См. database_migration_add_support_indexes.sql
+    const { searchParams } = new URL(request.url);
+    const limit = parseInt(searchParams.get('limit') || '100', 10); // По умолчанию 100 сообщений
+    const offset = parseInt(searchParams.get('offset') || '0', 10);
+    const maxLimit = 500; // Максимальный лимит для защиты от перегрузки
+    
+    const safeLimit = Math.min(Math.max(limit, 1), maxLimit);
+    const safeOffset = Math.max(offset, 0);
+    
     const { data: messages, error: messagesError } = await supabaseAdmin
       .from('support_messages')
       .select(`
@@ -120,7 +128,8 @@ export async function GET(
         sender:users!support_messages_sender_id_fkey(id, username, user_id, avatar)
       `)
       .eq('ticket_id', ticketId)
-      .order('created_at', { ascending: true });
+      .order('created_at', { ascending: true })
+      .range(safeOffset, safeOffset + safeLimit - 1);
 
     if (messagesError) {
       logger.error('Error fetching messages', {
@@ -137,10 +146,22 @@ export async function GET(
       );
     }
 
+    // Оптимизация: batch запрос для всех sender_id вместо N запросов
+    const uniqueSenderIds = Array.from(new Set((messages || []).map(msg => msg.sender_id)));
+    const senderRolesMap = await batchHasUserRole(uniqueSenderIds, 'support');
+    
+    const messagesWithSenderType = (messages || []).map((msg) => {
+      const senderIsSupport = senderRolesMap.get(msg.sender_id) || false;
+      return {
+        ...msg,
+        sender_type: senderIsSupport ? 'support' : 'user' as 'user' | 'support'
+      };
+    });
+
     return setCorsHeaders(
       NextResponse.json({
         ticket,
-        messages: messages || []
+        messages: messagesWithSenderType
       })
     );
   } catch (error) {
@@ -211,8 +232,7 @@ export async function PUT(
     const { ticketId } = await params;
 
     // Валидация UUID формата ticketId
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!uuidRegex.test(ticketId)) {
+    if (!isValidUUID(ticketId)) {
       return setCorsHeaders(
         NextResponse.json(
           { error: ERROR_INVALID_REQUEST_DATA },
@@ -446,12 +466,9 @@ export async function PUT(
           ticketId
         });
       } else {
-        // Обновляем last_message_at тикета после создания системного сообщения
-        await supabaseAdmin
-          .from('support_tickets')
-          .update({ last_message_at: new Date().toISOString() })
-          .eq('id', ticketId);
-
+        // last_message_at автоматически обновляется триггером БД при создании сообщения
+        // Не нужно обновлять вручную - это исправляет race condition
+        
         // Отправляем системное сообщение через WebSocket
         if (statusMessage) {
           broadcastNewMessage(ticketId, statusMessage);

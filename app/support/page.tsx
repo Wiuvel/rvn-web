@@ -983,9 +983,9 @@ export default function SupportPage() {
                 subject: retryData.ticket.subject,
                 status: retryData.ticket.status,
                 createdAt: new Date(retryData.ticket.created_at),
-                messages: (retryData.messages || []).map((m: { id: string; message: string; sender_type: string; created_at: string; is_read: boolean; sender?: { id: string; username: string; user_id: string } }) => ({
+                messages: (retryData.messages || []).map((m: { id: string; message_text: string; sender_type: string; created_at: string; is_read: boolean; sender?: { id: string; username: string; user_id: string } }) => ({
                   id: m.id,
-                  text: m.message,
+                  text: m.message_text,
                   sender: m.sender_type,
                   timestamp: new Date(m.created_at),
                   isRead: m.is_read,
@@ -1004,9 +1004,9 @@ export default function SupportPage() {
             subject: ticketData.ticket.subject,
             status: ticketData.ticket.status,
             createdAt: new Date(ticketData.ticket.created_at),
-            messages: (ticketData.messages || []).map((m: { id: string; message: string; sender_type: string; created_at: string; is_read: boolean; sender?: { id: string; username: string; user_id: string } }) => ({
+            messages: (ticketData.messages || []).map((m: { id: string; message_text: string; sender_type: string; created_at: string; is_read: boolean; sender?: { id: string; username: string; user_id: string } }) => ({
               id: m.id,
-              text: m.message,
+              text: m.message_text,
               sender: m.sender_type,
               timestamp: new Date(m.created_at),
               isRead: m.is_read,
@@ -1118,9 +1118,9 @@ export default function SupportPage() {
             });
             const retryData = await retryResponse.json();
             if (retryResponse.ok) {
-              const mappedMessages = (retryData.messages || []).map((m: { id: string; message: string; sender_type: string; created_at: string; is_read: boolean; sender?: { id: string; username: string; user_id: string } }) => ({
+              const mappedMessages = (retryData.messages || []).map((m: { id: string; message_text: string; sender_type: string; created_at: string; is_read: boolean; sender?: { id: string; username: string; user_id: string } }) => ({
                 id: m.id,
-                text: m.message,
+                text: m.message_text,
                 sender: m.sender_type,
                 timestamp: new Date(m.created_at),
                 isRead: m.is_read,
@@ -1144,9 +1144,9 @@ export default function SupportPage() {
         );
         const ticketData = await ticketResponse.json();
         if (ticketResponse.ok) {
-          const mappedMessages = (ticketData.messages || []).map((m: { id: string; message: string; sender_type: string; created_at: string; is_read: boolean; sender?: { id: string; username: string; user_id: string } }) => ({
+          const mappedMessages = (ticketData.messages || []).map((m: { id: string; message_text: string; sender_type: string; created_at: string; is_read: boolean; sender?: { id: string; username: string; user_id: string } }) => ({
             id: m.id,
-            text: m.message,
+            text: m.message_text,
             sender: m.sender_type,
             timestamp: new Date(m.created_at),
             isRead: m.is_read,
@@ -1282,9 +1282,9 @@ export default function SupportPage() {
             return prev;
           }
           
-          const mappedMessages = (data.messages || []).map((m: { id: string; message: string; sender_type: string; created_at: string; is_read: boolean; sender?: { id: string; username: string; user_id: string } }) => ({
+          const mappedMessages = (data.messages || []).map((m: { id: string; message_text: string; sender_type: string; created_at: string; is_read: boolean; sender?: { id: string; username: string; user_id: string } }) => ({
             id: m.id,
-            text: m.message,
+            text: m.message_text,
             sender: m.sender_type,
             timestamp: new Date(m.created_at),
             isRead: m.is_read,
