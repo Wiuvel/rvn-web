@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import AreaChart from '@/components/ui/AreaChart';
 // Простой Skeleton компонент для загрузки
 const Skeleton = ({ className }: { className?: string }) => (
   <div className={`animate-pulse bg-neutral-800 rounded ${className || ''}`} />
@@ -129,41 +130,48 @@ export default function SupportAnalytics() {
     );
   }
 
-  // Находим максимальные значения для масштабирования графиков
-  const maxDailyTickets = Math.max(
-    ...analytics.ticketsCreatedDaily.map(d => d.count),
-    ...analytics.ticketsClosedDaily.map(d => d.count),
-    1
-  );
-  const maxDailyMessages = Math.max(
-    ...analytics.messagesSentDaily.map(d => d.count),
-    1
-  );
-  const maxHourlyTickets = Math.max(
-    ...analytics.ticketsCreatedHourly.map(h => h.count),
-    1
-  );
-  const maxHourlyMessages = Math.max(
-    ...analytics.messagesSentHourly.map(h => h.count),
-    1
-  );
+  // Подготовка данных для графиков
+  const ticketsChartData = analytics.ticketsCreatedDaily.map((day) => ({
+    value: day.count,
+    label: formatDate(day.date),
+  }));
+  
+  const ticketsClosedChartData = analytics.ticketsClosedDaily.map((day) => ({
+    value: day.count,
+    label: formatDate(day.date),
+  }));
+
+  const messagesChartData = analytics.messagesSentDaily.map((day) => ({
+    value: day.count,
+    label: formatDate(day.date),
+  }));
+
+  const ticketsHourlyChartData = analytics.ticketsCreatedHourly.map((hour) => ({
+    value: hour.count,
+    label: formatHour(hour.hour),
+  }));
+
+  const messagesHourlyChartData = analytics.messagesSentHourly.map((hour) => ({
+    value: hour.count,
+    label: formatHour(hour.hour),
+  }));
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Заголовок с выбором периода */}
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-2xl font-semibold text-white">Аналитика поддержки</h3>
-          <p className="text-sm text-neutral-400 mt-1">Статистика системы поддержки</p>
+          <h3 className="text-xl font-semibold text-white">Аналитика поддержки</h3>
+          <p className="text-xs text-neutral-400 mt-0.5">Статистика системы поддержки</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           {PERIODS.map((p) => (
             <Button
               key={p.value}
               variant={period === p.value ? 'default' : 'outline'}
               size="sm"
               onClick={() => setPeriod(p.value)}
-              className={period === p.value ? '' : 'bg-neutral-900 border-neutral-800 text-neutral-300 hover:bg-neutral-800'}
+              className={`text-xs px-2.5 py-1 h-7 ${period === p.value ? '' : 'bg-neutral-900 border-neutral-800 text-neutral-300 hover:bg-neutral-800'}`}
             >
               {p.label}
             </Button>
@@ -171,133 +179,82 @@ export default function SupportAnalytics() {
         </div>
       </div>
 
-      {/* Основные метрики */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="bg-neutral-900 border-neutral-800">
-          <CardHeader className="pb-3">
-            <CardDescription className="text-neutral-400">Создано тикетов</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-white">{analytics.totalTicketsCreated}</div>
-            <p className="text-xs text-neutral-500 mt-1">За выбранный период</p>
-          </CardContent>
+      {/* Компактные метрики в одну строку */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <Card className="bg-neutral-900 border-neutral-800 p-3">
+          <CardDescription className="text-xs text-neutral-400 mb-1">Создано</CardDescription>
+          <div className="text-2xl font-bold text-white">{analytics.totalTicketsCreated}</div>
         </Card>
 
-        <Card className="bg-neutral-900 border-neutral-800">
-          <CardHeader className="pb-3">
-            <CardDescription className="text-neutral-400">Закрыто тикетов</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-green-400">{analytics.totalTicketsClosed}</div>
-            <p className="text-xs text-neutral-500 mt-1">За выбранный период</p>
-          </CardContent>
+        <Card className="bg-neutral-900 border-neutral-800 p-3">
+          <CardDescription className="text-xs text-neutral-400 mb-1">Закрыто</CardDescription>
+          <div className="text-2xl font-bold text-green-400">{analytics.totalTicketsClosed}</div>
         </Card>
 
-        <Card className="bg-neutral-900 border-neutral-800">
-          <CardHeader className="pb-3">
-            <CardDescription className="text-neutral-400">Сообщений</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-blue-400">{analytics.totalMessagesSent}</div>
-            <p className="text-xs text-neutral-500 mt-1">За выбранный период</p>
-          </CardContent>
+        <Card className="bg-neutral-900 border-neutral-800 p-3">
+          <CardDescription className="text-xs text-neutral-400 mb-1">Сообщений</CardDescription>
+          <div className="text-2xl font-bold text-blue-400">{analytics.totalMessagesSent}</div>
         </Card>
 
-        <Card className="bg-neutral-900 border-neutral-800">
-          <CardHeader className="pb-3">
-            <CardDescription className="text-neutral-400">WebSocket</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-purple-400">{analytics.websocketConnections}</div>
-            <p className="text-xs text-neutral-500 mt-1">Активных соединений</p>
-          </CardContent>
+        <Card className="bg-neutral-900 border-neutral-800 p-3">
+          <CardDescription className="text-xs text-neutral-400 mb-1">WebSocket</CardDescription>
+          <div className="text-2xl font-bold text-purple-400">{analytics.websocketConnections}</div>
         </Card>
       </div>
 
-      {/* Средние значения */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card className="bg-neutral-900 border-neutral-800">
-          <CardHeader>
-            <CardTitle className="text-lg">Среднее время ответа</CardTitle>
-            <CardDescription>Время до первого ответа поддержки</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-4xl font-bold text-blue-400">{formatTime(analytics.avgResponseTime)}</div>
-          </CardContent>
+      {/* Средние значения и статусы в одну строку */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <Card className="bg-neutral-900 border-neutral-800 p-3">
+          <CardDescription className="text-xs text-neutral-400 mb-1">Среднее время ответа</CardDescription>
+          <div className="text-xl font-bold text-blue-400">{formatTime(analytics.avgResponseTime)}</div>
         </Card>
 
-        <Card className="bg-neutral-900 border-neutral-800">
-          <CardHeader>
-            <CardTitle className="text-lg">Среднее время решения</CardTitle>
-            <CardDescription>Время до закрытия тикета</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-4xl font-bold text-green-400">{formatTime(analytics.avgResolutionTime)}</div>
-          </CardContent>
+        <Card className="bg-neutral-900 border-neutral-800 p-3">
+          <CardDescription className="text-xs text-neutral-400 mb-1">Среднее время решения</CardDescription>
+          <div className="text-xl font-bold text-green-400">{formatTime(analytics.avgResolutionTime)}</div>
         </Card>
-      </div>
 
-      {/* Тикеты по статусам */}
-      {Object.keys(analytics.ticketsByStatus).length > 0 && (
-        <Card className="bg-neutral-900 border-neutral-800">
-          <CardHeader>
-            <CardTitle className="text-lg">Тикеты по статусам</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-3">
-              {Object.entries(analytics.ticketsByStatus).map(([status, count]) => (
-                <Badge key={status} variant="secondary" className="bg-neutral-800 text-neutral-200 border-neutral-700 px-4 py-2 text-sm">
-                  <span className="font-semibold mr-2">{count}</span>
-                  <span className="capitalize">{status}</span>
+        {Object.keys(analytics.ticketsByStatus).length > 0 && (
+          <Card className="bg-neutral-900 border-neutral-800 p-3">
+            <CardDescription className="text-xs text-neutral-400 mb-2">По статусам</CardDescription>
+            <div className="flex flex-wrap gap-1.5">
+              {Object.entries(analytics.ticketsByStatus).slice(0, 3).map(([status, count]) => (
+                <Badge key={status} variant="secondary" className="bg-neutral-800 text-neutral-200 border-neutral-700 px-2 py-0.5 text-xs">
+                  <span className="font-semibold mr-1">{count}</span>
+                  <span className="capitalize text-[10px]">{status}</span>
                 </Badge>
               ))}
             </div>
-          </CardContent>
-        </Card>
-      )}
+          </Card>
+        )}
+      </div>
 
-      {/* График тикетов */}
-      {analytics.ticketsCreatedDaily.length > 0 && (
+      {/* График тикетов по дням с area chart */}
+      {ticketsChartData.length > 0 && (
         <Card className="bg-neutral-900 border-neutral-800">
-          <CardHeader>
-            <CardTitle className="text-lg">Тикеты по дням</CardTitle>
-            <CardDescription>Создано и закрыто тикетов</CardDescription>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Тикеты по дням</CardTitle>
+            <CardDescription className="text-xs">Создано и закрыто тикетов</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {analytics.ticketsCreatedDaily.map((day, index) => {
-                const closed = analytics.ticketsClosedDaily[index]?.count || 0;
-                const createdHeight = (day.count / maxDailyTickets) * 100;
-                const closedHeight = (closed / maxDailyTickets) * 100;
-                
-                return (
-                  <div key={day.date} className="flex items-end gap-2">
-                    <div className="flex-1">
-                      <div className="flex items-end gap-1 h-20">
-                        <div
-                          className="bg-blue-500 rounded-t flex-1 transition-all"
-                          style={{ height: `${createdHeight}%`, minHeight: day.count > 0 ? '2px' : '0' }}
-                          title={`Создано: ${day.count}`}
-                        />
-                        <div
-                          className="bg-green-500 rounded-t flex-1 transition-all"
-                          style={{ height: `${closedHeight}%`, minHeight: closed > 0 ? '2px' : '0' }}
-                          title={`Закрыто: ${closed}`}
-                        />
-                      </div>
-                      <div className="text-xs text-neutral-500 mt-2 text-center">{formatDate(day.date)}</div>
-                    </div>
-                  </div>
-                );
-              })}
+          <CardContent className="pt-0">
+            <div className="h-32 -mx-2">
+              <AreaChart
+                data={ticketsChartData}
+                data2={ticketsClosedChartData}
+                height={128}
+                color="#3b82f6"
+                color2="#10b981"
+                showGrid={true}
+                showLabels={period === 'day' || period === 'week'}
+              />
             </div>
-            <div className="flex items-center gap-4 mt-4 text-xs text-neutral-400">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-blue-500 rounded"></div>
+            <div className="flex items-center gap-4 mt-3 text-xs text-neutral-400">
+              <div className="flex items-center gap-1.5">
+                <div className="w-2 h-2 bg-blue-500 rounded"></div>
                 <span>Создано</span>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-green-500 rounded"></div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-2 h-2 bg-green-500 rounded"></div>
                 <span>Закрыто</span>
               </div>
             </div>
@@ -305,77 +262,59 @@ export default function SupportAnalytics() {
         </Card>
       )}
 
-      {/* График сообщений */}
-      {analytics.messagesSentDaily.length > 0 && (
+      {/* График сообщений по дням */}
+      {messagesChartData.length > 0 && (
         <Card className="bg-neutral-900 border-neutral-800">
-          <CardHeader>
-            <CardTitle className="text-lg">Сообщения по дням</CardTitle>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Сообщения по дням</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="flex items-end gap-1">
-              {analytics.messagesSentDaily.map((day) => {
-                const height = (day.count / maxDailyMessages) * 100;
-                return (
-                  <div key={day.date} className="flex-1 flex flex-col items-center">
-                    <div
-                      className="w-full bg-purple-500 rounded-t transition-all"
-                      style={{ height: `${height}%`, minHeight: day.count > 0 ? '2px' : '0', maxHeight: '120px' }}
-                      title={`${formatDate(day.date)}: ${day.count} сообщений`}
-                    />
-                    <div className="text-xs text-neutral-500 mt-2">{formatDate(day.date)}</div>
-                  </div>
-                );
-              })}
+          <CardContent className="pt-0">
+            <div className="h-32 -mx-2">
+              <AreaChart
+                data={messagesChartData}
+                height={128}
+                color="#8b5cf6"
+                showGrid={true}
+                showLabels={period === 'day' || period === 'week'}
+              />
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* График по часам */}
-      {analytics.ticketsCreatedHourly.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* Графики по часам в одну строку */}
+      {ticketsHourlyChartData.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <Card className="bg-neutral-900 border-neutral-800">
-            <CardHeader>
-              <CardTitle className="text-lg">Тикеты по часам</CardTitle>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Тикеты по часам</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="flex items-end gap-1">
-                {analytics.ticketsCreatedHourly.map((hour) => {
-                  const height = (hour.count / maxHourlyTickets) * 100;
-                  return (
-                    <div key={hour.hour} className="flex-1 flex flex-col items-center">
-                      <div
-                        className="w-full bg-blue-500 rounded-t transition-all"
-                        style={{ height: `${height}%`, minHeight: hour.count > 0 ? '2px' : '0', maxHeight: '100px' }}
-                        title={`${formatHour(hour.hour)}: ${hour.count} тикетов`}
-                      />
-                      <div className="text-xs text-neutral-500 mt-2">{formatHour(hour.hour)}</div>
-                    </div>
-                  );
-                })}
+            <CardContent className="pt-0">
+              <div className="h-24 -mx-2">
+                <AreaChart
+                  data={ticketsHourlyChartData}
+                  height={96}
+                  color="#3b82f6"
+                  showGrid={true}
+                  showLabels={false}
+                />
               </div>
             </CardContent>
           </Card>
 
           <Card className="bg-neutral-900 border-neutral-800">
-            <CardHeader>
-              <CardTitle className="text-lg">Сообщения по часам</CardTitle>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Сообщения по часам</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="flex items-end gap-1">
-                {analytics.messagesSentHourly.map((hour) => {
-                  const height = (hour.count / maxHourlyMessages) * 100;
-                  return (
-                    <div key={hour.hour} className="flex-1 flex flex-col items-center">
-                      <div
-                        className="w-full bg-purple-500 rounded-t transition-all"
-                        style={{ height: `${height}%`, minHeight: hour.count > 0 ? '2px' : '0', maxHeight: '100px' }}
-                        title={`${formatHour(hour.hour)}: ${hour.count} сообщений`}
-                      />
-                      <div className="text-xs text-neutral-500 mt-2">{formatHour(hour.hour)}</div>
-                    </div>
-                  );
-                })}
+            <CardContent className="pt-0">
+              <div className="h-24 -mx-2">
+                <AreaChart
+                  data={messagesHourlyChartData}
+                  height={96}
+                  color="#8b5cf6"
+                  showGrid={true}
+                  showLabels={false}
+                />
               </div>
             </CardContent>
           </Card>

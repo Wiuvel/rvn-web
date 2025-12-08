@@ -513,7 +513,7 @@ export default function SupportPanel() {
   useEffect(() => {
     if (!socket || !activeTicket || !authState.userId || !authState.hasSupportAccess) return;
 
-    joinTicket(activeTicket.id, authState.userId, true);
+    joinTicket(activeTicket.id);
 
     return () => {
       leaveTicket(activeTicket.id);

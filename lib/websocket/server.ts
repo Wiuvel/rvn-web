@@ -8,6 +8,8 @@ import { Server as HTTPServer } from 'http';
 import { logger } from '@/lib/utils/secure-logger';
 import type { SupportWebSocketEvents } from './events';
 import { supabaseAdmin } from '@/lib/database/supabase';
+import { getUserByToken } from '@/lib/auth/index';
+import { hasUserRole } from '@/lib/auth/user-roles';
 
 // Вспомогательные типы для извлечения типов данных из событий
 type MessageNewData = Parameters<SupportWebSocketEvents['support:message:new']>[0];
@@ -142,6 +144,48 @@ export function initWebSocketServer(httpServer: HTTPServer): SocketIOServer<Supp
     pingInterval: 25000,
   });
   
+  // Middleware для аутентификации при подключении
+  io.use(async (socket, next) => {
+    try {
+      // Получаем токен из auth параметра (передается клиентом)
+      const token = socket.handshake.auth?.token;
+      
+      if (!token) {
+        logger.warn('WebSocket: Connection attempt without token', {
+          id: socket.id,
+          origin: socket.handshake.headers.origin
+        });
+        return next(new Error('Authentication required'));
+      }
+
+      // Проверяем токен и получаем пользователя
+      const user = await getUserByToken(token);
+      
+      if (!user) {
+        logger.warn('WebSocket: Invalid token', {
+          id: socket.id,
+          origin: socket.handshake.headers.origin
+        });
+        return next(new Error('Invalid token'));
+      }
+
+      // Сохраняем пользователя в socket.data для использования в обработчиках
+      socket.data.user = user;
+      socket.data.userId = user.id;
+      
+      // Проверяем роль поддержки заранее для оптимизации
+      socket.data.isSupport = await hasUserRole(user.id, 'support');
+      
+      next();
+    } catch (error) {
+      logger.error('WebSocket: Authentication error', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        id: socket.id
+      });
+      next(new Error('Authentication failed'));
+    }
+  });
+  
   // Обработка ошибок подключения
   io.engine.on('connection_error', (err) => {
     logger.error('WebSocket: Connection error', {
@@ -174,13 +218,15 @@ export function initWebSocketServer(httpServer: HTTPServer): SocketIOServer<Supp
       });
     });
 
-    // Обработка присоединения к тикету с валидацией
+    // Обработка присоединения к тикету с полной валидацией прав доступа
     socket.on('support:join', async (data) => {
-      const { ticketId, userId, isSupport } = data;
+      const { ticketId } = data;
+      const user = socket.data.user;
+      const userId = socket.data.userId;
+      const isSupport = socket.data.isSupport;
       
       // Валидация входных данных
-      if (!ticketId || !userId || typeof isSupport !== 'boolean') {
-        // Не логируем валидационные ошибки - это нормальная ситуация
+      if (!ticketId) {
         socket.emit('support:error', { message: 'Invalid join request', code: 'INVALID_DATA' });
         return;
       }
@@ -188,36 +234,52 @@ export function initWebSocketServer(httpServer: HTTPServer): SocketIOServer<Supp
       // Валидация UUID формата ticketId
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
       if (!uuidRegex.test(ticketId)) {
-        // Не логируем валидационные ошибки
         socket.emit('support:error', { message: 'Invalid ticket ID', code: 'INVALID_TICKET_ID' });
         return;
       }
 
-      // Проверка существования тикета (базовая валидация)
-      // Примечание: Полная проверка прав доступа требует токена, который передается через cookies
-      // Для полной валидации нужно использовать proxy аутентификации Socket.IO
-      if (supabaseAdmin) {
-        try {
-          const { data: ticket, error: ticketError } = await supabaseAdmin
-            .from('support_tickets')
-            .select('id')
-            .eq('id', ticketId)
-            .single();
-
-          if (ticketError || !ticket) {
-            // Не логируем - тикет может быть удален или недоступен
-            socket.emit('support:error', { message: 'Ticket not found', code: 'TICKET_NOT_FOUND' });
-            return;
-          }
-        } catch (error) {
-          logger.error('Error validating ticket', { ticketId, error: error instanceof Error ? error.message : 'Unknown error' });
-          // Не блокируем присоединение при ошибке валидации, но логируем
-        }
+      // Проверка существования тикета и прав доступа
+      if (!supabaseAdmin) {
+        socket.emit('support:error', { message: 'Service unavailable', code: 'SERVICE_UNAVAILABLE' });
+        return;
       }
 
-      const room = `ticket:${ticketId}`;
-      socket.join(room);
-      // Не логируем успешные присоединения к комнатам
+      try {
+        const { data: ticket, error: ticketError } = await supabaseAdmin
+          .from('support_tickets')
+          .select('id, user_id')
+          .eq('id', ticketId)
+          .single();
+
+        if (ticketError || !ticket) {
+          socket.emit('support:error', { message: 'Ticket not found', code: 'TICKET_NOT_FOUND' });
+          return;
+        }
+
+        // Проверка прав доступа: пользователь может видеть только свои тикеты, поддержка - все
+        if (!isSupport && ticket.user_id !== userId) {
+          logger.warn('WebSocket: Access denied to ticket', {
+            userId,
+            ticketId,
+            ticketOwnerId: ticket.user_id
+          });
+          socket.emit('support:error', { message: 'Access denied', code: 'ACCESS_DENIED' });
+          return;
+        }
+
+        // Все проверки пройдены, присоединяемся к комнате
+        const room = `ticket:${ticketId}`;
+        socket.join(room);
+        
+        // Не логируем успешные присоединения к комнатам
+      } catch (error) {
+        logger.error('Error validating ticket access', {
+          ticketId,
+          userId,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        });
+        socket.emit('support:error', { message: 'Error validating access', code: 'VALIDATION_ERROR' });
+      }
     });
 
     // Обработка выхода из тикета
@@ -230,10 +292,18 @@ export function initWebSocketServer(httpServer: HTTPServer): SocketIOServer<Supp
 
     // Обработка статуса печати с rate limiting
     socket.on('support:typing', (data) => {
-      const { ticketId, userId, isTyping } = data;
+      const { ticketId, isTyping } = data;
+      const userId = socket.data.userId;
       
       // Валидация входных данных
-      if (!ticketId || !userId || typeof isTyping !== 'boolean') {
+      if (!ticketId || typeof isTyping !== 'boolean' || !userId) {
+        return;
+      }
+
+      // Проверяем, что пользователь присоединен к тикету
+      const room = `ticket:${ticketId}`;
+      if (!socket.rooms.has(room)) {
+        // Пользователь не присоединен к тикету, игнорируем событие
         return;
       }
 
@@ -267,13 +337,11 @@ export function initWebSocketServer(httpServer: HTTPServer): SocketIOServer<Supp
           }
         }
       }
-
-      const room = `ticket:${ticketId}`;
       // Отправляем статус печати всем в комнате, кроме отправителя
       socket.to(room).emit('support:typing:status', {
         ticketId,
-        userId,
-        username: '', // Будет заполнено на клиенте
+        userId: userId, // Из аутентификации
+        username: socket.data.user?.username || '', // Из аутентификации
         isTyping,
       });
     });

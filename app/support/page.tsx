@@ -485,7 +485,7 @@ export default function SupportPage() {
       return;
     }
 
-    joinTicket(activeTicket.id, userData.id, false);
+    joinTicket(activeTicket.id);
 
     return () => {
       leaveTicket(activeTicket.id);

@@ -14,18 +14,19 @@ interface UseWebSocketOptions {
   userId?: string;
   ticketId?: string;
   isSupport?: boolean;
+  token?: string; // dashboard_token для аутентификации
 }
 
 interface UseWebSocketReturn {
   socket: SocketType | null;
   isConnected: boolean;
-  joinTicket: (ticketId: string, userId: string, isSupport: boolean) => void;
+  joinTicket: (ticketId: string) => void;
   leaveTicket: (ticketId: string) => void;
-  sendTyping: (ticketId: string, userId: string, isTyping: boolean) => void;
+  sendTyping: (ticketId: string, isTyping: boolean) => void;
 }
 
 export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketReturn {
-  const { enabled = true, userId, ticketId, isSupport = false } = options;
+  const { enabled = true, userId, ticketId, isSupport = false, token } = options;
   const [isConnected, setIsConnected] = useState(false);
   const socketRef = useRef<SocketType | null>(null);
   const cleanupRef = useRef<(() => void) | null>(null);
@@ -44,14 +45,26 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
     // Если соединение уже существует и активно, переиспользуем его
     if (socketRef.current && socketRef.current.connected) {
       // Соединение уже активно, просто обновляем присоединение к тикету
-      if (ticketId && userId) {
-        socketRef.current.emit('support:join', { ticketId, userId, isSupport });
+      if (ticketId) {
+        socketRef.current.emit('support:join', { ticketId });
       }
       return;
     }
 
     // Создаем новое соединение (используем текущий домен)
     const wsUrl = process.env.NEXT_PUBLIC_WS_URL || (typeof window !== 'undefined' ? window.location.origin : '');
+    
+    // Получаем токен из параметров или из cookies
+    let authToken = token;
+    if (!authToken && typeof document !== 'undefined') {
+      // Пытаемся получить токен из cookies
+      const cookies = document.cookie.split(';');
+      const tokenCookie = cookies.find(c => c.trim().startsWith('dashboard_token='));
+      if (tokenCookie) {
+        authToken = tokenCookie.split('=')[1]?.trim();
+      }
+    }
+    
     const socket = io(wsUrl, {
       path: '/api/socket',
       transports: ['websocket', 'polling'],
@@ -62,6 +75,9 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
       timeout: 20000,
       forceNew: false,
       autoConnect: true,
+      auth: {
+        token: authToken || undefined // Передаем токен для аутентификации
+      }
     });
 
     socketRef.current = socket;
@@ -92,6 +108,12 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
         path: '/api/socket'
       });
       
+      // Специальная обработка ошибок аутентификации
+      if (error.message.includes('Authentication') || error.message.includes('Invalid token') || error.message.includes('Authentication required')) {
+        console.error('WebSocket authentication failed - token may be invalid or expired');
+        // Можно добавить логику для обновления токена или перенаправления на страницу входа
+      }
+      
       // Если ошибка связана с CORS или origin, показываем более детальную информацию
       if (error.message.includes('CORS') || error.message.includes('origin')) {
         console.error('WebSocket CORS error - check server CORS configuration');
@@ -113,8 +135,9 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
 
     // Автоматически присоединяемся к тикету после подключения
     const onConnect = () => {
-      if (ticketId && userId) {
-        socket.emit('support:join', { ticketId, userId, isSupport });
+      if (ticketId) {
+        // userId и isSupport теперь не нужны - они берутся из аутентификации
+        socket.emit('support:join', { ticketId });
       }
     };
 
@@ -127,7 +150,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
 
     // Функция очистки
     const cleanup = () => {
-      if (ticketId && userId && socket.connected) {
+      if (ticketId && socket.connected) {
         socket.emit('support:leave', { ticketId });
       }
       socket.off('connect', onConnect);
@@ -141,9 +164,10 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
     return cleanup;
   }, [enabled, ticketId, userId, isSupport]);
 
-  const joinTicket = useCallback((ticketId: string, userId: string, isSupport: boolean) => {
+  const joinTicket = useCallback((ticketId: string) => {
     if (socketRef.current) {
-      socketRef.current.emit('support:join', { ticketId, userId, isSupport });
+      // userId и isSupport теперь не нужны - они берутся из аутентификации
+      socketRef.current.emit('support:join', { ticketId });
     }
   }, []);
 
@@ -153,9 +177,10 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
     }
   }, []);
 
-  const sendTyping = useCallback((ticketId: string, userId: string, isTyping: boolean) => {
+  const sendTyping = useCallback((ticketId: string, isTyping: boolean) => {
     if (socketRef.current) {
-      socketRef.current.emit('support:typing', { ticketId, userId, isTyping });
+      // userId теперь не нужен - он берется из аутентификации
+      socketRef.current.emit('support:typing', { ticketId, isTyping });
     }
   }, []);
 
