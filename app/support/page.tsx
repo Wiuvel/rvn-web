@@ -48,7 +48,7 @@ interface Ticket {
   messages: Message[];
   last_message?: {
     id: string;
-    message_text: string;
+    message: string;
     sender_type: 'user' | 'support' | 'system';
     created_at: string;
     is_read: boolean;
@@ -502,7 +502,7 @@ export default function SupportPage() {
       ticketId: string;
       message: {
         id: string;
-        message_text: string;
+        message: string;
         sender_type: 'user' | 'support';
         created_at: string;
         is_read: boolean;
@@ -522,7 +522,7 @@ export default function SupportPage() {
       // Оптимизация: объединяем обновления состояния в один переход
       const newMessage = {
         id: data.message.id,
-        text: data.message.message_text,
+        text: data.message.message,
         sender: data.message.sender_type,
         timestamp: new Date(data.message.created_at),
         isRead: data.message.is_read,
@@ -531,7 +531,7 @@ export default function SupportPage() {
 
       const lastMessageData = {
         id: data.message.id,
-        message_text: data.message.message_text,
+        message: data.message.message,
         sender_type: data.message.sender_type,
         created_at: data.message.created_at,
         is_read: data.message.is_read
@@ -731,9 +731,9 @@ export default function SupportPage() {
           
           // Обновляем только если появились новые сообщения, изменился статус или хэш сообщений
           if (currentMessageCount > lastMessageCount || statusChanged || currentMessagesHash !== lastMessagesHash) {
-            const mappedMessages = data.messages.map((m: { id: string; message_text: string; sender_type: string; created_at: string; is_read: boolean; sender?: { id: string; username: string; user_id: string } }) => ({
+            const mappedMessages = data.messages.map((m: { id: string; message: string; sender_type: string; created_at: string; is_read: boolean; sender?: { id: string; username: string; user_id: string } }) => ({
               id: m.id,
-              text: m.message_text,
+              text: m.message,
               sender: m.sender_type,
               timestamp: new Date(m.created_at),
               isRead: m.is_read,
@@ -983,9 +983,9 @@ export default function SupportPage() {
                 subject: retryData.ticket.subject,
                 status: retryData.ticket.status,
                 createdAt: new Date(retryData.ticket.created_at),
-                messages: (retryData.messages || []).map((m: { id: string; message_text: string; sender_type: string; created_at: string; is_read: boolean; sender?: { id: string; username: string; user_id: string } }) => ({
+                messages: (retryData.messages || []).map((m: { id: string; message: string; sender_type: string; created_at: string; is_read: boolean; sender?: { id: string; username: string; user_id: string } }) => ({
                   id: m.id,
-                  text: m.message_text,
+                  text: m.message,
                   sender: m.sender_type,
                   timestamp: new Date(m.created_at),
                   isRead: m.is_read,
@@ -1004,9 +1004,9 @@ export default function SupportPage() {
             subject: ticketData.ticket.subject,
             status: ticketData.ticket.status,
             createdAt: new Date(ticketData.ticket.created_at),
-            messages: (ticketData.messages || []).map((m: { id: string; message_text: string; sender_type: string; created_at: string; is_read: boolean; sender?: { id: string; username: string; user_id: string } }) => ({
+            messages: (ticketData.messages || []).map((m: { id: string; message: string; sender_type: string; created_at: string; is_read: boolean; sender?: { id: string; username: string; user_id: string } }) => ({
               id: m.id,
-              text: m.message_text,
+              text: m.message,
               sender: m.sender_type,
               timestamp: new Date(m.created_at),
               isRead: m.is_read,
@@ -1118,9 +1118,9 @@ export default function SupportPage() {
             });
             const retryData = await retryResponse.json();
             if (retryResponse.ok) {
-              const mappedMessages = (retryData.messages || []).map((m: { id: string; message_text: string; sender_type: string; created_at: string; is_read: boolean; sender?: { id: string; username: string; user_id: string } }) => ({
+              const mappedMessages = (retryData.messages || []).map((m: { id: string; message: string; sender_type: string; created_at: string; is_read: boolean; sender?: { id: string; username: string; user_id: string } }) => ({
                 id: m.id,
-                text: m.message_text,
+                text: m.message,
                 sender: m.sender_type,
                 timestamp: new Date(m.created_at),
                 isRead: m.is_read,
@@ -1144,9 +1144,9 @@ export default function SupportPage() {
         );
         const ticketData = await ticketResponse.json();
         if (ticketResponse.ok) {
-          const mappedMessages = (ticketData.messages || []).map((m: { id: string; message_text: string; sender_type: string; created_at: string; is_read: boolean; sender?: { id: string; username: string; user_id: string } }) => ({
+          const mappedMessages = (ticketData.messages || []).map((m: { id: string; message: string; sender_type: string; created_at: string; is_read: boolean; sender?: { id: string; username: string; user_id: string } }) => ({
             id: m.id,
-            text: m.message_text,
+            text: m.message,
             sender: m.sender_type,
             timestamp: new Date(m.created_at),
             isRead: m.is_read,
@@ -1207,7 +1207,7 @@ export default function SupportPage() {
           created_at: string;
           last_message?: {
             id: string;
-            message_text: string;
+            message: string;
             sender_type: 'user' | 'support' | 'system';
             created_at: string;
             is_read: boolean;
@@ -1282,9 +1282,9 @@ export default function SupportPage() {
             return prev;
           }
           
-          const mappedMessages = (data.messages || []).map((m: { id: string; message_text: string; sender_type: string; created_at: string; is_read: boolean; sender?: { id: string; username: string; user_id: string } }) => ({
+          const mappedMessages = (data.messages || []).map((m: { id: string; message: string; sender_type: string; created_at: string; is_read: boolean; sender?: { id: string; username: string; user_id: string } }) => ({
             id: m.id,
-            text: m.message_text,
+            text: m.message,
             sender: m.sender_type,
             timestamp: new Date(m.created_at),
             isRead: m.is_read,
@@ -1769,7 +1769,7 @@ export default function SupportPage() {
                         </div>
                         {ticket.last_message && ticket.status !== 'closed' && (() => {
                           const SYSTEM_MESSAGE_TEXT = 'Спасибо за ваше обращение. Мы получили ваш запрос и ответим в ближайшее время.';
-                          const lastMessageText = ticket.last_message.message_text || '';
+                          const lastMessageText = ticket.last_message.message || '';
                           const isStatusChangeMessage = lastMessageText.includes('Статус тикета изменен') || 
                             lastMessageText.includes('Ваше обращение приняли в обработку') ||
                             lastMessageText.includes('Ваше обращение было закрыто');
@@ -1782,7 +1782,7 @@ export default function SupportPage() {
                                 {isSystemMessage ? 'Система:' : ticket.last_message.sender_type === 'user' ? 'Вы:' : 'Поддержка:'}
                               </span>
                               <span className="truncate flex-1 min-w-0">
-                                {ticket.last_message.message_text}
+                                {ticket.last_message.message}
                               </span>
                               {ticket.last_message.is_read === false && ticket.last_message.sender_type === 'support' && !isSystemMessage && (
                                 <span className="flex-shrink-0 w-2 h-2 bg-blue-500 rounded-full"></span>

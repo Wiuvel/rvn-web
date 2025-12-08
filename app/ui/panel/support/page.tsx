@@ -43,7 +43,7 @@ interface Ticket {
   } | null;
   last_message?: {
     id: string;
-    message_text: string;
+    message: string;
     sender_type: 'user' | 'support' | 'system';
     created_at: string;
     is_read: boolean;
@@ -56,7 +56,7 @@ interface Message {
   ticket_id: string;
   sender_id: string;
   sender_type: 'user' | 'support';
-  message_text: string;
+  message: string;
   is_read: boolean;
   created_at: string;
   sender?: {
@@ -135,7 +135,7 @@ function MessageItem({
           {/* Сообщение */}
           <div className="max-w-[70%] min-w-0 flex-shrink-0 rounded-2xl px-4 py-3 bg-neutral-700/50 text-neutral-300" style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>
             <p className="text-sm whitespace-pre-wrap break-words">
-              {message.message_text}
+              {message.message}
             </p>
             <div className="flex items-center gap-2 text-xs mt-1.5 text-neutral-400">
               <span>{formatTime(message.created_at)}</span>
@@ -176,7 +176,7 @@ function MessageItem({
                 : 'bg-neutral-800 text-neutral-100 rounded-bl-sm'
             }`} style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>
               <p className="text-sm whitespace-pre-wrap break-words">
-                {message.message_text}
+                {message.message}
               </p>
               <div className={`flex items-center gap-2 text-xs mt-1.5 ${
                 isSupport
@@ -551,7 +551,7 @@ export default function SupportPanel() {
         last_message_at: data.message.created_at,
         last_message: {
           id: data.message.id,
-          message_text: data.message.message_text,
+          message: data.message.message,
           sender_type: data.message.sender_type,
           created_at: data.message.created_at,
           is_read: data.message.is_read
@@ -626,11 +626,14 @@ export default function SupportPanel() {
       if (data.ticketId !== activeTicket.id) return;
 
       // Обновляем статус прочитанности сообщений
-      setMessages(prev => prev.map(msg => 
-        data.messageIds.includes(msg.id)
-          ? { ...msg, is_read: true }
-          : msg
-      ));
+      setMessages(prev => {
+        const messageIds = data.messageIds || [];
+        return prev.map(msg => 
+          messageIds.includes(msg.id)
+            ? { ...msg, is_read: true }
+            : msg
+        );
+      });
     };
 
     socket.on('support:message:new', handleNewMessage);
@@ -948,7 +951,7 @@ export default function SupportPanel() {
           } | null;
           last_message?: {
             id: string;
-            message_text: string;
+            message: string;
             sender_type: 'user' | 'support' | 'system';
             created_at: string;
             is_read: boolean;
@@ -1053,7 +1056,7 @@ export default function SupportPanel() {
           } | null;
           last_message?: {
             id: string;
-            message_text: string;
+            message: string;
             sender_type: 'user' | 'support' | 'system';
             created_at: string;
             is_read: boolean;
@@ -2025,11 +2028,12 @@ export default function SupportPanel() {
                   </div>
                   {ticket.last_message && ticket.status !== 'closed' && statusFilter !== 'archive' && (() => {
                     const SYSTEM_MESSAGE_TEXT = 'Спасибо за ваше обращение. Мы получили ваш запрос и ответим в ближайшее время.';
-                    const isStatusChangeMessage = ticket.last_message.message_text.includes('Статус тикета изменен') || 
-                      ticket.last_message.message_text.includes('Ваше обращение приняли в обработку') ||
-                      ticket.last_message.message_text.includes('Ваше обращение было закрыто');
+                    const lastMessageText = ticket.last_message.message || '';
+                    const isStatusChangeMessage = lastMessageText.includes('Статус тикета изменен') || 
+                      lastMessageText.includes('Ваше обращение приняли в обработку') ||
+                      lastMessageText.includes('Ваше обращение было закрыто');
                     // Используем trim() для надежного сравнения
-                    const isSystemMessage = ticket.last_message.message_text.trim() === SYSTEM_MESSAGE_TEXT.trim() || isStatusChangeMessage;
+                    const isSystemMessage = lastMessageText.trim() === SYSTEM_MESSAGE_TEXT.trim() || isStatusChangeMessage;
                     
                     return (
                       <div className="text-xs text-neutral-500 mt-1.5 truncate flex items-center gap-2">
@@ -2037,7 +2041,7 @@ export default function SupportPanel() {
                           {isSystemMessage ? 'Система:' : ticket.last_message.sender_type === 'user' ? 'Пользователь:' : 'Поддержка:'}
                         </span>
                         <span className="truncate flex-1 min-w-0">
-                          {ticket.last_message.message_text}
+                          {ticket.last_message.message}
                         </span>
                         {ticket.last_message.is_read === false && ticket.last_message.sender_type === 'user' && !isSystemMessage && (
                           <span className="flex-shrink-0 w-2 h-2 bg-blue-500 rounded-full"></span>
@@ -2188,12 +2192,13 @@ export default function SupportPanel() {
                   messages.map((message, index) => {
                     // Проверяем, является ли сообщение системным (автоматическим или о смене статуса)
                     const SYSTEM_MESSAGE_TEXT = 'Спасибо за ваше обращение. Мы получили ваш запрос и ответим в ближайшее время.';
-                    const isStatusChangeMessage = message.message_text.includes('Статус тикета изменен') || 
-                      message.message_text.includes('Ваше обращение приняли в обработку') ||
-                      message.message_text.includes('Ваше обращение было закрыто');
+                    const messageText = message.message || '';
+                    const isStatusChangeMessage = messageText.includes('Статус тикета изменен') || 
+                      messageText.includes('Ваше обращение приняли в обработку') ||
+                      messageText.includes('Ваше обращение было закрыто');
                     // Системное сообщение определяется по тексту, независимо от sender_type
                     // Используем trim() для надежного сравнения
-                    const isSystemMessage = message.message_text.trim() === SYSTEM_MESSAGE_TEXT.trim() || isStatusChangeMessage;
+                    const isSystemMessage = messageText.trim() === SYSTEM_MESSAGE_TEXT.trim() || isStatusChangeMessage;
                     
                     // Показываем дату если это первое сообщение или дата изменилась
                     const showDate = index === 0 || 

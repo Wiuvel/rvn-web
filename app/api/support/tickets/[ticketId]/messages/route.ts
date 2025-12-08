@@ -201,7 +201,6 @@ export async function POST(
         ticket_id: newMessage.ticket_id,
         sender_id: newMessage.sender_id,
         sender_type: isSupport ? 'support' : 'user' as 'user' | 'support',
-        message_text: newMessage.message, // Для обратной совместимости с фронтендом
         message: newMessage.message,
         is_read: newMessage.is_read || false,
         created_at: newMessage.created_at,

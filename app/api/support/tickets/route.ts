@@ -10,7 +10,7 @@ import { ERROR_INTERNAL_SERVER_ERROR, ERROR_NOT_AUTHENTICATED, ERROR_INVALID_REQ
 
 interface LastMessage {
   id: string;
-  message_text: string; // Для обратной совместимости с фронтендом
+  message: string;
   sender_id: string;
   created_at: string;
   is_read: boolean;
@@ -164,7 +164,7 @@ export async function GET(request: NextRequest) {
               if (lastMessage) {
                 lastMessagesMap[ticketId] = {
                   id: lastMessage.id,
-                  message_text: lastMessage.message,
+                  message: lastMessage.message,
                   sender_id: lastMessage.sender_id,
                   created_at: lastMessage.created_at,
                   is_read: lastMessage.is_read
@@ -179,7 +179,7 @@ export async function GET(request: NextRequest) {
             if (!messagesByTicket.has(msg.ticket_id)) {
               messagesByTicket.set(msg.ticket_id, {
                 id: msg.id,
-                message_text: msg.message,
+                message: msg.message,
                 sender_id: msg.sender_id,
                 created_at: msg.created_at,
                 is_read: msg.is_read
