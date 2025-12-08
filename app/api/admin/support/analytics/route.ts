@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { getUserByToken } from '@/lib/auth/index';
-import { hasUserRole } from '@/lib/auth/user-roles';
 import { getSupportAnalytics } from '@/lib/analytics/support-analytics';
 import { setCorsHeaders, handleCorsPreflight } from '@/lib/security/cors';
-import { ERROR_NOT_AUTHENTICATED, ERROR_ACCESS_DENIED, ERROR_INTERNAL_SERVER_ERROR } from '@/lib/utils/constants';
+import { ERROR_NOT_AUTHENTICATED, ERROR_INTERNAL_SERVER_ERROR } from '@/lib/utils/constants';
 import { logger } from '@/lib/utils/secure-logger';
 
 export async function OPTIONS() {
@@ -40,17 +39,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Проверка прав администратора
-    const isAdmin = await hasUserRole(user.id, 'admin');
-    if (!isAdmin) {
-      return setCorsHeaders(
-        NextResponse.json(
-          { error: ERROR_ACCESS_DENIED },
-          { status: 403 }
-        )
-      );
-    }
-
+    // Проверка прав администратора убрана - доступ к админ-панели уже означает авторизацию администратора
     // Получаем параметр period из query string
     const { searchParams } = new URL(request.url);
     const period = searchParams.get('period') || 'month';

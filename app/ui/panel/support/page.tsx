@@ -577,24 +577,26 @@ export default function SupportPanel() {
         closed_at?: string | null;
       };
     }) => {
-      if (data.ticketId !== activeTicket.id) return;
-
-      setActiveTicket(prev => {
-        if (!prev || prev.id !== data.ticketId) return prev;
-        return {
-          ...prev,
-          status: data.ticket.status,
-          updated_at: data.ticket.updated_at,
-          closed_at: data.ticket.closed_at,
-        };
-      });
-
-      // Обновляем тикет в списке
+      // ОПТИМИЗАЦИЯ: Обновляем тикет в списке всегда, даже если он не активный
+      // Это обеспечивает мгновенное обновление UI без дополнительных запросов
       updateTicketInList(data.ticketId, {
         status: data.ticket.status,
         updated_at: data.ticket.updated_at,
         closed_at: data.ticket.closed_at,
       });
+
+      // Обновляем активный тикет только если это текущий тикет
+      if (data.ticketId === activeTicket?.id) {
+        setActiveTicket(prev => {
+          if (!prev || prev.id !== data.ticketId) return prev;
+          return {
+            ...prev,
+            status: data.ticket.status,
+            updated_at: data.ticket.updated_at,
+            closed_at: data.ticket.closed_at,
+          };
+        });
+      }
     };
 
     const handleTicketAssignment = (data: {
@@ -607,22 +609,23 @@ export default function SupportPanel() {
         avatar?: string | null;
       } | null;
     }) => {
-      if (data.ticketId !== activeTicket.id) return;
-
-      setActiveTicket(prev => {
-        if (!prev || prev.id !== data.ticketId) return prev;
-        return {
-          ...prev,
-          assigned_to: data.assignedTo,
-          assigned_user: data.assignedUser,
-        };
-      });
-
-      // Обновляем тикет в списке
+      // ОПТИМИЗАЦИЯ: Обновляем тикет в списке всегда для мгновенного обновления UI
       updateTicketInList(data.ticketId, {
         assigned_to: data.assignedTo,
         assigned_user: data.assignedUser,
       });
+
+      // Обновляем активный тикет только если это текущий тикет
+      if (data.ticketId === activeTicket?.id) {
+        setActiveTicket(prev => {
+          if (!prev || prev.id !== data.ticketId) return prev;
+          return {
+            ...prev,
+            assigned_to: data.assignedTo,
+            assigned_user: data.assignedUser,
+          };
+        });
+      }
     };
 
     const handleMessageRead = (data: {
@@ -680,8 +683,10 @@ export default function SupportPanel() {
 
     const checkForNewMessages = async () => {
       // Проверяем только если страница видима и тикет не изменился
-      // Если WebSocket подключен, он будет обновлять сообщения в реальном времени
-      if (document.hidden || !activeTicket || currentTicketIdRef.current !== activeTicket.id || isConnected) return;
+      // ОПТИМИЗАЦИЯ: Если WebSocket подключен, не делаем polling
+      // WebSocket обеспечивает мгновенное обновление с нулевой латентностью
+      if (document.hidden || !activeTicket || currentTicketIdRef.current !== activeTicket.id) return;
+      if (isConnected && socket?.connected) return;
 
       try {
         const response = await fetchWithRateLimit(
@@ -762,8 +767,12 @@ export default function SupportPanel() {
       }
     };
 
-    // Проверяем каждые 5 секунд для более динамичного обновления статуса
-    interval = setInterval(checkForNewMessages, 5000);
+    // ОПТИМИЗАЦИЯ: Polling только как fallback когда WebSocket недоступен
+    // Используем увеличенный интервал (30 секунд) для снижения нагрузки
+    // WebSocket обеспечивает мгновенные обновления, polling нужен только для резерва
+    if (!isConnected || !socket?.connected) {
+      interval = setInterval(checkForNewMessages, 30000); // 30 секунд вместо 5
+    }
 
     // Отмечаем сообщения как прочитанные при открытии тикета (debounced)
     markMessagesAsRead(activeTicket.id);
@@ -782,7 +791,7 @@ export default function SupportPanel() {
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTicket?.id, authState.hasSupportAccess, messages.length]);
+  }, [activeTicket?.id, authState.hasSupportAccess, messages.length, isConnected, socket?.connected]);
 
   useEffect(() => {
     if (activeTicket) {
@@ -842,6 +851,16 @@ export default function SupportPanel() {
       if (!data.isAuthenticated) {
         router.push('/auth');
         return;
+      }
+
+      // Инициализируем CSRF токен при успешной авторизации
+      // Это обеспечит автоматическое обновление токена
+      if (data.isAuthenticated && typeof window !== 'undefined') {
+        import('@/lib/utils/csrf-client').then(({ getCSRFToken }) => {
+          getCSRFToken().catch(() => {
+            // Игнорируем ошибки при инициализации - токен будет получен при первой отправке
+          });
+        });
       }
 
       // Проверка на ошибку БД (500 или отсутствие данных)
@@ -1285,6 +1304,10 @@ export default function SupportPanel() {
     if (!activeTicket || !messageText.trim()) return;
 
     try {
+      // Получаем CSRF токен для защиты от спама
+      const { getCSRFToken } = await import('@/lib/utils/csrf-client');
+      const csrfToken = await getCSRFToken();
+      
       const response = await fetchWithRateLimit(
         `/api/support/tickets/${activeTicket.id}/messages`,
         {
@@ -1293,7 +1316,10 @@ export default function SupportPanel() {
             'Content-Type': 'application/json'
           },
           credentials: 'include',
-          body: JSON.stringify({ message: messageText.trim() })
+          body: JSON.stringify({ 
+            message: messageText.trim(),
+            csrfToken
+          })
         },
         handleSendMessage // Retry callback
       );

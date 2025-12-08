@@ -138,6 +138,50 @@ export class RateLimiter {
     };
   }
 
+  /**
+   * Проверка rate limit с кастомным ключом (например, user_id)
+   * Полезно для специфичных rate limiters, где нужна более точная идентификация
+   */
+  async checkWithKey(customKey: string): Promise<{
+    allowed: boolean;
+    remaining: number;
+    resetTime: number;
+  }> {
+    const now = Date.now();
+    const windowStart = now - this.options.windowMs;
+    
+    if (!store[customKey] || store[customKey].resetTime < windowStart) {
+      const resetTime = now + this.options.windowMs;
+      store[customKey] = {
+        count: 1,
+        resetTime
+      };
+      expirationTimes.set(customKey, resetTime);
+      
+      return {
+        allowed: true,
+        remaining: this.options.maxRequests - 1,
+        resetTime
+      };
+    }
+    
+    if (store[customKey].count >= this.options.maxRequests) {
+      return {
+        allowed: false,
+        remaining: 0,
+        resetTime: store[customKey].resetTime
+      };
+    }
+    
+    store[customKey].count++;
+    
+    return {
+      allowed: true,
+      remaining: this.options.maxRequests - store[customKey].count,
+      resetTime: store[customKey].resetTime
+    };
+  }
+
   async clear(request: Request): Promise<boolean> {
     const key = this.getKey(request);
     if (store[key]) {
@@ -204,5 +248,13 @@ export const authRateLimit = new RateLimiter({
 export const generalRateLimit = new RateLimiter({
   windowMs: 5 * 60 * 1000, // 5 минут
   maxRequests: 100, // 100 запросов
+});
+
+// Специфичный rate limiter для отправки сообщений
+// 50 сообщений за 5 минут - достаточно для активных саппортов, но защищает от спама
+// Использует IP по умолчанию, но можно передать user_id через checkWithUserId
+export const messageRateLimit = new RateLimiter({
+  windowMs: 5 * 60 * 1000, // 5 минут
+  maxRequests: 50, // 50 сообщений за 5 минут
 });
 

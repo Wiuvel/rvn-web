@@ -54,6 +54,7 @@ interface Ticket {
     is_read: boolean;
   } | null;
   unread_count?: number;
+  updated_at?: string; // Для обновления через WebSocket
 }
 
 // Компонент для сообщения
@@ -376,6 +377,16 @@ export default function SupportPage() {
               setIsSupport(false);
             } else {
               setUserData(data);
+              
+              // Инициализируем CSRF токен при загрузке пользователя
+              // Это обеспечит автоматическое обновление токена
+              if (typeof window !== 'undefined') {
+                import('@/lib/utils/csrf-client').then(({ getCSRFToken }) => {
+                  getCSRFToken().catch(() => {
+                    // Игнорируем ошибки при инициализации - токен будет получен при первой отправке
+                  });
+                });
+              }
               // Проверяем, является ли пользователь саппортом (данные приходят из API)
               setIsSupport(data.isSupport === true);
             }
@@ -422,7 +433,7 @@ export default function SupportPage() {
   }, [router]);
 
   // Инициализация WebSocket
-  const { socket, joinTicket, leaveTicket } = useWebSocket({
+  const { socket, isConnected: isWebSocketConnected, joinTicket, leaveTicket } = useWebSocket({
     enabled: !!userData,
     userId: userData?.id,
     ticketId: activeTicket?.id,
@@ -571,10 +582,20 @@ export default function SupportPage() {
       ticketId: string;
       ticket: {
         status: 'open' | 'closed' | 'pending';
+        updated_at?: string;
       };
     }) => {
-      if (data.ticketId !== activeTicket.id) return;
+      if (data.ticketId !== activeTicket.id) {
+        // Обновляем тикет в списке даже если он не активный
+        setTickets(prev => prev.map(t => 
+          t.id === data.ticketId 
+            ? { ...t, status: data.ticket.status, updated_at: data.ticket.updated_at || t.updated_at }
+            : t
+        ));
+        return;
+      }
 
+      // Обновляем активный тикет
       setActiveTicket(prev => {
         if (!prev || prev.id !== data.ticketId) return prev;
         return {
@@ -586,7 +607,7 @@ export default function SupportPage() {
       // Обновляем тикет в списке
       setTickets(prev => prev.map(t => 
         t.id === data.ticketId 
-          ? { ...t, status: data.ticket.status }
+          ? { ...t, status: data.ticket.status, updated_at: data.ticket.updated_at }
           : t
       ));
     };
@@ -684,7 +705,8 @@ export default function SupportPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTicket?.id]);
 
-  // Умное обновление сообщений: только когда страница активна и только проверка новых
+  // Умное обновление сообщений: polling только как fallback когда WebSocket недоступен
+  // ОПТИМИЗАЦИЯ: Отключаем polling при активном WebSocket для снижения нагрузки
   useEffect(() => {
     if (!activeTicket || !userData) return;
 
@@ -701,6 +723,12 @@ export default function SupportPage() {
     const checkForNewMessages = async () => {
       // Проверяем только если страница видима
       if (document.hidden) return;
+      
+      // ОПТИМИЗАЦИЯ: Если WebSocket подключен, не делаем polling
+      // WebSocket обеспечивает мгновенное обновление с нулевой латентностью
+      if (isWebSocketConnected && socket?.connected) {
+        return;
+      }
 
       try {
         const response = await fetchWithRateLimit(
@@ -779,8 +807,12 @@ export default function SupportPage() {
       })));
     }
 
-    // Проверяем каждые 5 секунд для более динамичного обновления статуса
-    interval = setInterval(checkForNewMessages, 5000);
+    // ОПТИМИЗАЦИЯ: Polling только как fallback когда WebSocket недоступен
+    // Используем увеличенный интервал (30 секунд) для снижения нагрузки
+    // WebSocket обеспечивает мгновенные обновления, polling нужен только для резерва
+    if (!isWebSocketConnected || !socket?.connected) {
+      interval = setInterval(checkForNewMessages, 30000); // 30 секунд вместо 5
+    }
 
     // Отмечаем сообщения как прочитанные при открытии тикета
     markMessagesAsRead(activeTicket.id);
@@ -789,7 +821,7 @@ export default function SupportPage() {
       if (interval) clearInterval(interval);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTicket?.id, userData, activeTicket?.status]);
+  }, [activeTicket?.id, userData, activeTicket?.status, isWebSocketConnected, socket?.connected]);
 
   // Очистка таймера при размонтировании компонента
   useEffect(() => {
@@ -1075,6 +1107,10 @@ export default function SupportPage() {
     setIsSendingMessage(true);
 
     try {
+      // Получаем CSRF токен для защиты от спама
+      const { getCSRFToken } = await import('@/lib/utils/csrf-client');
+      const csrfToken = await getCSRFToken();
+      
       const response = await fetchWithRateLimit(
         `/api/support/tickets/${activeTicket.id}/messages`,
         {
@@ -1084,7 +1120,8 @@ export default function SupportPage() {
           },
           credentials: 'include',
           body: JSON.stringify({
-            message: messageText.trim()
+            message: messageText.trim(),
+            csrfToken
           })
         },
         handleSendMessage // Retry callback

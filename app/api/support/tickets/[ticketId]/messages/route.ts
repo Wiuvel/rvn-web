@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { generalRateLimit } from '@/lib/security/rate-limit';
+import { generalRateLimit, messageRateLimit } from '@/lib/security/rate-limit';
 import { logger } from '@/lib/utils/secure-logger';
 import { setCorsHeaders, handleCorsPreflight } from '@/lib/security/cors';
 import { getUserByToken } from '@/lib/auth/index';
@@ -10,6 +10,7 @@ import { ERROR_INTERNAL_SERVER_ERROR, ERROR_NOT_AUTHENTICATED, ERROR_INVALID_REQ
 import { broadcastNewMessage, broadcastTicketUpdate } from '@/lib/websocket/server';
 import { isValidUUID } from '@/lib/utils/uuid-validation';
 import { cache } from '@/lib/database/cache';
+import { verifyCSRFToken } from '@/lib/security/csrf';
 
 export async function OPTIONS() {
   return handleCorsPreflight();
@@ -23,8 +24,9 @@ export async function POST(
   { params }: { params: Promise<{ ticketId: string }> }
 ) {
   try {
-    const rateLimitResult = await generalRateLimit.check(request);
-    if (!rateLimitResult.allowed) {
+    // Базовая проверка rate limit по IP
+    const generalRateLimitResult = await generalRateLimit.check(request);
+    if (!generalRateLimitResult.allowed) {
       return setCorsHeaders(
         NextResponse.json(
           { error: ERROR_TOO_MANY_REQUESTS },
@@ -57,6 +59,42 @@ export async function POST(
       );
     }
 
+    // Специфичный rate limit для сообщений по user_id (50 сообщений за 5 минут)
+    const messageRateLimitResult = await messageRateLimit.checkWithKey(`message:${user.id}`);
+    if (!messageRateLimitResult.allowed) {
+      return setCorsHeaders(
+        NextResponse.json(
+          { error: ERROR_TOO_MANY_REQUESTS },
+          { status: 429 }
+        )
+      );
+    }
+
+    // Проверка CSRF токена
+    const sessionId = cookieStore.get('session_id')?.value;
+    const requestData = await request.json();
+    const csrfToken = requestData.csrfToken;
+    
+    if (sessionId && csrfToken) {
+      const csrfValidation = verifyCSRFToken(csrfToken, sessionId, true);
+      if (!csrfValidation.valid) {
+        return setCorsHeaders(
+          NextResponse.json(
+            { error: 'Invalid request. Please refresh the page.' },
+            { status: 403 }
+          )
+        );
+      }
+    } else if (sessionId) {
+      // Если есть session_id, но нет CSRF токена - это подозрительно
+      return setCorsHeaders(
+        NextResponse.json(
+          { error: 'Invalid request. Please refresh the page.' },
+          { status: 403 }
+        )
+      );
+    }
+
     const isSupport = await hasUserRole(user.id, 'support');
     const { ticketId } = await params;
 
@@ -70,7 +108,7 @@ export async function POST(
       );
     }
 
-    const { message } = await request.json();
+    const { message } = requestData;
 
     if (!message || typeof message !== 'string' || message.trim().length === 0) {
       return setCorsHeaders(
