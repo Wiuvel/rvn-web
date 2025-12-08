@@ -7,12 +7,22 @@ import { getUserByToken } from '@/lib/auth/index';
 import { hasUserRole, batchHasUserRole } from '@/lib/auth/user-roles';
 import { supabaseAdmin } from '@/lib/database/supabase';
 import { ERROR_INTERNAL_SERVER_ERROR, ERROR_NOT_AUTHENTICATED, ERROR_INVALID_REQUEST_DATA, ERROR_MAXIMUM_TICKET_LIMIT_REACHED, ERROR_TOO_MANY_REQUESTS, TICKET_SUBJECT_MAX_LENGTH, MESSAGE_MAX_LENGTH, ERROR_MESSAGE_TOO_LONG, ERROR_SUBJECT_TOO_LONG, MAX_TICKETS_PER_USER } from '@/lib/utils/constants';
+import { cached, cache } from '@/lib/database/cache';
 
 interface LastMessage {
   id: string;
   message_text: string;
   sender_id: string;
   sender_type: 'user' | 'support';
+  created_at: string;
+  is_read: boolean;
+}
+
+interface RpcLastMessage {
+  ticket_id: string;
+  id: string;
+  message_text: string;
+  sender_id: string;
   created_at: string;
   is_read: boolean;
 }
@@ -107,50 +117,49 @@ export async function GET(request: NextRequest) {
       query = query.eq('status', status);
     }
 
-    const { data: tickets, error } = await query;
+    // Кэширование списка тикетов
+    const cacheKey = `tickets:${user.id}:${isSupport ? 'support' : 'user'}:${status || 'all'}:${forUser ? 'forUser' : 'all'}`;
+    
+    const tickets = await cached(cacheKey, async () => {
+      const { data, error } = await query;
+      
+      if (error) {
+        throw new Error(`Error fetching tickets: ${error.message}`);
+      }
+      
+      return data || [];
+    }, 30); // Кэш на 30 секунд
 
-    if (error) {
-      logger.error('Error fetching tickets', {
-        error: error.message,
-        code: error.code,
-        userId: user.id,
-        isSupport
-      });
+    if (!tickets || tickets.length === 0) {
       return setCorsHeaders(
-        NextResponse.json(
-          { error: ERROR_INTERNAL_SERVER_ERROR },
-          { status: 500 }
-        )
+        NextResponse.json({ tickets: [] })
       );
     }
 
     // Получаем последние сообщения для каждого тикета
-    // Оптимизация: используем один запрос для всех тикетов через IN и оконную функцию
-    const ticketIds = (tickets || []).map(t => t.id);
+    // Оптимизация: используем RPC функцию с оконными функциями SQL
+    const ticketIds = tickets.map(t => t.id);
     let lastMessagesMap: Record<string, LastMessage | null> = {};
     
     if (ticketIds.length > 0 && supabaseAdmin) {
-      // Сохраняем supabaseAdmin в локальную переменную для TypeScript
-      const supabase = supabaseAdmin;
-      
       try {
-        // Оптимизация: получаем все последние сообщения одним запросом
-        // Получаем все сообщения для всех тикетов, затем фильтруем на клиенте
-        // Это лучше чем N запросов, но не идеально - можно улучшить через RPC функцию в будущем
-        const { data: allMessages, error: lastMessagesError } = await supabase
-          .from('support_messages')
-          .select('ticket_id, id, message_text, sender_id, created_at, is_read')
-          .in('ticket_id', ticketIds)
-          .order('created_at', { ascending: false });
+        // Используем оптимизированную RPC функцию с оконными функциями
+        const { data: lastMessages, error: rpcError } = await supabaseAdmin
+          .rpc('get_last_messages_for_tickets', { ticket_ids: ticketIds }) as { data: RpcLastMessage[] | null; error: any };
         
-        if (lastMessagesError) {
-          // Fallback на индивидуальные запросы - не логируем
-          // Fallback: используем отдельные запросы при ошибке, но с ограничением параллелизма
-          const BATCH_SIZE = 10; // Ограничиваем параллелизм
+        if (rpcError) {
+          // Fallback на старый метод при ошибке RPC
+          logger.warn('RPC function failed, using fallback', {
+            error: rpcError.message,
+            ticketCount: ticketIds.length
+          });
+          
+          // supabaseAdmin уже проверен на строке 135, поэтому здесь он гарантированно не null
+          const BATCH_SIZE = 10;
           for (let i = 0; i < ticketIds.length; i += BATCH_SIZE) {
             const batch = ticketIds.slice(i, i + BATCH_SIZE);
             const batchPromises = batch.map(async (ticketId) => {
-              const { data: lastMessage } = await supabase
+              const { data: lastMessage } = await supabaseAdmin!
                 .from('support_messages')
                 .select('id, message_text, sender_id, created_at, is_read')
                 .eq('ticket_id', ticketId)
@@ -161,8 +170,6 @@ export async function GET(request: NextRequest) {
             });
             
             const batchResults = await Promise.all(batchPromises);
-            
-            // Оптимизация: batch запрос для всех sender_id
             const senderIds = batchResults
               .map(({ lastMessage }) => lastMessage?.sender_id)
               .filter((id): id is string => !!id);
@@ -184,43 +191,31 @@ export async function GET(request: NextRequest) {
               }
             });
           }
-        } else if (allMessages) {
-          // Группируем сообщения по ticket_id и берем первое (самое последнее) для каждого тикета
-          const messagesByTicket = new Map<string, { id: string; message_text: string; sender_id: string; created_at: string; is_read: boolean }>();
-          for (const msg of allMessages) {
-            if (!messagesByTicket.has(msg.ticket_id)) {
-              messagesByTicket.set(msg.ticket_id, {
-                id: msg.id,
-                message_text: msg.message_text,
-                sender_id: msg.sender_id,
-                created_at: msg.created_at,
-                is_read: msg.is_read
-              });
-            }
-          }
-          
-          // Оптимизация: batch запрос для всех sender_id вместо N запросов
-          const senderIds = Array.from(messagesByTicket.values()).map(msg => msg.sender_id);
+        } else if (lastMessages && lastMessages.length > 0) {
+          // Оптимизация: batch запрос для всех sender_id
+          const senderIds = lastMessages.map((msg: RpcLastMessage) => msg.sender_id).filter((id): id is string => !!id);
           const senderRolesMap = senderIds.length > 0 
             ? await batchHasUserRole(senderIds, 'support')
             : new Map<string, boolean>();
           
-          const lastMessagesWithType = Array.from(messagesByTicket.entries()).map(([ticketId, msg]) => {
+          // Создаем map из результатов RPC функции
+          for (const msg of lastMessages) {
             const senderIsSupport = senderRolesMap.get(msg.sender_id) || false;
-            return [ticketId, {
-              ...msg,
-              sender_type: senderIsSupport ? 'support' : 'user' as 'user' | 'support'
-            }] as [string, LastMessage];
-          });
-          
-          // Создаем map для быстрого доступа
-          lastMessagesMap = Object.fromEntries(lastMessagesWithType);
-          
-          // Заполняем null для тикетов без сообщений
-          for (const ticketId of ticketIds) {
-            if (!lastMessagesMap[ticketId]) {
-              lastMessagesMap[ticketId] = null;
-            }
+            lastMessagesMap[msg.ticket_id] = {
+              id: msg.id,
+              message_text: msg.message_text,
+              sender_id: msg.sender_id,
+              sender_type: senderIsSupport ? 'support' : 'user' as 'user' | 'support',
+              created_at: msg.created_at,
+              is_read: msg.is_read
+            };
+          }
+        }
+        
+        // Заполняем null для тикетов без сообщений
+        for (const ticketId of ticketIds) {
+          if (!lastMessagesMap[ticketId]) {
+            lastMessagesMap[ticketId] = null;
           }
         }
       } catch (error) {
@@ -378,22 +373,46 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Создаем тикет
+    // ОПТИМИЗАЦИЯ: Используем RPC функцию для атомарного создания тикета с сообщением
+    // Это предотвращает ситуацию, когда тикет создан, но сообщение не создано
+    const { data: ticketData, error: rpcError } = await supabaseAdmin
+      .rpc('create_ticket_with_message', {
+        p_user_id: user.id,
+        p_subject: subject.trim(),
+        p_message_text: message.trim()
+      });
+
+    if (rpcError || !ticketData || ticketData.length === 0) {
+      logger.error('Error creating ticket with message', {
+        error: rpcError?.message,
+        code: rpcError?.code,
+        userId: user.id
+      });
+      return setCorsHeaders(
+        NextResponse.json(
+          { error: ERROR_INTERNAL_SERVER_ERROR },
+          { status: 500 }
+        )
+      );
+    }
+
+    const result = ticketData[0];
+    const ticketId = result.ticket_id;
+
+    // Получаем полную информацию о тикете
     const { data: ticket, error: ticketError } = await supabaseAdmin
       .from('support_tickets')
-      .insert({
-        user_id: user.id,
-        subject: subject.trim(),
-        status: 'open'
-      })
-      .select()
+      .select(`
+        *,
+        user:users!support_tickets_user_id_fkey(id, username, user_id, avatar)
+      `)
+      .eq('id', ticketId)
       .single();
 
     if (ticketError || !ticket) {
-      logger.error('Error creating ticket', {
+      logger.error('Error fetching created ticket', {
         error: ticketError?.message,
-        code: ticketError?.code,
-        userId: user.id
+        ticketId
       });
       return setCorsHeaders(
         NextResponse.json(
@@ -405,50 +424,23 @@ export async function POST(request: NextRequest) {
 
     // Успешное создание тикета не логируется
 
+    // Инвалидируем кэш тикетов пользователя
+    cache.delete(`tickets:${user.id}:user:all:all`);
+    cache.delete(`tickets:${user.id}:user:all:forUser`);
+    cache.delete(`tickets:${user.id}:user:open:all`);
+    cache.delete(`tickets:${user.id}:user:open:forUser`);
+    // Также инвалидируем кэш для поддержки
+    cache.deleteByPattern(/^tickets:.*:support:.*$/);
+
     // Трекинг аналитики
     try {
-      const { trackTicketCreated } = await import('@/lib/analytics/support-analytics');
-      await trackTicketCreated(ticket.id, user.id, ticket.status);
+      const { trackTicketCreated, trackMessageSent } = await import('@/lib/analytics/support-analytics');
+      await Promise.all([
+        trackTicketCreated(ticket.id, user.id, ticket.status),
+        trackMessageSent(ticket.id, user.id, 'user')
+      ]);
     } catch (error) {
-      logger.error('Error tracking ticket creation', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-        ticketId: ticket.id
-      });
-    }
-
-    // Создаем первое сообщение
-    const { error: messageError } = await supabaseAdmin
-      .from('support_messages')
-      .insert({
-        ticket_id: ticket.id,
-        sender_id: user.id,
-        message_text: message.trim()
-      });
-
-    if (messageError) {
-      logger.error('Error creating ticket message', {
-        error: messageError.message,
-        code: messageError.code,
-        ticketId: ticket.id
-      });
-      // Удаляем тикет, если не удалось создать сообщение
-      await supabaseAdmin.from('support_tickets').delete().eq('id', ticket.id);
-      return setCorsHeaders(
-        NextResponse.json(
-          { error: ERROR_INTERNAL_SERVER_ERROR },
-          { status: 500 }
-        )
-      );
-    }
-
-        // Успешное создание сообщения не логируется
-
-    // Трекинг аналитики для первого сообщения
-    try {
-      const { trackMessageSent } = await import('@/lib/analytics/support-analytics');
-      await trackMessageSent(ticket.id, user.id, 'user');
-    } catch (error) {
-      logger.error('Error tracking message sent', {
+      logger.error('Error tracking ticket/message creation', {
         error: error instanceof Error ? error.message : 'Unknown error',
         ticketId: ticket.id
       });

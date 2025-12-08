@@ -1105,71 +1105,57 @@ export default function SupportPage() {
           setTimeoutSeconds(MESSAGE_TIMEOUT / 1000);
         }
         
-        // Загружаем сообщения заново
-        const ticketResponse = await fetchWithRateLimit(
-          `/api/support/tickets/${activeTicket.id}`,
-          {
-            credentials: 'include'
-          },
-          async () => {
-            // Retry callback
-            const retryResponse = await fetch(`/api/support/tickets/${activeTicket.id}`, {
-              credentials: 'include'
-            });
-            const retryData = await retryResponse.json();
-            if (retryResponse.ok) {
-              const mappedMessages = (retryData.messages || []).map((m: { id: string; message_text: string; sender_type: string; created_at: string; is_read: boolean; sender?: { id: string; username: string; user_id: string } }) => ({
-                id: m.id,
-                text: m.message_text,
-                sender: m.sender_type,
-                timestamp: new Date(m.created_at),
-                isRead: m.is_read,
-                senderData: m.sender
-              }));
-              
-              // Отмечаем новые сообщения
-              mappedMessages.forEach((m: { id: string }) => {
-                if (!loadedMessagesRef.current.has(m.id)) {
-                  loadedMessagesRef.current.add(m.id);
-                }
-              });
-              
-              setActiveTicket({
-                ...activeTicket,
-                messages: mappedMessages
-              });
-              markMessagesAsRead(activeTicket.id);
-            }
-          }
-        );
-        const ticketData = await ticketResponse.json();
-        if (ticketResponse.ok) {
-          const mappedMessages = (ticketData.messages || []).map((m: { id: string; message_text: string; sender_type: string; created_at: string; is_read: boolean; sender?: { id: string; username: string; user_id: string } }) => ({
-            id: m.id,
-            text: m.message_text,
-            sender: m.sender_type,
-            timestamp: new Date(m.created_at),
-            isRead: m.is_read,
-            senderData: m.sender
-          }));
+        // ОПТИМИЗАЦИЯ: Не загружаем сообщения заново - WebSocket обновит их автоматически
+        // Добавляем отправленное сообщение оптимистично в локальное состояние
+        // WebSocket подтвердит и обновит при получении события support:message:new
+        const optimisticMessage: Message = {
+          id: data.message.id,
+          text: messageText.trim(),
+          sender: 'user' as const,
+          timestamp: new Date(),
+          isRead: false,
+          senderData: userData ? {
+            id: userData.id,
+            username: userData.username,
+            user_id: userData.user_id
+          } : undefined
+        };
+        
+        setActiveTicket(prev => {
+          if (!prev) return prev;
+          // Проверяем, что сообщение еще не добавлено
+          const messageExists = prev.messages?.some(m => m.id === optimisticMessage.id);
+          if (messageExists) return prev;
           
-          // Отмечаем новые сообщения (после отправки)
-          mappedMessages.forEach((m: { id: string }) => {
-            if (!loadedMessagesRef.current.has(m.id)) {
-              loadedMessagesRef.current.add(m.id);
-            }
-          });
-          
-          setActiveTicket({
-            ...activeTicket,
-            messages: mappedMessages
-          });
-          
-          // Отмечаем сообщения как прочитанные
-          markMessagesAsRead(activeTicket.id);
-        }
-        // Обновляем список тикетов
-        await fetchTickets();
+          return {
+            ...prev,
+            messages: [...(prev.messages || []), optimisticMessage]
+          };
+        });
+        
+        // Отмечаем сообщение как загруженное
+        loadedMessagesRef.current.add(optimisticMessage.id);
+        
+        // Отмечаем сообщения как прочитанные
+        markMessagesAsRead(activeTicket.id);
+        
+        // ОПТИМИЗАЦИЯ: Не обновляем список тикетов - WebSocket обновит last_message через событие
+        // Обновляем только локально last_message для оптимистичного обновления UI
+        setTickets(prev => prev.map(t => 
+          t.id === activeTicket.id 
+            ? { 
+                ...t, 
+                last_message: {
+                  id: optimisticMessage.id,
+                  message_text: optimisticMessage.text,
+                  sender_type: 'user',
+                  created_at: optimisticMessage.timestamp.toISOString(),
+                  is_read: false
+                },
+                last_message_at: optimisticMessage.timestamp.toISOString()
+              }
+            : t
+        ));
       } else {
         const errorMessage = data.error || 'Ошибка отправки сообщения';
         showNotification(translateError(errorMessage));

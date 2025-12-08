@@ -93,6 +93,47 @@ class SimpleCache {
   }
 
   /**
+   * Получить все ключи кэша (для инвалидации по паттерну)
+   */
+  keys(): string[] {
+    const now = Date.now();
+    const validKeys: string[] = [];
+    
+    this.cache.forEach((entry, key) => {
+      if (entry.expiresAt >= now) {
+        validKeys.push(key);
+      } else {
+        // Удаляем истекшие ключи
+        this.cache.delete(key);
+      }
+    });
+    
+    return validKeys;
+  }
+
+  /**
+   * Удалить все ключи, соответствующие паттерну
+   */
+  deleteByPattern(pattern: RegExp): number {
+    let deletedCount = 0;
+    const keysToDelete: string[] = [];
+    
+    this.cache.forEach((_, key) => {
+      if (pattern.test(key)) {
+        keysToDelete.push(key);
+      }
+    });
+    
+    keysToDelete.forEach(key => {
+      if (this.cache.delete(key)) {
+        deletedCount++;
+      }
+    });
+    
+    return deletedCount;
+  }
+
+  /**
    * Очистить интервал очистки (для тестирования или graceful shutdown)
    */
   cleanup(): void {

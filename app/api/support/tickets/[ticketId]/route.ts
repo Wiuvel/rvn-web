@@ -9,6 +9,7 @@ import { supabaseAdmin } from '@/lib/database/supabase';
 import { ERROR_INTERNAL_SERVER_ERROR, ERROR_NOT_AUTHENTICATED, ERROR_INVALID_REQUEST_DATA, ERROR_TICKET_NOT_FOUND, ERROR_ACCESS_DENIED, ERROR_TOO_MANY_REQUESTS, ERROR_INVALID_STATUS_TRANSITION, ERROR_TICKET_NOT_ASSIGNED } from '@/lib/utils/constants';
 import { broadcastTicketUpdate, broadcastTicketAssignment, broadcastNewMessage } from '@/lib/websocket/server';
 import { isValidUUID } from '@/lib/utils/uuid-validation';
+import { cache } from '@/lib/database/cache';
 
 export async function OPTIONS() {
   return handleCorsPreflight();
@@ -386,6 +387,17 @@ export async function PUT(
           { status: 500 }
         )
       );
+    }
+
+    // Инвалидируем кэш тикетов при обновлении
+    if (ticket) {
+      // Инвалидируем кэш для владельца тикета
+      cache.delete(`tickets:${ticket.user_id}:user:all:all`);
+      cache.delete(`tickets:${ticket.user_id}:user:all:forUser`);
+      cache.delete(`tickets:${ticket.user_id}:user:open:all`);
+      cache.delete(`tickets:${ticket.user_id}:user:open:forUser`);
+      // Инвалидируем кэш для поддержки
+      cache.deleteByPattern(/^tickets:.*:support:.*$/);
     }
 
     // Отправляем обновление тикета через WebSocket
