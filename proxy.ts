@@ -15,10 +15,21 @@ function generateNonce(): string {
  * @returns CSP header string
  */
 function generateCSPHeader(nonce: string, isDev: boolean): string {
+  // In production, Next.js generates inline styles and scripts without nonce
+  // We need to allow 'unsafe-inline' for both styles and scripts
+  // 'strict-dynamic' blocks Next.js chunks, so we remove it in production
+  const scriptSrc = isDev
+    ? `'self' 'nonce-${nonce}' 'strict-dynamic' https://challenges.cloudflare.com 'unsafe-eval'`
+    : `'self' 'nonce-${nonce}' 'unsafe-inline' https://challenges.cloudflare.com`;
+  
+  const styleSrc = isDev
+    ? `'self' 'unsafe-inline'`
+    : `'self' 'unsafe-inline' 'nonce-${nonce}'`;
+  
   const cspHeader = `
     default-src 'self';
-    script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https://challenges.cloudflare.com ${isDev ? "'unsafe-eval'" : ''};
-    style-src 'self' ${isDev ? "'unsafe-inline'" : `'nonce-${nonce}'`};
+    script-src ${scriptSrc};
+    style-src ${styleSrc};
     img-src 'self' blob: data: https://ljeklmajzfylmyqjxcck.supabase.co;
     font-src 'self';
     connect-src 'self' https://challenges.cloudflare.com ${isDev ? 'http://localhost:* ws://localhost:* wss://localhost:*' : ''};
