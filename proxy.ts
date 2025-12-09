@@ -18,13 +18,15 @@ function generateCSPHeader(nonce: string, isDev: boolean): string {
   // In production, Next.js generates inline styles and scripts without nonce
   // We need to allow 'unsafe-inline' for both styles and scripts
   // 'strict-dynamic' blocks Next.js chunks, so we remove it in production
+  // Note: nonce in script-src blocks 'unsafe-inline', so we remove it in production
+  // External scripts (like Turnstile) work with domain allowlist, nonce not required
   const scriptSrc = isDev
     ? `'self' 'nonce-${nonce}' 'strict-dynamic' https://challenges.cloudflare.com 'unsafe-eval'`
-    : `'self' 'nonce-${nonce}' 'unsafe-inline' https://challenges.cloudflare.com`;
+    : `'self' 'unsafe-inline' https://challenges.cloudflare.com`;
   
-  const styleSrc = isDev
-    ? `'self' 'unsafe-inline'`
-    : `'self' 'unsafe-inline' 'nonce-${nonce}'`;
+  // Note: 'unsafe-inline' is ignored if nonce is present in CSP
+  // For Next.js inline styles, we use only 'unsafe-inline' in production
+  const styleSrc = `'self' 'unsafe-inline'`;
   
   const cspHeader = `
     default-src 'self';
