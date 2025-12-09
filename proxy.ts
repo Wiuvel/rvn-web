@@ -1,6 +1,93 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 /**
+ * Generates a unique nonce for Content Security Policy
+ * @returns Base64-encoded nonce string
+ */
+function generateNonce(): string {
+  return Buffer.from(crypto.randomUUID()).toString('base64');
+}
+
+/**
+ * Generates Content Security Policy header with nonce
+ * @param nonce - The nonce value to include in CSP
+ * @param isDev - Whether running in development mode
+ * @returns CSP header string
+ */
+function generateCSPHeader(nonce: string, isDev: boolean): string {
+  const cspHeader = `
+    default-src 'self';
+    script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https://challenges.cloudflare.com ${isDev ? "'unsafe-eval'" : ''};
+    style-src 'self' ${isDev ? "'unsafe-inline'" : `'nonce-${nonce}'`};
+    img-src 'self' blob: data: https://ljeklmajzfylmyqjxcck.supabase.co;
+    font-src 'self';
+    connect-src 'self' https://challenges.cloudflare.com ${isDev ? 'http://localhost:* ws://localhost:* wss://localhost:*' : ''};
+    frame-src 'self' https://challenges.cloudflare.com;
+    object-src 'none';
+    base-uri 'self';
+    form-action 'self';
+    frame-ancestors 'none';
+    ${!isDev ? 'upgrade-insecure-requests;' : ''}
+  `;
+  
+  // Replace newline characters and multiple spaces with single space
+  return cspHeader.replace(/\s{2,}/g, ' ').trim();
+}
+
+/**
+ * Creates a NextResponse with CSP headers and nonce
+ * According to Next.js 16 documentation, nonce is extracted from Content-Security-Policy header during SSR
+ * @param request - The NextRequest object
+ * @param nonce - The nonce value
+ * @param responseType - Type of response to create ('next' | 'redirect')
+ * @param redirectUrl - Optional redirect URL for redirect responses
+ * @returns NextResponse with CSP headers applied
+ */
+function createResponseWithCSP(
+  request: NextRequest,
+  nonce: string,
+  responseType: 'next' | 'redirect' = 'next',
+  redirectUrl?: URL
+): NextResponse {
+  const isDev = process.env.NODE_ENV === 'development';
+  const cspHeader = generateCSPHeader(nonce, isDev);
+  
+  // Create response based on type
+  let response: NextResponse;
+  if (responseType === 'redirect' && redirectUrl) {
+    response = NextResponse.redirect(redirectUrl);
+  } else {
+    response = NextResponse.next();
+  }
+  
+  // Set CSP header in response - Next.js extracts nonce from this header during SSR
+  response.headers.set('Content-Security-Policy', cspHeader);
+  
+  // Also set x-nonce header for manual access in Server Components via headers()
+  response.headers.set('x-nonce', nonce);
+  
+  return response;
+}
+
+/**
+ * Applies CSP headers and nonce to existing response
+ * @param response - The NextResponse object (for cases where response is already created)
+ * @param request - The NextRequest object
+ * @param nonce - The nonce value
+ */
+function applyCSPHeaders(response: NextResponse, request: NextRequest, nonce: string): void {
+  const isDev = process.env.NODE_ENV === 'development';
+  const cspHeader = generateCSPHeader(nonce, isDev);
+  
+  // Set CSP header in response
+  response.headers.set('Content-Security-Policy', cspHeader);
+  
+  // Note: For existing responses, we can't modify the request headers
+  // Next.js will extract nonce from Content-Security-Policy header during SSR
+  // The x-nonce header is set when creating new responses via createResponseWithCSP
+}
+
+/**
  * Static file detection - bypasses all proxy checks
  * @param pathname - The request pathname
  * @returns True if the pathname is a static file
@@ -50,18 +137,23 @@ function shouldBypassProxy(pathname: string, userAgent: string): boolean {
  * Protection Proxy - checks if user passed protection screen
  * @param request - The Next.js request object
  * @param pathname - The request pathname
+ * @param nonce - The CSP nonce value
  * @returns NextResponse with redirect to protection page, or null to allow access
  */
-function handleProtection(request: NextRequest, pathname: string): NextResponse | null {
+function handleProtection(request: NextRequest, pathname: string, nonce: string): NextResponse | null {
   const accessGranted = request.cookies.get('access_granted')?.value === 'true';
   const accessHash = request.cookies.get('access_hash')?.value;
 
   /** Protection page itself - allow access, but redirect if already protected */
   if (pathname === '/protection' || pathname.startsWith('/protection/')) {
     if (accessGranted && accessHash) {
-      return NextResponse.redirect(new URL('/', request.url));
+      const response = NextResponse.redirect(new URL('/', request.url));
+      applyCSPHeaders(response, request, nonce);
+      return response;
     }
-    return NextResponse.next();
+    const response = NextResponse.next();
+    applyCSPHeaders(response, request, nonce);
+    return response;
   }
 
   /** OAuth routes - must bypass protection for OAuth flow */
@@ -95,7 +187,10 @@ function handleProtection(request: NextRequest, pathname: string): NextResponse 
 
   /** Redirect to protection page */
   const targetPath = pathname + request.nextUrl.search;
-  const response = NextResponse.redirect(
+  const response = createResponseWithCSP(
+    request,
+    nonce,
+    'redirect',
     new URL(`/protection?redirect=${encodeURIComponent(targetPath)}`, request.url)
   );
   
@@ -117,9 +212,10 @@ function handleProtection(request: NextRequest, pathname: string): NextResponse 
  * Auth Proxy - handles authentication and authorization
  * @param request - The Next.js request object
  * @param pathname - The request pathname
+ * @param nonce - The CSP nonce value
  * @returns NextResponse with redirect or null to allow/deny access
  */
-function handleAuth(request: NextRequest, pathname: string): NextResponse | null {
+function handleAuth(request: NextRequest, pathname: string, nonce: string): NextResponse | null {
   const isAuthenticated = request.cookies.get('user_authenticated')?.value === 'true';
   const dashboardToken = request.cookies.get('dashboard_token')?.value;
 
@@ -132,64 +228,59 @@ function handleAuth(request: NextRequest, pathname: string): NextResponse | null
       pathname === '/auth/oauth-callback' ||
       pathname.startsWith('/auth/oauth-callback/')
     ) {
-      return NextResponse.next();
+      return createResponseWithCSP(request, nonce, 'next');
     }
 
     /** Redirect authenticated users away from auth page */
     if (isAuthenticated && dashboardToken) {
       const retpatch = request.nextUrl.searchParams.get('retpatch');
       if (retpatch) {
-        return NextResponse.redirect(new URL(retpatch, request.url));
+        return createResponseWithCSP(request, nonce, 'redirect', new URL(retpatch, request.url));
       }
-      return NextResponse.redirect(new URL(`/dashboard/${dashboardToken}`, request.url));
+      return createResponseWithCSP(request, nonce, 'redirect', new URL(`/dashboard/${dashboardToken}`, request.url));
     }
 
-    return NextResponse.next();
+    return createResponseWithCSP(request, nonce, 'next');
   }
 
   /** Dashboard routes - require authentication */
   if (pathname.startsWith('/dashboard')) {
     if (!isAuthenticated || !dashboardToken) {
       const retpatch = encodeURIComponent(pathname);
-      return NextResponse.redirect(new URL(`/auth?retpatch=${retpatch}`, request.url));
+      return createResponseWithCSP(request, nonce, 'redirect', new URL(`/auth?retpatch=${retpatch}`, request.url));
     }
 
     /** Normalize dashboard URL */
     if (pathname === '/dashboard' || pathname === '/dashboard/') {
-      return NextResponse.redirect(new URL(`/dashboard/${dashboardToken}`, request.url));
+      return createResponseWithCSP(request, nonce, 'redirect', new URL(`/dashboard/${dashboardToken}`, request.url));
     }
 
     /** Ensure user accesses their own dashboard */
     const urlToken = pathname.split('/dashboard/')[1]?.split('/')[0];
     if (urlToken && urlToken !== dashboardToken) {
-      return NextResponse.redirect(new URL(`/dashboard/${dashboardToken}`, request.url));
+      return createResponseWithCSP(request, nonce, 'redirect', new URL(`/dashboard/${dashboardToken}`, request.url));
     }
 
-    return NextResponse.next();
+    return createResponseWithCSP(request, nonce, 'next');
   }
 
   /** Support panel - requires authentication */
   if (pathname.startsWith('/ui/panel/support')) {
     if (!isAuthenticated || !dashboardToken) {
       const retpatch = encodeURIComponent(pathname);
-      return NextResponse.redirect(new URL(`/auth?retpatch=${retpatch}`, request.url));
+      return createResponseWithCSP(request, nonce, 'redirect', new URL(`/auth?retpatch=${retpatch}`, request.url));
     }
-    return NextResponse.next();
+    return createResponseWithCSP(request, nonce, 'next');
   }
 
   /** Admin panel - requires admin authentication */
   if (pathname.startsWith('/ui/panel/admin')) {
-    const isAdminAuthenticated = request.cookies.get('admin_authenticated')?.value === 'true';
-    if (!isAdminAuthenticated) {
-      /** Let the page handle unauthorized access */
-      return NextResponse.next();
-    }
-    return NextResponse.next();
+    return createResponseWithCSP(request, nonce, 'next');
   }
 
   /** Public support page - no auth required */
   if (pathname === '/support' || pathname.startsWith('/support/')) {
-    return NextResponse.next();
+    return createResponseWithCSP(request, nonce, 'next');
   }
 
   return null;
@@ -209,19 +300,23 @@ export function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
+  /** Generate nonce for CSP - unique for each request */
+  const nonce = generateNonce();
+
   /** 1. Protection Proxy - checks protection cookies */
-  const protectionResponse = handleProtection(request, pathname);
+  const protectionResponse = handleProtection(request, pathname, nonce);
   if (protectionResponse) {
     return protectionResponse;
   }
 
   /** 2. Auth Proxy - checks authentication and authorization */
-  const authResponse = handleAuth(request, pathname);
+  const authResponse = handleAuth(request, pathname, nonce);
   if (authResponse) {
     return authResponse;
   }
 
-  return NextResponse.next();
+  /** Default response for public pages - apply CSP */
+  return createResponseWithCSP(request, nonce, 'next');
 }
 
 export const config = {
@@ -234,8 +329,16 @@ export const config = {
      * - favicon.ico, robots.txt, sitemap.xml
      * - public folder
      * - static folder
+     * 
+     * Also exclude prefetch requests to avoid unnecessary CSP generation
      */
-    '/((?!api|_next/static|_next/image|favicon.ico|public|static|robots.txt|sitemap.xml).*)',
+    {
+      source: '/((?!api|_next/static|_next/image|favicon.ico|public|static|robots.txt|sitemap.xml).*)',
+      missing: [
+        { type: 'header', key: 'next-router-prefetch' },
+        { type: 'header', key: 'purpose', value: 'prefetch' },
+      ],
+    },
   ],
 };
 
