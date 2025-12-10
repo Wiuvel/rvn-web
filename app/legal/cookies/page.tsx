@@ -5,7 +5,6 @@ import { useFadeIn } from '@/hooks/useGSAP';
 import { useState, useEffect } from 'react';
 import LegalNavigation from '@/components/navigation/Legal';
 import Skeleton from '@/components/ui/Skeleton';
-
 export default function CookiePolicyPage() {
   const titleRef = useFadeIn(0.1);
   const [isLoading, setIsLoading] = useState(true);
@@ -20,15 +19,8 @@ export default function CookiePolicyPage() {
   return (
     <div className="legal-page">
       <div className="legal-container">
-        <header className="legal-header">
-          <Link href="/" className="back-btn">
-            <span className="back-text">← На главную</span>
-            <span className="back-arrow">←</span>
-          </Link>
-          <div className="logo">Raven Private</div>
-        </header>
         
-        <main>
+        <main className="mt-8">
           <div ref={titleRef} className="page-title">
             <h1>Политика использования Cookies</h1>
             <p className="subtitle">

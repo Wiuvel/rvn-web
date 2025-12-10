@@ -308,6 +308,17 @@ function OAuthHandlerContent() {
       if (typeof window !== 'undefined') {
         window.location.href = '/api/auth/oauth/vk';
       }
+    } else if (provider === 'twitch') {
+      setStatus('redirecting');
+      try {
+        if (typeof sessionStorage !== 'undefined' && isPopupWindow()) {
+          sessionStorage.setItem('oauth_popup', 'true');
+        }
+      } catch {
+      }
+      if (typeof window !== 'undefined') {
+        window.location.href = '/api/auth/oauth/twitch';
+      }
     } else {
       setHandled(true);
       const errorMsg = getOAuthErrorMessage('invalid_provider');
@@ -352,15 +363,21 @@ function OAuthHandlerContent() {
         <div className="relative inline-block mb-6">
           <div className="w-16 h-16 border-4 border-white/20 border-t-white rounded-full animate-spin"></div>
         </div>
-        <p className={`text-lg font-medium text-white/90 mb-2 transition-all duration-300 ${
-          status === 'loading' || status === 'redirecting' ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'
-        }`}>
+        <p
+          className={`text-lg font-medium text-white/90 mb-2 transition-all duration-300 ${
+            status === 'loading' || status === 'redirecting' ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'
+          }`}
+          aria-live="polite"
+        >
           {status === 'loading' && 'Перенаправляем..'}
           {status === 'redirecting' && 'Перенаправляем..'}
         </p>
-        <p className={`text-lg font-medium text-white/90 mb-2 transition-all duration-300 ${
-          status === 'processing' ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'
-        }`}>
+        <p
+          className={`text-lg font-medium text-white/90 mb-2 transition-all duration-300 ${
+            status === 'processing' ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'
+          }`}
+          aria-live="polite"
+        >
           {status === 'processing' && 'Авторизация..'}
         </p>
       </div>

@@ -4,7 +4,12 @@ import { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import AuroraBackground from '@/components/ui/AuroraBackground';
+import dynamic from 'next/dynamic';
+// Heavy WebGL background; load on client only.
+const AuroraBackground = dynamic(() => import('@/components/ui/AuroraBackground'), {
+  ssr: false,
+  loading: () => null
+});
 import { translateError } from '@/lib/utils/error-translations';
 import { adminAuthSchema, adminRegisterSchema, type AdminAuthFormData, type AdminRegisterFormData } from '@/lib/validation/schemas';
 

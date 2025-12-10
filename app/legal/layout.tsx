@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "../globals.css";
 import "./legal.css";
 import { pageMetadata } from "@/lib/utils/seo";
+import ScrollToTop from "@/components/layout/ScrollToTop";
 
 export const metadata: Metadata = pageMetadata.legal;
 
@@ -16,6 +17,7 @@ export default function LegalLayout({
 }>) {
   return (
     <div className="legal-layout">
+      <ScrollToTop />
       {children}
     </div>
   );

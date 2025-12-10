@@ -35,6 +35,10 @@ const envSchema = z.object({
   VK_CLIENT_ID: z.string().optional(),
   VK_CLIENT_SECRET: z.string().optional(),
   
+  // Twitch OAuth
+  TWITCH_CLIENT_ID: z.string().optional(),
+  TWITCH_CLIENT_SECRET: z.string().optional(),
+
   // GitHub OAuth for Admin Panel
   GITHUB_CLIENT_ID: z.string().optional(),
   GITHUB_CLIENT_SECRET: z.string().optional(),
@@ -44,6 +48,33 @@ const envSchema = z.object({
   
   // Node environment
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+}).superRefine((val, ctx) => {
+  const pairs: Array<[keyof typeof val, keyof typeof val, string]> = [
+    ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'Google'],
+    ['YANDEX_CLIENT_ID', 'YANDEX_CLIENT_SECRET', 'Yandex'],
+    ['VK_CLIENT_ID', 'VK_CLIENT_SECRET', 'VK'],
+    ['TWITCH_CLIENT_ID', 'TWITCH_CLIENT_SECRET', 'Twitch'],
+    ['GITHUB_CLIENT_ID', 'GITHUB_CLIENT_SECRET', 'GitHub'],
+  ];
+
+  pairs.forEach(([idKey, secretKey, label]) => {
+    const hasId = !!val[idKey];
+    const hasSecret = !!val[secretKey];
+    if (hasId && !hasSecret) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `${label} secret is required when client id is set`,
+        path: [secretKey],
+      });
+    }
+    if (hasSecret && !hasId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `${label} client id is required when secret is set`,
+        path: [idKey],
+      });
+    }
+  });
 });
 
 type Env = z.infer<typeof envSchema>;
@@ -76,6 +107,8 @@ export function validateEnv(): Env {
       YANDEX_CLIENT_SECRET: process.env.YANDEX_CLIENT_SECRET,
       VK_CLIENT_ID: process.env.VK_CLIENT_ID,
       VK_CLIENT_SECRET: process.env.VK_CLIENT_SECRET,
+      TWITCH_CLIENT_ID: process.env.TWITCH_CLIENT_ID,
+      TWITCH_CLIENT_SECRET: process.env.TWITCH_CLIENT_SECRET,
       GITHUB_CLIENT_ID: process.env.GITHUB_CLIENT_ID,
       GITHUB_CLIENT_SECRET: process.env.GITHUB_CLIENT_SECRET,
       PUBLIC_DOMAIN: process.env.PUBLIC_DOMAIN,

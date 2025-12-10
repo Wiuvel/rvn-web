@@ -712,7 +712,7 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
             <div className="flex justify-center">
               <button
                 type="submit"
-                className="glass-btn"
+                className="glass-btn focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-900"
                 disabled={isLoading || isPopupOpen}
               >
                 {isLoading && !activeProvider && <span className="spinner"></span>}
@@ -737,7 +737,7 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
             <div className="oauth-grid">
               <button
                 type="button"
-                className="oauth-btn"
+                className="oauth-btn focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-900"
                 onClick={() => oauthLogin('vk')}
                 disabled={isLoading || isPopupOpen}
                 title="Войти через VK ID"
@@ -751,7 +751,7 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
               </button>
               <button
                 type="button"
-                className="oauth-btn"
+                className="oauth-btn focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-900"
                 onClick={() => oauthLogin('yandex')}
                 disabled={isLoading || isPopupOpen}
                 title="Войти через Yandex ID"
@@ -765,7 +765,7 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
               </button>              
               <button
                 type="button"
-                className="oauth-btn"
+                className="oauth-btn focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-900"
                 onClick={() => oauthLogin('telegram')}
                 disabled={isLoading || isPopupOpen}
                 title="Войти через Telegram"
@@ -779,21 +779,7 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
               </button>              
               <button
                 type="button"
-                className="oauth-btn"
-                onClick={() => oauthLogin('vk')}
-                disabled={isLoading || isPopupOpen}
-                title="Войти через VK ID"
-                aria-label="Войти через VK ID"
-              >
-                {activeProvider === 'vk' ? (
-                  <div className="w-5 h-5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
-                ) : (
-                  <Image src="/static/icons/oauth/vk.svg" alt="VK" width={20} height={20} className="oauth-icon" />
-                )}
-              </button>
-              <button
-                type="button"
-                className="oauth-btn"
+                className="oauth-btn focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-900"
                 onClick={() => oauthLogin('google')}
                 disabled={isLoading || isPopupOpen}
                 title="Войти через Google"
@@ -807,7 +793,7 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
               </button>
               <button
                 type="button"
-                className="oauth-btn"
+                className="oauth-btn focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-900"
                 onClick={() => oauthLogin('twitch')}
                 disabled={isLoading || isPopupOpen}
                 title="Войти через Twitch"
@@ -939,7 +925,7 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
             <div className="flex justify-center">
               <button
                 type="submit"
-                className={`glass-btn ${loginAttemptState === 'error' ? 'btn-shake' : ''}`}
+                className={`glass-btn ${loginAttemptState === 'error' ? 'btn-shake' : ''} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-900`}
                 disabled={isLoading || isPopupOpen}
               >
                 {isLoading && !activeProvider && <span className="spinner"></span>}
@@ -964,7 +950,7 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
             <div className="oauth-grid">
               <button
                 type="button"
-                className="oauth-btn"
+                className="oauth-btn focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-900"
                 onClick={() => oauthLogin('vk')}
                 disabled={isLoading || isPopupOpen}
                 title="Войти через VK ID"
@@ -978,7 +964,7 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
               </button>
               <button
                 type="button"
-                className="oauth-btn"
+                className="oauth-btn focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-900"
                 onClick={() => oauthLogin('yandex')}
                 disabled={isLoading || isPopupOpen}
                 title="Войти через Yandex ID"
@@ -992,7 +978,7 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
               </button>              
               <button
                 type="button"
-                className="oauth-btn"
+                className="oauth-btn focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-900"
                 onClick={() => oauthLogin('telegram')}
                 disabled={isLoading || isPopupOpen}
                 title="Войти через Telegram"
@@ -1006,21 +992,7 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
               </button>
               <button
                 type="button"
-                className="oauth-btn"
-                onClick={() => oauthLogin('vk')}
-                disabled={isLoading || isPopupOpen}
-                title="Войти через VK ID"
-                aria-label="Войти через VK ID"
-              >
-                {activeProvider === 'vk' ? (
-                  <div className="w-5 h-5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
-                ) : (
-                  <Image src="/static/icons/oauth/vk.svg" alt="VK" width={20} height={20} className="oauth-icon" />
-                )}
-              </button>
-              <button
-                type="button"
-                className="oauth-btn"
+                className="oauth-btn focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-900"
                 onClick={() => oauthLogin('google')}
                 disabled={isLoading || isPopupOpen}
                 title="Войти через Google"
@@ -1034,7 +1006,7 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
               </button>
               <button
                 type="button"
-                className="oauth-btn"
+                className="oauth-btn focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-900"
                 onClick={() => oauthLogin('twitch')}
                 disabled={isLoading || isPopupOpen}
                 title="Войти через Twitch"

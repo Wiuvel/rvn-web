@@ -41,14 +41,10 @@ export function generateMetadata({
     description: fullDescription,
     keywords: [
       'Raven Private',
-      'RVN.MARKET',
-      'VLESS',
-      'PROXY',
-      'прокси',
-      'безопасность',
-      'приватность',
-      'анонимность',
-      'защита данных',
+      'rvn.market',
+      'Vless',
+      'Hysteria',
+      'Proxy',
       ...keywords
     ].join(', '),
     openGraph: {
@@ -76,7 +72,6 @@ export function generateMetadata({
       card: 'summary_large_image',
       title: fullTitle,
       description: fullDescription,
-      creator: '@rvnprivate',
       site: '@rvnprivate',
       images: [`${baseUrl}/og-image.png`]
     },
@@ -95,14 +90,8 @@ export function generateMetadata({
       yandex: '9fa13ce9cd4df963',
     },
     category: 'Technology',
-    classification: 'VPN Service',
     other: {
-      'msapplication-TileColor': '#0f7fdb',
       'theme-color': '#0f7fdb',
-      'format-detection': 'telephone=no',
-      'geo.region': 'RU',
-      'geo.placename': 'Russia',
-      'language': 'Russian',
     }
   };
 
@@ -113,21 +102,21 @@ export const pageMetadata = {
   home: generateMetadata({
     title: 'Raven Private — безопасный доступ в сеть',
     description: 'RVN.MARKET — современный сервис приватного доступа в сеть. Высокая скорость и полная анонимность. Стабильные сервера с минимальным пингом.',
-    keywords: ['VPN', 'Proxy', 'безопасность', 'приватность', 'VLESS'],
+    keywords: ['Main Page', 'Home Page', 'Main'],
     url: '/'
   }),
 
   auth: generateMetadata({
     title: 'Авторизация',
-    description: 'Регистрация и вход в личный кабинет RVN.MARKET.',
-    keywords: ['вход', 'регистрация', 'авторизация'],
+    description: 'Регистрация и вход в личный кабинет Raven Private.',
+    keywords: ['login', 'registration', 'authorization'],
     url: '/auth'
   }),
 
   dashboard: generateMetadata({
     title: 'Панель управления',
-    description: 'Удобная панель управления для вашей подписки и настроек VLESS.',
-    keywords: ['панель управления', 'профиль', 'аккаунт', 'настройки'],
+    description: 'Удобная панель управления для вашей подписки и настроек.',
+    keywords: ['profile', 'account', 'settings'],
     url: '/dashboard',
     noindex: true
   }),
@@ -135,7 +124,7 @@ export const pageMetadata = {
   protection: generateMetadata({
     title: 'Проверка безопасности',
     description: 'Подтвердите, что вы человек, чтобы получить доступ к сайту Raven Private.',
-    keywords: ['проверка', 'безопасность', 'captcha', 'защита'],
+    keywords: ['captcha'],
     url: '/protection',
     noindex: true
   }),
@@ -143,21 +132,21 @@ export const pageMetadata = {
   legal: generateMetadata({
     title: 'Правовая информация',
     description: 'Соглашения и политики. Другие правовые документы Raven Private.',
-    keywords: ['правовая информация', 'пользовательское соглашение', 'политика конфиденциальности'],
+    keywords: ['legal information', 'user agreement', 'privacy policy'],
     url: '/legal'
   }),
 
   support: generateMetadata({
     title: 'Поддержка',
-    description: 'Центр поддержки Raven Private. Создавайте тикеты, получайте помощь по вопросам использования сервиса, настройки VLESS и решения проблем.',
-    keywords: ['поддержка', 'помощь', 'тикеты', 'обратная связь', 'контакты', 'техническая поддержка'],
+    description: 'Служба поддержки сервиса Raven Private.',
+    keywords: ['support', 'technical support', 'help'],
     url: '/support'
   }),
 
   supportHelp: generateMetadata({
     title: 'Требуется авторизация',
     description: 'Для доступа к центру поддержки требуется авторизация. Войдите в аккаунт или обратитесь в Telegram.',
-    keywords: ['авторизация', 'поддержка', 'вход'],
+    keywords: ['login', 'registration', 'authorization'],
     url: '/support/help',
     noindex: true
   })

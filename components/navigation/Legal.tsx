@@ -26,7 +26,7 @@ export default function LegalNavigation() {
         const isLast = index === legalPages.length - 1;
         
         return (
-          <span key={page.path}>
+          <span key={page.path} className="legal-breadcrumb-item">
             {isActive ? (
               <span className="active">{page.title}</span>
             ) : (
@@ -34,7 +34,7 @@ export default function LegalNavigation() {
                 {page.title}
               </Link>
             )}
-            {!isLast && <span className="separator"> \ </span>}
+            {!isLast && <span className="separator"> · </span>}
           </span>
         );
       })}

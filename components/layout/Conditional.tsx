@@ -10,11 +10,29 @@ interface ConditionalLayoutProps {
 
 export default function ConditionalLayout({ children }: ConditionalLayoutProps) {
   const pathname = usePathname();
+  
+  // Страницы с header и footer
   const pagesWithHeaderFooter = [
     '/',
   ];
   
-  const shouldShowHeaderFooter = pagesWithHeaderFooter.includes(pathname);
+  // Страницы только с header (без footer)
+  const pagesWithHeaderOnly = [
+    '/about',
+  ];
+  
+  // Legal страницы - с header который скрывается при скролле
+  const legalPages = [
+    '/legal/privacy',
+    '/legal/terms',
+    '/legal/cookies',
+    '/legal/offer',
+    '/legal/refunds',
+  ];
+  
+  const isLegalPage = legalPages.some(page => pathname.startsWith(page));
+  const isHeaderOnlyPage = pagesWithHeaderOnly.includes(pathname);
+  const shouldShowHeaderFooter = pagesWithHeaderFooter.includes(pathname) || isLegalPage || isHeaderOnlyPage;
   
   if (!shouldShowHeaderFooter) {
     return <>{children}</>;
@@ -22,11 +40,11 @@ export default function ConditionalLayout({ children }: ConditionalLayoutProps) 
   
   return (
     <>
-      <Header />
+      <Header variant="main" hideOnScroll={isLegalPage} />
       <main>
         {children}
       </main>
-      <Footer />
+      {!isLegalPage && !isHeaderOnlyPage && <Footer />}
     </>
   );
 }

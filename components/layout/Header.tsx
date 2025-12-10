@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { gsap } from 'gsap';
 import { Notification } from '@/types';
 import { useAuth } from '@/hooks/useAuth';
@@ -11,8 +11,18 @@ import { UserMenu } from '@/components/navigation/UserMenu';
 import { NotificationsMenu } from '@/components/navigation/Notifications';
 import { GSAP_DEFAULT_DURATION, GSAP_DEFAULT_EASE } from '@/lib/utils/constants';
 import { getGradientClasses } from '@/lib/utils/avatar-gradients';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
 
-export default function Header() {
+if (typeof window !== 'undefined') {
+  gsap.registerPlugin(ScrollTrigger);
+}
+
+interface HeaderProps {
+  variant?: 'main' | 'auth' | 'dashboard';
+  hideOnScroll?: boolean;
+}
+
+export default function Header({ variant = 'main', hideOnScroll = false }: HeaderProps = {}) {
   const [open, setOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -25,23 +35,31 @@ export default function Header() {
   const spinnerRef = useRef<HTMLDivElement>(null);
   const mobileSpinnerRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
+  const pathname = usePathname();
   const authContainerRef = useRef<HTMLDivElement>(null);
   
   // Используем новый хук useAuth
   const { userData, loading } = useAuth({ silent: true });
 
+  const headerRef = useRef<HTMLElement>(null);
+  const lastScrollY = useRef(0);
+
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || !headerRef.current) return;
+    
+    const header = headerRef.current;
+    const headerContainer = header.querySelector('.header-container') as HTMLElement;
+    if (!headerContainer) return;
     
     const isMobile = window.innerWidth < 768;
     if (isMobile) {
       // На мобильных устройствах просто устанавливаем финальное состояние без анимации
-      gsap.set('.header-container', { opacity: 1, y: 0 });
+      gsap.set(headerContainer, { opacity: 1, y: 0 });
       return;
     }
     
     // Плавная анимация появления header без влияния на layout
-    gsap.fromTo('.header-container', 
+    gsap.fromTo(headerContainer, 
       { 
         opacity: 0, 
         y: -10 
@@ -56,7 +74,65 @@ export default function Header() {
         force3D: true
       }
     );
-  }, []);
+
+    // Анимация скрытия при скролле для legal страниц
+    if (hideOnScroll) {
+      const handleScroll = () => {
+        const currentScrollY = window.scrollY;
+        
+        // Если вверху страницы - всегда показываем header
+        if (currentScrollY < 50) {
+          gsap.to(headerContainer, {
+            y: 0,
+            opacity: 1,
+            pointerEvents: 'auto',
+            duration: 0.3,
+            ease: 'power2.out'
+          });
+        }
+        // Если скроллим вниз и прошли больше 100px - скрываем header
+        else if (currentScrollY > lastScrollY.current && currentScrollY > 100) {
+          gsap.to(headerContainer, {
+            y: -100,
+            opacity: 0,
+            pointerEvents: 'none',
+            duration: 0.3,
+            ease: 'power2.out'
+          });
+        } 
+        // Если скроллим вверх - показываем header
+        else if (currentScrollY < lastScrollY.current) {
+          gsap.to(headerContainer, {
+            y: 0,
+            opacity: 1,
+            pointerEvents: 'auto',
+            duration: 0.3,
+            ease: 'power2.out'
+          });
+        }
+        
+        lastScrollY.current = currentScrollY;
+      };
+
+      // Throttle для оптимизации
+      let ticking = false;
+      const throttledScroll = () => {
+        if (!ticking) {
+          window.requestAnimationFrame(() => {
+            handleScroll();
+            ticking = false;
+          });
+          ticking = true;
+        }
+      };
+
+      window.addEventListener('scroll', throttledScroll, { passive: true });
+
+      return () => {
+        window.removeEventListener('scroll', throttledScroll);
+      };
+    }
+  }, [hideOnScroll]);
 
   // Плавный переход между состояниями auth контейнера
   useEffect(() => {
@@ -185,11 +261,63 @@ export default function Header() {
     return username.charAt(0).toUpperCase();
   };
 
+  // Определяем навигацию в зависимости от варианта
+  const getNavigation = () => {
+    if (variant === 'main') {
+      return (
+        <>
+          <Link href="/about" className="hover:text-white transition" aria-current={pathname === '/about' ? 'page' : undefined}>
+            О проекте
+          </Link>
+          <Link
+            href="/support"
+            className="hover:text-white transition"
+            aria-current={pathname === '/support' ? 'page' : undefined}
+          >
+            Поддержка
+          </Link>
+          <span className="text-neutral-500 cursor-not-allowed">Wiki</span>
+        </>
+      );
+    }
+    // Для auth и dashboard используем стандартную навигацию (если нужно)
+    return null;
+  };
+
+  const getMobileNavigation = () => {
+    if (variant === 'main') {
+      return (
+        <>
+          <Link 
+            href="/about" 
+            onClick={() => setOpen(false)} 
+            className="block text-white/80 hover:text-white transition-colors duration-300 py-2"
+          >
+            О проекте
+          </Link>
+          <Link 
+            href="/support" 
+            onClick={() => setOpen(false)} 
+            className="block text-white/80 hover:text-white transition-colors duration-300 py-2"
+          >
+            Поддержка
+          </Link>
+          <span className="block text-neutral-500 cursor-not-allowed py-2">Wiki</span>
+        </>
+      );
+    }
+    return null;
+  };
+
   return (
-    <header className="fixed top-0 left-0 right-0 pt-4 z-50">
+    <header ref={headerRef} className={`${hideOnScroll ? 'sticky' : 'fixed'} top-0 left-0 right-0 pt-4 z-50`}>
       <div className="mx-auto max-w-6xl px-4">
         <div className="header-container backdrop-blur-md bg-neutral-900/40 border border-white/10 rounded-full px-6 py-3 flex items-center justify-between shadow-lg">
-          <Link href="/" className="flex items-center gap-2">
+          <Link
+            href="/"
+            className="flex items-center gap-2"
+            aria-current={pathname === '/' ? 'page' : undefined}
+          >
             <Image 
               src="/static/logo.svg" 
               alt="RVNPrivate" 
@@ -200,11 +328,11 @@ export default function Header() {
             />
             <span className="font-semibold text-white">Raven Private</span>
           </Link>
-          <nav className="hidden lg:flex items-center gap-8 text-sm text-neutral-300">
-            <Link href="#pricing" className="hover:text-white transition">Тарифы</Link>
-            <Link href="/support" className="hover:text-white transition">Поддержка</Link>
-            <Link href="#faq" className="hover:text-white transition">FAQ</Link>
-          </nav>
+          {variant === 'main' && (
+            <nav className="hidden lg:flex items-center gap-8 text-sm text-neutral-300">
+              {getNavigation()}
+            </nav>
+          )}
           <div className="hidden lg:flex items-center gap-2 relative" ref={userMenuRef}>
             {/* Единый контейнер с фиксированной минимальной шириной для предотвращения прыжков */}
             <div 
@@ -246,6 +374,7 @@ export default function Header() {
                       onClose={() => setNotificationsOpen(false)}
                       onMarkAsRead={markNotificationAsRead}
                       menuRef={notificationsMenuRef}
+                      isMobile={false}
                     />
                   </div>
                   <button
@@ -275,7 +404,7 @@ export default function Header() {
               ) : (
                 <Link 
                   href="/auth" 
-                  className="rounded-xl bg-primary-500 hover:bg-primary-400 px-4 py-2 text-sm font-medium text-white shadow-glow transition flex items-center gap-2 h-10 flex-shrink-0"
+                  className="rounded-xl bg-primary-500 hover:bg-primary-400 px-4 py-2 text-sm font-medium text-white shadow-glow transition flex items-center gap-2 h-10 flex-shrink-0 min-w-[110px] justify-center"
                 >
                   <Image 
                     src="/static/icons/accounts/log-in.svg" 
@@ -289,23 +418,70 @@ export default function Header() {
               )}
             </div>
           </div>
-          <button 
-            onClick={() => setOpen(!open)} 
-            className="lg:hidden p-2 text-white/80 hover:text-white transition-colors duration-300" 
-            aria-label="Открыть меню"
-          >
-            {!open ? (
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"/>
-              </svg>
-            ) : (
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/>
-              </svg>
+          <div className="lg:hidden flex items-center gap-2">
+            {/* Кнопка уведомлений для мобильных - только для авторизированных пользователей */}
+            {!loading && userData && (
+              <button
+                ref={notificationsButtonRef}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  // Закрываем мобильное меню при открытии уведомлений
+                  if (open) {
+                    setOpen(false);
+                  }
+                  setNotificationsOpen(!notificationsOpen);
+                }}
+                className="w-10 h-10 rounded-full bg-neutral-800/60 hover:bg-neutral-700/60 flex items-center justify-center text-white/80 hover:text-white transition-all duration-200 hover:scale-110 cursor-pointer flex-shrink-0"
+                title="Уведомления"
+                aria-label="Уведомления"
+                aria-expanded={notificationsOpen}
+              >
+                <Image 
+                  src={hasUnreadNotifications ? "/static/icons/accounts/bell-dot.svg" : "/static/icons/accounts/bell.svg"} 
+                  alt="Уведомления" 
+                  width={18} 
+                  height={18} 
+                  className="w-[18px] h-[18px]"
+                />
+              </button>
             )}
-          </button>
+            <button 
+              onClick={() => {
+                // Закрываем меню уведомлений при открытии мобильного меню
+                if (notificationsOpen) {
+                  setNotificationsOpen(false);
+                }
+                setOpen(!open);
+              }} 
+              className="p-2 text-white/80 hover:text-white transition-colors duration-300" 
+              aria-label="Открыть меню"
+            >
+              {!open ? (
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"/>
+                </svg>
+              ) : (
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+              )}
+            </button>
+          </div>
         </div>
-        {open && (
+        {/* Мобильное меню уведомлений */}
+        {notificationsOpen && (
+          <NotificationsMenu
+            notifications={notifications}
+            readNotifications={readNotifications}
+            isOpen={notificationsOpen}
+            onClose={() => setNotificationsOpen(false)}
+            onMarkAsRead={markNotificationAsRead}
+            menuRef={notificationsMenuRef}
+            isMobile={true}
+          />
+        )}
+        {/* Мобильное меню профиля */}
+        {open && !notificationsOpen && (
           <div className="lg:hidden mt-4 py-4 bg-black/50 backdrop-blur-xl rounded-2xl border border-white/10">
             <div className="px-4 space-y-2">
               {loading ? (
@@ -404,27 +580,7 @@ export default function Header() {
                 </>
               ) : (
                 <>
-                  <Link 
-                    href="#pricing" 
-                    onClick={() => setOpen(false)} 
-                    className="block text-white/80 hover:text-white transition-colors duration-300 py-2"
-                  >
-                    Тарифы
-                  </Link>
-                  <Link 
-                    href="/support" 
-                    onClick={() => setOpen(false)} 
-                    className="block text-white/80 hover:text-white transition-colors duration-300 py-2"
-                  >
-                    Поддержка
-                  </Link>
-                  <Link 
-                    href="#faq" 
-                    onClick={() => setOpen(false)} 
-                    className="block text-white/80 hover:text-white transition-colors duration-300 py-2"
-                  >
-                    FAQ
-                  </Link>
+                  {variant === 'main' && getMobileNavigation()}
                   <div className="pt-4 border-t border-white/10">
                     <Link 
                       href="/auth" 

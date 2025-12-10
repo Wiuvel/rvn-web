@@ -57,7 +57,7 @@ export function UserMenu({
   return (
     <div 
       ref={animatedMenuRef}
-      className="absolute -right-3 top-full mt-4 w-64 bg-neutral-900/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-xl overflow-hidden z-50"
+      className="absolute -right-3 top-full mt-4 w-64 max-w-[calc(100vw-2rem)] bg-neutral-900/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-xl overflow-hidden z-50"
     >
       <div>
         <Link

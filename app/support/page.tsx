@@ -12,18 +12,9 @@ import { getGradientClasses } from '@/lib/utils/avatar-gradients';
 import { useWebSocket } from '@/hooks/useWebSocket';
 
 // Lazy load RateLimitCaptcha для оптимизации bundle size
+// Убираем loading state, чтобы избежать показа модального окна при загрузке страницы
 const RateLimitCaptcha = dynamic(() => import('@/components/auth/RateLimitCaptcha'), {
-  ssr: false,
-  loading: () => (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
-      <div className="bg-neutral-900 rounded-2xl p-6 sm:p-8 max-w-md w-full mx-4 border border-neutral-800 shadow-2xl">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-white/20 border-t-white rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-sm text-neutral-400">Загрузка капчи..</p>
-        </div>
-      </div>
-    </div>
-  )
+  ssr: false
 });
 
 interface UserData {
@@ -230,6 +221,7 @@ export default function SupportPage() {
   const activeTicketMessagesRef = useRef<Message[]>([]); // Ref для актуальных сообщений активного тикета
   const [showRateLimitCaptcha, setShowRateLimitCaptcha] = useState(false);
   const isCaptchaOpenRef = useRef(false);
+  const [ticketsListVisible, setTicketsListVisible] = useState(false);
   // Очередь запросов вместо одного callback - исправляет race condition
   const pendingRequestsQueueRef = useRef<Array<() => Promise<void>>>([]);
   const isProcessingCaptchaRef = useRef(false); // Флаг обработки капчи - предотвращает повторные открытия
@@ -1640,20 +1632,36 @@ export default function SupportPage() {
               <div className="bg-neutral-900 border border-white/10 rounded-2xl p-2 sm:p-4 flex-1 flex flex-col overflow-hidden">
                 <div className="flex items-center justify-between mb-2 sm:mb-4 flex-shrink-0">
                   <h2 className="text-base sm:text-lg font-semibold">Мои тикеты</h2>
-                  <button
-                    onClick={() => {
-                      if (activeTicketsCount >= MAX_TICKETS_PER_USER) {
-                        alert('Вы можете создать максимум 2 активных обращения');
-                        return;
-                      }
-                      setShowNewTicketForm(!showNewTicketForm);
-                    }}
-                    disabled={activeTicketsCount >= MAX_TICKETS_PER_USER || isSupport}
-                    className="px-3 py-1.5 bg-primary-500 hover:bg-primary-400 disabled:bg-neutral-700 disabled:text-neutral-500 text-white text-sm rounded-lg transition-colors"
-                    title={isSupport ? 'Создание тикетов недоступно для сотрудников поддержки' : ''}
-                  >
-                    + Новый
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {/* Кнопка раскрытия списка тикетов на мобильных */}
+                    <button
+                      onClick={() => setTicketsListVisible(!ticketsListVisible)}
+                      className="lg:hidden px-2 py-1.5 text-neutral-400 hover:text-white transition-colors"
+                      aria-label="Показать/скрыть тикеты"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        {ticketsListVisible ? (
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        ) : (
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                        )}
+                      </svg>
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (activeTicketsCount >= MAX_TICKETS_PER_USER) {
+                          alert('Вы можете создать максимум 2 активных обращения');
+                          return;
+                        }
+                        setShowNewTicketForm(!showNewTicketForm);
+                      }}
+                      disabled={activeTicketsCount >= MAX_TICKETS_PER_USER || isSupport}
+                      className="px-3 py-1.5 bg-primary-500 hover:bg-primary-400 disabled:bg-neutral-700 disabled:text-neutral-500 text-white text-sm rounded-lg transition-colors"
+                      title={isSupport ? 'Создание тикетов недоступно для сотрудников поддержки' : ''}
+                    >
+                      + Новый
+                    </button>
+                  </div>
                 </div>
 
                 {!isSupport && (
@@ -1737,7 +1745,7 @@ export default function SupportPage() {
                   </div>
                 )}
 
-                <div className="support-tickets-list flex-1 overflow-y-auto min-h-0">
+                <div className={`support-tickets-list flex-1 overflow-y-auto min-h-0 flex-col ${ticketsListVisible ? 'flex' : 'hidden'} lg:flex`}>
                   {tickets.length === 0 ? (
                     <div className="text-center text-neutral-400 text-sm py-8">
                       Нет открытых тикетов.

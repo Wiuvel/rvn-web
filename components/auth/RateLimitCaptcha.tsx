@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Script from 'next/script';
 
 interface TurnstileInstance {
@@ -41,13 +41,6 @@ export default function RateLimitCaptcha({ isOpen, onSuccess, onClose }: RateLim
   const containerRef = useRef<HTMLDivElement>(null);
   const isProcessingRef = useRef(false);
   const tokenSentRef = useRef(false);
-
-  // Get nonce from meta tag (set by server layout)
-  const nonce = useMemo(() => {
-    if (typeof document === 'undefined') return undefined;
-    const meta = document.querySelector('meta[name="csp-nonce"]');
-    return meta?.getAttribute('content') || undefined;
-  }, []);
 
   // Check if Turnstile is already loaded (from layout) or wait for it
   useEffect(() => {
@@ -196,7 +189,6 @@ export default function RateLimitCaptcha({ isOpen, onSuccess, onClose }: RateLim
           src="https://challenges.cloudflare.com/turnstile/v0/api.js"
           strategy="afterInteractive"
           onLoad={() => setIsScriptLoaded(true)}
-          nonce={nonce}
         />
       )}
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">

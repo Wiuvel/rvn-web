@@ -84,6 +84,15 @@ export default function DashboardPage() {
             const data = await response.json();
             // Проверяем, что пользователь авторизован
             if (data.authenticated === false || !data.dashboard_token) {
+              // Очищаем сессию через API и редиректим на авторизацию
+              try {
+                await fetch('/api/auth/logout', {
+                  method: 'POST',
+                  credentials: 'include'
+                });
+              } catch {
+                // Игнорируем ошибки logout
+              }
               router.push('/auth');
               return;
             }
@@ -94,6 +103,18 @@ export default function DashboardPage() {
               return;
             }
             setUserData(data);
+          } else if (response.status === 404) {
+            // Токен не существует в БД - очищаем сессию через API и редиректим на авторизацию
+            try {
+              await fetch('/api/auth/logout', {
+                method: 'POST',
+                credentials: 'include'
+              });
+            } catch {
+              // Игнорируем ошибки logout
+            }
+            router.push('/auth');
+            return;
           } else {
             router.push('/auth');
           }
@@ -359,6 +380,7 @@ export default function DashboardPage() {
             <nav className="hidden lg:flex items-center gap-8 text-sm text-neutral-300">
               <Link href="/" className="hover:text-white transition">Главная</Link>
               <Link href="/auth/" className="hover:text-white transition">Профиль</Link>
+              <Link href="/support" className="hover:text-white transition">Поддержка</Link>
             </nav>
             {userData && (
               <div className="hidden lg:flex items-center gap-2 relative" ref={userMenuRef}>
@@ -648,10 +670,10 @@ export default function DashboardPage() {
               <div className="mt-2 text-neutral-300 text-sm">Появятся после покупки.</div>
             </section>
             <section className="rounded-2xl border border-neutral-800 bg-neutral-900 p-5">
-              <div className="text-sm text-neutral-400">Поддержка</div>
-              <Link href="/support" prefetch={false} className="mt-2 inline-block text-primary-400 hover:underline hover:text-primary-300 transition-colors">
-                Связаться с нами
-              </Link>
+              <div className="text-sm text-neutral-400">Информация</div>
+              <div className="mt-2 text-neutral-300 text-sm">
+                ...
+              </div>
             </section>
           </div>
           {/* Servers status */}

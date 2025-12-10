@@ -3,12 +3,22 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import dynamic from 'next/dynamic';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import LightRays from "@/components/LightRays";
 
-export default function HeroSection() {
+interface HeroSectionProps {
+  onLightRaysLoad?: () => void;
+}
+
+// Heavy WebGL effect — load client-side only; include gentle fade-in on mount.
+const LightRays = dynamic(() => import('@/components/LightRays'), {
+  ssr: false,
+  loading: () => <div className="absolute inset-0" aria-hidden="true" />
+});
+
+export default function HeroSection({ onLightRaysLoad }: HeroSectionProps = {}) {
   const [ping, setPing] = useState(0);
   const [connected, setConnected] = useState(false);
   const [serverInfo, setServerInfo] = useState<{ country: string, code: string, flag: string } | null>(null);
@@ -53,6 +63,75 @@ export default function HeroSection() {
     return "text-orange-400";
   };
 
+  // Отслеживаем загрузку LightRays
+  useEffect(() => {
+    if (!onLightRaysLoad) return;
+
+    let hasCalled = false;
+    
+    const checkLightRaysLoaded = () => {
+      if (hasCalled) return;
+      
+      // Ищем canvas внутри секции Hero
+      const heroSection = document.querySelector('#home');
+      if (!heroSection) return;
+      
+      const canvas = heroSection.querySelector('canvas');
+      if (canvas && canvas.width > 0 && canvas.height > 0) {
+        // Canvas инициализирован и имеет размеры - LightRays загружен
+        hasCalled = true;
+        // Даем небольшую задержку для завершения инициализации WebGL
+        setTimeout(() => {
+          onLightRaysLoad();
+        }, 150);
+        return true;
+      }
+      return false;
+    };
+
+    // Используем MutationObserver для отслеживания появления canvas
+    const observer = new MutationObserver(() => {
+      checkLightRaysLoaded();
+    });
+
+    // Наблюдаем за изменениями в document
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['width', 'height']
+    });
+
+    // Проверяем сразу и через небольшие интервалы
+    if (checkLightRaysLoaded()) {
+      observer.disconnect();
+      return;
+    }
+
+    const interval = setInterval(() => {
+      if (checkLightRaysLoaded()) {
+        clearInterval(interval);
+        observer.disconnect();
+      }
+    }, 50);
+
+    // Таймаут на случай если LightRays не загрузится
+    const timeout = setTimeout(() => {
+      if (!hasCalled && onLightRaysLoad) {
+        hasCalled = true;
+        onLightRaysLoad();
+      }
+      clearInterval(interval);
+      observer.disconnect();
+    }, 3000);
+
+    return () => {
+      observer.disconnect();
+      clearInterval(interval);
+      clearTimeout(timeout);
+    };
+  }, [onLightRaysLoad]);
+
   return (
     <section id="home" className="relative overflow-visible bg-neutral-950">
       <div className="absolute inset-0 w-full h-full pointer-events-none" style={{ overflow: 'visible' }}>
@@ -70,7 +149,6 @@ export default function HeroSection() {
           className="custom-rays"
         />
       </div>
-      {/* Градиентная маска для плавного затухания внизу */}
       <div className="absolute bottom-0 left-0 right-0 h-32 pointer-events-none z-10 bg-gradient-to-t from-neutral-950 to-transparent" />
       <div className="mx-auto max-w-7xl px-6 sm:px-8 lg:px-12 xl:px-16 pt-24 pb-24 md:pt-32 md:pb-36 relative z-10">
         <div className="flex flex-col lg:grid lg:grid-cols-2 gap-8 md:gap-12 items-center">
@@ -128,9 +206,9 @@ export default function HeroSection() {
                     <div className="rounded-xl border border-neutral-800 p-3 md:p-4 col-span-2">
                       <div className="text-neutral-400 text-xs">Текущий сервер</div>
                       {!connected ? (
-                        <div className="mt-1 flex items-center gap-2 text-neutral-500 animate-pulse">
+                      <div className="mt-1 flex items-center gap-2 text-neutral-500 animate-pulse">
                           <span>Выбор сервера…</span>
-                        </div>
+                      </div>
                       ) : serverInfo ? (
                         <div className="mt-1 flex items-center gap-2">
                           <Image
