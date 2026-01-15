@@ -1,14 +1,17 @@
 import type { NextConfig } from "next";
 
 // CDN URL для статических файлов в продакшене
-const CDN_URL = process.env.NEXT_PUBLIC_CDN_URL || 'https://cdn.rvn.market';
+// TODO: Раскомментировать для включения CDN
+// const CDN_URL = process.env.NEXT_PUBLIC_CDN_URL || 'https://cdn.rvn.market';
 
 const nextConfig: NextConfig = {
   output: 'standalone',
   compress: true,
   poweredByHeader: false,
+  // TODO: Раскомментировать для включения CDN
   // Use CDN for static assets in production
-  assetPrefix: process.env.NODE_ENV === 'production' ? CDN_URL : '',
+  // assetPrefix: process.env.NODE_ENV === 'production' ? CDN_URL : '',
+  assetPrefix: '', // CDN отключен - используем основной домен
   trailingSlash: false,
   outputFileTracingRoot: process.cwd(),
   outputFileTracingIncludes: {
