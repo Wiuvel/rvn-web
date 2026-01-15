@@ -127,7 +127,7 @@ export async function GET(
       .select(`
         *,
         sender:users!support_messages_sender_id_fkey(id, username, user_id, avatar),
-        attachments:support_message_attachments(id, file_name, file_type, file_size, storage_url)
+        attachments:support_message_attachments(id, file_name, file_type, file_size, storage_path, storage_url)
       `)
       .eq('ticket_id', ticketId)
       .order('created_at', { ascending: true })
@@ -154,9 +154,21 @@ export async function GET(
     
     const messagesWithSenderType = (messages || []).map((msg) => {
       const senderIsSupport = senderRolesMap.get(msg.sender_id) || false;
+      // Формируем правильные URL для вложений из storage_path
+      let attachments = undefined;
+      if (msg.attachments) {
+        const attArray = Array.isArray(msg.attachments) ? msg.attachments : [msg.attachments];
+        attachments = attArray.map((att: any) => ({
+          ...att,
+          storage_url: att.storage_path 
+            ? `/api/support/files/${encodeURIComponent(att.storage_path)}` 
+            : att.storage_url || ''
+        }));
+      }
       return {
         ...msg,
-        sender_type: senderIsSupport ? 'support' : 'user' as 'user' | 'support'
+        sender_type: senderIsSupport ? 'support' : 'user' as 'user' | 'support',
+        attachments
       };
     });
 

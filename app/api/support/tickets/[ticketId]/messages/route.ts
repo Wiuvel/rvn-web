@@ -240,7 +240,7 @@ export async function POST(
         file_type: att.fileType,
         file_size: att.fileSize,
         storage_path: att.storagePath,
-        storage_url: att.storageUrl,
+        storage_url: `/api/support/files/${encodeURIComponent(att.storagePath)}`, // Используем API endpoint для авторизованного доступа
       }));
 
       const { error: attachmentsError } = await supabaseAdmin
@@ -271,6 +271,33 @@ export async function POST(
         }
       }
       
+      // Получаем вложения для сообщения
+      let attachmentsData: Array<{
+        id: string;
+        file_name: string;
+        file_type: string;
+        file_size: number;
+        storage_path: string;
+      }> = [];
+      
+      if (attachments && Array.isArray(attachments) && attachments.length > 0) {
+        // Получаем вложения из базы данных
+        const { data: dbAttachments } = await supabaseAdmin
+          .from('support_message_attachments')
+          .select('id, file_name, file_type, file_size, storage_path')
+          .eq('message_id', newMessage.id);
+        
+        if (dbAttachments && dbAttachments.length > 0) {
+          attachmentsData = dbAttachments.map(att => ({
+            id: att.id,
+            file_name: att.file_name,
+            file_type: att.file_type,
+            file_size: att.file_size,
+            storage_path: att.storage_path,
+          }));
+        }
+      }
+      
       const messageForBroadcast = {
         id: newMessage.id,
         ticket_id: newMessage.ticket_id,
@@ -280,6 +307,7 @@ export async function POST(
         is_read: newMessage.is_read || false,
         created_at: newMessage.created_at,
         sender: senderData,
+        attachments: attachmentsData.length > 0 ? attachmentsData : undefined,
       };
       
       // Успешное создание сообщения не логируется

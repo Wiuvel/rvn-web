@@ -16,6 +16,13 @@ interface LastMessage {
   sender_type: 'user' | 'support';
   created_at: string;
   is_read: boolean;
+  attachments?: Array<{
+    id: string;
+    file_name: string;
+    file_type: string;
+    file_size: number;
+    storage_path: string;
+  }>;
 }
 
 interface RpcLastMessage {
@@ -161,7 +168,14 @@ export async function GET(request: NextRequest) {
             const batchPromises = batch.map(async (ticketId) => {
               const { data: lastMessage } = await supabaseAdmin!
                 .from('support_messages')
-                .select('id, message_text, sender_id, created_at, is_read')
+                .select(`
+                  id, 
+                  message_text, 
+                  sender_id, 
+                  created_at, 
+                  is_read,
+                  attachments:support_message_attachments(id, file_name, file_type, file_size, storage_path)
+                `)
                 .eq('ticket_id', ticketId)
                 .order('created_at', { ascending: false })
                 .limit(1)
@@ -180,13 +194,33 @@ export async function GET(request: NextRequest) {
             batchResults.forEach(({ ticketId, lastMessage }) => {
               if (lastMessage) {
                 const senderIsSupport = senderRolesMap.get(lastMessage.sender_id) || false;
+                // Обрабатываем вложения (могут быть массивом или объектом)
+                let attachments: Array<{
+                  id: string;
+                  file_name: string;
+                  file_type: string;
+                  file_size: number;
+                  storage_path: string;
+                }> = [];
+                if (lastMessage.attachments) {
+                  if (Array.isArray(lastMessage.attachments)) {
+                    attachments = lastMessage.attachments.map((att: any) => ({
+                      id: att.id,
+                      file_name: att.file_name,
+                      file_type: att.file_type,
+                      file_size: att.file_size,
+                      storage_path: att.storage_path,
+                    }));
+                  }
+                }
                 lastMessagesMap[ticketId] = {
                   id: lastMessage.id,
                   message_text: lastMessage.message_text,
                   sender_id: lastMessage.sender_id,
                   sender_type: senderIsSupport ? 'support' : 'user' as 'user' | 'support',
                   created_at: lastMessage.created_at,
-                  is_read: lastMessage.is_read
+                  is_read: lastMessage.is_read,
+                  attachments: attachments.length > 0 ? attachments : undefined
                 };
               }
             });

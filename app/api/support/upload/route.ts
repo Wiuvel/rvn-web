@@ -170,7 +170,7 @@ export async function POST(request: NextRequest) {
         fileType: file.type,
         fileSize: file.size,
         storagePath,
-        storageUrl: fileUrl,
+        storageUrl: `/api/support/files/${encodeURIComponent(storagePath)}`, // Используем API endpoint для авторизованного доступа
       });
     }
 

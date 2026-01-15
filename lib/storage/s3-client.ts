@@ -48,41 +48,17 @@ export async function uploadFileToS3(
     Key: key,
     Body: file,
     ContentType: contentType,
-    // Публичный доступ для чтения
-    ACL: 'public-read',
+    // Авторизованный доступ для чтения (только для авторизованных пользователей)
+    // Примечание: некоторые S3-совместимые провайдеры могут не поддерживать ACL
+    // В этом случае доступ контролируется через bucket policies
+    ACL: 'authenticated-read',
   });
 
   await client.send(command);
 
-  // Формируем публичный URL
-  // 
-  // ВАЖНО: Если вы используете кастомный домен (привязанный к S3 бакету),
-  // убедитесь, что:
-  // 1. SSL сертификат настроен для вашего кастомного домена
-  // 2. DNS записи настроены правильно (CNAME или A-запись)
-  // 3. В S3_PUBLIC_URL указан ваш кастомный домен с HTTPS
-  //
-  // Если SSL не настроен для кастомного домена, используйте S3_PUBLIC_URL
-  // с предоставленным провайдером URL (который имеет валидный SSL).
-  //
-  // Если задан S3_PUBLIC_URL, используем его (приоритет для кастомных доменов с SSL)
-  if (env.S3_PUBLIC_URL) {
-    const publicUrl = env.S3_PUBLIC_URL.endsWith('/') 
-      ? env.S3_PUBLIC_URL.slice(0, -1) 
-      : env.S3_PUBLIC_URL;
-    return `${publicUrl}/${key}`;
-  }
-
-  // Fallback: формируем URL из endpoint и bucket
-  // Используется, если S3_PUBLIC_URL не задан
-  // Этот URL обычно имеет валидный SSL от провайдера
-  if (!env.S3_ENDPOINT || !env.S3_BUCKET) {
-    throw new Error('S3 endpoint and bucket must be configured');
-  }
-  const endpointUrl = env.S3_ENDPOINT.endsWith('/') 
-    ? env.S3_ENDPOINT.slice(0, -1) 
-    : env.S3_ENDPOINT;
-  return `${endpointUrl}/${env.S3_BUCKET}/${key}`;
+  // Возвращаем путь к файлу (storage_path), а не публичный URL
+  // Фактический доступ к файлу будет через API endpoint с авторизацией
+  return key;
 }
 
 /**
@@ -102,6 +78,29 @@ export async function deleteFileFromS3(key: string): Promise<void> {
   });
 
   await client.send(command);
+}
+
+/**
+ * Генерирует presigned URL для временного доступа к файлу
+ * @param key - Путь к файлу в бакете
+ * @param expiresIn - Время жизни URL в секундах (по умолчанию 1 час)
+ * @returns Presigned URL
+ */
+export async function getPresignedUrl(key: string, expiresIn: number = 3600): Promise<string> {
+  const client = getS3Client();
+  const env = getEnv();
+  
+  if (!client || !env.S3_BUCKET) {
+    throw new Error('S3 storage is not configured');
+  }
+
+  const command = new GetObjectCommand({
+    Bucket: env.S3_BUCKET,
+    Key: key,
+  });
+
+  const url = await getSignedUrl(client, command, { expiresIn });
+  return url;
 }
 
 /**

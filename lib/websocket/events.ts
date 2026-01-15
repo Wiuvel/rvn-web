@@ -25,6 +25,13 @@ export interface SupportWebSocketEvents {
         user_id: string;
         avatar?: string | null;
       };
+      attachments?: Array<{
+        id: string;
+        file_name: string;
+        file_type: string;
+        file_size: number;
+        storage_path: string;
+      }>;
     };
   }) => void;
   'support:ticket:updated': (data: {

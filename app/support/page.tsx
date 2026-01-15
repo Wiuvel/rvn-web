@@ -37,6 +37,7 @@ interface MessageAttachment {
   file_type: string;
   file_size: number;
   storage_url: string;
+  storage_path?: string; // Опционально, для формирования URL из пути
 }
 
 interface Message {
@@ -65,6 +66,13 @@ interface Ticket {
     sender_type: 'user' | 'support' | 'system';
     created_at: string;
     is_read: boolean;
+    attachments?: Array<{
+      id: string;
+      file_name: string;
+      file_type: string;
+      file_size: number;
+      storage_path: string;
+    }>;
   } | null;
   unread_count?: number;
   updated_at?: string; // Для обновления через WebSocket
@@ -686,7 +694,7 @@ export default function SupportPage() {
           file_name: string;
           file_type: string;
           file_size: number;
-          storage_url: string;
+          storage_path: string;
         }>;
       };
     }) => {
@@ -704,7 +712,16 @@ export default function SupportPage() {
         timestamp: new Date(data.message.created_at),
         isRead: data.message.is_read,
         senderData: data.message.sender,
-        attachments: data.message.attachments || [],
+        attachments: (data.message.attachments || []).map((att: any) => ({
+          id: att.id,
+          file_name: att.file_name,
+          file_type: att.file_type,
+          file_size: att.file_size,
+          storage_url: att.storage_path 
+            ? `/api/support/files/${encodeURIComponent(att.storage_path)}` 
+            : '',
+          storage_path: att.storage_path
+        })),
       };
 
       const lastMessageData = {
@@ -1197,13 +1214,28 @@ export default function SupportPage() {
                 subject: retryData.ticket.subject,
                 status: retryData.ticket.status,
                 createdAt: new Date(retryData.ticket.created_at),
-                messages: (retryData.messages || []).map((m: { id: string; message_text: string; sender_type: string; created_at: string; is_read: boolean; sender?: { id: string; username: string; user_id: string } }) => ({
+                messages: (retryData.messages || []).map((m: { 
+                  id: string; 
+                  message_text: string; 
+                  sender_type: string; 
+                  created_at: string; 
+                  is_read: boolean; 
+                  sender?: { id: string; username: string; user_id: string };
+                  attachments?: Array<{
+                    id: string;
+                    file_name: string;
+                    file_type: string;
+                    file_size: number;
+                    storage_url: string;
+                  }>;
+                }) => ({
                   id: m.id,
                   text: m.message_text,
                   sender: m.sender_type,
                   timestamp: new Date(m.created_at),
                   isRead: m.is_read,
-                  senderData: m.sender
+                  senderData: m.sender,
+                  attachments: m.attachments || []
                 }))
               });
               markMessagesAsRead(data.ticket.id);
@@ -1604,13 +1636,40 @@ export default function SupportPage() {
             return prev;
           }
           
-          const mappedMessages = (data.messages || []).map((m: { id: string; message_text: string; sender_type: string; created_at: string; is_read: boolean; sender?: { id: string; username: string; user_id: string } }) => ({
+          const mappedMessages = (data.messages || []).map((m: { 
+            id: string; 
+            message_text: string; 
+            sender_type: string; 
+            created_at: string; 
+            is_read: boolean; 
+            sender?: { id: string; username: string; user_id: string };
+            attachments?: Array<{
+              id: string;
+              file_name: string;
+              file_type: string;
+              file_size: number;
+              storage_url: string;
+              storage_path?: string;
+            }>;
+          }) => ({
             id: m.id,
             text: m.message_text,
             sender: m.sender_type,
             timestamp: new Date(m.created_at),
             isRead: m.is_read,
-            senderData: m.sender // Добавляем данные отправителя
+            senderData: m.sender,
+            attachments: (m.attachments || []).map((att: any) => ({
+              id: att.id,
+              file_name: att.file_name,
+              file_type: att.file_type,
+              file_size: att.file_size,
+              storage_url: att.storage_path 
+                ? `/api/support/files/${encodeURIComponent(att.storage_path)}` 
+                : att.storage_url?.startsWith('/api/support/files/') 
+                  ? att.storage_url 
+                  : att.storage_url || '',
+              storage_path: att.storage_path
+            }))
           }));
           
           // Отмечаем все загруженные сообщения как уже загруженные (первая загрузка тикета)
@@ -2125,16 +2184,43 @@ export default function SupportPage() {
                           // Используем trim() для надежного сравнения
                           const isSystemMessage = lastMessageText.trim() === SYSTEM_MESSAGE_TEXT.trim() || isStatusChangeMessage;
                           
+                          const hasAttachments = ticket.last_message.attachments && ticket.last_message.attachments.length > 0;
+                          const imagesCount = hasAttachments ? ticket.last_message.attachments!.filter(a => a.file_type.startsWith('image/')).length : 0;
+                          const documentsCount = hasAttachments ? ticket.last_message.attachments!.filter(a => !a.file_type.startsWith('image/')).length : 0;
+                          
                           return (
-                            <div className="text-xs text-neutral-500 mt-1.5 truncate flex items-center gap-2">
-                              <span className="flex-shrink-0 text-neutral-600">
-                                {isSystemMessage ? 'Система:' : ticket.last_message.sender_type === 'user' ? 'Вы:' : 'Поддержка:'}
-                              </span>
-                              <span className="truncate flex-1 min-w-0">
-                                {ticket.last_message.message_text}
-                              </span>
-                              {ticket.last_message.is_read === false && ticket.last_message.sender_type === 'support' && !isSystemMessage && (
-                                <span className="flex-shrink-0 w-2 h-2 bg-blue-500 rounded-full"></span>
+                            <div className="text-xs text-neutral-500 mt-1.5">
+                              <div className="truncate flex items-center gap-2">
+                                <span className="flex-shrink-0 text-neutral-600">
+                                  {isSystemMessage ? 'Система:' : ticket.last_message.sender_type === 'user' ? 'Вы:' : 'Поддержка:'}
+                                </span>
+                                {ticket.last_message.message_text ? (
+                                  <span className="truncate flex-1 min-w-0">
+                                    {ticket.last_message.message_text}
+                                  </span>
+                                ) : hasAttachments ? (
+                                  <span className="truncate flex-1 min-w-0 text-neutral-400">
+                                    {imagesCount > 0 && documentsCount > 0 
+                                      ? `📎 ${imagesCount} изображений, ${documentsCount} документов`
+                                      : imagesCount > 0 
+                                        ? `📷 ${imagesCount} ${imagesCount === 1 ? 'изображение' : 'изображений'}`
+                                        : `📄 ${documentsCount} ${documentsCount === 1 ? 'документ' : 'документов'}`
+                                    }
+                                  </span>
+                                ) : null}
+                                {ticket.last_message.is_read === false && ticket.last_message.sender_type === 'support' && !isSystemMessage && (
+                                  <span className="flex-shrink-0 w-2 h-2 bg-blue-500 rounded-full"></span>
+                                )}
+                              </div>
+                              {ticket.last_message.message_text && hasAttachments && (
+                                <div className="text-[10px] text-neutral-400 mt-0.5 truncate">
+                                  {imagesCount > 0 && documentsCount > 0 
+                                    ? `📎 ${imagesCount} изображений, ${documentsCount} документов`
+                                    : imagesCount > 0 
+                                      ? `📷 ${imagesCount} ${imagesCount === 1 ? 'изображение' : 'изображений'}`
+                                      : `📄 ${documentsCount} ${documentsCount === 1 ? 'документ' : 'документов'}`
+                                  }
+                                </div>
                               )}
                             </div>
                           );

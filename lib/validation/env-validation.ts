@@ -52,10 +52,6 @@ const envSchema = z.object({
   S3_ACCESS_KEY: z.string().optional(),
   S3_SECRET_KEY: z.string().optional(),
   S3_REGION: z.string().optional(),
-  // Публичный URL для доступа к файлам
-  // ВАЖНО: Если используете кастомный домен, убедитесь что SSL сертификат настроен для него
-  // Иначе используйте предоставленный провайдером URL (который имеет валидный SSL)
-  S3_PUBLIC_URL: z.string().url().optional(),
   
   // Node environment
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
@@ -143,7 +139,6 @@ export function validateEnv(): Env {
       S3_ACCESS_KEY: process.env.S3_ACCESS_KEY,
       S3_SECRET_KEY: process.env.S3_SECRET_KEY,
       S3_REGION: process.env.S3_REGION,
-      S3_PUBLIC_URL: process.env.S3_PUBLIC_URL,
       NODE_ENV: process.env.NODE_ENV || 'development',
     });
     
