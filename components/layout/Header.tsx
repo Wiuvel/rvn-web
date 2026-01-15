@@ -13,7 +13,6 @@ import { GSAP_DEFAULT_DURATION, GSAP_DEFAULT_EASE } from '@/lib/utils/constants'
 import { getGradientClasses } from '@/lib/utils/avatar-gradients';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { getStaticUrl } from "@/lib/utils";
-import { CdnImage } from '@/components/ui/CdnImage';
 
 if (typeof window !== 'undefined') {
   gsap.registerPlugin(ScrollTrigger);
@@ -261,8 +260,8 @@ export default function Header({ variant = 'main' }: HeaderProps = {}) {
             className="flex items-center gap-2"
             aria-current={pathname === '/' ? 'page' : undefined}
           >
-            <CdnImage 
-              src="/static/logo.svg" 
+            <Image 
+              src={getStaticUrl("/static/logo.svg")} 
               alt="RVNPrivate" 
               width={256} 
               height={256} 
