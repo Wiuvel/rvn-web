@@ -6,6 +6,7 @@ import { useEffect } from 'react';
 // Using full gsap for ScrollTrigger plugin
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { getStaticUrl } from '@/lib/utils';
 
 export default function Footer() {
   const currentYear = new Date().getFullYear();
@@ -50,7 +51,7 @@ export default function Footer() {
           <div className="md:col-span-4">
             <div className="flex items-center text-neutral-200">
               <Image 
-                src="/static/large-logo.svg" 
+                src={getStaticUrl("/static/large-logo.svg")} 
                 alt="Raven Private" 
                 width={905} 
                 height={440} 

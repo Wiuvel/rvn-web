@@ -12,6 +12,7 @@ import { NotificationsMenu } from '@/components/navigation/Notifications';
 import { GSAP_DEFAULT_DURATION, GSAP_DEFAULT_EASE } from '@/lib/utils/constants';
 import { getGradientClasses } from '@/lib/utils/avatar-gradients';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { getStaticUrl } from "@/lib/utils";
 
 if (typeof window !== 'undefined') {
   gsap.registerPlugin(ScrollTrigger);
@@ -260,11 +261,11 @@ export default function Header({ variant = 'main' }: HeaderProps = {}) {
             aria-current={pathname === '/' ? 'page' : undefined}
           >
             <Image 
-              src="/static/logo.svg" 
+              src={getStaticUrl("/static/logo.svg")} 
               alt="RVNPrivate" 
               width={256} 
               height={256} 
-              className="w-6 h-6"
+                  className="w-6 h-6"
               priority
             />
             <span className="font-semibold text-white">Raven Private</span>
@@ -301,7 +302,7 @@ export default function Header({ variant = 'main' }: HeaderProps = {}) {
                       aria-expanded={notificationsOpen}
                     >
                       <Image 
-                        src={hasUnreadNotifications ? "/static/icons/accounts/bell-dot.svg" : "/static/icons/accounts/bell.svg"} 
+                        src={hasUnreadNotifications ? getStaticUrl("/static/icons/accounts/bell-dot.svg") : getStaticUrl("/static/icons/accounts/bell.svg")} 
                         alt="Уведомления" 
                         width={18} 
                         height={18} 
@@ -348,7 +349,7 @@ export default function Header({ variant = 'main' }: HeaderProps = {}) {
                   className="rounded-xl bg-primary-500 hover:bg-primary-400 px-4 py-2 text-sm font-medium text-white shadow-glow transition flex items-center gap-2 h-10 flex-shrink-0 min-w-[110px] justify-center"
                 >
                   <Image 
-                    src="/static/icons/accounts/log-in.svg" 
+                    src={getStaticUrl("/static/icons/accounts/log-in.svg")} 
                     alt="Войти" 
                     width={24} 
                     height={24} 
@@ -378,7 +379,7 @@ export default function Header({ variant = 'main' }: HeaderProps = {}) {
                 aria-expanded={notificationsOpen}
               >
                 <Image 
-                  src={hasUnreadNotifications ? "/static/icons/accounts/bell-dot.svg" : "/static/icons/accounts/bell.svg"} 
+                  src={hasUnreadNotifications ? getStaticUrl("/static/icons/accounts/bell-dot.svg") : getStaticUrl("/static/icons/accounts/bell.svg")} 
                   alt="Уведомления" 
                   width={18} 
                   height={18} 
@@ -455,7 +456,7 @@ export default function Header({ variant = 'main' }: HeaderProps = {}) {
                       className="flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-xl text-white/80 hover:text-white hover:bg-white/5 transition-colors duration-200"
                     >
                       <Image 
-                        src="/static/icons/accounts/users.svg" 
+                        src={getStaticUrl("/static/icons/accounts/users.svg")} 
                         alt="Профиль" 
                         width={24} 
                         height={24} 
@@ -469,7 +470,7 @@ export default function Header({ variant = 'main' }: HeaderProps = {}) {
                       className="flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-xl text-white/80 hover:text-white hover:bg-white/5 transition-colors duration-200"
                     >
                       <Image 
-                        src="/static/icons/accounts/wallet.svg" 
+                        src={getStaticUrl("/static/icons/accounts/wallet.svg")} 
                         alt="Мои тарифы" 
                         width={24} 
                         height={24} 
@@ -483,7 +484,7 @@ export default function Header({ variant = 'main' }: HeaderProps = {}) {
                       className="flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-xl text-white/80 hover:text-white hover:bg-white/5 transition-colors duration-200"
                     >
                       <Image 
-                        src="/static/icons/accounts/support.svg" 
+                        src={getStaticUrl("/static/icons/accounts/support.svg")} 
                         alt="Поддержка" 
                         width={24} 
                         height={24} 
@@ -509,7 +510,7 @@ export default function Header({ variant = 'main' }: HeaderProps = {}) {
                       className="w-full flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-xl text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors duration-200"
                     >
                       <Image 
-                        src="/static/icons/accounts/log-out.svg" 
+                        src={getStaticUrl("/static/icons/accounts/log-out.svg")} 
                         alt="Выйти" 
                         width={24} 
                         height={24} 

@@ -1,6 +1,7 @@
 import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
 import { randomBytes } from "crypto"
+import { domains } from './config';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -14,6 +15,9 @@ export function generateSessionId(): string {
   return randomBytes(32).toString('hex');
 }
 
+// Экспортируем domains для удобства
+export { domains };
+
 /**
  * Генерирует URL для статических файлов с поддержкой CDN
  * В продакшене использует CDN URL из переменной окружения или дефолтный
@@ -26,9 +30,8 @@ export function getStaticUrl(path: string): string {
   
   // В продакшене используем CDN, в dev - относительный путь
   if (process.env.NODE_ENV === 'production') {
-    const cdnUrl = process.env.CDN_URL || 'https://cdn.rvn.market';
     // Убираем trailing slash из CDN URL если есть
-    const cleanCdnUrl = cdnUrl.endsWith('/') ? cdnUrl.slice(0, -1) : cdnUrl;
+    const cleanCdnUrl = domains.cdnUrl.endsWith('/') ? domains.cdnUrl.slice(0, -1) : domains.cdnUrl;
     return `${cleanCdnUrl}${cleanPath}`;
   }
   

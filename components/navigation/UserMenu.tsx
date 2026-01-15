@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { UserData } from '@/types';
 import { useMenuAnimation } from '@/hooks/useMenuAnimation';
 import { getGradientClasses } from '@/lib/utils/avatar-gradients';
+import { getStaticUrl } from '@/lib/utils';
 
 interface UserMenuProps {
   userData: UserData;
@@ -85,7 +86,7 @@ export function UserMenu({
               className="flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-xl text-white/80 hover:text-white hover:bg-white/5 transition-colors duration-200"
             >
               <Image 
-                src="/static/icons/accounts/users.svg" 
+                src={getStaticUrl("/static/icons/accounts/users.svg")} 
                 alt="Профиль" 
                 width={20} 
                 height={20} 
@@ -100,7 +101,7 @@ export function UserMenu({
             className="flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-xl text-white/80 hover:text-white hover:bg-white/5 transition-colors duration-200"
           >
             <Image 
-              src="/static/icons/accounts/wallet.svg" 
+              src={getStaticUrl("/static/icons/accounts/wallet.svg")} 
               alt="Мои тарифы" 
               width={20} 
               height={20} 
@@ -114,7 +115,7 @@ export function UserMenu({
             className="flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-xl text-white/80 hover:text-white hover:bg-white/5 transition-colors duration-200"
           >
             <Image 
-              src="/static/icons/accounts/support.svg" 
+              src={getStaticUrl("/static/icons/accounts/support.svg")} 
               alt="Поддержка" 
               width={20} 
               height={20} 
@@ -128,7 +129,7 @@ export function UserMenu({
             className="w-full flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-xl text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors duration-200"
           >
             <Image 
-              src="/static/icons/accounts/log-out.svg" 
+              src={getStaticUrl("/static/icons/accounts/log-out.svg")} 
               alt="Выйти" 
               width={20} 
               height={20} 

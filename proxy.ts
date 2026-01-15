@@ -1,5 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+// Домены из переменных окружения
+const MAIN_DOMAIN = process.env.NEXT_PUBLIC_DOMAIN?.replace(/^https?:\/\//, '') || 
+                    process.env.PUBLIC_DOMAIN?.replace(/^https?:\/\//, '') || 
+                    'rvn.market';
+const CDN_DOMAIN = process.env.NEXT_PUBLIC_CDN_URL?.replace(/^https?:\/\//, '') || 
+                   process.env.CDN_URL?.replace(/^https?:\/\//, '') || 
+                   'cdn.rvn.market';
+
 /**
  * Generates Content Security Policy header
  * Based on Next.js.org CSP structure, adapted for rvn.market
@@ -7,13 +15,11 @@ import { NextRequest, NextResponse } from 'next/server';
  * @returns CSP header string
  */
 function generateCSPHeader(isDev: boolean): string {
-  const domain = 'rvn.market';
-  const cdnDomain = 'cdn.rvn.market';
   const supabaseDomain = 'ljeklmajzfylmyqjxcck.supabase.co';
   const turnstileDomain = 'challenges.cloudflare.com';
   
   // Base domains for CSP - explicitly include CDN domain
-  const baseDomains = `'self' ${domain} *.${domain} https://${cdnDomain} http://${cdnDomain}`;
+  const baseDomains = `'self' ${MAIN_DOMAIN} *.${MAIN_DOMAIN} https://${CDN_DOMAIN} http://${CDN_DOMAIN}`;
   
   // Localhost for dev mode
   const localhost = isDev ? ' localhost:* http://localhost:* ws://localhost:* wss://localhost:*' : '';
@@ -321,7 +327,7 @@ export function proxy(request: NextRequest) {
   const isStatic = isStaticFile(pathname);
   
   // Check if request is from CDN domain
-  const isCdnRequest = hostname === 'cdn.rvn.market' || hostname.endsWith('.rvn.market');
+  const isCdnRequest = hostname === CDN_DOMAIN || hostname === `cdn.${MAIN_DOMAIN}` || hostname.endsWith(`.${MAIN_DOMAIN}`);
 
   /** Early exit for static files, API routes, and bots */
   if (shouldBypassProxy(pathname, userAgent, hostname)) {

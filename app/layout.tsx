@@ -5,16 +5,22 @@ import ConditionalLayout from "@/components/layout/Conditional";
 import { pageMetadata } from "@/lib/utils/seo";
 import { exo2 } from "./fonts";
 import HomeStructuredData from "@/components/seo/HomeStructuredData";
+import { domains, getStaticUrl } from "@/lib/utils";
+
+// Генерируем URL для favicon с поддержкой CDN
+const faviconUrl = process.env.NODE_ENV === 'production' 
+  ? getStaticUrl('/favicon.ico')
+  : '/favicon.ico';
 
 export const metadata: Metadata = {
   ...pageMetadata.home,
   icons: {
     icon: [
-      { url: '/favicon.ico', sizes: '48x48', type: 'image/x-icon' },
+      { url: faviconUrl, sizes: '48x48', type: 'image/x-icon' },
     ],
   },
   alternates: {
-    canonical: 'https://rvn.market',
+    canonical: domains.mainUrl,
   },
 };
 

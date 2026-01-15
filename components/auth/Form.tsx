@@ -9,6 +9,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { translateError } from '@/lib/utils/error-translations';
 import { getOAuthErrorMessage } from '@/lib/utils/oauth-errors';
 import { loginSchema, registerSchema, type LoginFormData, type RegisterFormData } from '@/lib/validation/schemas';
+import { getStaticUrl } from '@/lib/utils';
 
 interface WindowWithPopup extends Window {
   __lastPopup?: Window & {
@@ -613,7 +614,7 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
                 aria-label={showPassword.register ? 'Скрыть пароль' : 'Показать пароль'}
               >
                 <Image
-                  src={showPassword.register ? "/static/icons/login/pass-hide.svg" : "/static/icons/login/pass-hideoff.svg"}
+                  src={showPassword.register ? getStaticUrl("/static/icons/login/pass-hide.svg") : getStaticUrl("/static/icons/login/pass-hideoff.svg")}
                   alt={showPassword.register ? "Скрыть пароль" : "Показать пароль"}
                   width={24}
                   height={24}
@@ -882,7 +883,7 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
                 aria-label={showPassword.login ? 'Скрыть пароль' : 'Показать пароль'}
               >
                 <Image
-                  src={showPassword.login ? "/static/icons/login/pass-hide.svg" : "/static/icons/login/pass-hideoff.svg"}
+                  src={showPassword.login ? getStaticUrl("/static/icons/login/pass-hide.svg") : getStaticUrl("/static/icons/login/pass-hideoff.svg")}
                   alt={showPassword.login ? "Скрыть пароль" : "Показать пароль"}
                   width={24}
                   height={24}

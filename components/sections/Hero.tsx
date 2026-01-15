@@ -7,6 +7,7 @@ import dynamic from 'next/dynamic';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { getStaticUrl } from "@/lib/utils";
 
 interface HeroSectionProps {
   onLightRaysLoad?: () => void;
@@ -25,10 +26,10 @@ export default function HeroSection({ onLightRaysLoad }: HeroSectionProps = {}) 
 
   useEffect(() => {
     const servers = [
-      { country: "Германия", code: "DE-1", flag: "/static/icons/flags/de.svg" },
-      { country: "Германия", code: "DE-2", flag: "/static/icons/flags/de.svg" },
-      { country: "Швеция", code: "SWE-1", flag: "/static/icons/flags/swe.svg" },
-      { country: "Швеция", code: "SWE-2", flag: "/static/icons/flags/swe.svg" }
+      { country: "Германия", code: "DE-1", flag: getStaticUrl("/static/icons/flags/de.svg") },
+      { country: "Германия", code: "DE-2", flag: getStaticUrl("/static/icons/flags/de.svg") },
+      { country: "Швеция", code: "SWE-1", flag: getStaticUrl("/static/icons/flags/swe.svg") },
+      { country: "Швеция", code: "SWE-2", flag: getStaticUrl("/static/icons/flags/swe.svg") }
     ];
 
     const timer = setTimeout(() => {
