@@ -11,6 +11,9 @@ import { translateError } from '@/lib/utils/error-translations';
 import { getGradientClasses } from '@/lib/utils/avatar-gradients';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import TicketSkeleton from '@/components/ui/TicketSkeleton';
+import FileUploadModal from '@/components/support/FileUploadModal';
+import { Paperclip, X, Image as ImageIcon, FileText, AlertCircle } from 'lucide-react';
+import ImageViewer from '@/components/support/ImageViewer';
 
 // Lazy load RateLimitCaptcha для оптимизации bundle size
 // Убираем loading state, чтобы избежать показа модального окна при загрузке страницы
@@ -28,6 +31,14 @@ interface UserData {
   avatar?: string | null;
 }
 
+interface MessageAttachment {
+  id: string;
+  file_name: string;
+  file_type: string;
+  file_size: number;
+  storage_url: string;
+}
+
 interface Message {
   id: string;
   text: string;
@@ -39,6 +50,7 @@ interface Message {
     username: string;
     user_id: string;
   };
+  attachments?: MessageAttachment[];
 }
 
 interface Ticket {
@@ -58,6 +70,43 @@ interface Ticket {
   updated_at?: string; // Для обновления через WebSocket
 }
 
+// Компонент для изображения с обработкой ошибок
+function ImageWithError({ src, alt, className }: { src: string; alt: string; className?: string }) {
+  const [hasError, setHasError] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  return (
+    <div className={`relative bg-neutral-800 ${className || ''}`}>
+      {hasError ? (
+        <div className="aspect-video flex items-center justify-center">
+          <div className="text-center p-4">
+            <AlertCircle className="w-8 h-8 text-red-400 mx-auto mb-2" />
+            <p className="text-xs text-red-300">Изображение недоступно</p>
+          </div>
+        </div>
+      ) : (
+        <>
+          {isLoading && (
+            <div className="absolute inset-0 flex items-center justify-center bg-neutral-800">
+              <div className="w-6 h-6 border-2 border-neutral-600 border-t-neutral-400 rounded-full animate-spin" />
+            </div>
+          )}
+          <img
+            src={src}
+            alt={alt}
+            className={`w-full h-auto object-contain ${isLoading ? 'opacity-0' : 'opacity-100'} transition-opacity ${className || ''}`}
+            onLoad={() => setIsLoading(false)}
+            onError={() => {
+              setHasError(true);
+              setIsLoading(false);
+            }}
+          />
+        </>
+      )}
+    </div>
+  );
+}
+
 // Компонент для сообщения
 function MessageItem({ 
   message, 
@@ -65,7 +114,8 @@ function MessageItem({
   userData, 
   formatDate, 
   formatTime,
-  isInitialLoad = false
+  isInitialLoad = false,
+  onImageClick
 }: { 
   message: Message; 
   showDate: boolean; 
@@ -73,7 +123,20 @@ function MessageItem({
   formatDate: (date: Date) => string;
   formatTime: (date: Date) => string;
   isInitialLoad?: boolean;
+  onImageClick?: (url: string, alt: string) => void;
 }) {
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return `${bytes} Б`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} КБ`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} МБ`;
+  };
+  
+  // Функция для форматирования размера файла (используется в MessageItem)
+  const formatFileSizeForMessage = (bytes: number): string => {
+    if (bytes < 1024) return `${bytes} Б`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} КБ`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} МБ`;
+  };
   const messageRef = useRef<HTMLDivElement>(null);
   const hasAnimatedRef = useRef(false);
 
@@ -163,9 +226,68 @@ function MessageItem({
                   : 'bg-neutral-600 text-white rounded-br-sm'
                 : 'bg-neutral-800 text-neutral-100 rounded-bl-sm'
             }`} style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>
-              <p className="text-xs sm:text-sm whitespace-pre-wrap break-words">
-                {message.text}
-              </p>
+              {message.text && (
+                <p className="text-xs sm:text-sm whitespace-pre-wrap break-words">
+                  {message.text}
+                </p>
+              )}
+              
+              {/* Вложения */}
+              {message.attachments && message.attachments.length > 0 && (() => {
+                const images = message.attachments.filter(a => a.file_type.startsWith('image/'));
+                const documents = message.attachments.filter(a => !a.file_type.startsWith('image/'));
+                
+                return (
+                  <div className={`mt-2 space-y-2 ${message.text ? 'mt-2' : ''}`}>
+                    {/* Группировка изображений */}
+                    {images.length > 0 && (
+                      <div className={`grid gap-1.5 max-w-xs ${
+                        images.length === 1 ? 'grid-cols-1' : images.length === 2 ? 'grid-cols-2' : 'grid-cols-2'
+                      }`}>
+                        {images.map((attachment) => (
+                          <button
+                            key={attachment.id}
+                            onClick={() => onImageClick?.(attachment.storage_url, attachment.file_name)}
+                            className="block rounded-lg overflow-hidden cursor-pointer hover:opacity-90 transition-opacity"
+                          >
+                            <ImageWithError
+                              src={attachment.storage_url}
+                              alt={attachment.file_name}
+                              className="rounded-lg"
+                            />
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {/* Документы */}
+                    {documents.length > 0 && (
+                      <div className="space-y-1.5">
+                        {documents.map((attachment) => (
+                          <a
+                            key={attachment.id}
+                            href={attachment.storage_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={`flex items-center gap-2 p-2 hover:bg-white/5 transition-colors rounded-lg ${
+                              message.sender === 'user'
+                                ? 'bg-white/10'
+                                : 'bg-neutral-700/50'
+                            }`}
+                          >
+                            <FileText className="w-4 h-4 flex-shrink-0 text-neutral-300" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-medium truncate">{attachment.file_name}</p>
+                              <p className="text-[10px] text-neutral-400">{formatFileSize(attachment.file_size)}</p>
+                            </div>
+                          </a>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+              
               <div className={`text-[10px] sm:text-xs mt-1 ${
                 message.sender === 'user' 
                   ? message.isRead !== false 
@@ -237,6 +359,27 @@ export default function SupportPage() {
   const [showRateLimitCaptcha, setShowRateLimitCaptcha] = useState(false);
   const isCaptchaOpenRef = useRef(false);
   const [ticketsListVisible, setTicketsListVisible] = useState(false);
+  const [showFileUploadModal, setShowFileUploadModal] = useState(false);
+  const [uploadedFiles, setUploadedFiles] = useState<Array<{
+    fileName: string;
+    fileType: string;
+    fileSize: number;
+    storagePath: string;
+    storageUrl: string;
+  }>>([]);
+  const [filePreviews, setFilePreviews] = useState<Map<string, string>>(new Map());
+  const [fileErrors, setFileErrors] = useState<Set<string>>(new Set());
+  const [viewingImage, setViewingImage] = useState<{ url: string; alt: string } | null>(null);
+  
+  // Загружаем превью для изображений после загрузки файлов
+  useEffect(() => {
+    uploadedFiles.forEach((file) => {
+      if (file.fileType.startsWith('image/') && !filePreviews.has(file.storageUrl) && !fileErrors.has(file.storageUrl)) {
+        // Превью уже есть в storageUrl, просто добавляем в Map
+        setFilePreviews(prev => new Map(prev).set(file.storageUrl, file.storageUrl));
+      }
+    });
+  }, [uploadedFiles]);
   // Очередь запросов вместо одного callback - исправляет race condition
   const pendingRequestsQueueRef = useRef<Array<() => Promise<void>>>([]);
   const isProcessingCaptchaRef = useRef(false); // Флаг обработки капчи - предотвращает повторные открытия
@@ -538,6 +681,13 @@ export default function SupportPage() {
           username: string;
           user_id: string;
         };
+        attachments?: Array<{
+          id: string;
+          file_name: string;
+          file_type: string;
+          file_size: number;
+          storage_url: string;
+        }>;
       };
     }) => {
       if (data.ticketId !== activeTicket.id) return;
@@ -547,13 +697,14 @@ export default function SupportPage() {
       if (messageExists) return;
 
       // Оптимизация: объединяем обновления состояния в один переход
-      const newMessage = {
+      const newMessage: Message = {
         id: data.message.id,
         text: data.message.message_text,
         sender: data.message.sender_type,
         timestamp: new Date(data.message.created_at),
         isRead: data.message.is_read,
         senderData: data.message.sender,
+        attachments: data.message.attachments || [],
       };
 
       const lastMessageData = {
@@ -775,13 +926,28 @@ export default function SupportPage() {
           
           // Обновляем только если появились новые сообщения, изменился статус или хэш сообщений
           if (currentMessageCount > lastMessageCount || statusChanged || currentMessagesHash !== lastMessagesHash) {
-            const mappedMessages = data.messages.map((m: { id: string; message_text: string; sender_type: string; created_at: string; is_read: boolean; sender?: { id: string; username: string; user_id: string } }) => ({
+            const mappedMessages = data.messages.map((m: { 
+              id: string; 
+              message_text: string; 
+              sender_type: string; 
+              created_at: string; 
+              is_read: boolean; 
+              sender?: { id: string; username: string; user_id: string };
+              attachments?: Array<{
+                id: string;
+                file_name: string;
+                file_type: string;
+                file_size: number;
+                storage_url: string;
+              }>;
+            }) => ({
               id: m.id,
               text: m.message_text,
               sender: m.sender_type,
               timestamp: new Date(m.created_at),
               isRead: m.is_read,
-              senderData: m.sender
+              senderData: m.sender,
+              attachments: m.attachments || []
             }));
 
             // Отмечаем новые сообщения (которые еще не были загружены)
@@ -1052,13 +1218,28 @@ export default function SupportPage() {
             subject: ticketData.ticket.subject,
             status: ticketData.ticket.status,
             createdAt: new Date(ticketData.ticket.created_at),
-            messages: (ticketData.messages || []).map((m: { id: string; message_text: string; sender_type: string; created_at: string; is_read: boolean; sender?: { id: string; username: string; user_id: string } }) => ({
+            messages: (ticketData.messages || []).map((m: { 
+              id: string; 
+              message_text: string; 
+              sender_type: string; 
+              created_at: string; 
+              is_read: boolean; 
+              sender?: { id: string; username: string; user_id: string };
+              attachments?: Array<{
+                id: string;
+                file_name: string;
+                file_type: string;
+                file_size: number;
+                storage_url: string;
+              }>;
+            }) => ({
               id: m.id,
               text: m.message_text,
               sender: m.sender_type,
               timestamp: new Date(m.created_at),
               isRead: m.is_read,
-              senderData: m.sender
+              senderData: m.sender,
+              attachments: m.attachments || []
             }))
           });
           
@@ -1096,7 +1277,10 @@ export default function SupportPage() {
   };
 
   const handleSendMessage = async () => {
-    if (!messageText.trim() || !activeTicket) return;
+    if (!activeTicket) return;
+    
+    // Разрешаем отправку если есть текст или файлы
+    if (!messageText.trim() && uploadedFiles.length === 0) return;
     
     // Проверка статуса тикета - нельзя отправлять сообщения в закрытые тикеты
     if (activeTicket.status === 'closed') {
@@ -1127,6 +1311,83 @@ export default function SupportPage() {
       const { getCSRFToken } = await import('@/lib/utils/csrf-client');
       const csrfToken = await getCSRFToken();
       
+      // Разделяем файлы на изображения и документы
+      const images = uploadedFiles.filter(f => f.fileType.startsWith('image/'));
+      const documents = uploadedFiles.filter(f => !f.fileType.startsWith('image/'));
+      
+      // Если есть и документы, и изображения - отправляем отдельными сообщениями
+      if (documents.length > 0 && images.length > 0) {
+        // Сначала отправляем сообщение с текстом и изображениями (если есть)
+        if (messageText.trim() || images.length > 0) {
+          const response = await fetchWithRateLimit(
+            `/api/support/tickets/${activeTicket.id}/messages`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              credentials: 'include',
+              body: JSON.stringify({
+                message: messageText.trim() || '',
+                csrfToken,
+                attachments: images.length > 0 ? images : undefined
+              })
+            },
+            handleSendMessage
+          );
+          
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Ошибка отправки сообщения');
+          }
+        }
+        
+        // Затем отправляем документы отдельными сообщениями
+        for (const doc of documents) {
+          const docResponse = await fetchWithRateLimit(
+            `/api/support/tickets/${activeTicket.id}/messages`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              credentials: 'include',
+              body: JSON.stringify({
+                message: '',
+                csrfToken,
+                attachments: [doc]
+              })
+            },
+            handleSendMessage
+          );
+          
+          if (!docResponse.ok) {
+            const errorData = await docResponse.json();
+            throw new Error(errorData.error || 'Ошибка отправки документа');
+          }
+        }
+        
+        // Обновляем UI после всех отправок
+        setMessageText('');
+        setUploadedFiles([]);
+        setFilePreviews(new Map());
+        setFileErrors(new Set());
+        
+        // Увеличиваем счетчик
+        const newCount = messagesSentCount + 1 + documents.length;
+        setMessagesSentCount(newCount);
+        
+        if (newCount >= 2) {
+          setLastMessageTime(Date.now());
+          setTimeoutSeconds(MESSAGE_TIMEOUT / 1000);
+        }
+        
+        // Загружаем сообщения заново для отображения всех отправленных
+        await fetchTicketMessages(activeTicket.id);
+        return;
+      }
+      
+      // Обычная отправка (только изображения или только документы, или без файлов)
       const response = await fetchWithRateLimit(
         `/api/support/tickets/${activeTicket.id}/messages`,
         {
@@ -1136,8 +1397,9 @@ export default function SupportPage() {
           },
           credentials: 'include',
           body: JSON.stringify({
-            message: messageText.trim(),
-            csrfToken
+            message: messageText.trim() || '',
+            csrfToken,
+            attachments: uploadedFiles.length > 0 ? uploadedFiles : undefined
           })
         },
         handleSendMessage // Retry callback
@@ -1146,7 +1408,13 @@ export default function SupportPage() {
       const data = await response.json();
 
       if (response.ok && data.message) {
+        const sentText = messageText.trim();
+        const sentFiles = [...uploadedFiles];
+        
         setMessageText('');
+        setUploadedFiles([]); // Очищаем загруженные файлы после отправки
+        setFilePreviews(new Map()); // Очищаем превью
+        setFileErrors(new Set()); // Очищаем ошибки
         
         // Увеличиваем счетчик отправленных сообщений
         const newCount = messagesSentCount + 1;
@@ -1163,7 +1431,7 @@ export default function SupportPage() {
         // WebSocket подтвердит и обновит при получении события support:message:new
         const optimisticMessage: Message = {
           id: data.message.id,
-          text: messageText.trim(),
+          text: sentText,
           sender: 'user' as const,
           timestamp: new Date(),
           isRead: false,
@@ -1171,7 +1439,14 @@ export default function SupportPage() {
             id: userData.id,
             username: userData.username,
             user_id: userData.user_id
-          } : undefined
+          } : undefined,
+          attachments: sentFiles.length > 0 ? sentFiles.map((f, idx) => ({
+            id: `temp-${idx}`,
+            file_name: f.fileName,
+            file_type: f.fileType,
+            file_size: f.fileSize,
+            storage_url: f.storageUrl
+          })) : []
         };
         
         setActiveTicket(prev => {
@@ -1928,6 +2203,7 @@ export default function SupportPage() {
                                   formatDate={formatDate}
                                   formatTime={formatTime}
                                   isInitialLoad={isInitialLoad}
+                                  onImageClick={(url, alt) => setViewingImage({ url, alt })}
                                 />
                               );
                             })}
@@ -1947,7 +2223,58 @@ export default function SupportPage() {
                           <p className="text-neutral-400 text-sm">Этот тикет закрыт. Вы не можете отправлять сообщения в закрытые тикеты.</p>
                         </div>
                       ) : (
-                        <div className="flex gap-2">
+                        <>
+                          {/* Список загруженных файлов */}
+                          {uploadedFiles.length > 0 && (
+                            <div className="mb-2 flex flex-wrap gap-2">
+                              {uploadedFiles.map((file, index) => {
+                                const isImage = file.fileType.startsWith('image/');
+                                
+                                return (
+                                  <div
+                                    key={index}
+                                    className="flex items-center gap-2 px-3 py-1.5 bg-neutral-800/50 rounded-lg border border-white/10 text-sm"
+                                  >
+                                    {isImage ? (
+                                      <ImageIcon className="w-4 h-4 text-blue-400 flex-shrink-0" />
+                                    ) : (
+                                      <FileText className="w-4 h-4 text-neutral-400 flex-shrink-0" />
+                                    )}
+                                    <span className="text-neutral-300 truncate max-w-[150px]">{file.fileName}</span>
+                                    <button
+                                      onClick={() => {
+                                        setUploadedFiles(prev => prev.filter((_, i) => i !== index));
+                                        setFilePreviews(prev => {
+                                          const newMap = new Map(prev);
+                                          newMap.delete(file.storageUrl);
+                                          return newMap;
+                                        });
+                                        setFileErrors(prev => {
+                                          const newSet = new Set(prev);
+                                          newSet.delete(file.storageUrl);
+                                          return newSet;
+                                        });
+                                      }}
+                                      className="p-1 hover:bg-red-500/20 rounded transition-colors"
+                                      aria-label="Удалить файл"
+                                    >
+                                      <X className="w-3 h-3 text-red-400" />
+                                    </button>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                          <div className="flex gap-2">
+                          <button
+                            onClick={() => setShowFileUploadModal(true)}
+                            disabled={timeoutSeconds > 0 || isSendingMessage || uploadedFiles.length >= 2}
+                            className="px-3 py-2 bg-neutral-700 hover:bg-neutral-600 disabled:bg-neutral-800 disabled:text-neutral-500 text-white rounded-xl transition-colors text-sm sm:text-base flex-shrink-0"
+                            title="Прикрепить файл"
+                            aria-label="Прикрепить файл"
+                          >
+                            <Paperclip className="w-5 h-5" />
+                          </button>
                           <div className="flex-1 relative">
                             <input
                               ref={messageInputRef}
@@ -1987,12 +2314,13 @@ export default function SupportPage() {
                           </div>
                           <button
                             onClick={handleSendMessage}
-                            disabled={!messageText.trim() || timeoutSeconds > 0 || isSendingMessage}
+                            disabled={(!messageText.trim() && uploadedFiles.length === 0) || timeoutSeconds > 0 || isSendingMessage}
                             className="px-4 sm:px-6 py-2 bg-primary-500 hover:bg-primary-400 disabled:bg-neutral-700 text-white rounded-xl transition-colors text-sm sm:text-base"
                           >
                             {isSendingMessage ? 'Отправка...' : 'Отправить'}
                           </button>
-                        </div>
+                          </div>
+                        </>
                       )}
                     </div>
                     </div>
@@ -2050,6 +2378,35 @@ export default function SupportPage() {
           pendingRequestsQueueRef.current = [];
         }}
       />
+
+      {activeTicket && (
+        <FileUploadModal
+          isOpen={showFileUploadModal}
+          onClose={() => setShowFileUploadModal(false)}
+          onUploadComplete={(files) => {
+            setUploadedFiles(prev => [...prev, ...files]);
+            // Генерируем превью для изображений
+            files.forEach((file) => {
+              if (file.fileType.startsWith('image/')) {
+                // Превью будет загружено из storageUrl
+                setFilePreviews(prev => new Map(prev).set(file.storageUrl, file.storageUrl));
+              }
+            });
+            setShowFileUploadModal(false);
+          }}
+          ticketId={activeTicket.id}
+          maxFiles={2}
+        />
+      )}
+
+      {viewingImage && (
+        <ImageViewer
+          isOpen={!!viewingImage}
+          onClose={() => setViewingImage(null)}
+          imageUrl={viewingImage.url}
+          alt={viewingImage.alt}
+        />
+      )}
     </div>
   );
 }

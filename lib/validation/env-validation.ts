@@ -46,6 +46,17 @@ const envSchema = z.object({
   // Public domain for OAuth redirects (optional, falls back to host header)
   NEXT_PUBLIC_DOMAIN: z.string().url().optional(),
   
+  // S3-compatible Object Storage
+  S3_ENDPOINT: z.string().url().optional(),
+  S3_BUCKET: z.string().optional(),
+  S3_ACCESS_KEY: z.string().optional(),
+  S3_SECRET_KEY: z.string().optional(),
+  S3_REGION: z.string().optional(),
+  // Публичный URL для доступа к файлам
+  // ВАЖНО: Если используете кастомный домен, убедитесь что SSL сертификат настроен для него
+  // Иначе используйте предоставленный провайдером URL (который имеет валидный SSL)
+  S3_PUBLIC_URL: z.string().url().optional(),
+  
   // Node environment
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
 }).superRefine((val, ctx) => {
@@ -75,6 +86,21 @@ const envSchema = z.object({
       });
     }
   });
+
+  // Проверка S3 конфигурации
+  const s3Keys: Array<keyof typeof val> = ['S3_ENDPOINT', 'S3_BUCKET', 'S3_ACCESS_KEY', 'S3_SECRET_KEY', 'S3_REGION'];
+  const hasS3Config = s3Keys.some(key => !!val[key]);
+  if (hasS3Config) {
+    s3Keys.forEach(key => {
+      if (!val[key]) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `S3 ${key} is required when any S3 config is set`,
+          path: [key],
+        });
+      }
+    });
+  }
 });
 
 type Env = z.infer<typeof envSchema>;
@@ -112,6 +138,12 @@ export function validateEnv(): Env {
       GITHUB_CLIENT_ID: process.env.GITHUB_CLIENT_ID,
       GITHUB_CLIENT_SECRET: process.env.GITHUB_CLIENT_SECRET,
       NEXT_PUBLIC_DOMAIN: process.env.NEXT_PUBLIC_DOMAIN,
+      S3_ENDPOINT: process.env.S3_ENDPOINT,
+      S3_BUCKET: process.env.S3_BUCKET,
+      S3_ACCESS_KEY: process.env.S3_ACCESS_KEY,
+      S3_SECRET_KEY: process.env.S3_SECRET_KEY,
+      S3_REGION: process.env.S3_REGION,
+      S3_PUBLIC_URL: process.env.S3_PUBLIC_URL,
       NODE_ENV: process.env.NODE_ENV || 'development',
     });
     

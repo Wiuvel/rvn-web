@@ -1,0 +1,363 @@
+'use client';
+
+import { useState, useRef, useEffect } from 'react';
+import { gsap } from 'gsap';
+import { X, Upload, FileText, Image as ImageIcon } from 'lucide-react';
+
+interface UploadedFile {
+  fileName: string;
+  fileType: string;
+  fileSize: number;
+  storagePath: string;
+  storageUrl: string;
+}
+
+interface FileUploadModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onUploadComplete: (files: UploadedFile[]) => void;
+  ticketId: string;
+  maxFiles?: number;
+}
+
+export default function FileUploadModal({
+  isOpen,
+  onClose,
+  onUploadComplete,
+  ticketId,
+  maxFiles = 2,
+}: FileUploadModalProps) {
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [previews, setPreviews] = useState<Map<string, string>>(new Map());
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const modalRef = useRef<HTMLDivElement>(null);
+  const backdropRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !modalRef.current || !backdropRef.current) return;
+
+    if (isOpen) {
+      gsap.set([backdropRef.current, modalRef.current], { opacity: 0 });
+      gsap.to(backdropRef.current, {
+        opacity: 1,
+        duration: 0.2,
+        ease: 'power2.out',
+      });
+      gsap.fromTo(
+        modalRef.current,
+        { opacity: 0, scale: 0.95, y: 20 },
+        {
+          opacity: 1,
+          scale: 1,
+          y: 0,
+          duration: 0.3,
+          ease: 'power2.out',
+        }
+      );
+    } else {
+      gsap.to([backdropRef.current, modalRef.current], {
+        opacity: 0,
+        duration: 0.2,
+        ease: 'power2.in',
+        onComplete: () => {
+          setSelectedFiles([]);
+          setPreviews(new Map());
+          setError(null);
+        },
+      });
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    const newPreviews = new Map<string, string>();
+    
+    selectedFiles.forEach((file) => {
+      if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          if (e.target?.result) {
+            newPreviews.set(file.name, e.target.result as string);
+            setPreviews(new Map(newPreviews));
+          }
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+  }, [selectedFiles]);
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    
+    if (selectedFiles.length + files.length > maxFiles) {
+      setError(`Можно загрузить максимум ${maxFiles} файла`);
+      return;
+    }
+
+    const MAX_FILE_SIZE = 10 * 1024 * 1024;
+    const allowedImageTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp', 'image/svg+xml'];
+    const allowedDocumentTypes = ['application/pdf', 'text/plain'];
+
+    const invalidFiles: string[] = [];
+    const newFiles: File[] = [];
+    const existingFileNames = new Set(selectedFiles.map(f => f.name.toLowerCase()));
+    
+    files.forEach((file) => {
+      // Проверка на дубликаты
+      if (existingFileNames.has(file.name.toLowerCase())) {
+        // Автоматическое исправление - добавляем номер
+        let counter = 1;
+        let newName = file.name;
+        const nameParts = file.name.split('.');
+        const extension = nameParts.pop();
+        const baseName = nameParts.join('.');
+        
+        while (existingFileNames.has(newName.toLowerCase()) || 
+               selectedFiles.some(f => f.name.toLowerCase() === newName.toLowerCase())) {
+          newName = `${baseName} (${counter}).${extension}`;
+          counter++;
+        }
+        
+        // Создаем новый File объект с исправленным именем
+        const blob = file.slice(0, file.size, file.type);
+        const renamedFile = new File([blob], newName, { type: file.type, lastModified: file.lastModified });
+        newFiles.push(renamedFile);
+        existingFileNames.add(newName.toLowerCase());
+      } else {
+        newFiles.push(file);
+        existingFileNames.add(file.name.toLowerCase());
+      }
+      
+      // Валидация размера и типа
+      if (file.size > MAX_FILE_SIZE) {
+        invalidFiles.push(`${file.name} (превышен лимит 10МБ)`);
+      } else if (!allowedImageTypes.includes(file.type) && !allowedDocumentTypes.includes(file.type) && 
+                 !file.name.toLowerCase().endsWith('.pdf') && !file.name.toLowerCase().endsWith('.txt')) {
+        invalidFiles.push(`${file.name} (неподдерживаемый формат)`);
+      }
+    });
+
+    if (invalidFiles.length > 0) {
+      setError(`Ошибка: ${invalidFiles.join(', ')}`);
+      return;
+    }
+
+    setSelectedFiles((prev) => [...prev, ...newFiles]);
+    setError(null);
+    
+    // Сбрасываем input для возможности повторного выбора того же файла
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const removeFile = (index: number) => {
+    setSelectedFiles((prev) => {
+      const newFiles = prev.filter((_, i) => i !== index);
+      if (prev[index] && prev[index].type.startsWith('image/')) {
+        const newPreviews = new Map(previews);
+        newPreviews.delete(prev[index].name);
+        setPreviews(newPreviews);
+      }
+      return newFiles;
+    });
+  };
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return `${bytes} Б`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} КБ`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} МБ`;
+  };
+
+  const handleUpload = async () => {
+    if (selectedFiles.length === 0) return;
+
+    setUploading(true);
+    setError(null);
+
+    try {
+      const formData = new FormData();
+      selectedFiles.forEach((file) => {
+        formData.append('files', file);
+      });
+
+      const response = await fetch(`/api/support/upload?ticketId=${ticketId}`, {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Ошибка загрузки файлов');
+      }
+
+      if (data.success && data.files) {
+        onUploadComplete(data.files);
+        // Очищаем выбранные файлы после успешной загрузки
+        setSelectedFiles([]);
+        setPreviews(new Map());
+        setError(null);
+        setTimeout(() => {
+          onClose();
+        }, 300);
+      } else {
+        throw new Error('Неожиданный формат ответа');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Ошибка загрузки файлов');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <>
+      <div
+        ref={backdropRef}
+        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[1000]"
+        onClick={onClose}
+      />
+
+      <div
+        ref={modalRef}
+        className="fixed inset-0 z-[1001] flex items-center justify-center p-4 pointer-events-none"
+      >
+        <div
+          className="bg-neutral-900 border border-white/10 rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col pointer-events-auto"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="p-4 sm:p-6 border-b border-white/10 flex items-center justify-between flex-shrink-0">
+            <h2 className="text-lg font-semibold text-white">Прикрепить файлы</h2>
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+              aria-label="Закрыть"
+            >
+              <X className="w-5 h-5 text-neutral-400" />
+            </button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+            <div className="mb-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+              <p className="text-sm text-blue-300">
+                До {maxFiles} файлов, максимум 10МБ каждый
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading || selectedFiles.length >= maxFiles}
+              className="w-full p-8 border-2 border-dashed border-white/20 rounded-xl hover:border-primary-500/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed mb-4"
+            >
+              <div className="flex flex-col items-center gap-2">
+                <Upload className="w-8 h-8 text-neutral-400" />
+                <span className="text-sm text-neutral-300">
+                  {selectedFiles.length >= maxFiles ? 'Достигнут лимит' : 'Выбрать файлы'}
+                </span>
+              </div>
+            </button>
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept="image/*,.pdf,.txt"
+              onChange={handleFileSelect}
+              className="hidden"
+            />
+
+            {selectedFiles.length > 0 && (
+              <div className="space-y-2">
+                {selectedFiles.map((file, index) => {
+                  const preview = previews.get(file.name);
+                  const isImage = file.type.startsWith('image/');
+
+                  return (
+                    <div
+                      key={`${file.name}-${index}`}
+                      className="flex items-center gap-3 p-3 bg-neutral-800/50 rounded-lg border border-white/10"
+                    >
+                      <div className="flex-shrink-0">
+                        {isImage && preview ? (
+                          <div className="relative w-12 h-12 rounded-lg overflow-hidden bg-neutral-700">
+                            <img
+                              src={preview}
+                              alt={file.name}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        ) : (
+                          <div className="w-12 h-12 rounded-lg bg-neutral-700 flex items-center justify-center">
+                            {file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf') ? (
+                              <FileText className="w-6 h-6 text-red-400" />
+                            ) : (
+                              <FileText className="w-6 h-6 text-neutral-400" />
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-white truncate">{file.name}</p>
+                        <p className="text-xs text-neutral-400">{formatFileSize(file.size)}</p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => removeFile(index)}
+                        disabled={uploading}
+                        className="flex-shrink-0 p-2 hover:bg-red-500/20 rounded-lg transition-colors disabled:opacity-50"
+                        aria-label="Удалить файл"
+                      >
+                        <X className="w-4 h-4 text-red-400" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {error && (
+              <div className="mt-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
+                <p className="text-sm text-red-300">{error}</p>
+              </div>
+            )}
+          </div>
+
+          <div className="p-4 sm:p-6 border-t border-white/10 flex items-center justify-end gap-3 flex-shrink-0">
+            <button
+              onClick={onClose}
+              disabled={uploading}
+              className="px-4 py-2 text-neutral-300 hover:text-white transition-colors disabled:opacity-50"
+            >
+              Отмена
+            </button>
+            <button
+              onClick={handleUpload}
+              disabled={uploading || selectedFiles.length === 0}
+              className="px-4 py-2 bg-primary-500 hover:bg-primary-400 disabled:bg-neutral-700 disabled:text-neutral-500 text-white rounded-lg transition-colors flex items-center gap-2"
+            >
+              {uploading ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Загрузка...
+                </>
+              ) : (
+                <>
+                  <Upload className="w-4 h-4" />
+                  Загрузить
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}

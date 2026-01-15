@@ -109,17 +109,22 @@ export async function POST(
     }
 
     const { message } = requestData;
+    const attachments = requestData.attachments || [];
 
-    if (!message || typeof message !== 'string' || message.trim().length === 0) {
-      return setCorsHeaders(
-        NextResponse.json(
-          { error: ERROR_INVALID_REQUEST_DATA },
-          { status: 400 }
-        )
-      );
+    // Разрешаем пустое сообщение, если есть вложения
+    if (!attachments || attachments.length === 0) {
+      if (!message || typeof message !== 'string' || message.trim().length === 0) {
+        return setCorsHeaders(
+          NextResponse.json(
+            { error: ERROR_INVALID_REQUEST_DATA },
+            { status: 400 }
+          )
+        );
+      }
     }
 
-    if (message.length > MESSAGE_MAX_LENGTH) {
+    // Валидация сообщения, если оно есть
+    if (message && typeof message === 'string' && message.length > MESSAGE_MAX_LENGTH) {
       return setCorsHeaders(
         NextResponse.json(
           { error: ERROR_MESSAGE_TOO_LONG },
@@ -193,13 +198,13 @@ export async function POST(
       }
     }
 
-    // Создаем сообщение
+    // Создаем сообщение (разрешаем пустой текст, если есть вложения)
     const { data: newMessage, error: messageError } = await supabaseAdmin
       .from('support_messages')
       .insert({
         ticket_id: ticketId,
         sender_id: user.id,
-        message_text: message.trim()
+        message_text: (message && typeof message === 'string' && message.trim()) ? message.trim() : ''
       })
       .select(`
         *,
@@ -219,6 +224,37 @@ export async function POST(
           { status: 500 }
         )
       );
+    }
+
+    // Создаем вложения, если они есть
+    if (attachments && Array.isArray(attachments) && attachments.length > 0) {
+      const attachmentRecords = attachments.map((att: {
+        storagePath: string;
+        storageUrl: string;
+        fileName: string;
+        fileType: string;
+        fileSize: number;
+      }) => ({
+        message_id: newMessage.id,
+        file_name: att.fileName,
+        file_type: att.fileType,
+        file_size: att.fileSize,
+        storage_path: att.storagePath,
+        storage_url: att.storageUrl,
+      }));
+
+      const { error: attachmentsError } = await supabaseAdmin
+        .from('support_message_attachments')
+        .insert(attachmentRecords);
+
+      if (attachmentsError) {
+        logger.error('Error creating attachments', {
+          error: attachmentsError.message,
+          code: attachmentsError.code,
+          messageId: newMessage.id
+        });
+        // Не прерываем выполнение, так как сообщение уже создано
+      }
     }
 
     // Отправляем новое сообщение через WebSocket

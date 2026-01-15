@@ -126,7 +126,8 @@ export async function GET(
       .from('support_messages')
       .select(`
         *,
-        sender:users!support_messages_sender_id_fkey(id, username, user_id, avatar)
+        sender:users!support_messages_sender_id_fkey(id, username, user_id, avatar),
+        attachments:support_message_attachments(id, file_name, file_type, file_size, storage_url)
       `)
       .eq('ticket_id', ticketId)
       .order('created_at', { ascending: true })
