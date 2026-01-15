@@ -7,6 +7,7 @@ import { setCorsHeaders, handleCorsPreflight } from '@/lib/security/cors';
 import { logger } from '@/lib/utils/secure-logger';
 import { authRateLimit } from '@/lib/security/rate-limit';
 import { getErrorRedirectUrl, GOOGLE_ERROR_MAP } from '@/lib/utils/oauth-errors';
+import { domains, getCookieDomain } from '@/lib/utils';
 
 const ADMIN_SESSION_COOKIE = 'admin_session_id';
 
@@ -67,19 +68,9 @@ async function isTrustedDeveloper(
 export async function GET(request: NextRequest) {
   try {
     const env = getEnv();
-    if (!env.PUBLIC_DOMAIN) {
-      logger.error('OAuth: PUBLIC_DOMAIN not configured.');
-      return setCorsHeaders(
-        NextResponse.json(
-          { error: 'OAuth service not configured' },
-          { status: 503 }
-        )
-      );
-    }
-
-    const origin = env.PUBLIC_DOMAIN.endsWith('/') 
-      ? env.PUBLIC_DOMAIN.slice(0, -1) 
-      : env.PUBLIC_DOMAIN;
+    const origin = domains.mainUrl.endsWith('/') 
+      ? domains.mainUrl.slice(0, -1) 
+      : domains.mainUrl;
 
     // Get state early to determine if this is a popup request
     const { searchParams } = request.nextUrl;
@@ -349,10 +340,10 @@ export async function GET(request: NextRequest) {
     
     try {
       const env = getEnv();
-      if (env.PUBLIC_DOMAIN) {
-        const origin = env.PUBLIC_DOMAIN.endsWith('/') 
-          ? env.PUBLIC_DOMAIN.slice(0, -1) 
-          : env.PUBLIC_DOMAIN;
+      {
+        const origin = domains.mainUrl.endsWith('/') 
+          ? domains.mainUrl.slice(0, -1) 
+          : domains.mainUrl;
         const errorUrl = getErrorRedirectUrl('internal_error', origin, false);
         return setCorsHeaders(NextResponse.redirect(errorUrl));
       }

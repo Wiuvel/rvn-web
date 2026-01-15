@@ -1,7 +1,8 @@
 import { MetadataRoute } from 'next';
+import { domains } from '@/lib/utils/config';
 
 export default function robots(): MetadataRoute.Robots {
-  const baseUrl = 'https://rvn.market';
+  const baseUrl = domains.mainUrl;
 
   return {
     rules: [

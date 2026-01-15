@@ -1,7 +1,8 @@
 import { MetadataRoute } from 'next';
+import { domains } from '@/lib/utils/config';
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl = 'https://rvn.market';
+  const baseUrl = domains.mainUrl;
   const currentDate = new Date().toISOString();
   const staticPages = [
     {

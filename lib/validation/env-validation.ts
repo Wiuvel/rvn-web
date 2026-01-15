@@ -44,7 +44,7 @@ const envSchema = z.object({
   GITHUB_CLIENT_SECRET: z.string().optional(),
   
   // Public domain for OAuth redirects (optional, falls back to host header)
-  PUBLIC_DOMAIN: z.string().url().optional(),
+  NEXT_PUBLIC_DOMAIN: z.string().url().optional(),
   
   // Node environment
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
@@ -111,7 +111,7 @@ export function validateEnv(): Env {
       TWITCH_CLIENT_SECRET: process.env.TWITCH_CLIENT_SECRET,
       GITHUB_CLIENT_ID: process.env.GITHUB_CLIENT_ID,
       GITHUB_CLIENT_SECRET: process.env.GITHUB_CLIENT_SECRET,
-      PUBLIC_DOMAIN: process.env.PUBLIC_DOMAIN,
+      NEXT_PUBLIC_DOMAIN: process.env.NEXT_PUBLIC_DOMAIN,
       NODE_ENV: process.env.NODE_ENV || 'development',
     });
     

@@ -334,7 +334,13 @@ async function setSecureCookie(): Promise<boolean> {
       domain = '';
       secure = '';
     } else {
-      domain = '.rvn.market';
+      // Extract root domain from hostname (e.g., rvn.market from www.rvn.market)
+      const hostnameParts = hostname.split('.');
+      if (hostnameParts.length >= 2) {
+        // Get last two parts (e.g., ['rvn', 'market'])
+        const rootDomain = hostnameParts.slice(-2).join('.');
+        domain = `.${rootDomain}`;
+      }
       secure = 'Secure';
     }
 

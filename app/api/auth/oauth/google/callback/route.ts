@@ -7,6 +7,7 @@ import { setCorsHeaders, handleCorsPreflight } from '@/lib/security/cors';
 import { logger } from '@/lib/utils/secure-logger';
 import { authRateLimit } from '@/lib/security/rate-limit';
 import { getErrorRedirectUrl, GOOGLE_ERROR_MAP } from '@/lib/utils/oauth-errors';
+import { domains, getCookieDomain } from '@/lib/utils';
 
 export async function OPTIONS() {
   return handleCorsPreflight();
@@ -16,19 +17,9 @@ export async function OPTIONS() {
 export async function GET(request: NextRequest) {
   try {
     const env = getEnv();
-    if (!env.PUBLIC_DOMAIN) {
-      logger.error('Public domain not configured');
-      return setCorsHeaders(
-        NextResponse.json(
-          { error: 'OAuth service not configured' },
-          { status: 503 }
-        )
-      );
-    }
-
-    const origin = env.PUBLIC_DOMAIN.endsWith('/') 
-      ? env.PUBLIC_DOMAIN.slice(0, -1) 
-      : env.PUBLIC_DOMAIN;
+    const origin = domains.mainUrl.endsWith('/') 
+      ? domains.mainUrl.slice(0, -1) 
+      : domains.mainUrl;
 
     // Get state early to determine if this is a popup request
     const { searchParams } = request.nextUrl;
@@ -219,12 +210,8 @@ export async function GET(request: NextRequest) {
     const accessHash = request.cookies.get('access_hash')?.value;
     const accessTime = request.cookies.get('access_time')?.value;
 
-    // Determine cookie domain based on hostname (matching protection script logic)
-    const isVercel = hostname.includes('vercel.app');
-    let cookieDomain: string | undefined;
-    if (!isLocalhost && !isVercel && hostname.includes('rvn.market')) {
-      cookieDomain = '.rvn.market';
-    }
+    // Determine cookie domain based on hostname
+    const cookieDomain = getCookieDomain(hostname);
 
     if (accessGranted && accessHash) {
       // Preserve existing protection cookies
@@ -334,10 +321,10 @@ export async function GET(request: NextRequest) {
     // Get origin for error redirect
     try {
       const env = getEnv();
-      if (env.PUBLIC_DOMAIN) {
-        const origin = env.PUBLIC_DOMAIN.endsWith('/') 
-          ? env.PUBLIC_DOMAIN.slice(0, -1) 
-          : env.PUBLIC_DOMAIN;
+      {
+        const origin = domains.mainUrl.endsWith('/') 
+          ? domains.mainUrl.slice(0, -1) 
+          : domains.mainUrl;
         const errorUrl = getErrorRedirectUrl('internal_error', origin, false);
         return setCorsHeaders(NextResponse.redirect(errorUrl));
       }

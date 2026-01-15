@@ -6,6 +6,7 @@ import { logger } from '@/lib/utils/secure-logger';
 import { authRateLimit } from '@/lib/security/rate-limit';
 import { getErrorRedirectUrl } from '@/lib/utils/oauth-errors';
 import { getTelegramBotId } from '@/lib/utils/telegram-bot';
+import { domains } from '@/lib/utils';
 
 // Handle CORS preflight
 export async function OPTIONS() {
@@ -16,19 +17,9 @@ export async function OPTIONS() {
 export async function GET(request: NextRequest) {
   try {
     const env = getEnv();
-    if (!env.PUBLIC_DOMAIN) {
-      logger.error('Public domain not configured');
-      return setCorsHeaders(
-        NextResponse.json(
-          { error: 'OAuth service not configured' },
-          { status: 503 }
-        )
-      );
-    }
-
-    const origin = env.PUBLIC_DOMAIN.endsWith('/') 
-      ? env.PUBLIC_DOMAIN.slice(0, -1) 
-      : env.PUBLIC_DOMAIN;
+    const origin = domains.mainUrl.endsWith('/') 
+      ? domains.mainUrl.slice(0, -1) 
+      : domains.mainUrl;
 
     // Check if request is from popup (oauth-handler page opens in popup)
     // This must be determined early as it's used in error handling
@@ -102,10 +93,10 @@ export async function GET(request: NextRequest) {
     
     try {
       const env = getEnv();
-      if (env.PUBLIC_DOMAIN) {
-        const origin = env.PUBLIC_DOMAIN.endsWith('/') 
-          ? env.PUBLIC_DOMAIN.slice(0, -1) 
-          : env.PUBLIC_DOMAIN;
+      if (domains.mainUrl) {
+        const origin = domains.mainUrl.endsWith('/') 
+          ? domains.mainUrl.slice(0, -1) 
+          : domains.mainUrl;
         // Determine if popup from error context
         const referer = request.headers.get('referer') || '';
         const isPopup = referer.includes('/auth/oauth-handler') || 

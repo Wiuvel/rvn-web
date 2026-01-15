@@ -1,12 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { domains } from './lib/utils/config';
 
-// Домены из переменных окружения
-const MAIN_DOMAIN = process.env.NEXT_PUBLIC_DOMAIN?.replace(/^https?:\/\//, '') || 
-                    process.env.PUBLIC_DOMAIN?.replace(/^https?:\/\//, '') || 
-                    'rvn.market';
-const CDN_DOMAIN = process.env.NEXT_PUBLIC_CDN_URL?.replace(/^https?:\/\//, '') || 
-                   process.env.CDN_URL?.replace(/^https?:\/\//, '') || 
-                   'cdn.rvn.market';
+// Домены из централизованной конфигурации
+const MAIN_DOMAIN = domains.main;
+const CDN_DOMAIN = domains.cdn;
+
+/**
+ * Проверяет, является ли hostname CDN доменом или поддоменом основного домена
+ * @param hostname - Hostname для проверки
+ * @returns True если это CDN или поддомен основного домена
+ */
+function isCdnOrSubdomain(hostname: string): boolean {
+  return hostname === CDN_DOMAIN || 
+         hostname === `cdn.${MAIN_DOMAIN}` || 
+         hostname.endsWith(`.${MAIN_DOMAIN}`);
+}
+
+/**
+ * Проверяет, является ли origin допустимым (CDN или основной домен)
+ * @param origin - Origin header для проверки
+ * @returns True если origin допустим
+ */
+function isValidOrigin(origin: string): boolean {
+  return origin.includes(CDN_DOMAIN) || origin.includes(MAIN_DOMAIN);
+}
 
 /**
  * Generates Content Security Policy header
@@ -54,38 +71,51 @@ function applySecurityHeaders(response: NextResponse, isStaticFile: boolean = fa
   const isDev = process.env.NODE_ENV === 'development';
   const cspHeader = generateCSPHeader(isDev);
   
-  // Set CSP header (only for non-static files to avoid blocking CDN resources)
-  if (!isStaticFile) {
-    response.headers.set('Content-Security-Policy', cspHeader);
+  // For static files, apply minimal headers to avoid HTTP/2 protocol errors
+  if (isStaticFile) {
+    // CORS headers for static files (CDN support)
+    if (request) {
+      const origin = request.headers.get('origin');
+      const hostname = request.nextUrl.hostname;
+      
+      // Allow requests from CDN domain or same origin
+      if (origin && isValidOrigin(origin)) {
+        response.headers.set('Access-Control-Allow-Origin', origin);
+        response.headers.set('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+        response.headers.set('Access-Control-Allow-Headers', 'Content-Type');
+        response.headers.set('Access-Control-Max-Age', '86400');
+      } else if (isCdnOrSubdomain(hostname)) {
+        // Allow all subdomains of main domain (including CDN)
+        response.headers.set('Access-Control-Allow-Origin', '*');
+        response.headers.set('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+        response.headers.set('Access-Control-Allow-Headers', 'Content-Type');
+        response.headers.set('Access-Control-Max-Age', '86400');
+      }
+    }
+    
+    // Set proper Content-Type for SVG files to avoid HTTP/2 errors
+    // Only set if not already set by Next.js
+    if (request) {
+      const pathname = request.nextUrl.pathname.toLowerCase();
+      if (pathname.endsWith('.svg') && !response.headers.has('Content-Type')) {
+        response.headers.set('Content-Type', 'image/svg+xml');
+      }
+    }
+    
+    // Don't apply security headers to static files to avoid HTTP/2 protocol errors
+    return;
   }
   
-  // Strict Transport Security (HSTS) - only in production
+  // Security headers for non-static files
+  response.headers.set('Content-Security-Policy', cspHeader);
+  
+  // Strict Transport Security (HSTS) - only in production, not for static files
   if (!isDev) {
     response.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
   }
   
   // X-XSS-Protection
   response.headers.set('X-XSS-Protection', '1; mode=block');
-  
-  // CORS headers for static files (CDN support)
-  if (isStaticFile && request) {
-    const origin = request.headers.get('origin');
-    const hostname = request.nextUrl.hostname;
-    
-    // Allow requests from CDN domain or same origin
-    if (origin && (origin.includes('cdn.rvn.market') || origin.includes('rvn.market'))) {
-      response.headers.set('Access-Control-Allow-Origin', origin);
-      response.headers.set('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
-      response.headers.set('Access-Control-Allow-Headers', 'Content-Type');
-      response.headers.set('Access-Control-Max-Age', '86400');
-    } else if (hostname === 'cdn.rvn.market' || hostname.endsWith('.rvn.market')) {
-      // Allow all subdomains of rvn.market (including cdn.rvn.market)
-      response.headers.set('Access-Control-Allow-Origin', '*');
-      response.headers.set('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
-      response.headers.set('Access-Control-Allow-Headers', 'Content-Type');
-      response.headers.set('Access-Control-Max-Age', '86400');
-    }
-  }
 }
 
 /**
@@ -123,10 +153,8 @@ function isStaticFile(pathname: string): boolean {
  */
 function shouldBypassProxy(pathname: string, userAgent: string, hostname?: string): boolean {
   // CDN domain requests - always bypass protection for static files
-  if (hostname && (hostname === 'cdn.rvn.market' || hostname.endsWith('.rvn.market'))) {
-    if (isStaticFile(pathname)) {
-      return true;
-    }
+  if (hostname && isCdnOrSubdomain(hostname) && isStaticFile(pathname)) {
+    return true;
   }
   
   if (isStaticFile(pathname)) {
@@ -327,7 +355,7 @@ export function proxy(request: NextRequest) {
   const isStatic = isStaticFile(pathname);
   
   // Check if request is from CDN domain
-  const isCdnRequest = hostname === CDN_DOMAIN || hostname === `cdn.${MAIN_DOMAIN}` || hostname.endsWith(`.${MAIN_DOMAIN}`);
+  const isCdnRequest = isCdnOrSubdomain(hostname);
 
   /** Early exit for static files, API routes, and bots */
   if (shouldBypassProxy(pathname, userAgent, hostname)) {

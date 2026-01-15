@@ -37,3 +37,25 @@ export function getStaticUrl(path: string): string {
   
   return cleanPath;
 }
+
+/**
+ * Определяет домен для cookie на основе hostname
+ * @param hostname - Hostname запроса
+ * @returns Cookie domain или undefined для localhost/vercel
+ */
+export function getCookieDomain(hostname: string): string | undefined {
+  const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
+  const isVercel = hostname.includes('vercel.app');
+  
+  // Не устанавливаем domain для localhost и vercel
+  if (isLocalhost || isVercel) {
+    return undefined;
+  }
+  
+  // Проверяем, является ли hostname поддоменом основного домена
+  if (hostname === domains.main || hostname.endsWith(`.${domains.main}`)) {
+    return `.${domains.main}`;
+  }
+  
+  return undefined;
+}

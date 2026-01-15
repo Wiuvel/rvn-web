@@ -4,6 +4,7 @@ import { logger } from '@/lib/utils/secure-logger';
 import { setCorsHeaders, handleCorsPreflight } from '@/lib/security/cors';
 import { SessionManager } from '@/lib/auth/session-manager';
 import { revokeCSRFToken } from '@/lib/security/csrf';
+import { getCookieDomain } from '@/lib/utils';
 
 export async function OPTIONS() {
   return handleCorsPreflight();
@@ -23,12 +24,7 @@ export async function POST(request: NextRequest) {
     
     // Get hostname for cookie domain handling
     const hostname = request.nextUrl.hostname;
-    const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
-    const isVercel = hostname.includes('vercel.app');
-    let cookieDomain: string | undefined;
-    if (!isLocalhost && !isVercel && hostname.includes('rvn.market')) {
-      cookieDomain = '.rvn.market';
-    }
+    const cookieDomain = getCookieDomain(hostname);
 
     // Create response
     const response = NextResponse.json(

@@ -1,13 +1,15 @@
 import StructuredData from './StructuredData';
+import { domains } from '@/lib/utils/config';
 
 export default function HomeStructuredData() {
+  const baseUrl = domains.mainUrl;
   const organizationData = {
     '@context': 'https://schema.org',
     '@type': 'Organization',
     name: 'Raven Private',
     alternateName: 'RVN.MARKET',
-    url: 'https://rvn.market',
-    logo: 'https://rvn.market/logo.svg',
+    url: baseUrl,
+    logo: `${baseUrl}/logo.svg`,
     description: 'RVN.MARKET — современный сервис приватного доступа в сеть. Высокая скорость и полная анонимность.',
     sameAs: [
       'https://twitter.com/rvnprivate',
@@ -24,13 +26,13 @@ export default function HomeStructuredData() {
     '@type': 'WebSite',
     name: 'Raven Private',
     alternateName: 'RVN.MARKET',
-    url: 'https://rvn.market',
+    url: baseUrl,
     description: 'RVN.MARKET — современный сервис приватного доступа в сеть. Высокая скорость и полная анонимность.',
     potentialAction: {
       '@type': 'SearchAction',
       target: {
         '@type': 'EntryPoint',
-        urlTemplate: 'https://rvn.market/search?q={search_term_string}',
+        urlTemplate: `${baseUrl}/search?q={search_term_string}`,
       },
       'query-input': 'required name=search_term_string',
     },

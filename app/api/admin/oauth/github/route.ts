@@ -5,6 +5,7 @@ import { setCorsHeaders, handleCorsPreflight } from '@/lib/security/cors';
 import { logger } from '@/lib/utils/secure-logger';
 import { authRateLimit } from '@/lib/security/rate-limit';
 import { getErrorRedirectUrl } from '@/lib/utils/oauth-errors';
+import { domains } from '@/lib/utils';
 
 // Handle CORS preflight
 export async function OPTIONS() {
@@ -15,19 +16,9 @@ export async function OPTIONS() {
 export async function GET(request: NextRequest) {
   try {
     const env = getEnv();
-    if (!env.PUBLIC_DOMAIN) {
-      logger.error('OAuth: PUBLIC_DOMAIN not configured.');
-      return setCorsHeaders(
-        NextResponse.json(
-          { error: 'OAuth service not configured' },
-          { status: 503 }
-        )
-      );
-    }
-
-    const origin = env.PUBLIC_DOMAIN.endsWith('/') 
-      ? env.PUBLIC_DOMAIN.slice(0, -1) 
-      : env.PUBLIC_DOMAIN;
+    const origin = domains.mainUrl.endsWith('/') 
+      ? domains.mainUrl.slice(0, -1) 
+      : domains.mainUrl;
 
     // Check if request is from popup (oauth-handler page opens in popup)
     const referer = request.headers.get('referer') || '';
@@ -86,10 +77,10 @@ export async function GET(request: NextRequest) {
     
     try {
       const env = getEnv();
-      if (env.PUBLIC_DOMAIN) {
-        const origin = env.PUBLIC_DOMAIN.endsWith('/') 
-          ? env.PUBLIC_DOMAIN.slice(0, -1) 
-          : env.PUBLIC_DOMAIN;
+      if (domains.mainUrl) {
+        const origin = domains.mainUrl.endsWith('/') 
+          ? domains.mainUrl.slice(0, -1) 
+          : domains.mainUrl;
         const errorUrl = getErrorRedirectUrl('oauth_init_error', origin, false);
         return setCorsHeaders(NextResponse.redirect(errorUrl));
       }

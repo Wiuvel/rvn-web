@@ -1,6 +1,7 @@
 import { Metadata } from 'next';
+import { domains } from './config';
 
-const baseUrl = 'https://rvn.market';
+const baseUrl = domains.mainUrl;
 const siteName = 'Raven Private';
 
 interface SEOProps {
