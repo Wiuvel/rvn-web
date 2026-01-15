@@ -4,7 +4,10 @@ const nextConfig: NextConfig = {
   output: 'standalone',
   compress: true,
   poweredByHeader: false,
-  assetPrefix: process.env.NODE_ENV === 'production' ? '' : '',
+  // Use CDN for static assets in production
+  assetPrefix: process.env.NODE_ENV === 'production' 
+    ? (process.env.CDN_URL || 'https://cdn.rvn.market')
+    : '',
   trailingSlash: false,
   outputFileTracingRoot: process.cwd(),
   outputFileTracingIncludes: {
