@@ -10,6 +10,7 @@ import { MESSAGE_MAX_LENGTH, TICKET_SUBJECT_MAX_LENGTH, MAX_TICKETS_PER_USER, ME
 import { translateError } from '@/lib/utils/error-translations';
 import { getGradientClasses } from '@/lib/utils/avatar-gradients';
 import { useWebSocket } from '@/hooks/useWebSocket';
+import TicketSkeleton from '@/components/ui/TicketSkeleton';
 
 // Lazy load RateLimitCaptcha для оптимизации bundle size
 // Убираем loading state, чтобы избежать показа модального окна при загрузке страницы
@@ -196,6 +197,20 @@ export default function SupportPage() {
   const [newTicketSubject, setNewTicketSubject] = useState('');
   const [newTicketMessage, setNewTicketMessage] = useState(''); // Отдельное состояние для сообщения нового тикета
   const [ticketsLoading, setTicketsLoading] = useState(false);
+  const [skeletonCount, setSkeletonCount] = useState<number | null>(() => {
+    // Загружаем из localStorage или используем 3 по умолчанию
+    if (typeof window !== 'undefined') {
+      const cached = localStorage.getItem('support_tickets_count');
+      if (cached !== null) {
+        const parsed = parseInt(cached, 10);
+        if (!isNaN(parsed)) {
+          // Если 0, возвращаем null (не показываем скелетоны)
+          return parsed === 0 ? null : parsed;
+        }
+      }
+    }
+    return 3; // По умолчанию показываем 3, если нет данных
+  });
   const [lastMessageTime, setLastMessageTime] = useState<number | null>(null);
   const [timeoutSeconds, setTimeoutSeconds] = useState<number>(0);
   const [isCreatingTicket, setIsCreatingTicket] = useState(false); // Флаг для блокировки кнопки создания тикета
@@ -1246,6 +1261,14 @@ export default function SupportPage() {
         }));
         setTickets(mappedTickets);
         
+        // Сохраняем количество тикетов в localStorage для скелетонов
+        if (typeof window !== 'undefined') {
+          const count = mappedTickets.length;
+          localStorage.setItem('support_tickets_count', count.toString());
+          // Если тикетов нет (0), не показываем скелетоны (null)
+          setSkeletonCount(count === 0 ? null : count);
+        }
+        
         // Восстанавливаем последний открытый тикет после загрузки списка
         if (typeof window !== 'undefined' && !activeTicket) {
           const lastTicketId = localStorage.getItem('support_last_ticket_id');
@@ -1746,7 +1769,18 @@ export default function SupportPage() {
                 )}
 
                 <div className={`support-tickets-list flex-1 overflow-y-auto min-h-0 flex-col ${ticketsListVisible ? 'flex' : 'hidden'} lg:flex`}>
-                  {tickets.length === 0 ? (
+                  {ticketsLoading ? (
+                    skeletonCount === null ? (
+                      // Если последний раз тикетов не было, не показываем скелетоны
+                      <div className="text-center py-8 text-neutral-400 text-sm">
+                        Загрузка...
+                      </div>
+                    ) : (
+                      <div className="flex flex-col gap-2">
+                        <TicketSkeleton count={skeletonCount} variant="user" />
+                      </div>
+                    )
+                  ) : tickets.length === 0 ? (
                     <div className="text-center text-neutral-400 text-sm py-8">
                       Нет открытых тикетов.
                     </div>

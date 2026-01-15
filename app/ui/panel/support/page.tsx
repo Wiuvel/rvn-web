@@ -10,6 +10,7 @@ import { GSAP_DEFAULT_DURATION, GSAP_DEFAULT_EASE } from '@/lib/utils/constants'
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { getGradientClasses } from '@/lib/utils/avatar-gradients';
 import { useWebSocket } from '@/hooks/useWebSocket';
+import TicketSkeleton from '@/components/ui/TicketSkeleton';
 
 interface AuthState {
   isAuthenticated: boolean;
@@ -1975,19 +1976,7 @@ export default function SupportPanel() {
               </div>
             ) : (
               <div className="space-y-2">
-                {[...Array(skeletonCount)].map((_, i) => (
-                  <div
-                    key={i}
-                    className="p-4 rounded-lg border bg-neutral-800/50 border-neutral-700"
-                  >
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="h-4 skeleton-shimmer rounded flex-1"></div>
-                      <div className="h-5 w-16 skeleton-shimmer rounded ml-2"></div>
-                    </div>
-                    <div className="h-3 skeleton-shimmer rounded w-24 mb-1"></div>
-                    <div className="h-3 skeleton-shimmer rounded w-32"></div>
-                  </div>
-                ))}
+                <TicketSkeleton count={skeletonCount} variant="panel" />
               </div>
             )
           ) : filteredTickets.length === 0 ? (

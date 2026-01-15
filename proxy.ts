@@ -8,11 +8,12 @@ import { NextRequest, NextResponse } from 'next/server';
  */
 function generateCSPHeader(isDev: boolean): string {
   const domain = 'rvn.market';
+  const cdnDomain = 'cdn.rvn.market';
   const supabaseDomain = 'ljeklmajzfylmyqjxcck.supabase.co';
   const turnstileDomain = 'challenges.cloudflare.com';
   
-  // Base domains for CSP
-  const baseDomains = `'self' ${domain} *.${domain}`;
+  // Base domains for CSP - explicitly include CDN domain
+  const baseDomains = `'self' ${domain} *.${domain} https://${cdnDomain} http://${cdnDomain}`;
   
   // Localhost for dev mode
   const localhost = isDev ? ' localhost:* http://localhost:* ws://localhost:* wss://localhost:*' : '';
@@ -40,13 +41,17 @@ function generateCSPHeader(isDev: boolean): string {
 /**
  * Applies security headers to response
  * @param response - The NextResponse object
+ * @param isStaticFile - Whether this is a static file request
+ * @param request - The NextRequest object (for CDN detection)
  */
-function applySecurityHeaders(response: NextResponse): void {
+function applySecurityHeaders(response: NextResponse, isStaticFile: boolean = false, request?: NextRequest): void {
   const isDev = process.env.NODE_ENV === 'development';
   const cspHeader = generateCSPHeader(isDev);
   
-  // Set CSP header
-  response.headers.set('Content-Security-Policy', cspHeader);
+  // Set CSP header (only for non-static files to avoid blocking CDN resources)
+  if (!isStaticFile) {
+    response.headers.set('Content-Security-Policy', cspHeader);
+  }
   
   // Strict Transport Security (HSTS) - only in production
   if (!isDev) {
@@ -55,6 +60,26 @@ function applySecurityHeaders(response: NextResponse): void {
   
   // X-XSS-Protection
   response.headers.set('X-XSS-Protection', '1; mode=block');
+  
+  // CORS headers for static files (CDN support)
+  if (isStaticFile && request) {
+    const origin = request.headers.get('origin');
+    const hostname = request.nextUrl.hostname;
+    
+    // Allow requests from CDN domain or same origin
+    if (origin && (origin.includes('cdn.rvn.market') || origin.includes('rvn.market'))) {
+      response.headers.set('Access-Control-Allow-Origin', origin);
+      response.headers.set('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+      response.headers.set('Access-Control-Allow-Headers', 'Content-Type');
+      response.headers.set('Access-Control-Max-Age', '86400');
+    } else if (hostname === 'cdn.rvn.market' || hostname.endsWith('.rvn.market')) {
+      // Allow all subdomains of rvn.market (including cdn.rvn.market)
+      response.headers.set('Access-Control-Allow-Origin', '*');
+      response.headers.set('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+      response.headers.set('Access-Control-Allow-Headers', 'Content-Type');
+      response.headers.set('Access-Control-Max-Age', '86400');
+    }
+  }
 }
 
 /**
@@ -87,9 +112,17 @@ function isStaticFile(pathname: string): boolean {
  * Early exit for static files, API routes, and bots
  * @param pathname - The request pathname
  * @param userAgent - The request user agent
+ * @param hostname - The request hostname (for CDN detection)
  * @returns True if the request should bypass all proxy checks
  */
-function shouldBypassProxy(pathname: string, userAgent: string): boolean {
+function shouldBypassProxy(pathname: string, userAgent: string, hostname?: string): boolean {
+  // CDN domain requests - always bypass protection for static files
+  if (hostname && (hostname === 'cdn.rvn.market' || hostname.endsWith('.rvn.market'))) {
+    if (isStaticFile(pathname)) {
+      return true;
+    }
+  }
+  
   if (isStaticFile(pathname)) {
     return true;
   }
@@ -117,11 +150,11 @@ function handleProtection(request: NextRequest, pathname: string): NextResponse 
   if (pathname === '/protection' || pathname.startsWith('/protection/')) {
     if (accessGranted && accessHash) {
       const response = NextResponse.redirect(new URL('/', request.url));
-      applySecurityHeaders(response);
+      applySecurityHeaders(response, false);
       return response;
     }
     const response = NextResponse.next();
-    applySecurityHeaders(response);
+    applySecurityHeaders(response, false);
     return response;
   }
 
@@ -160,7 +193,7 @@ function handleProtection(request: NextRequest, pathname: string): NextResponse 
     new URL(`/protection?redirect=${encodeURIComponent(targetPath)}`, request.url)
   );
   
-  applySecurityHeaders(response);
+  applySecurityHeaders(response, false);
   
   const hostname = request.nextUrl.hostname;
   const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
@@ -196,7 +229,7 @@ function handleAuth(request: NextRequest, pathname: string): NextResponse | null
       pathname.startsWith('/auth/oauth-callback/')
     ) {
       const response = NextResponse.next();
-      applySecurityHeaders(response);
+      applySecurityHeaders(response, false);
       return response;
     }
 
@@ -205,16 +238,16 @@ function handleAuth(request: NextRequest, pathname: string): NextResponse | null
       const retpatch = request.nextUrl.searchParams.get('retpatch');
       if (retpatch) {
         const response = NextResponse.redirect(new URL(retpatch, request.url));
-        applySecurityHeaders(response);
+        applySecurityHeaders(response, false);
         return response;
       }
       const response = NextResponse.redirect(new URL(`/dashboard/${dashboardToken}`, request.url));
-      applySecurityHeaders(response);
+      applySecurityHeaders(response, false);
       return response;
     }
 
     const response = NextResponse.next();
-    applySecurityHeaders(response);
+    applySecurityHeaders(response, false);
     return response;
   }
 
@@ -223,14 +256,14 @@ function handleAuth(request: NextRequest, pathname: string): NextResponse | null
     if (!isAuthenticated || !dashboardToken) {
       const retpatch = encodeURIComponent(pathname);
       const response = NextResponse.redirect(new URL(`/auth?retpatch=${retpatch}`, request.url));
-      applySecurityHeaders(response);
+      applySecurityHeaders(response, false);
       return response;
     }
 
     /** Normalize dashboard URL */
     if (pathname === '/dashboard' || pathname === '/dashboard/') {
       const response = NextResponse.redirect(new URL(`/dashboard/${dashboardToken}`, request.url));
-      applySecurityHeaders(response);
+      applySecurityHeaders(response, false);
       return response;
     }
 
@@ -238,12 +271,12 @@ function handleAuth(request: NextRequest, pathname: string): NextResponse | null
     const urlToken = pathname.split('/dashboard/')[1]?.split('/')[0];
     if (urlToken && urlToken !== dashboardToken) {
       const response = NextResponse.redirect(new URL(`/dashboard/${dashboardToken}`, request.url));
-      applySecurityHeaders(response);
+      applySecurityHeaders(response, false);
       return response;
     }
 
     const response = NextResponse.next();
-    applySecurityHeaders(response);
+    applySecurityHeaders(response, false);
     return response;
   }
 
@@ -252,25 +285,25 @@ function handleAuth(request: NextRequest, pathname: string): NextResponse | null
     if (!isAuthenticated || !dashboardToken) {
       const retpatch = encodeURIComponent(pathname);
       const response = NextResponse.redirect(new URL(`/auth?retpatch=${retpatch}`, request.url));
-      applySecurityHeaders(response);
+      applySecurityHeaders(response, false);
       return response;
     }
     const response = NextResponse.next();
-    applySecurityHeaders(response);
+    applySecurityHeaders(response, false);
     return response;
   }
 
   /** Admin panel - requires admin authentication */
   if (pathname.startsWith('/ui/panel/admin')) {
     const response = NextResponse.next();
-    applySecurityHeaders(response);
+    applySecurityHeaders(response, false);
     return response;
   }
 
   /** Public support page - no auth required */
   if (pathname === '/support' || pathname.startsWith('/support/')) {
     const response = NextResponse.next();
-    applySecurityHeaders(response);
+    applySecurityHeaders(response, false);
     return response;
   }
 
@@ -278,17 +311,26 @@ function handleAuth(request: NextRequest, pathname: string): NextResponse | null
 }
 
 /**
- * Main proxy function - handles all request routing and protection
+ * Next.js Proxy (Middleware) - handles all request routing and protection
  * @param request - The Next.js request object
  * @returns NextResponse with appropriate redirect or next() to continue
  */
 export function proxy(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+  const { pathname, hostname } = request.nextUrl;
   const userAgent = request.headers.get('user-agent') || '';
+  const isStatic = isStaticFile(pathname);
+  
+  // Check if request is from CDN domain
+  const isCdnRequest = hostname === 'cdn.rvn.market' || hostname.endsWith('.rvn.market');
 
   /** Early exit for static files, API routes, and bots */
-  if (shouldBypassProxy(pathname, userAgent)) {
-    return NextResponse.next();
+  if (shouldBypassProxy(pathname, userAgent, hostname)) {
+    const response = NextResponse.next();
+    // Apply CORS headers for static files to support CDN
+    if (isStatic || isCdnRequest) {
+      applySecurityHeaders(response, true, request);
+    }
+    return response;
   }
 
   /** 1. Protection Proxy - checks protection cookies */
@@ -305,7 +347,7 @@ export function proxy(request: NextRequest) {
 
   /** Default response for public pages - apply security headers */
   const response = NextResponse.next();
-  applySecurityHeaders(response);
+  applySecurityHeaders(response, false);
   return response;
 }
 

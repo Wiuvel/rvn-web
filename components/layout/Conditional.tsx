@@ -40,7 +40,7 @@ export default function ConditionalLayout({ children }: ConditionalLayoutProps) 
   
   return (
     <>
-      <Header variant="main" hideOnScroll={isLegalPage} />
+      <Header variant="main" />
       <main>
         {children}
       </main>

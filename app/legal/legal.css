@@ -8,7 +8,7 @@
     linear-gradient(135deg, #0a0a0a 0%, #0f0f0f 50%, #0a0a0a 100%);
   color: #e5e5e5;
   min-height: 100vh;
-  padding: 2rem 1rem;
+  padding: 4rem 1rem 2rem 1rem;
   position: relative;
 }
 
@@ -97,6 +97,7 @@
 .page-title {
   text-align: center;
   margin-bottom: 3rem;
+  margin-top: 2rem;
 }
 
 .page-title h1 {

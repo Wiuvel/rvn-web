@@ -379,7 +379,7 @@ export default function DashboardPage() {
             </Link>
             <nav className="hidden lg:flex items-center gap-8 text-sm text-neutral-300">
               <Link href="/" className="hover:text-white transition">Главная</Link>
-              <Link href="/auth/" className="hover:text-white transition">Профиль</Link>
+              <Link href="/dashboard/${userData.dashboard_token}" className="hover:text-white transition">Профиль</Link>
               <Link href="/support" className="hover:text-white transition">Поддержка</Link>
             </nav>
             {userData && (

@@ -19,10 +19,9 @@ if (typeof window !== 'undefined') {
 
 interface HeaderProps {
   variant?: 'main' | 'auth' | 'dashboard';
-  hideOnScroll?: boolean;
 }
 
-export default function Header({ variant = 'main', hideOnScroll = false }: HeaderProps = {}) {
+export default function Header({ variant = 'main' }: HeaderProps = {}) {
   const [open, setOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -42,7 +41,6 @@ export default function Header({ variant = 'main', hideOnScroll = false }: Heade
   const { userData, loading } = useAuth({ silent: true });
 
   const headerRef = useRef<HTMLElement>(null);
-  const lastScrollY = useRef(0);
 
   useEffect(() => {
     if (typeof window === 'undefined' || !headerRef.current) return;
@@ -75,64 +73,7 @@ export default function Header({ variant = 'main', hideOnScroll = false }: Heade
       }
     );
 
-    // Анимация скрытия при скролле для legal страниц
-    if (hideOnScroll) {
-      const handleScroll = () => {
-        const currentScrollY = window.scrollY;
-        
-        // Если вверху страницы - всегда показываем header
-        if (currentScrollY < 50) {
-          gsap.to(headerContainer, {
-            y: 0,
-            opacity: 1,
-            pointerEvents: 'auto',
-            duration: 0.3,
-            ease: 'power2.out'
-          });
-        }
-        // Если скроллим вниз и прошли больше 100px - скрываем header
-        else if (currentScrollY > lastScrollY.current && currentScrollY > 100) {
-          gsap.to(headerContainer, {
-            y: -100,
-            opacity: 0,
-            pointerEvents: 'none',
-            duration: 0.3,
-            ease: 'power2.out'
-          });
-        } 
-        // Если скроллим вверх - показываем header
-        else if (currentScrollY < lastScrollY.current) {
-          gsap.to(headerContainer, {
-            y: 0,
-            opacity: 1,
-            pointerEvents: 'auto',
-            duration: 0.3,
-            ease: 'power2.out'
-          });
-        }
-        
-        lastScrollY.current = currentScrollY;
-      };
-
-      // Throttle для оптимизации
-      let ticking = false;
-      const throttledScroll = () => {
-        if (!ticking) {
-          window.requestAnimationFrame(() => {
-            handleScroll();
-            ticking = false;
-          });
-          ticking = true;
-        }
-      };
-
-      window.addEventListener('scroll', throttledScroll, { passive: true });
-
-      return () => {
-        window.removeEventListener('scroll', throttledScroll);
-      };
-    }
-  }, [hideOnScroll]);
+  }, []);
 
   // Плавный переход между состояниями auth контейнера
   useEffect(() => {
@@ -310,7 +251,7 @@ export default function Header({ variant = 'main', hideOnScroll = false }: Heade
   };
 
   return (
-    <header ref={headerRef} className={`${hideOnScroll ? 'sticky' : 'fixed'} top-0 left-0 right-0 pt-4 z-50`}>
+    <header ref={headerRef} className="fixed top-0 left-0 right-0 pt-4 z-50">
       <div className="mx-auto max-w-6xl px-4">
         <div className="header-container backdrop-blur-md bg-neutral-900/40 border border-white/10 rounded-full px-6 py-3 flex items-center justify-between shadow-lg">
           <Link
