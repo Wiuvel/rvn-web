@@ -13,6 +13,7 @@ import { GSAP_DEFAULT_DURATION, GSAP_DEFAULT_EASE } from '@/lib/utils/constants'
 import { getGradientClasses } from '@/lib/utils/avatar-gradients';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { getStaticUrl } from "@/lib/utils";
+import { CdnImage } from '@/components/ui/CdnImage';
 
 if (typeof window !== 'undefined') {
   gsap.registerPlugin(ScrollTrigger);
@@ -260,12 +261,12 @@ export default function Header({ variant = 'main' }: HeaderProps = {}) {
             className="flex items-center gap-2"
             aria-current={pathname === '/' ? 'page' : undefined}
           >
-            <Image 
-              src={getStaticUrl("/static/logo.svg")} 
+            <CdnImage 
+              src="/static/logo.svg" 
               alt="RVNPrivate" 
               width={256} 
               height={256} 
-                  className="w-6 h-6"
+              className="w-6 h-6"
               priority
             />
             <span className="font-semibold text-white">Raven Private</span>

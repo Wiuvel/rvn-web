@@ -19,23 +19,37 @@ export function generateSessionId(): string {
 export { domains };
 
 /**
- * Генерирует URL для статических файлов с поддержкой CDN
+ * Генерирует URL для статических файлов с поддержкой CDN и fallback
  * В продакшене использует CDN URL из переменной окружения или дефолтный
+ * Если CDN недоступен, использует основной домен
  * @param path - Путь к статическому файлу (например, '/static/logo.svg')
- * @returns Полный URL с CDN префиксом в продакшене
+ * @param useFallback - Принудительно использовать fallback (для клиентской стороны)
+ * @returns Полный URL с CDN префиксом или fallback на основной домен
  */
-export function getStaticUrl(path: string): string {
+export function getStaticUrl(path: string, useFallback: boolean = false): string {
   // Убираем начальный слэш если есть, чтобы избежать двойных слэшей
   const cleanPath = path.startsWith('/') ? path : `/${path}`;
   
-  // В продакшене используем CDN, в dev - относительный путь
-  if (process.env.NODE_ENV === 'production') {
-    // Убираем trailing slash из CDN URL если есть
+  // В dev режиме используем относительный путь
+  if (process.env.NODE_ENV !== 'production') {
+    return cleanPath;
+  }
+
+  // На сервере всегда используем CDN (проверка доступности только на клиенте)
+  if (typeof window === 'undefined') {
     const cleanCdnUrl = domains.cdnUrl.endsWith('/') ? domains.cdnUrl.slice(0, -1) : domains.cdnUrl;
     return `${cleanCdnUrl}${cleanPath}`;
   }
-  
-  return cleanPath;
+
+  // На клиенте проверяем доступность CDN
+  if (useFallback) {
+    const cleanMainUrl = domains.mainUrl.endsWith('/') ? domains.mainUrl.slice(0, -1) : domains.mainUrl;
+    return `${cleanMainUrl}${cleanPath}`;
+  }
+
+  // По умолчанию используем CDN (fallback будет обработан на уровне компонентов)
+  const cleanCdnUrl = domains.cdnUrl.endsWith('/') ? domains.cdnUrl.slice(0, -1) : domains.cdnUrl;
+  return `${cleanCdnUrl}${cleanPath}`;
 }
 
 /**

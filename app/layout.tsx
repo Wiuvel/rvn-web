@@ -5,6 +5,7 @@ import ConditionalLayout from "@/components/layout/Conditional";
 import { pageMetadata } from "@/lib/utils/seo";
 import { exo2 } from "./fonts";
 import HomeStructuredData from "@/components/seo/HomeStructuredData";
+import CdnInit from "@/components/utils/CdnInit";
 import { domains, getStaticUrl } from "@/lib/utils";
 
 // Генерируем URL для favicon с поддержкой CDN
@@ -36,6 +37,7 @@ export default function RootLayout({
   return (
     <html lang="ru" className={`h-full scroll-smooth dark ${exo2.variable}`} data-scroll-behavior="smooth">
       <body className={`h-full bg-neutral-950 text-neutral-100 antialiased relative ${exo2.className}`}>
+        <CdnInit />
         <HomeStructuredData />
         <SmoothScroll />
         <ConditionalLayout>
