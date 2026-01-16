@@ -127,7 +127,7 @@ export async function GET(
       .select(`
         *,
         sender:users!support_messages_sender_id_fkey(id, username, user_id, avatar),
-        attachments:support_message_attachments(id, file_name, file_type, file_size, storage_path, storage_url)
+        attachments:support_message_attachments(id, file_name, file_type, file_size, storage_path)
       `)
       .eq('ticket_id', ticketId)
       .order('created_at', { ascending: true })
@@ -152,18 +152,27 @@ export async function GET(
     const uniqueSenderIds = Array.from(new Set((messages || []).map(msg => msg.sender_id)));
     const senderRolesMap = await batchHasUserRole(uniqueSenderIds, 'support');
     
+    // Оптимизированная обработка сообщений с вложениями
     const messagesWithSenderType = (messages || []).map((msg) => {
       const senderIsSupport = senderRolesMap.get(msg.sender_id) || false;
-      // Формируем правильные URL для вложений из storage_path
+      // Формируем правильные URL для вложений из storage_path (оптимизировано)
       let attachments = undefined;
       if (msg.attachments) {
+        // Обрабатываем как массив (нормализуем)
         const attArray = Array.isArray(msg.attachments) ? msg.attachments : [msg.attachments];
-        attachments = attArray.map((att: any) => ({
-          ...att,
-          storage_url: att.storage_path 
-            ? `/api/support/files/${encodeURIComponent(att.storage_path)}` 
-            : att.storage_url || ''
-        }));
+        if (attArray.length > 0) {
+          attachments = attArray.map((att: any) => ({
+            id: att.id,
+            file_name: att.file_name,
+            file_type: att.file_type,
+            file_size: att.file_size,
+            storage_path: att.storage_path,
+            // Формируем URL только из storage_path (единственный источник истины)
+            storage_url: att.storage_path 
+              ? `/api/support/files/${encodeURIComponent(att.storage_path)}` 
+              : ''
+          }));
+        }
       }
       return {
         ...msg,

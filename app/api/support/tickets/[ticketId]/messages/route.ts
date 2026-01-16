@@ -298,6 +298,18 @@ export async function POST(
         }
       }
       
+      // Формируем вложения с правильными URL для WebSocket broadcast
+      const attachmentsForBroadcast = attachmentsData.length > 0 
+        ? attachmentsData.map(att => ({
+            id: att.id,
+            file_name: att.file_name,
+            file_type: att.file_type,
+            file_size: att.file_size,
+            storage_path: att.storage_path,
+            storage_url: `/api/support/files/${encodeURIComponent(att.storage_path)}`
+          }))
+        : undefined;
+
       const messageForBroadcast = {
         id: newMessage.id,
         ticket_id: newMessage.ticket_id,
@@ -307,7 +319,7 @@ export async function POST(
         is_read: newMessage.is_read || false,
         created_at: newMessage.created_at,
         sender: senderData,
-        attachments: attachmentsData.length > 0 ? attachmentsData : undefined,
+        attachments: attachmentsForBroadcast,
       };
       
       // Успешное создание сообщения не логируется

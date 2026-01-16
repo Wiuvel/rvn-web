@@ -10,6 +10,7 @@ import { MESSAGE_MAX_LENGTH, TICKET_SUBJECT_MAX_LENGTH, MAX_TICKETS_PER_USER, ME
 import { translateError } from '@/lib/utils/error-translations';
 import { getGradientClasses } from '@/lib/utils/avatar-gradients';
 import { useWebSocket } from '@/hooks/useWebSocket';
+import { debugPerformanceAsync, debugStart, debugEnd, debugError } from '@/lib/utils/debug';
 import TicketSkeleton from '@/components/ui/TicketSkeleton';
 import FileUploadModal from '@/components/support/FileUploadModal';
 import { Paperclip, X, Image as ImageIcon, FileText, AlertCircle } from 'lucide-react';
@@ -78,13 +79,56 @@ interface Ticket {
   updated_at?: string; // Для обновления через WebSocket
 }
 
-// Компонент для изображения с обработкой ошибок
-function ImageWithError({ src, alt, className }: { src: string; alt: string; className?: string }) {
+// Компонент для изображения с обработкой ошибок и skeleton-loader с shimmer эффектом
+function ImageWithError({ 
+  src, 
+  alt, 
+  className, 
+  loading = 'lazy',
+  isRead = false 
+}: { 
+  src: string; 
+  alt: string; 
+  className?: string; 
+  loading?: 'lazy' | 'eager';
+  isRead?: boolean;
+}) {
   const [hasError, setHasError] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isInView, setIsInView] = useState(false);
+  const imgRef = useRef<HTMLDivElement>(null);
+  
+  // Intersection Observer для lazy loading
+  useEffect(() => {
+    if (!imgRef.current || loading !== 'lazy') {
+      setIsInView(true);
+      return;
+    }
+    
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            setIsInView(true);
+            observer.disconnect();
+          }
+        });
+      },
+      { rootMargin: '50px' } // Начинаем загрузку за 50px до появления в viewport
+    );
+    
+    observer.observe(imgRef.current);
+    
+    return () => observer.disconnect();
+  }, [loading]);
+  
+  // Определяем палитру skeleton-loader на основе статуса прочтения
+  const skeletonGradient = isRead
+    ? 'linear-gradient(90deg, rgba(59,130,246,0.3) 0%, rgba(96,165,250,0.5) 50%, rgba(59,130,246,0.3) 100%)' // Синяя палитра
+    : 'linear-gradient(90deg, rgba(64,64,64,0.3) 0%, rgba(115,115,115,0.5) 50%, rgba(64,64,64,0.3) 100%)'; // Стандартная палитра
   
   return (
-    <div className={`relative bg-neutral-800 ${className || ''}`}>
+    <div className={`relative bg-neutral-800 ${className || ''}`} ref={imgRef}>
       {hasError ? (
         <div className="aspect-video flex items-center justify-center">
           <div className="text-center p-4">
@@ -95,20 +139,32 @@ function ImageWithError({ src, alt, className }: { src: string; alt: string; cla
       ) : (
         <>
           {isLoading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-neutral-800">
-              <div className="w-6 h-6 border-2 border-neutral-600 border-t-neutral-400 rounded-full animate-spin" />
+            <div className="absolute inset-0 bg-neutral-800 rounded-lg overflow-hidden">
+              <div 
+                className="w-full h-full rounded-lg" 
+                style={{ 
+                  height: '100%', 
+                  width: '100%',
+                  background: skeletonGradient,
+                  backgroundSize: '200% 100%',
+                  animation: 'shimmer 1.5s ease-in-out infinite'
+                }} 
+              />
             </div>
           )}
-          <img
-            src={src}
-            alt={alt}
-            className={`w-full h-auto object-contain ${isLoading ? 'opacity-0' : 'opacity-100'} transition-opacity ${className || ''}`}
-            onLoad={() => setIsLoading(false)}
-            onError={() => {
-              setHasError(true);
-              setIsLoading(false);
-            }}
-          />
+          {isInView && (
+            <img
+              src={src}
+              alt={alt}
+              loading={loading}
+              className={`w-full h-auto object-contain ${isLoading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300 ${className || ''}`}
+              onLoad={() => setIsLoading(false)}
+              onError={() => {
+                setHasError(true);
+                setIsLoading(false);
+              }}
+            />
+          )}
         </>
       )}
     </div>
@@ -262,6 +318,7 @@ function MessageItem({
                               src={attachment.storage_url}
                               alt={attachment.file_name}
                               className="rounded-lg"
+                              isRead={message.isRead !== false}
                             />
                           </button>
                         ))}
@@ -275,9 +332,8 @@ function MessageItem({
                           <a
                             key={attachment.id}
                             href={attachment.storage_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className={`flex items-center gap-2 p-2 hover:bg-white/5 transition-colors rounded-lg ${
+                            download={attachment.file_name}
+                            className={`flex items-center gap-2 p-2 hover:bg-white/5 transition-colors rounded-lg cursor-pointer ${
                               message.sender === 'user'
                                 ? 'bg-white/10'
                                 : 'bg-neutral-700/50'
@@ -348,6 +404,13 @@ export default function SupportPage() {
   const [messagesSentCount, setMessagesSentCount] = useState<number>(0);
   const [notification, setNotification] = useState<{ message: string; show: boolean; type?: 'error' | 'info' }>({ message: '', show: false, type: 'error' });
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const messagesTopRef = useRef<HTMLDivElement>(null);
+  const [hasMoreMessages, setHasMoreMessages] = useState(false);
+  const [isLoadingOlderMessages, setIsLoadingOlderMessages] = useState(false);
+  const [loadedMessageCount, setLoadedMessageCount] = useState(0);
+  const scrollPositionRef = useRef<number | null>(null);
+  const isRestoringScrollRef = useRef(false);
   const router = useRouter();
   
   // Подсчет активных тикетов (только open и pending)
@@ -676,6 +739,7 @@ export default function SupportPage() {
   useEffect(() => {
     if (!socket || !activeTicket) return;
 
+    // Обработчик новых сообщений через WebSocket (оптимизировано)
     const handleNewMessage = (data: {
       ticketId: string;
       message: {
@@ -695,6 +759,7 @@ export default function SupportPage() {
           file_type: string;
           file_size: number;
           storage_path: string;
+          storage_url?: string;
         }>;
       };
     }) => {
@@ -712,15 +777,16 @@ export default function SupportPage() {
         timestamp: new Date(data.message.created_at),
         isRead: data.message.is_read,
         senderData: data.message.sender,
-        attachments: (data.message.attachments || []).map((att: any) => ({
+        // Вложения уже правильно сформированы на сервере при broadcast, используем как есть
+        attachments: data.message.attachments?.map((att: any) => ({
           id: att.id,
           file_name: att.file_name,
           file_type: att.file_type,
           file_size: att.file_size,
-          storage_url: att.storage_path 
+          storage_path: att.storage_path,
+          storage_url: att.storage_url || (att.storage_path 
             ? `/api/support/files/${encodeURIComponent(att.storage_path)}` 
-            : '',
-          storage_path: att.storage_path
+            : '')
         })),
       };
 
@@ -884,7 +950,10 @@ export default function SupportPage() {
       // Очищаем загруженные сообщения при смене тикета
       loadedMessagesRef.current.clear();
       initialLoadRef.current = true;
-      fetchTicketMessages(activeTicket.id);
+      setLoadedMessageCount(0);
+      setHasMoreMessages(false);
+      // Загружаем сообщения с восстановлением позиции скролла
+      fetchTicketMessages(activeTicket.id, 25, 0, true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTicket?.id]);
@@ -923,7 +992,7 @@ export default function SupportPage() {
           async () => {
             // Retry callback для обновления сообщений
             if (activeTicket) {
-              await fetchTicketMessages(activeTicket.id);
+              await fetchTicketMessages(activeTicket.id, 25, 0, false);
             }
           }
         );
@@ -1106,12 +1175,253 @@ export default function SupportPage() {
     return username.charAt(0).toUpperCase();
   };
 
-  // Автопрокрутка к последнему сообщению
+  // Автопрокрутка к последнему сообщению только для новых сообщений (не при первой загрузке)
   useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    if (!activeTicket?.messages || activeTicket.messages.length === 0 || isRestoringScrollRef.current) return;
+    
+    // Проверяем, есть ли сохраненная позиция скролла
+    if (typeof window !== 'undefined' && activeTicket.id) {
+      const savedPosition = localStorage.getItem(`support_scroll_${activeTicket.id}`);
+      // Если есть сохраненная позиция и это не 'bottom', не скроллим автоматически
+      if (savedPosition && savedPosition !== 'bottom') {
+        return;
+      }
     }
-  }, [activeTicket?.messages]);
+    
+    // Скроллим вниз только если это новое сообщение (последнее сообщение не было загружено ранее)
+    const lastMessage = activeTicket.messages[activeTicket.messages.length - 1];
+    if (lastMessage && !loadedMessagesRef.current.has(lastMessage.id)) {
+      // Ждем загрузки всех изображений перед скроллом
+      const scrollToBottom = () => {
+        if (messagesEndRef.current && !isRestoringScrollRef.current) {
+          requestAnimationFrame(() => {
+            setTimeout(() => {
+              if (messagesEndRef.current && !isRestoringScrollRef.current) {
+                messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+              }
+            }, 100);
+          });
+        }
+      };
+      
+      // Проверяем, загружены ли все изображения
+      const images = document.querySelectorAll('img[src*="/api/support/files/"]');
+      if (images.length === 0) {
+        scrollToBottom();
+        return;
+      }
+      
+      let loadedCount = 0;
+      const totalImages = images.length;
+      
+      const checkAllLoaded = () => {
+        loadedCount++;
+        if (loadedCount >= totalImages) {
+          scrollToBottom();
+        }
+      };
+      
+      images.forEach((img) => {
+        if ((img as HTMLImageElement).complete) {
+          checkAllLoaded();
+        } else {
+          img.addEventListener('load', checkAllLoaded, { once: true });
+          img.addEventListener('error', checkAllLoaded, { once: true });
+        }
+      });
+      
+      const timeout = setTimeout(scrollToBottom, 2000);
+      
+      return () => {
+        clearTimeout(timeout);
+        images.forEach((img) => {
+          img.removeEventListener('load', checkAllLoaded);
+          img.removeEventListener('error', checkAllLoaded);
+        });
+      };
+    }
+  }, [activeTicket?.messages, activeTicket?.id]);
+
+  // Сохранение позиции скролла
+  const saveScrollPosition = useCallback((ticketId: string) => {
+    if (!messagesContainerRef.current || isRestoringScrollRef.current) return;
+    
+    const scrollTop = messagesContainerRef.current.scrollTop;
+    const scrollHeight = messagesContainerRef.current.scrollHeight;
+    const clientHeight = messagesContainerRef.current.clientHeight;
+    
+    // Сохраняем только если не в самом низу (с небольшим допуском)
+    const isAtBottom = scrollHeight - scrollTop - clientHeight < 50;
+    
+    if (typeof window !== 'undefined') {
+      if (isAtBottom) {
+        // Если внизу, сохраняем специальный маркер
+        localStorage.setItem(`support_scroll_${ticketId}`, 'bottom');
+      } else {
+        // Сохраняем позицию скролла
+        localStorage.setItem(`support_scroll_${ticketId}`, scrollTop.toString());
+      }
+    }
+  }, []);
+
+  // Восстановление позиции скролла
+  const restoreScrollPosition = useCallback((ticketId: string) => {
+    if (!messagesContainerRef.current || typeof window === 'undefined') return;
+    
+    const savedPosition = localStorage.getItem(`support_scroll_${ticketId}`);
+    
+    // Функция для выполнения скролла после загрузки всех элементов
+    const performScroll = () => {
+      if (!messagesContainerRef.current) return;
+      
+      isRestoringScrollRef.current = true;
+      
+      if (savedPosition === 'bottom' || savedPosition === null) {
+        // Если был внизу или нет сохраненной позиции, скроллим к самому новому сообщению
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            if (messagesEndRef.current) {
+              messagesEndRef.current.scrollIntoView({ behavior: 'auto' });
+            } else if (messagesContainerRef.current) {
+              // Если messagesEndRef еще не готов, скроллим в самый низ контейнера
+              messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+            }
+            setTimeout(() => {
+              isRestoringScrollRef.current = false;
+            }, 200);
+          });
+        });
+      } else {
+        // Восстанавливаем сохраненную позицию
+        const scrollTop = parseInt(savedPosition, 10);
+        if (!isNaN(scrollTop)) {
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              if (messagesContainerRef.current) {
+                messagesContainerRef.current.scrollTop = scrollTop;
+              }
+              setTimeout(() => {
+                isRestoringScrollRef.current = false;
+              }, 200);
+            });
+          });
+        }
+      }
+    };
+    
+    // Ждем загрузки всех изображений перед восстановлением позиции
+    const images = messagesContainerRef.current.querySelectorAll('img[src*="/api/support/files/"]');
+    if (images.length === 0) {
+      // Нет изображений, можно сразу скроллить
+      setTimeout(performScroll, 100);
+      return;
+    }
+    
+    let loadedCount = 0;
+    const totalImages = images.length;
+    let scrollPerformed = false;
+    
+    const checkAllLoaded = () => {
+      loadedCount++;
+      if (loadedCount >= totalImages && !scrollPerformed) {
+        scrollPerformed = true;
+        performScroll();
+      }
+    };
+    
+    images.forEach((img) => {
+      if ((img as HTMLImageElement).complete) {
+        checkAllLoaded();
+      } else {
+        img.addEventListener('load', checkAllLoaded, { once: true });
+        img.addEventListener('error', checkAllLoaded, { once: true });
+      }
+    });
+    
+    // Таймаут на случай, если изображения не загрузятся
+    setTimeout(() => {
+      if (!scrollPerformed) {
+        scrollPerformed = true;
+        performScroll();
+      }
+    }, 2000);
+  }, []);
+
+  // Сохранение позиции скролла при прокрутке
+  useEffect(() => {
+    if (!messagesContainerRef.current || !activeTicket?.id) return;
+    
+    const container = messagesContainerRef.current;
+    let scrollTimeout: NodeJS.Timeout;
+    
+    const handleScroll = () => {
+      if (isRestoringScrollRef.current) return;
+      
+      // Debounce сохранения позиции
+      clearTimeout(scrollTimeout);
+      scrollTimeout = setTimeout(() => {
+        saveScrollPosition(activeTicket.id);
+      }, 300);
+    };
+    
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    
+    return () => {
+      container.removeEventListener('scroll', handleScroll);
+      clearTimeout(scrollTimeout);
+    };
+  }, [activeTicket?.id, saveScrollPosition]);
+
+  // Загрузка старых сообщений при прокрутке вверх
+  const loadOlderMessages = useCallback(async () => {
+    if (!activeTicket || isLoadingOlderMessages || !hasMoreMessages) return;
+    
+    return debugPerformanceAsync('loadOlderMessages', async () => {
+      setIsLoadingOlderMessages(true);
+      debugStart('loadOlderMessages', { ticketId: activeTicket.id, offset: loadedMessageCount });
+      
+      try {
+        const currentScrollTop = messagesContainerRef.current?.scrollTop || 0;
+        const currentScrollHeight = messagesContainerRef.current?.scrollHeight || 0;
+        
+        await fetchTicketMessages(activeTicket.id, 25, loadedMessageCount, false);
+        
+        // Восстанавливаем позицию скролла после добавления старых сообщений
+        requestAnimationFrame(() => {
+          if (messagesContainerRef.current) {
+            const newScrollHeight = messagesContainerRef.current.scrollHeight;
+            const scrollDiff = newScrollHeight - currentScrollHeight;
+            messagesContainerRef.current.scrollTop = currentScrollTop + scrollDiff;
+            debugEnd('loadOlderMessages', { scrollDiff, newHeight: newScrollHeight });
+          }
+        });
+      } catch (error) {
+        debugError('loadOlderMessages', { ticketId: activeTicket.id, error });
+      } finally {
+        setIsLoadingOlderMessages(false);
+      }
+    });
+  }, [activeTicket, isLoadingOlderMessages, hasMoreMessages, loadedMessageCount]);
+
+  // Intersection Observer для загрузки старых сообщений при прокрутке вверх
+  useEffect(() => {
+    if (!messagesTopRef.current || !activeTicket?.id || !hasMoreMessages) return;
+    
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting && !isLoadingOlderMessages && hasMoreMessages) {
+            loadOlderMessages();
+          }
+        });
+      },
+      { rootMargin: '100px' } // Начинаем загрузку за 100px до появления индикатора
+    );
+    
+    observer.observe(messagesTopRef.current);
+    
+    return () => observer.disconnect();
+  }, [activeTicket?.id, hasMoreMessages, isLoadingOlderMessages, loadOlderMessages]);
 
   // Таймер тайм-аута между сообщениями
   useEffect(() => {
@@ -1585,8 +1895,8 @@ export default function SupportPage() {
               // Небольшая задержка для корректного обновления state
               setTimeout(() => {
                 setActiveTicket(lastTicket);
-                // Загружаем сообщения для восстановленного тикета
-                fetchTicketMessages(lastTicket.id);
+                // Загружаем сообщения для восстановленного тикета с восстановлением позиции
+                fetchTicketMessages(lastTicket.id, 25, 0, true);
               }, 50);
             }
           }
@@ -1609,70 +1919,87 @@ export default function SupportPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTicket, showNotification]);
 
-  const fetchTicketMessages = async (ticketId: string) => {
-    // Предотвращаем дублирующиеся запросы
-    if (fetchingTicketIdRef.current === ticketId) {
-      return;
-    }
-    
-    try {
-      fetchingTicketIdRef.current = ticketId;
+  const fetchTicketMessages = async (ticketId: string, limit: number = 25, offset: number = 0, restoreScroll: boolean = false) => {
+    return debugPerformanceAsync('fetchTicketMessages', async () => {
+      // Предотвращаем дублирующиеся запросы
+      if (fetchingTicketIdRef.current === ticketId && !restoreScroll) {
+        debugStart('fetchTicketMessages', { ticketId, reason: 'duplicate_request' });
+        return;
+      }
       
-      const response = await fetchWithRateLimit(
-        `/api/support/tickets/${ticketId}`,
-        {
-          credentials: 'include'
-        },
-        () => fetchTicketMessages(ticketId) // Retry callback
-      );
-      const data = await response.json();
+      try {
+        if (!restoreScroll) {
+          fetchingTicketIdRef.current = ticketId;
+        }
+        
+        debugStart('fetchTicketMessages', { ticketId, limit, offset, restoreScroll });
+        
+        // Загружаем только последние N сообщений для оптимизации
+        const response = await fetchWithRateLimit(
+          `/api/support/tickets/${ticketId}?limit=${limit}&offset=${offset}`,
+          {
+            credentials: 'include'
+          },
+          () => fetchTicketMessages(ticketId, limit, offset, restoreScroll) // Retry callback
+        );
+        const data = await response.json();
       
       if (response.ok) {
+        // Маппим сообщения с вложениями (оптимизировано - используем данные с сервера)
+        const mappedMessages = (data.messages || []).map((m: { 
+          id: string; 
+          message_text: string; 
+          sender_type: string; 
+          created_at: string; 
+          is_read: boolean; 
+          sender?: { id: string; username: string; user_id: string };
+          attachments?: Array<{
+            id: string;
+            file_name: string;
+            file_type: string;
+            file_size: number;
+            storage_url: string;
+            storage_path?: string;
+          }>;
+        }) => ({
+          id: m.id,
+          text: m.message_text,
+          sender: m.sender_type,
+          timestamp: new Date(m.created_at),
+          isRead: m.is_read,
+          senderData: m.sender,
+          // Вложения уже правильно сформированы на сервере, используем как есть
+          attachments: m.attachments || undefined
+        }));
+        
         // Проверяем, что тикет все еще активный (не изменился во время запроса)
         setActiveTicket(prev => {
           // Если тикет изменился во время запроса, не обновляем
           if (prev && prev.id && prev.id !== ticketId) {
-            fetchingTicketIdRef.current = null;
+            if (!restoreScroll) {
+              fetchingTicketIdRef.current = null;
+            }
             return prev;
           }
           
-          const mappedMessages = (data.messages || []).map((m: { 
-            id: string; 
-            message_text: string; 
-            sender_type: string; 
-            created_at: string; 
-            is_read: boolean; 
-            sender?: { id: string; username: string; user_id: string };
-            attachments?: Array<{
-              id: string;
-              file_name: string;
-              file_type: string;
-              file_size: number;
-              storage_url: string;
-              storage_path?: string;
-            }>;
-          }) => ({
-            id: m.id,
-            text: m.message_text,
-            sender: m.sender_type,
-            timestamp: new Date(m.created_at),
-            isRead: m.is_read,
-            senderData: m.sender,
-            attachments: (m.attachments || []).map((att: any) => ({
-              id: att.id,
-              file_name: att.file_name,
-              file_type: att.file_type,
-              file_size: att.file_size,
-              storage_url: att.storage_path 
-                ? `/api/support/files/${encodeURIComponent(att.storage_path)}` 
-                : att.storage_url?.startsWith('/api/support/files/') 
-                  ? att.storage_url 
-                  : att.storage_url || '',
-              storage_path: att.storage_path
-            }))
-          }));
+          // Если это первая загрузка (offset === 0), заменяем все сообщения
+          // Если это загрузка старых сообщений (offset > 0), добавляем в начало
+          let finalMessages: typeof mappedMessages;
+          if (offset === 0) {
+            finalMessages = mappedMessages;
+            setLoadedMessageCount(mappedMessages.length);
+            // Проверяем, есть ли еще сообщения для загрузки
+            // Если загрузили меньше чем запросили, значит это все сообщения
+            setHasMoreMessages(mappedMessages.length >= limit);
+          } else {
+            // Добавляем старые сообщения в начало
+            finalMessages = [...mappedMessages, ...(prev?.messages || [])];
+            setLoadedMessageCount(prev => prev + mappedMessages.length);
+            // Если загрузили меньше чем запросили, значит больше нет старых сообщений
+            setHasMoreMessages(mappedMessages.length >= limit);
+          }
           
-          // Отмечаем все загруженные сообщения как уже загруженные (первая загрузка тикета)
+          // Отмечаем все загруженные сообщения как уже загруженные
           mappedMessages.forEach((m: { id: string }) => {
             loadedMessagesRef.current.add(m.id);
           });
@@ -1682,11 +2009,11 @@ export default function SupportPage() {
             subject: data.ticket.subject,
             status: data.ticket.status,
             createdAt: new Date(data.ticket.created_at),
-            messages: mappedMessages
+            messages: finalMessages
           };
           
           // Обновляем ref с актуальными сообщениями
-          activeTicketMessagesRef.current = mappedMessages;
+          activeTicketMessagesRef.current = finalMessages;
           
           // Сохраняем ID последнего открытого тикета
           if (typeof window !== 'undefined') {
@@ -1694,25 +2021,55 @@ export default function SupportPage() {
           }
           
           // Устанавливаем флаг первой загрузки после небольшой задержки, чтобы сообщения успели отрендериться
-          setTimeout(() => {
-            initialLoadRef.current = false;
-          }, 100);
+          if (offset === 0) {
+            setTimeout(() => {
+              initialLoadRef.current = false;
+            }, 100);
+          }
           
           return ticket;
         });
         
+        // Восстанавливаем позицию скролла после первой загрузки
+        // Используем двойной requestAnimationFrame для гарантии полного рендера
+        if (offset === 0 && restoreScroll) {
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              // Дополнительная задержка для гарантии, что DOM полностью обновлен
+              setTimeout(() => {
+                restoreScrollPosition(ticketId);
+              }, 50);
+            });
+          });
+        }
+        
         // Отмечаем сообщения как прочитанные после загрузки
-        markMessagesAsRead(ticketId);
+        if (offset === 0) {
+          markMessagesAsRead(ticketId);
+        }
+        
+        debugEnd('fetchTicketMessages', { 
+          ticketId, 
+          messagesCount: mappedMessages.length,
+          hasMore: mappedMessages.length >= limit 
+        });
       } else {
-        fetchingTicketIdRef.current = null;
+        if (!restoreScroll) {
+          fetchingTicketIdRef.current = null;
+        }
         const errorMessage = data.error || 'Ошибка загрузки сообщений';
+        debugError('fetchTicketMessages', { ticketId, error: errorMessage });
         showNotification(translateError(errorMessage));
       }
     } catch (error) {
       // Ошибка получения сообщений
-      console.error('Error fetching ticket messages:', error);
+      if (!restoreScroll) {
+        fetchingTicketIdRef.current = null;
+      }
+      debugError('fetchTicketMessages', { ticketId, error });
       showNotification('Ошибка загрузки сообщений');
     }
+    });
   };
 
   const formatTime = (date: Date) => {
@@ -2146,8 +2503,8 @@ export default function SupportPage() {
                           setMessagesSentCount(0);
                           setLastMessageTime(null);
                           setTimeoutSeconds(0);
-                          // Загружаем сообщения асинхронно
-                          await fetchTicketMessages(ticket.id);
+                          // Загружаем сообщения асинхронно с восстановлением позиции скролла
+                          await fetchTicketMessages(ticket.id, 25, 0, true);
                         }}
                         disabled={activeTicket?.id === ticket.id}
                         className={`w-full text-left p-3 rounded-xl transition-colors ${
@@ -2260,7 +2617,10 @@ export default function SupportPage() {
                       </div>
                     </div>
 
-                    <div className="support-chat-messages flex-1 overflow-y-auto min-h-0 relative">
+                    <div 
+                      ref={messagesContainerRef}
+                      className="support-chat-messages flex-1 overflow-y-auto min-h-0 relative"
+                    >
                       {ticketsLoading && (
                         <div className="absolute top-4 right-4 flex items-center gap-2 text-neutral-400 text-sm z-10">
                           <div className="w-4 h-4 border-2 border-neutral-400 border-t-transparent rounded-full animate-spin"></div>
@@ -2270,6 +2630,19 @@ export default function SupportPage() {
                       <div key={`messages-${activeTicket.id}`} className="p-2 sm:p-4 flex flex-col gap-3 sm:gap-4 min-h-full">
                         {activeTicket.messages && Array.isArray(activeTicket.messages) && activeTicket.messages.length > 0 ? (
                           <>
+                            {/* Индикатор загрузки старых сообщений */}
+                            {hasMoreMessages && (
+                              <div ref={messagesTopRef} className="flex justify-center py-2">
+                                {isLoadingOlderMessages ? (
+                                  <div className="flex items-center gap-2 text-neutral-400 text-sm">
+                                    <div className="w-4 h-4 border-2 border-neutral-400 border-t-transparent rounded-full animate-spin"></div>
+                                    <span>Загрузка старых сообщений...</span>
+                                  </div>
+                                ) : (
+                                  <div className="h-1" /> // Невидимый элемент для Intersection Observer
+                                )}
+                              </div>
+                            )}
                             {activeTicket.messages.map((message, index) => {
                               const showDate = index === 0 || 
                                 new Date(message.timestamp).getDate() !== 

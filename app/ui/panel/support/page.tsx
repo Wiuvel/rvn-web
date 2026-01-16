@@ -11,6 +11,8 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { getGradientClasses } from '@/lib/utils/avatar-gradients';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import TicketSkeleton from '@/components/ui/TicketSkeleton';
+import { FileText, AlertCircle, Image as ImageIcon } from 'lucide-react';
+import ImageViewer from '@/components/support/ImageViewer';
 
 interface AuthState {
   isAuthenticated: boolean;
@@ -52,6 +54,15 @@ interface Ticket {
   unread_count?: number;
 }
 
+interface MessageAttachment {
+  id: string;
+  file_name: string;
+  file_type: string;
+  file_size: number;
+  storage_url: string;
+  storage_path?: string;
+}
+
 interface Message {
   id: string;
   ticket_id: string;
@@ -66,12 +77,88 @@ interface Message {
     user_id: string;
     avatar?: string | null;
   };
+  attachments?: MessageAttachment[];
 }
 
 interface Notification {
   message: string;
   type: 'error';
   show: boolean;
+}
+
+// Компонент для изображения с обработкой ошибок и skeleton-loader с shimmer эффектом
+function ImageWithError({ src, alt, className, loading = 'lazy' }: { src: string; alt: string; className?: string; loading?: 'lazy' | 'eager' }) {
+  const [hasError, setHasError] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isInView, setIsInView] = useState(false);
+  const imgRef = useRef<HTMLDivElement>(null);
+  
+  // Intersection Observer для lazy loading
+  useEffect(() => {
+    if (!imgRef.current || loading !== 'lazy') {
+      setIsInView(true);
+      return;
+    }
+    
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            setIsInView(true);
+            observer.disconnect();
+          }
+        });
+      },
+      { rootMargin: '50px' } // Начинаем загрузку за 50px до появления в viewport
+    );
+    
+    observer.observe(imgRef.current);
+    
+    return () => observer.disconnect();
+  }, [loading]);
+  
+  return (
+    <div className={`relative bg-neutral-800 ${className || ''}`} ref={imgRef}>
+      {hasError ? (
+        <div className="aspect-video flex items-center justify-center">
+          <div className="text-center p-4">
+            <AlertCircle className="w-8 h-8 text-red-400 mx-auto mb-2" />
+            <p className="text-xs text-red-300">Изображение недоступно</p>
+          </div>
+        </div>
+      ) : (
+        <>
+          {isLoading && (
+            <div className="absolute inset-0 bg-neutral-800 rounded-lg overflow-hidden">
+              <div 
+                className="w-full h-full rounded-lg" 
+                style={{ 
+                  height: '100%', 
+                  width: '100%',
+                  background: 'linear-gradient(90deg, rgba(64,64,64,0.3) 0%, rgba(115,115,115,0.5) 50%, rgba(64,64,64,0.3) 100%)',
+                  backgroundSize: '200% 100%',
+                  animation: 'shimmer 1.5s ease-in-out infinite'
+                }} 
+              />
+            </div>
+          )}
+          {isInView && (
+            <img
+              src={src}
+              alt={alt}
+              loading={loading}
+              className={`w-full h-auto object-contain ${isLoading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300 ${className || ''}`}
+              onLoad={() => setIsLoading(false)}
+              onError={() => {
+                setHasError(true);
+                setIsLoading(false);
+              }}
+            />
+          )}
+        </>
+      )}
+    </div>
+  );
 }
 
 // Компонент для анимированного сообщения
@@ -84,7 +171,9 @@ function MessageItem({
   formatDate, 
   formatTime,
   getInitial,
-  isInitialLoad = false
+  isInitialLoad = false,
+  onImageClick,
+  formatFileSize
 }: { 
   message: Message; 
   showDate: boolean; 
@@ -95,6 +184,8 @@ function MessageItem({
   formatTime: (date: string) => string;
   getInitial: (username: string) => string;
   isInitialLoad?: boolean;
+  onImageClick?: (url: string, alt: string) => void;
+  formatFileSize: (bytes: number) => string;
 }) {
   const messageRef = useRef<HTMLDivElement>(null);
   const hasAnimatedRef = useRef(false);
@@ -176,9 +267,63 @@ function MessageItem({
                   : 'bg-neutral-800 text-neutral-100 rounded-br-sm'
                 : 'bg-neutral-800 text-neutral-100 rounded-bl-sm'
             }`} style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>
-              <p className="text-sm whitespace-pre-wrap break-words">
-                {message.message_text}
-              </p>
+              {message.message_text && (
+                <p className="text-sm whitespace-pre-wrap break-words">
+                  {message.message_text}
+                </p>
+              )}
+              
+              {/* Вложения */}
+              {message.attachments && message.attachments.length > 0 && (() => {
+                const images = message.attachments!.filter(a => a.file_type.startsWith('image/'));
+                const documents = message.attachments!.filter(a => !a.file_type.startsWith('image/'));
+                
+                return (
+                  <div className={`space-y-2 ${message.message_text ? 'mt-2' : ''}`}>
+                    {/* Группировка изображений */}
+                    {images.length > 0 && (
+                      <div className={`grid gap-1.5 max-w-xs ${
+                        images.length === 1 ? 'grid-cols-1' : images.length === 2 ? 'grid-cols-2' : 'grid-cols-2'
+                      }`}>
+                        {images.map((attachment) => (
+                          <button
+                            key={attachment.id}
+                            onClick={() => onImageClick?.(attachment.storage_url, attachment.file_name)}
+                            className="block rounded-lg overflow-hidden cursor-pointer hover:opacity-90 transition-opacity"
+                          >
+                            <ImageWithError
+                              src={attachment.storage_url}
+                              alt={attachment.file_name}
+                              className="rounded-lg"
+                            />
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {/* Документы */}
+                    {documents.length > 0 && (
+                      <div className="space-y-1.5">
+                        {documents.map((attachment) => (
+                          <a
+                            key={attachment.id}
+                            href={attachment.storage_url}
+                            download={attachment.file_name}
+                            className="flex items-center gap-2 p-2 bg-neutral-700/50 hover:bg-neutral-700/70 transition-colors rounded-lg cursor-pointer"
+                          >
+                            <FileText className="w-4 h-4 flex-shrink-0 text-neutral-300" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-medium truncate">{attachment.file_name}</p>
+                              <p className="text-[10px] text-neutral-400">{formatFileSize(attachment.file_size)}</p>
+                            </div>
+                          </a>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+              
               <div className={`flex items-center gap-2 text-xs mt-1.5 ${
                 isSupport
                   ? message.is_read
@@ -243,6 +388,7 @@ export default function SupportPanel() {
   const [ticketToClose, setTicketToClose] = useState<string | null>(null);
   const [archiveSearchQuery, setArchiveSearchQuery] = useState(''); // Поисковый запрос для архива
   const [activeSearchQuery, setActiveSearchQuery] = useState(''); // Поисковый запрос для активных тикетов
+  const [viewingImage, setViewingImage] = useState<{ url: string; alt: string } | null>(null);
   const [rightPanelCollapsed, setRightPanelCollapsed] = useState(() => {
     // На мобильных устройствах панель свернута по умолчанию
     if (typeof window !== 'undefined') {
@@ -350,15 +496,70 @@ export default function SupportPanel() {
   const isInitialMessagesLoadRef = useRef(true); // Флаг первой загрузки сообщений
   
   // Функция для получения инициалов
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return `${bytes} Б`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} КБ`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} МБ`;
+  };
+
   const getInitial = (username: string) => {
     return username.charAt(0).toUpperCase();
   };
 
-  // Автоскролл при новых сообщениях
+  // Автоскролл при новых сообщениях с учетом загрузки изображений
   useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    if (!messages || messages.length === 0) return;
+    
+    // Ждем загрузки всех изображений перед скроллом
+    const scrollToBottom = () => {
+      if (messagesEndRef.current) {
+        // Используем requestAnimationFrame для плавного скролла после рендера
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            if (messagesEndRef.current) {
+              messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+            }
+          }, 100); // Небольшая задержка для загрузки изображений
+        });
+      }
+    };
+    
+    // Проверяем, загружены ли все изображения
+    const images = document.querySelectorAll('img[src*="/api/support/files/"]');
+    if (images.length === 0) {
+      scrollToBottom();
+      return;
     }
+    
+    let loadedCount = 0;
+    const totalImages = images.length;
+    
+    const checkAllLoaded = () => {
+      loadedCount++;
+      if (loadedCount >= totalImages) {
+        scrollToBottom();
+      }
+    };
+    
+    images.forEach((img) => {
+      if ((img as HTMLImageElement).complete) {
+        checkAllLoaded();
+      } else {
+        img.addEventListener('load', checkAllLoaded, { once: true });
+        img.addEventListener('error', checkAllLoaded, { once: true });
+      }
+    });
+    
+    // Таймаут на случай, если изображения не загрузятся
+    const timeout = setTimeout(scrollToBottom, 2000);
+    
+    return () => {
+      clearTimeout(timeout);
+      images.forEach((img) => {
+        img.removeEventListener('load', checkAllLoaded);
+        img.removeEventListener('error', checkAllLoaded);
+      });
+    };
   }, [messages]);
 
   // Обертка для fetch с обработкой rate limit
@@ -541,16 +742,30 @@ export default function SupportPanel() {
   useEffect(() => {
     if (!socket || !activeTicket || !authState.hasSupportAccess) return;
 
-    const handleNewMessage = (data: { ticketId: string; message: Message }) => {
+    const handleNewMessage = (data: { ticketId: string; message: any }) => {
       if (data.ticketId !== activeTicket.id) return;
 
       // Проверяем, что сообщение еще не добавлено (используем ref для актуальных данных)
       const messageExists = messagesRef.current.some(m => m.id === data.message.id);
       if (messageExists) return;
 
+      // Маппим вложения для нового сообщения (оптимизировано - используем данные из WebSocket)
+      const mappedMessage: Message = {
+        id: data.message.id,
+        ticket_id: data.ticketId,
+        sender_id: data.message.sender?.id || '',
+        sender_type: data.message.sender_type,
+        message_text: data.message.message_text,
+        is_read: data.message.is_read,
+        created_at: data.message.created_at,
+        sender: data.message.sender,
+        // Вложения уже правильно сформированы на сервере при broadcast, используем как есть
+        attachments: data.message.attachments || undefined
+      };
+
       // Добавляем новое сообщение
       setMessages(prev => {
-        const updated = [...prev, data.message];
+        const updated = [...prev, mappedMessage];
         messagesRef.current = updated; // Обновляем ref сразу
         return updated;
       });
@@ -704,7 +919,20 @@ export default function SupportPanel() {
             });
             const retryData = await retryResponse.json();
             if (retryResponse.ok && activeTicket && currentTicketIdRef.current === activeTicket.id) {
-              setMessages(retryData.messages || []);
+            // Маппим сообщения с вложениями (оптимизировано - используем данные с сервера)
+            const mappedMessages = (retryData.messages || []).map((m: any) => ({
+              id: m.id,
+              ticket_id: activeTicket.id,
+              sender_id: m.sender?.id || '',
+              sender_type: m.sender_type,
+              message_text: m.message_text,
+              is_read: m.is_read,
+              created_at: m.created_at,
+              sender: m.sender,
+              // Вложения уже правильно сформированы на сервере, используем как есть
+              attachments: m.attachments || undefined
+            }));
+              setMessages(mappedMessages);
               if (retryData.ticket && activeTicket && activeTicket.id === retryData.ticket.id) {
                 if (activeTicket.status !== retryData.ticket.status) {
                   setActiveTicket({ ...activeTicket, status: retryData.ticket.status });
@@ -735,7 +963,21 @@ export default function SupportPanel() {
             // Еще раз проверяем, что тикет не изменился
             if (currentTicketIdRef.current !== activeTicket.id) return;
             
-            setMessages(data.messages || []);
+            // Маппим сообщения с вложениями (оптимизировано - используем данные с сервера)
+            const mappedMessages = (data.messages || []).map((m: any) => ({
+              id: m.id,
+              ticket_id: activeTicket.id,
+              sender_id: m.sender?.id || '',
+              sender_type: m.sender_type,
+              message_text: m.message_text,
+              is_read: m.is_read,
+              created_at: m.created_at,
+              sender: m.sender,
+              // Вложения уже правильно сформированы на сервере, используем как есть
+              attachments: m.attachments || undefined
+            }));
+            
+            setMessages(mappedMessages);
             lastMessageCount = currentMessageCount;
             lastMessagesHash = currentMessagesHash;
             
@@ -1226,15 +1468,36 @@ export default function SupportPanel() {
       }
       
       if (response.ok) {
-        setMessages(data.messages || []);
+        // Маппим сообщения с вложениями (оптимизировано - используем данные с сервера)
+        const mappedMessages = (data.messages || []).map((m: { 
+          id: string; 
+          message_text: string; 
+          sender_type: string; 
+          created_at: string; 
+          is_read: boolean; 
+          sender?: { id: string; username: string; user_id: string; avatar?: string | null };
+          attachments?: Array<{
+            id: string;
+            file_name: string;
+            file_type: string;
+            file_size: number;
+            storage_url: string;
+            storage_path?: string;
+          }>;
+        }) => ({
+          id: m.id,
+          ticket_id: ticketId,
+          sender_id: m.sender?.id || '',
+          sender_type: m.sender_type,
+          message_text: m.message_text,
+          is_read: m.is_read,
+          created_at: m.created_at,
+          sender: m.sender,
+          // Вложения уже правильно сформированы на сервере, используем как есть
+          attachments: m.attachments || undefined
+        }));
         
-        // После первой загрузки сбрасываем флаг
-        if (isFirstLoad) {
-          // Используем setTimeout, чтобы дать React время отрендерить сообщения без анимации
-          setTimeout(() => {
-            isInitialMessagesLoadRef.current = false;
-          }, 100);
-        }
+        setMessages(mappedMessages);
         
         // После первой загрузки сбрасываем флаг
         if (isFirstLoad) {
@@ -2300,6 +2563,8 @@ export default function SupportPanel() {
                         formatTime={formatTime}
                         getInitial={getInitial}
                         isInitialLoad={isInitialMessagesLoadRef.current}
+                        onImageClick={(url, alt) => setViewingImage({ url, alt })}
+                        formatFileSize={formatFileSize}
                       />
                     );
                   })
@@ -2557,6 +2822,16 @@ export default function SupportPanel() {
             </div>
           </div>
         </div>
+      )}
+      
+      {/* ImageViewer для просмотра изображений */}
+      {viewingImage && (
+        <ImageViewer
+          isOpen={!!viewingImage}
+          onClose={() => setViewingImage(null)}
+          imageUrl={viewingImage.url}
+          alt={viewingImage.alt}
+        />
       )}
     </div>
   );

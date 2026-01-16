@@ -3,6 +3,22 @@
 import { useState, useRef, useEffect } from 'react';
 import { gsap } from 'gsap';
 import { X, Upload, FileText, Image as ImageIcon } from 'lucide-react';
+import dynamic from 'next/dynamic';
+
+// Lazy load RateLimitCaptcha для оптимизации bundle size
+const RateLimitCaptcha = dynamic(() => import('@/components/auth/RateLimitCaptcha'), {
+  ssr: false,
+  loading: () => (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+      <div className="bg-neutral-900 rounded-2xl p-6 sm:p-8 max-w-md w-full mx-4 border border-neutral-800 shadow-2xl">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-white/20 border-t-white rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-sm text-neutral-400">Загрузка капчи..</p>
+        </div>
+      </div>
+    </div>
+  )
+});
 
 interface UploadedFile {
   fileName: string;
@@ -31,9 +47,13 @@ export default function FileUploadModal({
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [previews, setPreviews] = useState<Map<string, string>>(new Map());
+  const [showRateLimitCaptcha, setShowRateLimitCaptcha] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
+  const isCaptchaOpenRef = useRef(false);
+  const isProcessingCaptchaRef = useRef(false);
+  const pendingUploadRef = useRef<{ files: File[] } | null>(null);
 
   useEffect(() => {
     if (typeof window === 'undefined' || !modalRef.current || !backdropRef.current) return;
@@ -65,6 +85,11 @@ export default function FileUploadModal({
           setSelectedFiles([]);
           setPreviews(new Map());
           setError(null);
+          // Сбрасываем состояние captcha при закрытии модального окна
+          isCaptchaOpenRef.current = false;
+          isProcessingCaptchaRef.current = false;
+          setShowRateLimitCaptcha(false);
+          pendingUploadRef.current = null;
         },
       });
     }
@@ -170,6 +195,41 @@ export default function FileUploadModal({
     return `${(bytes / (1024 * 1024)).toFixed(1)} МБ`;
   };
 
+  const performUpload = async (filesToUpload: File[]) => {
+    const formData = new FormData();
+    filesToUpload.forEach((file) => {
+      formData.append('files', file);
+    });
+
+    const response = await fetch(`/api/support/upload?ticketId=${ticketId}`, {
+      method: 'POST',
+      credentials: 'include',
+      body: formData,
+    });
+
+    // Обработка rate limit
+    if (response.status === 429) {
+      // Сохраняем файлы для повторной попытки после captcha
+      pendingUploadRef.current = { files: filesToUpload };
+      
+      // Показываем captcha только если она еще не открыта
+      if (!isCaptchaOpenRef.current && !isProcessingCaptchaRef.current) {
+        isCaptchaOpenRef.current = true;
+        setShowRateLimitCaptcha(true);
+      }
+      
+      throw new Error('RATE_LIMIT_EXCEEDED');
+    }
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || 'Ошибка загрузки файлов');
+    }
+
+    return data;
+  };
+
   const handleUpload = async () => {
     if (selectedFiles.length === 0) return;
 
@@ -177,22 +237,7 @@ export default function FileUploadModal({
     setError(null);
 
     try {
-      const formData = new FormData();
-      selectedFiles.forEach((file) => {
-        formData.append('files', file);
-      });
-
-      const response = await fetch(`/api/support/upload?ticketId=${ticketId}`, {
-        method: 'POST',
-        credentials: 'include',
-        body: formData,
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Ошибка загрузки файлов');
-      }
+      const data = await performUpload(selectedFiles);
 
       if (data.success && data.files) {
         onUploadComplete(data.files);
@@ -200,6 +245,7 @@ export default function FileUploadModal({
         setSelectedFiles([]);
         setPreviews(new Map());
         setError(null);
+        pendingUploadRef.current = null;
         setTimeout(() => {
           onClose();
         }, 300);
@@ -207,9 +253,63 @@ export default function FileUploadModal({
         throw new Error('Неожиданный формат ответа');
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Ошибка загрузки файлов');
-    } finally {
-      setUploading(false);
+      if (err instanceof Error && err.message === 'RATE_LIMIT_EXCEEDED') {
+        // Не показываем ошибку, так как показываем captcha
+        setError(null);
+      } else {
+        setError(err instanceof Error ? err.message : 'Ошибка загрузки файлов');
+        setUploading(false);
+      }
+    }
+  };
+
+  const handleRateLimitSuccess = async () => {
+    // Устанавливаем флаг обработки капчи
+    isProcessingCaptchaRef.current = true;
+    
+    // Закрываем модальное окно captcha
+    isCaptchaOpenRef.current = false;
+    setShowRateLimitCaptcha(false);
+    
+    // Ждем применения иммунитета на сервере
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // Повторяем загрузку, если есть отложенные файлы
+    if (pendingUploadRef.current) {
+      setUploading(true);
+      setError(null);
+      
+      try {
+        const data = await performUpload(pendingUploadRef.current.files);
+        
+        if (data.success && data.files) {
+          onUploadComplete(data.files);
+          setSelectedFiles([]);
+          setPreviews(new Map());
+          setError(null);
+          pendingUploadRef.current = null;
+          setTimeout(() => {
+            onClose();
+          }, 300);
+        } else {
+          throw new Error('Неожиданный формат ответа');
+        }
+      } catch (err) {
+        if (err instanceof Error && err.message === 'RATE_LIMIT_EXCEEDED') {
+          // Если снова rate limit, показываем captcha снова
+          if (!isCaptchaOpenRef.current && !isProcessingCaptchaRef.current) {
+            isCaptchaOpenRef.current = true;
+            setShowRateLimitCaptcha(true);
+          }
+        } else {
+          setError(err instanceof Error ? err.message : 'Ошибка загрузки файлов');
+          setUploading(false);
+        }
+      } finally {
+        isProcessingCaptchaRef.current = false;
+      }
+    } else {
+      isProcessingCaptchaRef.current = false;
     }
   };
 
@@ -358,6 +458,19 @@ export default function FileUploadModal({
           </div>
         </div>
       </div>
+
+      <RateLimitCaptcha
+        isOpen={showRateLimitCaptcha}
+        onSuccess={handleRateLimitSuccess}
+        onClose={() => {
+          // При закрытии очищаем состояние и сбрасываем флаги
+          isCaptchaOpenRef.current = false;
+          isProcessingCaptchaRef.current = false;
+          setShowRateLimitCaptcha(false);
+          pendingUploadRef.current = null;
+          setUploading(false);
+        }}
+      />
     </>
   );
 }
