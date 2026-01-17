@@ -458,6 +458,59 @@ export default function SupportPage() {
   
   // Лимиты символов (используем константы из lib/constants.ts)
   
+  // Функции кэширования сообщений
+  const CACHE_PREFIX = 'support_messages_';
+  const CACHE_TTL_MS = 5 * 60 * 1000; // 5 минут
+  
+  const getCacheKey = (ticketId: string) => `${CACHE_PREFIX}${ticketId}`;
+  
+  const saveMessagesToCache = useCallback((ticketId: string, messages: Message[]) => {
+    if (typeof window === 'undefined') return;
+    
+    try {
+      const cacheData = {
+        messages,
+        timestamp: Date.now()
+      };
+      localStorage.setItem(getCacheKey(ticketId), JSON.stringify(cacheData));
+    } catch (error) {
+      // Игнорируем ошибки localStorage (quota exceeded и т.д.)
+      console.warn('Failed to cache messages:', error);
+    }
+  }, []);
+  
+  const loadMessagesFromCache = useCallback((ticketId: string): Message[] | null => {
+    if (typeof window === 'undefined') return null;
+    
+    try {
+      const cached = localStorage.getItem(getCacheKey(ticketId));
+      if (!cached) return null;
+      
+      const cacheData = JSON.parse(cached);
+      const age = Date.now() - cacheData.timestamp;
+      
+      // Проверяем TTL
+      if (age > CACHE_TTL_MS) {
+        localStorage.removeItem(getCacheKey(ticketId));
+        return null;
+      }
+      
+      // Преобразуем timestamp строки обратно в Date объекты
+      const messages = (cacheData.messages || []).map((msg: any) => ({
+        ...msg,
+        timestamp: msg.timestamp instanceof Date 
+          ? msg.timestamp 
+          : new Date(msg.timestamp)
+      }));
+      
+      return messages;
+    } catch (error) {
+      // Игнорируем ошибки парсинга
+      localStorage.removeItem(getCacheKey(ticketId));
+      return null;
+    }
+  }, []);
+
   // Обертка для fetch с обработкой rate limit
   const fetchWithRateLimit = async (
     url: string,
@@ -806,6 +859,9 @@ export default function SupportPage() {
 
           const updatedMessages = [...(prev.messages || []), newMessage];
           activeTicketMessagesRef.current = updatedMessages; // Обновляем ref сразу
+          
+          // Кэшируем обновленные сообщения
+          saveMessagesToCache(data.ticketId, updatedMessages);
 
           return {
             ...prev,
@@ -1927,6 +1983,31 @@ export default function SupportPage() {
         return;
       }
       
+      // Загружаем кэшированные сообщения для мгновенного отображения (только для первой загрузки)
+      let cachedMessages: Message[] | null = null;
+      if (offset === 0) {
+        cachedMessages = loadMessagesFromCache(ticketId);
+        if (cachedMessages && cachedMessages.length > 0) {
+          // Обновляем сообщения из кэша
+          setActiveTicket(prev => {
+            if (prev && prev.id === ticketId) {
+              return {
+                ...prev,
+                messages: cachedMessages || []
+              };
+            }
+            return prev;
+          });
+          activeTicketMessagesRef.current = cachedMessages;
+          // Восстанавливаем позицию скролла после загрузки кэша
+          if (!restoreScroll) {
+            requestAnimationFrame(() => {
+              restoreScrollPosition(ticketId);
+            });
+          }
+        }
+      }
+      
       try {
         if (!restoreScroll) {
           fetchingTicketIdRef.current = ticketId;
@@ -2014,6 +2095,11 @@ export default function SupportPage() {
           
           // Обновляем ref с актуальными сообщениями
           activeTicketMessagesRef.current = finalMessages;
+          
+          // Кэшируем сообщения (только для первой загрузки)
+          if (offset === 0) {
+            saveMessagesToCache(ticketId, finalMessages);
+          }
           
           // Сохраняем ID последнего открытого тикета
           if (typeof window !== 'undefined') {

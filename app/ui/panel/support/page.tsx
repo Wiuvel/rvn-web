@@ -86,6 +86,29 @@ interface Notification {
   show: boolean;
 }
 
+// Функция-помощник для обработки вложений с формированием storage_url
+function processAttachments(attachments?: Array<{
+  id: string;
+  file_name: string;
+  file_type: string;
+  file_size: number;
+  storage_url?: string;
+  storage_path?: string;
+}>): MessageAttachment[] | undefined {
+  if (!attachments || attachments.length === 0) return undefined;
+  
+  return attachments.map((att) => ({
+    id: att.id,
+    file_name: att.file_name,
+    file_type: att.file_type,
+    file_size: att.file_size,
+    storage_path: att.storage_path,
+    storage_url: att.storage_url || (att.storage_path 
+      ? `/api/support/files/${encodeURIComponent(att.storage_path)}` 
+      : '')
+  }));
+}
+
 // Компонент для изображения с обработкой ошибок и skeleton-loader с shimmer эффектом
 function ImageWithError({ src, alt, className, loading = 'lazy' }: { src: string; alt: string; className?: string; loading?: 'lazy' | 'eager' }) {
   const [hasError, setHasError] = useState(false);
@@ -488,12 +511,15 @@ export default function SupportPanel() {
   const pendingRequestsQueueRef = useRef<Array<() => Promise<void>>>([]);
   const isProcessingCaptchaRef = useRef(false); // Флаг обработки капчи - предотвращает повторные открытия
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const markReadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const currentTicketIdRef = useRef<string | null>(null);
   const notificationRef = useRef<HTMLDivElement>(null);
   const currentFilterRef = useRef<'active' | 'archive'>('active');
   const fetchTicketsAbortControllerRef = useRef<AbortController | null>(null);
   const isInitialMessagesLoadRef = useRef(true); // Флаг первой загрузки сообщений
+  const isRestoringScrollRef = useRef(false); // Флаг восстановления скролла
+  const scrollSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   // Функция для получения инициалов
   const formatFileSize = (bytes: number): string => {
@@ -506,17 +532,179 @@ export default function SupportPanel() {
     return username.charAt(0).toUpperCase();
   };
 
+  // Функции кэширования сообщений
+  const CACHE_PREFIX = 'support_panel_messages_';
+  const CACHE_TTL_MS = 5 * 60 * 1000; // 5 минут
+  
+  const getCacheKey = (ticketId: string) => `${CACHE_PREFIX}${ticketId}`;
+  
+  const saveMessagesToCache = useCallback((ticketId: string, messages: Message[]) => {
+    if (typeof window === 'undefined') return;
+    
+    try {
+      const cacheData = {
+        messages,
+        timestamp: Date.now()
+      };
+      localStorage.setItem(getCacheKey(ticketId), JSON.stringify(cacheData));
+    } catch (error) {
+      // Игнорируем ошибки localStorage (quota exceeded и т.д.)
+      console.warn('Failed to cache messages:', error);
+    }
+  }, []);
+  
+  const loadMessagesFromCache = useCallback((ticketId: string): Message[] | null => {
+    if (typeof window === 'undefined') return null;
+    
+    try {
+      const cached = localStorage.getItem(getCacheKey(ticketId));
+      if (!cached) return null;
+      
+      const cacheData = JSON.parse(cached);
+      const age = Date.now() - cacheData.timestamp;
+      
+      // Проверяем TTL
+      if (age > CACHE_TTL_MS) {
+        localStorage.removeItem(getCacheKey(ticketId));
+        return null;
+      }
+      
+      return cacheData.messages || null;
+    } catch (error) {
+      // Игнорируем ошибки парсинга
+      localStorage.removeItem(getCacheKey(ticketId));
+      return null;
+    }
+  }, []);
+  
+  const clearMessagesCache = useCallback((ticketId: string) => {
+    if (typeof window === 'undefined') return;
+    localStorage.removeItem(getCacheKey(ticketId));
+  }, []);
+
+  // Сохранение позиции скролла
+  const saveScrollPosition = useCallback((ticketId: string) => {
+    if (!messagesContainerRef.current || isRestoringScrollRef.current || typeof window === 'undefined') return;
+    
+    const scrollTop = messagesContainerRef.current.scrollTop;
+    const scrollHeight = messagesContainerRef.current.scrollHeight;
+    const clientHeight = messagesContainerRef.current.clientHeight;
+    
+    // Сохраняем только если не в самом низу (с небольшим допуском)
+    const isAtBottom = scrollHeight - scrollTop - clientHeight < 50;
+    
+    if (isAtBottom) {
+      // Если внизу, сохраняем специальный маркер
+      localStorage.setItem(`support_panel_scroll_${ticketId}`, 'bottom');
+    } else {
+      // Сохраняем позицию скролла
+      localStorage.setItem(`support_panel_scroll_${ticketId}`, scrollTop.toString());
+    }
+  }, []);
+
+  // Восстановление позиции скролла
+  const restoreScrollPosition = useCallback((ticketId: string) => {
+    if (!messagesContainerRef.current || typeof window === 'undefined') return;
+    
+    const savedPosition = localStorage.getItem(`support_panel_scroll_${ticketId}`);
+    
+    // Функция для выполнения скролла после загрузки всех элементов
+    const performScroll = () => {
+      if (!messagesContainerRef.current) return;
+      
+      isRestoringScrollRef.current = true;
+      
+      if (savedPosition === 'bottom' || savedPosition === null) {
+        // Если был внизу или нет сохраненной позиции, скроллим к самому новому сообщению
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            if (messagesEndRef.current) {
+              messagesEndRef.current.scrollIntoView({ behavior: 'auto' });
+            } else if (messagesContainerRef.current) {
+              // Если messagesEndRef еще не готов, скроллим в самый низ контейнера
+              messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+            }
+            setTimeout(() => {
+              isRestoringScrollRef.current = false;
+            }, 200);
+          });
+        });
+      } else {
+        // Восстанавливаем сохраненную позицию
+        const scrollTop = parseInt(savedPosition, 10);
+        if (!isNaN(scrollTop)) {
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              if (messagesContainerRef.current) {
+                messagesContainerRef.current.scrollTop = scrollTop;
+              }
+              setTimeout(() => {
+                isRestoringScrollRef.current = false;
+              }, 200);
+            });
+          });
+        }
+      }
+    };
+
+    // Ждем загрузки всех изображений перед восстановлением скролла
+    const images = messagesContainerRef.current.querySelectorAll('img[src*="/api/support/files/"]');
+    if (images.length === 0) {
+      // Нет изображений, можно сразу скроллить
+      setTimeout(performScroll, 100);
+      return;
+    }
+    
+    let loadedCount = 0;
+    const totalImages = images.length;
+    let scrollPerformed = false;
+    
+    const checkAllLoaded = () => {
+      loadedCount++;
+      if (loadedCount >= totalImages && !scrollPerformed) {
+        scrollPerformed = true;
+        performScroll();
+      }
+    };
+    
+    images.forEach((img) => {
+      if ((img as HTMLImageElement).complete) {
+        checkAllLoaded();
+      } else {
+        img.addEventListener('load', checkAllLoaded, { once: true });
+        img.addEventListener('error', checkAllLoaded, { once: true });
+      }
+    });
+    
+    // Таймаут на случай, если изображения не загрузятся
+    setTimeout(() => {
+      if (!scrollPerformed) {
+        scrollPerformed = true;
+        performScroll();
+      }
+    }, 2000);
+  }, []);
+
   // Автоскролл при новых сообщениях с учетом загрузки изображений
   useEffect(() => {
-    if (!messages || messages.length === 0) return;
+    if (!messages || messages.length === 0 || isRestoringScrollRef.current) return;
+    
+    // Проверяем, есть ли сохраненная позиция скролла
+    if (typeof window !== 'undefined' && activeTicket?.id) {
+      const savedPosition = localStorage.getItem(`support_panel_scroll_${activeTicket.id}`);
+      // Если есть сохраненная позиция и это не 'bottom', не скроллим автоматически
+      if (savedPosition && savedPosition !== 'bottom') {
+        return;
+      }
+    }
     
     // Ждем загрузки всех изображений перед скроллом
     const scrollToBottom = () => {
-      if (messagesEndRef.current) {
+      if (messagesEndRef.current && !isRestoringScrollRef.current) {
         // Используем requestAnimationFrame для плавного скролла после рендера
         requestAnimationFrame(() => {
           setTimeout(() => {
-            if (messagesEndRef.current) {
+            if (messagesEndRef.current && !isRestoringScrollRef.current) {
               messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
             }
           }, 100); // Небольшая задержка для загрузки изображений
@@ -560,7 +748,7 @@ export default function SupportPanel() {
         img.removeEventListener('error', checkAllLoaded);
       });
     };
-  }, [messages]);
+  }, [messages, activeTicket?.id]);
 
   // Обертка для fetch с обработкой rate limit
   const fetchWithRateLimit = async (
@@ -759,14 +947,17 @@ export default function SupportPanel() {
         is_read: data.message.is_read,
         created_at: data.message.created_at,
         sender: data.message.sender,
-        // Вложения уже правильно сформированы на сервере при broadcast, используем как есть
-        attachments: data.message.attachments || undefined
+        attachments: processAttachments(data.message.attachments)
       };
 
       // Добавляем новое сообщение
       setMessages(prev => {
         const updated = [...prev, mappedMessage];
         messagesRef.current = updated; // Обновляем ref сразу
+        // Кэшируем обновленные сообщения
+        if (data.ticketId) {
+          saveMessagesToCache(data.ticketId, updated);
+        }
         return updated;
       });
 
@@ -929,8 +1120,7 @@ export default function SupportPanel() {
               is_read: m.is_read,
               created_at: m.created_at,
               sender: m.sender,
-              // Вложения уже правильно сформированы на сервере, используем как есть
-              attachments: m.attachments || undefined
+              attachments: processAttachments(m.attachments)
             }));
               setMessages(mappedMessages);
               if (retryData.ticket && activeTicket && activeTicket.id === retryData.ticket.id) {
@@ -973,8 +1163,7 @@ export default function SupportPanel() {
               is_read: m.is_read,
               created_at: m.created_at,
               sender: m.sender,
-              // Вложения уже правильно сформированы на сервере, используем как есть
-              attachments: m.attachments || undefined
+              attachments: processAttachments(m.attachments)
             }));
             
             setMessages(mappedMessages);
@@ -1442,6 +1631,16 @@ export default function SupportPanel() {
     // Определяем, является ли это первой загрузкой сообщений для этого тикета
     const isFirstLoad = isInitialMessagesLoadRef.current;
     
+    // Загружаем кэшированные сообщения для мгновенного отображения
+    const cachedMessages = loadMessagesFromCache(ticketId);
+    if (cachedMessages && cachedMessages.length > 0) {
+      setMessages(cachedMessages);
+      // Восстанавливаем позицию скролла после загрузки кэша
+      requestAnimationFrame(() => {
+        restoreScrollPosition(ticketId);
+      });
+    }
+    
     // Не блокируем загрузку сообщений заранее - мы должны получать актуальные данные с сервера
     // даже если тикет занят другим саппортом, чтобы корректно обновить состояние UI
     
@@ -1469,6 +1668,7 @@ export default function SupportPanel() {
       
       if (response.ok) {
         // Маппим сообщения с вложениями (оптимизировано - используем данные с сервера)
+        // Обрабатываем вложения, формируя storage_url если он отсутствует
         const mappedMessages = (data.messages || []).map((m: { 
           id: string; 
           message_text: string; 
@@ -1481,7 +1681,7 @@ export default function SupportPanel() {
             file_name: string;
             file_type: string;
             file_size: number;
-            storage_url: string;
+            storage_url?: string;
             storage_path?: string;
           }>;
         }) => ({
@@ -1493,17 +1693,23 @@ export default function SupportPanel() {
           is_read: m.is_read,
           created_at: m.created_at,
           sender: m.sender,
-          // Вложения уже правильно сформированы на сервере, используем как есть
-          attachments: m.attachments || undefined
+          attachments: processAttachments(m.attachments)
         }));
         
         setMessages(mappedMessages);
         
-        // После первой загрузки сбрасываем флаг
+        // Кэшируем сообщения
+        saveMessagesToCache(ticketId, mappedMessages);
+        
+        // После первой загрузки сбрасываем флаг и восстанавливаем скролл
         if (isFirstLoad) {
           // Используем setTimeout, чтобы дать React время отрендерить сообщения без анимации
           setTimeout(() => {
             isInitialMessagesLoadRef.current = false;
+            // Восстанавливаем позицию скролла только если не было кэша
+            if (!cachedMessages || cachedMessages.length === 0) {
+              restoreScrollPosition(ticketId);
+            }
           }, 100);
         }
         
@@ -2488,7 +2694,24 @@ export default function SupportPanel() {
               )}
               
                 {/* Messages */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar min-h-0">
+                <div 
+                  ref={messagesContainerRef}
+                  className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar min-h-0"
+                  onScroll={() => {
+                    // Debounce сохранения позиции скролла
+                    if (isRestoringScrollRef.current || !activeTicket) return;
+                    
+                    if (scrollSaveTimeoutRef.current) {
+                      clearTimeout(scrollSaveTimeoutRef.current);
+                    }
+                    
+                    scrollSaveTimeoutRef.current = setTimeout(() => {
+                      if (activeTicket) {
+                        saveScrollPosition(activeTicket.id);
+                      }
+                    }, 300);
+                  }}
+                >
                 {messagesLoading ? (
                   <div className="flex items-center justify-center h-full">
                     <div className="text-center">
