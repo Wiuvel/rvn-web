@@ -30,12 +30,12 @@ export default function Footer() {
         { 
           opacity: 1, 
           y: 0, 
-          duration: 0.5, 
+          duration: 0.4, 
           ease: "power2.out",
           scrollTrigger: {
             trigger: '.footer-container',
-            start: "top 90%",
-            end: "bottom 10%",
+            start: "top 92%",
+            end: "bottom 8%",
             toggleActions: "play none none none"
           }
         }

@@ -213,9 +213,27 @@ export async function GET(request: NextRequest) {
                     }));
                   }
                 }
+                // Если текст сообщения пустой, но есть вложения - формируем текст на основе типа файлов
+                let displayMessageText = lastMessage.message_text;
+                if (!displayMessageText && attachments.length > 0) {
+                  const images = attachments.filter(att => att.file_type.startsWith('image/'));
+                  const files = attachments.filter(att => !att.file_type.startsWith('image/'));
+                  
+                  if (images.length > 0 && files.length === 0) {
+                    // Только изображения
+                    displayMessageText = images.length === 1 ? '📷 Фотография' : `📷 ${images.length} фотографий`;
+                  } else if (files.length > 0 && images.length === 0) {
+                    // Только файлы
+                    displayMessageText = files.length === 1 ? '📎 Файл' : `📎 ${files.length} файлов`;
+                  } else {
+                    // И изображения, и файлы
+                    displayMessageText = `📎 ${images.length + files.length} вложений`;
+                  }
+                }
+
                 lastMessagesMap[ticketId] = {
                   id: lastMessage.id,
-                  message_text: lastMessage.message_text,
+                  message_text: displayMessageText,
                   sender_id: lastMessage.sender_id,
                   sender_type: senderIsSupport ? 'support' : 'user' as 'user' | 'support',
                   created_at: lastMessage.created_at,
@@ -232,16 +250,66 @@ export async function GET(request: NextRequest) {
             ? await batchHasUserRole(senderIds, 'support')
             : new Map<string, boolean>();
           
+          // Для сообщений с пустым текстом нужно проверить вложения
+          const messagesNeedingAttachments = lastMessages.filter((msg: RpcLastMessage) => !msg.message_text);
+          const messageIdsNeedingAttachments = messagesNeedingAttachments.map(msg => msg.id);
+          
+          // Получаем вложения для сообщений с пустым текстом
+          let attachmentsMap: Record<string, Array<{ id: string; file_name: string; file_type: string; file_size: number; storage_path: string }>> = {};
+          if (messageIdsNeedingAttachments.length > 0 && supabaseAdmin) {
+            const { data: attachmentsData } = await supabaseAdmin
+              .from('support_message_attachments')
+              .select('message_id, id, file_name, file_type, file_size, storage_path')
+              .in('message_id', messageIdsNeedingAttachments);
+            
+            if (attachmentsData) {
+              attachmentsData.forEach(att => {
+                if (!attachmentsMap[att.message_id]) {
+                  attachmentsMap[att.message_id] = [];
+                }
+                attachmentsMap[att.message_id].push({
+                  id: att.id,
+                  file_name: att.file_name,
+                  file_type: att.file_type,
+                  file_size: att.file_size,
+                  storage_path: att.storage_path
+                });
+              });
+            }
+          }
+          
           // Создаем map из результатов RPC функции
           for (const msg of lastMessages) {
             const senderIsSupport = senderRolesMap.get(msg.sender_id) || false;
+            
+            // Если текст сообщения пустой, но есть вложения - формируем текст на основе типа файлов
+            let displayMessageText = msg.message_text;
+            const attachments = attachmentsMap[msg.id] || [];
+            
+            if (!displayMessageText && attachments.length > 0) {
+              const images = attachments.filter(att => att.file_type.startsWith('image/'));
+              const files = attachments.filter(att => !att.file_type.startsWith('image/'));
+              
+              if (images.length > 0 && files.length === 0) {
+                // Только изображения
+                displayMessageText = images.length === 1 ? '📷 Фотография' : `📷 ${images.length} фотографий`;
+              } else if (files.length > 0 && images.length === 0) {
+                // Только файлы
+                displayMessageText = files.length === 1 ? '📎 Файл' : `📎 ${files.length} файлов`;
+              } else {
+                // И изображения, и файлы
+                displayMessageText = `📎 ${images.length + files.length} вложений`;
+              }
+            }
+            
             lastMessagesMap[msg.ticket_id] = {
               id: msg.id,
-              message_text: msg.message_text,
+              message_text: displayMessageText,
               sender_id: msg.sender_id,
               sender_type: senderIsSupport ? 'support' : 'user' as 'user' | 'support',
               created_at: msg.created_at,
-              is_read: msg.is_read
+              is_read: msg.is_read,
+              attachments: attachments.length > 0 ? attachments : undefined
             };
           }
         }

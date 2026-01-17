@@ -138,7 +138,7 @@ export async function GET(request: NextRequest) {
     }
 
     const userInfo = await userInfoResponse.json();
-    const { email, verified_email } = userInfo;
+    const { email, verified_email, picture } = userInfo;
 
     if (!email) {
       logger.error('No email in user info');
@@ -156,7 +156,8 @@ export async function GET(request: NextRequest) {
     let user = await getUserByEmail(email);
 
     if (!user) {
-      const createResult = await createUserFromOAuth(email);
+      // Передаем URL аватара из Google (поле picture)
+      const createResult = await createUserFromOAuth(email, undefined, picture);
       
       if (!createResult.success || !createResult.user) {
         logger.error('Failed to create user', { error: createResult.error });

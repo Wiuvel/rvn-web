@@ -59,6 +59,14 @@ export default function FileUploadModal({
     if (typeof window === 'undefined' || !modalRef.current || !backdropRef.current) return;
 
     if (isOpen) {
+      // Сбрасываем состояние при открытии модального окна
+      setUploading(false);
+      setError(null);
+      isCaptchaOpenRef.current = false;
+      isProcessingCaptchaRef.current = false;
+      setShowRateLimitCaptcha(false);
+      pendingUploadRef.current = null;
+      
       gsap.set([backdropRef.current, modalRef.current], { opacity: 0 });
       gsap.to(backdropRef.current, {
         opacity: 1,
@@ -246,6 +254,7 @@ export default function FileUploadModal({
         setPreviews(new Map());
         setError(null);
         pendingUploadRef.current = null;
+        setUploading(false); // Сбрасываем состояние загрузки перед закрытием
         setTimeout(() => {
           onClose();
         }, 300);
@@ -256,6 +265,7 @@ export default function FileUploadModal({
       if (err instanceof Error && err.message === 'RATE_LIMIT_EXCEEDED') {
         // Не показываем ошибку, так как показываем captcha
         setError(null);
+        // Не сбрасываем uploading, так как будет повторная попытка после captcha
       } else {
         setError(err instanceof Error ? err.message : 'Ошибка загрузки файлов');
         setUploading(false);
@@ -288,6 +298,7 @@ export default function FileUploadModal({
           setPreviews(new Map());
           setError(null);
           pendingUploadRef.current = null;
+          setUploading(false); // Сбрасываем состояние загрузки перед закрытием
           setTimeout(() => {
             onClose();
           }, 300);
@@ -301,6 +312,7 @@ export default function FileUploadModal({
             isCaptchaOpenRef.current = true;
             setShowRateLimitCaptcha(true);
           }
+          // Не сбрасываем uploading, так как будет повторная попытка
         } else {
           setError(err instanceof Error ? err.message : 'Ошибка загрузки файлов');
           setUploading(false);

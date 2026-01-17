@@ -126,7 +126,7 @@ export async function GET(request: NextRequest) {
     }
 
     const userInfo = await userInfoResponse.json();
-    const { default_email, emails } = userInfo;
+    const { default_email, emails, default_avatar_id } = userInfo;
 
     // Yandex может вернуть email в default_email или в массиве emails
     const email = default_email || (emails && Array.isArray(emails) && emails.length > 0 ? emails[0] : null);
@@ -137,11 +137,19 @@ export async function GET(request: NextRequest) {
       return setCorsHeaders(NextResponse.redirect(errorUrl));
     }
 
+    // Формируем URL аватара из Yandex (если есть default_avatar_id)
+    let avatarUrl: string | undefined;
+    if (default_avatar_id) {
+      // Yandex возвращает ID аватара, URL формируется как:
+      // https://avatars.yandex.net/get-yapic/{default_avatar_id}/islands-200
+      avatarUrl = `https://avatars.yandex.net/get-yapic/${default_avatar_id}/islands-200`;
+    }
+
     // Get or create user
     let user = await getUserByEmail(email);
 
     if (!user) {
-      const createResult = await createUserFromOAuth(email);
+      const createResult = await createUserFromOAuth(email, undefined, avatarUrl);
       
       if (!createResult.success || !createResult.user) {
         logger.error('OAuth: Failed to create user.', { error: createResult.error });

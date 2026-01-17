@@ -139,6 +139,7 @@ export async function GET(request: NextRequest) {
     const email = twitchUser.email;
     const verifiedEmail = twitchUser.email_verified ?? true;
     const preferredUsername = twitchUser.display_name || twitchUser.login;
+    const avatarUrl = twitchUser.profile_image_url;
 
     if (!email) {
       logger.error('No email in Twitch user info');
@@ -155,7 +156,7 @@ export async function GET(request: NextRequest) {
     let user = await getUserByEmail(email);
 
     if (!user) {
-      const createResult = await createUserFromOAuth(email, preferredUsername);
+      const createResult = await createUserFromOAuth(email, preferredUsername, avatarUrl);
       
       if (!createResult.success || !createResult.user) {
         logger.error('Failed to create user from Twitch', { error: createResult.error });

@@ -68,14 +68,22 @@ export async function GET(
     // Декодируем key (может быть URL-encoded)
     const decodedKey = decodeURIComponent(key);
 
-    // Проверяем, что путь начинается с support/ (безопасность)
-    if (!decodedKey.startsWith('support/')) {
+    // Проверяем, что путь начинается с support/ или avatars/ (безопасность)
+    if (!decodedKey.startsWith('support/') && !decodedKey.startsWith('avatars/')) {
       return setCorsHeaders(
         NextResponse.json(
           { error: 'Invalid file path' },
           { status: 400 }
         )
       );
+    }
+
+    // Для аватаров просто выдаем файл без проверки прав доступа к тикету
+    if (decodedKey.startsWith('avatars/')) {
+      // Генерируем presigned URL (действителен 1 час)
+      const presignedUrl = await getPresignedUrl(decodedKey, 3600);
+      // Редиректим на presigned URL
+      return NextResponse.redirect(presignedUrl);
     }
 
     // Извлекаем ticketId из пути (формат: support/{ticketId}/...)

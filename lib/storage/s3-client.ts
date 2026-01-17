@@ -151,6 +151,85 @@ export function isDocumentFile(mimeType: string, fileName: string): boolean {
 }
 
 /**
+ * Загружает изображение по URL и сохраняет в Object Storage
+ * @param imageUrl - URL изображения
+ * @param userId - ID пользователя для генерации пути
+ * @returns Путь к файлу в S3 или null в случае ошибки
+ */
+export async function uploadAvatarFromUrl(
+  imageUrl: string,
+  userId: string
+): Promise<string | null> {
+  try {
+    // Скачиваем изображение
+    const imageResponse = await fetch(imageUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; Raven/1.0)',
+      },
+    });
+
+    if (!imageResponse.ok) {
+      console.warn(`Failed to fetch avatar from URL: ${imageUrl}`, {
+        status: imageResponse.status,
+      });
+      return null;
+    }
+
+    // Проверяем, что это изображение
+    const contentType = imageResponse.headers.get('content-type');
+    if (!contentType || !contentType.startsWith('image/')) {
+      console.warn(`Invalid content type for avatar: ${contentType}`);
+      return null;
+    }
+
+    // Ограничиваем размер файла (максимум 2MB для аватаров)
+    const contentLength = imageResponse.headers.get('content-length');
+    if (contentLength && parseInt(contentLength) > 2 * 1024 * 1024) {
+      console.warn(`Avatar file too large: ${contentLength} bytes`);
+      return null;
+    }
+
+    // Читаем изображение в Buffer
+    const arrayBuffer = await imageResponse.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    // Проверяем фактический размер
+    if (buffer.length > 2 * 1024 * 1024) {
+      console.warn(`Avatar file too large: ${buffer.length} bytes`);
+      return null;
+    }
+
+    // Определяем расширение файла из content-type или URL
+    let extension = 'jpg';
+    if (contentType.includes('png')) {
+      extension = 'png';
+    } else if (contentType.includes('gif')) {
+      extension = 'gif';
+    } else if (contentType.includes('webp')) {
+      extension = 'webp';
+    } else {
+      // Пытаемся определить из URL
+      const urlMatch = imageUrl.match(/\.(jpg|jpeg|png|gif|webp)(\?|$)/i);
+      if (urlMatch) {
+        extension = urlMatch[1].toLowerCase();
+      }
+    }
+
+    // Генерируем путь для хранения аватара
+    const timestamp = Date.now();
+    const storagePath = `avatars/${userId}/${timestamp}.${extension}`;
+
+    // Загружаем в S3
+    await uploadFileToS3(buffer, storagePath, contentType);
+
+    return storagePath;
+  } catch (error) {
+    console.error('Error uploading avatar from URL:', error);
+    return null;
+  }
+}
+
+/**
  * Валидирует файл перед загрузкой
  */
 export function validateFile(file: { size: number; type: string; name: string }): {

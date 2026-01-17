@@ -569,7 +569,13 @@ export default function SupportPanel() {
         return null;
       }
       
-      return cacheData.messages || null;
+      // Обрабатываем вложения при загрузке из кэша
+      const messages = (cacheData.messages || []).map((msg: any) => ({
+        ...msg,
+        attachments: processAttachments(msg.attachments)
+      }));
+      
+      return messages;
     } catch (error) {
       // Игнорируем ошибки парсинга
       localStorage.removeItem(getCacheKey(ticketId));
@@ -961,12 +967,16 @@ export default function SupportPanel() {
         return updated;
       });
 
+      // Формируем текст для last_message (если пустой, но есть вложения - используем текст из broadcast)
+      // Сервер уже формирует правильный текст, используем его как есть
+      const lastMessageText = data.message.message_text || '';
+      
       // Обновляем last_message_at и last_message в списке тикетов
       updateTicketInList(data.ticketId, {
         last_message_at: data.message.created_at,
         last_message: {
           id: data.message.id,
-          message_text: data.message.message_text,
+          message_text: lastMessageText,
           sender_type: data.message.sender_type,
           created_at: data.message.created_at,
           is_read: data.message.is_read

@@ -73,18 +73,18 @@ export const useFadeIn = (delay: number = 0) => {
     const animation = gsap.fromTo(element, 
       { 
         opacity: 0, 
-        y: 20 
+        y: 15 
       },
       { 
         opacity: 1, 
         y: 0, 
-        duration: 0.5, 
+        duration: 0.4, 
         ease: "power2.out",
         delay,
         scrollTrigger: {
           trigger: element,
-          start: "top 85%",
-          end: "bottom 15%",
+          start: "top 92%",
+          end: "bottom 8%",
           toggleActions: "play none none none"
         }
       }
@@ -119,7 +119,7 @@ export const useStaggeredFadeIn = (delay: number = 0, stagger: number = 0.05) =>
       if (!containerRef.current) return;
       
       const rect = containerRef.current.getBoundingClientRect();
-      const isAlreadyVisible = rect.top < window.innerHeight * 0.85;
+      const isAlreadyVisible = rect.top < window.innerHeight * 0.92;
       
       if (isAlreadyVisible) {
         // Если элемент уже виден, оставляем его видимым (не применяем анимацию)
@@ -128,20 +128,20 @@ export const useStaggeredFadeIn = (delay: number = 0, stagger: number = 0.05) =>
       }
 
       // Если элемент не виден, устанавливаем начальное состояние и создаем анимацию
-      gsap.set(elements, { opacity: 0, y: 15, scale: 0.98 });
+      gsap.set(elements, { opacity: 0, y: 10, scale: 0.98 });
       
       const animation = gsap.to(elements, {
         opacity: 1,
         y: 0,
         scale: 1,
-        duration: 0.4,
+        duration: 0.35,
         ease: "power2.out",
         delay,
         stagger,
         scrollTrigger: {
           trigger: containerRef.current,
-          start: "top 85%",
-          end: "bottom 15%",
+          start: "top 92%",
+          end: "bottom 8%",
           toggleActions: "play none none none"
         }
       });

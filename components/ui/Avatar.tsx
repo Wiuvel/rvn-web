@@ -1,4 +1,5 @@
-import { getGradientClasses } from '@/lib/utils/avatar-gradients';
+import { getGradientClasses, getAvatarUrl } from '@/lib/utils/avatar-gradients';
+import Image from 'next/image';
 
 interface AvatarProps {
   username: string;
@@ -19,7 +20,25 @@ export function Avatar({ username, gradient, size = 'md', className = '' }: Avat
   };
 
   const gradientClasses = getGradientClasses(gradient);
+  const avatarUrl = getAvatarUrl(gradient);
 
+  // Если есть URL аватара, отображаем изображение
+  if (avatarUrl) {
+    return (
+      <div className={`${sizeClasses[size]} rounded-full overflow-hidden flex items-center justify-center flex-shrink-0 ${className}`}>
+        <Image
+          src={avatarUrl}
+          alt={username}
+          width={size === 'sm' ? 32 : size === 'md' ? 40 : 48}
+          height={size === 'sm' ? 32 : size === 'md' ? 40 : 48}
+          className="w-full h-full object-cover"
+          unoptimized // Аватары из S3 могут быть внешними
+        />
+      </div>
+    );
+  }
+
+  // Иначе отображаем градиент с инициалом
   return (
     <div 
       className={`${sizeClasses[size]} rounded-full ${gradientClasses} flex items-center justify-center text-white font-semibold flex-shrink-0 ${className}`}

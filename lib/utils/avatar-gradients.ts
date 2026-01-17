@@ -48,11 +48,18 @@ export function generateAvatarFromString(str: string): AvatarId {
 
 /**
  * Получает классы Tailwind для применения градиента по идентификатору аватарки
+ * Если avatarId начинается с 's3:', возвращает пустую строку (для использования с изображением)
  */
 export function getGradientClasses(avatarId: string | null | undefined, fallback: AvatarId = '0'): string {
   if (!avatarId) {
     const gradient = AVATAR_GRADIENTS[parseInt(fallback) || 0];
     return `bg-gradient-to-r ${gradient}`;
+  }
+  
+  // Проверяем, является ли аватар путем к S3 (формат: s3:avatars/userId/timestamp.ext)
+  if (avatarId.startsWith('s3:')) {
+    // Возвращаем пустую строку, чтобы компонент мог использовать изображение
+    return '';
   }
   
   // Валидируем идентификатор
@@ -64,6 +71,27 @@ export function getGradientClasses(avatarId: string | null | undefined, fallback
   
   const gradient = AVATAR_GRADIENTS[id];
   return `bg-gradient-to-r ${gradient}`;
+}
+
+/**
+ * Получает URL аватара для отображения
+ * Если avatarId начинается с 's3:', формирует URL к API endpoint
+ * Иначе возвращает null (используется градиент)
+ */
+export function getAvatarUrl(avatarId: string | null | undefined): string | null {
+  if (!avatarId) {
+    return null;
+  }
+  
+  // Проверяем, является ли аватар путем к S3
+  if (avatarId.startsWith('s3:')) {
+    // Извлекаем путь (убираем префикс 's3:')
+    const storagePath = avatarId.substring(3);
+    // Формируем URL к API endpoint
+    return `/api/support/files/${encodeURIComponent(storagePath)}`;
+  }
+  
+  return null;
 }
 
 /**

@@ -495,12 +495,25 @@ export default function SupportPage() {
         return null;
       }
       
-      // Преобразуем timestamp строки обратно в Date объекты
+      // Преобразуем timestamp строки обратно в Date объекты и проверяем вложения
       const messages = (cacheData.messages || []).map((msg: any) => ({
         ...msg,
         timestamp: msg.timestamp instanceof Date 
           ? msg.timestamp 
-          : new Date(msg.timestamp)
+          : new Date(msg.timestamp),
+        // Убеждаемся, что вложения правильно обработаны
+        attachments: msg.attachments && Array.isArray(msg.attachments) && msg.attachments.length > 0
+          ? msg.attachments.map((att: any) => ({
+              id: att.id,
+              file_name: att.file_name,
+              file_type: att.file_type,
+              file_size: att.file_size,
+              storage_path: att.storage_path,
+              storage_url: att.storage_url || (att.storage_path 
+                ? `/api/support/files/${encodeURIComponent(att.storage_path)}` 
+                : '')
+            }))
+          : undefined
       }));
       
       return messages;
@@ -831,16 +844,18 @@ export default function SupportPage() {
         isRead: data.message.is_read,
         senderData: data.message.sender,
         // Вложения уже правильно сформированы на сервере при broadcast, используем как есть
-        attachments: data.message.attachments?.map((att: any) => ({
-          id: att.id,
-          file_name: att.file_name,
-          file_type: att.file_type,
-          file_size: att.file_size,
-          storage_path: att.storage_path,
-          storage_url: att.storage_url || (att.storage_path 
-            ? `/api/support/files/${encodeURIComponent(att.storage_path)}` 
-            : '')
-        })),
+        attachments: data.message.attachments && Array.isArray(data.message.attachments) && data.message.attachments.length > 0
+          ? data.message.attachments.map((att: any) => ({
+              id: att.id,
+              file_name: att.file_name,
+              file_type: att.file_type,
+              file_size: att.file_size,
+              storage_path: att.storage_path,
+              storage_url: att.storage_url || (att.storage_path 
+                ? `/api/support/files/${encodeURIComponent(att.storage_path)}` 
+                : '')
+            }))
+          : undefined,
       };
 
       const lastMessageData = {
@@ -2050,7 +2065,19 @@ export default function SupportPage() {
           isRead: m.is_read,
           senderData: m.sender,
           // Вложения уже правильно сформированы на сервере, используем как есть
-          attachments: m.attachments || undefined
+          // Проверяем, что вложения есть и это массив с элементами
+          attachments: m.attachments && Array.isArray(m.attachments) && m.attachments.length > 0
+            ? m.attachments.map((att: any) => ({
+                id: att.id,
+                file_name: att.file_name,
+                file_type: att.file_type,
+                file_size: att.file_size,
+                storage_path: att.storage_path,
+                storage_url: att.storage_url || (att.storage_path 
+                  ? `/api/support/files/${encodeURIComponent(att.storage_path)}` 
+                  : '')
+              }))
+            : undefined
         }));
         
         // Проверяем, что тикет все еще активный (не изменился во время запроса)

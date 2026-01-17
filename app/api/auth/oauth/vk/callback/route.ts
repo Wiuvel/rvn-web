@@ -143,7 +143,7 @@ export async function GET(request: NextRequest) {
     const userInfoResponse = await fetch(
       `https://api.vk.com/method/users.get?${new URLSearchParams({
         user_ids: user_id.toString(),
-        fields: 'screen_name',
+        fields: 'screen_name,photo_200,photo_max',
         access_token: access_token,
         v: '5.131',
       })}`
@@ -155,6 +155,7 @@ export async function GET(request: NextRequest) {
     }
 
     let vkUsername: string | undefined;
+    let avatarUrl: string | undefined;
     if (userInfoResponse.ok) {
       const userInfoData = await userInfoResponse.json();
       if (userInfoData.response && userInfoData.response[0]) {
@@ -164,6 +165,8 @@ export async function GET(request: NextRequest) {
                      (vkUser.first_name && vkUser.last_name 
                        ? `${vkUser.first_name}_${vkUser.last_name}`.toLowerCase().replace(/[^a-z0-9_]/g, '_')
                        : undefined);
+        // VK возвращает URL аватара в поле photo_max или photo_200
+        avatarUrl = vkUser.photo_200 || vkUser.photo_max;
       }
     }
 
@@ -171,7 +174,7 @@ export async function GET(request: NextRequest) {
     let user = await getUserByEmail(userEmail);
 
     if (!user) {
-      const createResult = await createUserFromOAuth(userEmail, vkUsername);
+      const createResult = await createUserFromOAuth(userEmail, vkUsername, avatarUrl);
       
       if (!createResult.success || !createResult.user) {
         logger.error('Failed to create user', { error: createResult.error });

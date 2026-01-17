@@ -310,12 +310,30 @@ export async function POST(
           }))
         : undefined;
 
+      // Если текст сообщения пустой, но есть вложения - формируем текст на основе типа файлов
+      let displayMessageText = newMessage.message_text;
+      if (!displayMessageText && attachmentsData.length > 0) {
+        const images = attachmentsData.filter(att => att.file_type.startsWith('image/'));
+        const files = attachmentsData.filter(att => !att.file_type.startsWith('image/'));
+        
+        if (images.length > 0 && files.length === 0) {
+          // Только изображения
+          displayMessageText = images.length === 1 ? '📷 Фотография' : `📷 ${images.length} фотографий`;
+        } else if (files.length > 0 && images.length === 0) {
+          // Только файлы
+          displayMessageText = files.length === 1 ? '📎 Файл' : `📎 ${files.length} файлов`;
+        } else {
+          // И изображения, и файлы
+          displayMessageText = `📎 ${images.length + files.length} вложений`;
+        }
+      }
+
       const messageForBroadcast = {
         id: newMessage.id,
         ticket_id: newMessage.ticket_id,
         sender_id: newMessage.sender_id,
         sender_type: isSupport ? 'support' : 'user' as 'user' | 'support',
-        message_text: newMessage.message_text,
+        message_text: displayMessageText,
         is_read: newMessage.is_read || false,
         created_at: newMessage.created_at,
         sender: senderData,

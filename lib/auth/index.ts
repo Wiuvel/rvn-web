@@ -424,7 +424,7 @@ export async function getUserByEmail(email: string): Promise<User | null> {
 }
 
 // Create user from OAuth (email-based, no password)
-export async function createUserFromOAuth(email: string, preferredUsername?: string): Promise<{ success: boolean; user?: User; error?: string }> {
+export async function createUserFromOAuth(email: string, preferredUsername?: string, avatarUrl?: string): Promise<{ success: boolean; user?: User; error?: string }> {
   try {
     if (!supabaseAdmin) {
       logger.error('Database not configured');
@@ -524,7 +524,25 @@ export async function createUserFromOAuth(email: string, preferredUsername?: str
 
     // Generate dashboard token and avatar
     const dashboardToken = generateDashboardToken();
-    const avatar = generateRandomAvatar();
+    
+    // Попытка загрузить аватар из OAuth провайдера
+    let avatar: string = generateRandomAvatar(); // Fallback на случайный градиент
+    if (avatarUrl) {
+      try {
+        const { uploadAvatarFromUrl } = await import('@/lib/storage/s3-client');
+        const uploadedAvatarPath = await uploadAvatarFromUrl(avatarUrl, userId);
+        if (uploadedAvatarPath) {
+          // Сохраняем путь к файлу в S3 в формате `s3:avatars/userId/timestamp.ext`
+          avatar = `s3:${uploadedAvatarPath}`;
+        }
+      } catch (error) {
+        // Если загрузка не удалась, используем случайный градиент
+        logger.warn('Failed to upload avatar from OAuth provider', {
+          error: error instanceof Error ? error.message : 'Unknown error',
+          email
+        });
+      }
+    }
 
     // OAuth users don't need password - set password_hash to null
     // This distinguishes OAuth users from password-based users

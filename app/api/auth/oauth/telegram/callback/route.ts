@@ -152,7 +152,8 @@ export async function GET(request: NextRequest) {
         sanitizedUsername = telegramUsernameFromEmail;
       }
       
-      const createResult = await createUserFromOAuth(telegramEmail, sanitizedUsername);
+      // Передаем URL аватара из Telegram (если есть)
+      const createResult = await createUserFromOAuth(telegramEmail, sanitizedUsername, photoUrl);
       
       if (!createResult.success || !createResult.user) {
         logger.error('Failed to create user', { error: createResult.error });
