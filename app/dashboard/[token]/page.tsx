@@ -7,7 +7,7 @@ import Image from 'next/image';
 import { useFadeIn, useStaggeredFadeIn } from '@/hooks/useGSAP';
 import { gsap } from 'gsap';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
-import { getGradientClasses } from '@/lib/utils/avatar-gradients';
+import { getGradientClasses, getAvatarUrl } from '@/lib/utils/avatar-gradients';
 import { APP_VERSION } from '@/lib/utils/constants';
 
 interface UserData {
@@ -457,15 +457,33 @@ export default function DashboardPage() {
                     </div>
                   )}
                 </div>
-                <button
-                  onClick={() => setUserMenuOpen(!userMenuOpen)}
-                  className={`w-10 h-10 rounded-full ${getGradientClasses(userData?.avatar)} flex items-center justify-center text-white font-semibold text-sm shadow-glow transition-transform duration-200 hover:scale-110 cursor-pointer`}
-                  title={userData.username}
-                  aria-label="Меню пользователя"
-                  aria-expanded={userMenuOpen}
-                >
-                  {getInitial(userData.username)}
-                </button>
+                {(() => {
+                  const avatarUrl = getAvatarUrl(userData?.avatar);
+                  const gradientClasses = getGradientClasses(userData?.avatar);
+                  
+                  return (
+                    <button
+                      onClick={() => setUserMenuOpen(!userMenuOpen)}
+                      className={`w-10 h-10 rounded-full overflow-hidden ${avatarUrl ? '' : gradientClasses} flex items-center justify-center text-white font-semibold text-sm shadow-glow transition-transform duration-200 hover:scale-110 cursor-pointer`}
+                      title={userData.username}
+                      aria-label="Меню пользователя"
+                      aria-expanded={userMenuOpen}
+                    >
+                      {avatarUrl ? (
+                        <Image
+                          src={avatarUrl}
+                          alt={userData.username}
+                          width={40}
+                          height={40}
+                          className="w-full h-full object-cover"
+                          unoptimized
+                        />
+                      ) : (
+                        getInitial(userData.username)
+                      )}
+                    </button>
+                  );
+                })()}
                 {shouldRenderMenu && (
                   <div 
                     ref={menuRef}
@@ -477,9 +495,27 @@ export default function DashboardPage() {
                       className="block p-4 border-b border-white/10 hover:bg-white/5 transition-colors duration-200 cursor-pointer mx-2 my-1 rounded-xl"
                     >
                       <div className="flex items-center gap-3">
-                        <div className={`w-12 h-12 rounded-full ${getGradientClasses(userData?.avatar)} flex items-center justify-center text-white font-semibold text-base flex-shrink-0`}>
-                          {getInitial(userData.username)}
-                        </div>
+                        {(() => {
+                          const avatarUrl = getAvatarUrl(userData?.avatar);
+                          const gradientClasses = getGradientClasses(userData?.avatar);
+                          
+                          return (
+                            <div className={`w-12 h-12 rounded-full overflow-hidden ${avatarUrl ? '' : gradientClasses} flex items-center justify-center text-white font-semibold text-base flex-shrink-0`}>
+                              {avatarUrl ? (
+                                <Image
+                                  src={avatarUrl}
+                                  alt={userData.username}
+                                  width={48}
+                                  height={48}
+                                  className="w-full h-full object-cover"
+                                  unoptimized
+                                />
+                              ) : (
+                                getInitial(userData.username)
+                              )}
+                            </div>
+                          );
+                        })()}
                         <div className="min-w-0 flex-1">
                           <div className="text-white font-medium truncate">{userData.username}</div>
                           <div className="text-neutral-400 text-xs truncate">Пользователь</div>
@@ -560,9 +596,27 @@ export default function DashboardPage() {
                   className="block p-4 border-b border-white/10 hover:bg-white/5 transition-colors duration-200 cursor-pointer mx-2 my-1 rounded-xl"
                 >
                   <div className="flex items-center gap-3">
-                    <div className={`w-12 h-12 rounded-full ${getGradientClasses(userData?.avatar)} flex items-center justify-center text-white font-semibold text-base flex-shrink-0`}>
-                      {getInitial(userData.username)}
-                    </div>
+                    {(() => {
+                      const avatarUrl = getAvatarUrl(userData?.avatar);
+                      const gradientClasses = getGradientClasses(userData?.avatar);
+                      
+                      return (
+                        <div className={`w-12 h-12 rounded-full overflow-hidden ${avatarUrl ? '' : gradientClasses} flex items-center justify-center text-white font-semibold text-base flex-shrink-0`}>
+                          {avatarUrl ? (
+                            <Image
+                              src={avatarUrl}
+                              alt={userData.username}
+                              width={48}
+                              height={48}
+                              className="w-full h-full object-cover"
+                              unoptimized
+                            />
+                          ) : (
+                            getInitial(userData.username)
+                          )}
+                        </div>
+                      );
+                    })()}
                     <div className="min-w-0 flex-1">
                       <div className="text-white font-medium truncate">{userData.username}</div>
                     </div>
@@ -647,9 +701,27 @@ export default function DashboardPage() {
           {/* Profile section */}
           <section ref={profileRef} className="mt-6 rounded-2xl border border-neutral-800 bg-neutral-900 p-5">
             <div className="flex items-center gap-4">
-              <div className={`shrink-0 h-14 w-14 rounded-full ${getGradientClasses(userData?.avatar)} flex items-center justify-center text-white font-semibold text-lg border border-white/10`}>
-                {userData?.username ? userData.username.charAt(0).toUpperCase() : '—'}
-              </div>
+              {(() => {
+                const avatarUrl = getAvatarUrl(userData?.avatar);
+                const gradientClasses = getGradientClasses(userData?.avatar);
+                
+                return (
+                  <div className={`shrink-0 h-14 w-14 rounded-full overflow-hidden ${avatarUrl ? '' : gradientClasses} flex items-center justify-center text-white font-semibold text-lg border border-white/10`}>
+                    {avatarUrl ? (
+                      <Image
+                        src={avatarUrl}
+                        alt={userData?.username || ''}
+                        width={56}
+                        height={56}
+                        className="w-full h-full object-cover"
+                        unoptimized
+                      />
+                    ) : (
+                      userData?.username ? userData.username.charAt(0).toUpperCase() : '—'
+                    )}
+                  </div>
+                );
+              })()}
               <div className="flex-1">
                 <div className="text-lg font-medium">{userData?.username || '—'}</div>
                 <div className="mt-1 text-sm text-neutral-400 flex flex-wrap gap-x-4 gap-y-1">

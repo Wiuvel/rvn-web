@@ -9,7 +9,7 @@ import DashboardPreviewSection from "@/components/sections/DashboardPreview";
 import AppsSection from "@/components/sections/Apps";
 import FAQSection from "@/components/sections/FAQ";
 import { useGSAP } from "@/hooks/useGSAP";
-import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import LogoLoader from '@/components/ui/LogoLoader';
 
 export default function Home() {
   const containerRef = useGSAP();
@@ -36,12 +36,8 @@ export default function Home() {
 
   return (
     <>
-      {/* Лоадер - показывается пока не загружен LightRays, header остается видимым */}
-      {isLoading && (
-        <div className="fixed inset-0 top-0 flex items-center justify-center bg-neutral-950 z-30" style={{ paddingTop: '100px' }}>
-          <div className="spinner" />
-        </div>
-      )}
+      {/* Лоадер - показывается пока не загружен LightRays */}
+      {isLoading && <LogoLoader />}
       
       <div ref={containerRef} className="relative">
         {/* Контент страницы - всегда рендерится, но скрыт/прозрачен при загрузке */}

@@ -10,7 +10,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { UserMenu } from '@/components/navigation/UserMenu';
 import { NotificationsMenu } from '@/components/navigation/Notifications';
 import { GSAP_DEFAULT_DURATION, GSAP_DEFAULT_EASE } from '@/lib/utils/constants';
-import { getGradientClasses } from '@/lib/utils/avatar-gradients';
+import { getGradientClasses, getAvatarUrl } from '@/lib/utils/avatar-gradients';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { getStaticUrl } from "@/lib/utils";
 
@@ -319,19 +319,37 @@ export default function Header({ variant = 'main' }: HeaderProps = {}) {
                       isMobile={false}
                     />
                   </div>
-                  <button
-                    ref={userMenuButtonRef}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setUserMenuOpen(!userMenuOpen);
-                    }}
-                    className={`w-10 h-10 rounded-full ${getGradientClasses(userData.avatar)} flex items-center justify-center text-white font-semibold text-sm shadow-glow transition-transform duration-200 hover:scale-110 cursor-pointer flex-shrink-0`}
-                    title={userData.username}
-                    aria-label="Меню пользователя"
-                    aria-expanded={userMenuOpen}
-                  >
-                    {getInitial(userData.username)}
-                  </button>
+                  {(() => {
+                    const avatarUrl = getAvatarUrl(userData.avatar);
+                    const gradientClasses = getGradientClasses(userData.avatar);
+                    
+                    return (
+                      <button
+                        ref={userMenuButtonRef}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setUserMenuOpen(!userMenuOpen);
+                        }}
+                        className={`w-10 h-10 rounded-full overflow-hidden ${avatarUrl ? '' : gradientClasses} flex items-center justify-center text-white font-semibold text-sm shadow-glow transition-transform duration-200 hover:scale-110 cursor-pointer flex-shrink-0`}
+                        title={userData.username}
+                        aria-label="Меню пользователя"
+                        aria-expanded={userMenuOpen}
+                      >
+                        {avatarUrl ? (
+                          <Image
+                            src={avatarUrl}
+                            alt={userData.username}
+                            width={40}
+                            height={40}
+                            className="w-full h-full object-cover"
+                            unoptimized
+                          />
+                        ) : (
+                          getInitial(userData.username)
+                        )}
+                      </button>
+                    );
+                  })()}
                   {userData && (
                     <UserMenu
                       userData={userData}

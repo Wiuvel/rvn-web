@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { UserData } from '@/types';
 import { useMenuAnimation } from '@/hooks/useMenuAnimation';
-import { getGradientClasses } from '@/lib/utils/avatar-gradients';
+import { getGradientClasses, getAvatarUrl } from '@/lib/utils/avatar-gradients';
 import { getStaticUrl } from '@/lib/utils';
 
 interface UserMenuProps {
@@ -67,9 +67,27 @@ export function UserMenu({
           className="block p-4 border-b border-white/10 hover:bg-white/5 transition-colors duration-200 cursor-pointer mx-2 my-1 rounded-xl"
         >
           <div className="flex items-center gap-3">
-            <div className={`w-12 h-12 rounded-full ${getGradientClasses(userData.avatar)} flex items-center justify-center text-white font-semibold text-base flex-shrink-0`}>
-              {getInitial(userData.username)}
-            </div>
+            {(() => {
+              const avatarUrl = getAvatarUrl(userData.avatar);
+              const gradientClasses = getGradientClasses(userData.avatar);
+              
+              return (
+                <div className={`w-12 h-12 rounded-full overflow-hidden ${avatarUrl ? '' : gradientClasses} flex items-center justify-center text-white font-semibold text-base flex-shrink-0`}>
+                  {avatarUrl ? (
+                    <Image
+                      src={avatarUrl}
+                      alt={userData.username}
+                      width={48}
+                      height={48}
+                      className="w-full h-full object-cover"
+                      unoptimized
+                    />
+                  ) : (
+                    getInitial(userData.username)
+                  )}
+                </div>
+              );
+            })()}
             <div className="min-w-0 flex-1">
               <div className="text-white font-medium truncate">{userData.username}</div>
               <div className="text-neutral-400 text-xs truncate">
