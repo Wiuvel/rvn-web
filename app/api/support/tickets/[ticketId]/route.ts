@@ -169,7 +169,7 @@ export async function GET(
             storage_path: att.storage_path,
             // Формируем URL только из storage_path (единственный источник истины)
             storage_url: att.storage_path 
-              ? `/api/support/files/${encodeURIComponent(att.storage_path)}` 
+              ? `/support/files/${encodeURIComponent(att.storage_path)}` 
               : ''
           }));
         }

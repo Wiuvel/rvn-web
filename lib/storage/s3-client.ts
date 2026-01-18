@@ -151,6 +151,41 @@ export function isDocumentFile(mimeType: string, fileName: string): boolean {
 }
 
 /**
+ * Загружает аватар в Object Storage с публичным доступом
+ * @param file - File объект или Buffer
+ * @param key - Путь к файлу в бакете (например, 'avatars/userId/timestamp.ext')
+ * @param contentType - MIME type файла
+ * @returns Путь к файлу в S3
+ */
+export async function uploadAvatarToS3(
+  file: Buffer | Uint8Array,
+  key: string,
+  contentType: string
+): Promise<string> {
+  const client = getS3Client();
+  const env = getEnv();
+  
+  if (!client || !env.S3_BUCKET) {
+    throw new Error('S3 storage is not configured');
+  }
+
+  const command = new PutObjectCommand({
+    Bucket: env.S3_BUCKET,
+    Key: key,
+    Body: file,
+    ContentType: contentType,
+    // Публичный доступ для чтения (для аватаров)
+    // Примечание: некоторые S3-совместимые провайдеры могут не поддерживать ACL
+    // В этом случае доступ контролируется через bucket policies
+    ACL: 'public-read',
+  });
+
+  await client.send(command);
+
+  return key;
+}
+
+/**
  * Загружает изображение по URL и сохраняет в Object Storage
  * @param imageUrl - URL изображения
  * @param userId - ID пользователя для генерации пути
@@ -219,8 +254,8 @@ export async function uploadAvatarFromUrl(
     const timestamp = Date.now();
     const storagePath = `avatars/${userId}/${timestamp}.${extension}`;
 
-    // Загружаем в S3
-    await uploadFileToS3(buffer, storagePath, contentType);
+    // Загружаем в S3 с публичным доступом
+    await uploadAvatarToS3(buffer, storagePath, contentType);
 
     return storagePath;
   } catch (error) {

@@ -240,7 +240,7 @@ export async function POST(
         file_type: att.fileType,
         file_size: att.fileSize,
         storage_path: att.storagePath,
-        storage_url: `/api/support/files/${encodeURIComponent(att.storagePath)}`, // Используем API endpoint для авторизованного доступа
+        storage_url: `/support/files/${encodeURIComponent(att.storagePath)}`, // Используем endpoint для авторизованного доступа
       }));
 
       const { error: attachmentsError } = await supabaseAdmin

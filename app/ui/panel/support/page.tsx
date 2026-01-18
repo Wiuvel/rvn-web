@@ -3,12 +3,13 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { gsap } from 'gsap';
 import { translateError } from '@/lib/utils/error-translations';
 import RateLimitCaptcha from '@/components/auth/RateLimitCaptcha';
 import { GSAP_DEFAULT_DURATION, GSAP_DEFAULT_EASE } from '@/lib/utils/constants';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
-import { getGradientClasses } from '@/lib/utils/avatar-gradients';
+import { getGradientClasses, getAvatarUrl } from '@/lib/utils/avatar-gradients';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import TicketSkeleton from '@/components/ui/TicketSkeleton';
 import { FileText, AlertCircle, Image as ImageIcon } from 'lucide-react';
@@ -104,7 +105,7 @@ function processAttachments(attachments?: Array<{
     file_size: att.file_size,
     storage_path: att.storage_path,
     storage_url: att.storage_url || (att.storage_path 
-      ? `/api/support/files/${encodeURIComponent(att.storage_path)}` 
+      ? `/support/files/${encodeURIComponent(att.storage_path)}` 
       : '')
   }));
 }
@@ -276,11 +277,27 @@ function MessageItem({
           {/* Сообщение с аватаркой */}
           <div className={`flex items-end gap-3 ${isSupport ? 'flex-row-reverse' : 'flex-row'} ${isSupport ? 'w-full' : 'w-full'}`}>
             {/* Аватарка для пользователя (слева) */}
-            {isUser && message.sender && (
-              <div className={`w-10 h-10 rounded-full ${getGradientClasses(message.sender.avatar)} flex items-center justify-center text-white font-semibold text-sm flex-shrink-0 mb-1`}>
-                {getInitial(message.sender.username)}
-              </div>
-            )}
+            {isUser && message.sender && (() => {
+              const avatarUrl = getAvatarUrl(message.sender.avatar);
+              const gradientClasses = getGradientClasses(message.sender.avatar);
+              
+              return (
+                <div className={`w-10 h-10 rounded-full overflow-hidden ${avatarUrl ? '' : gradientClasses} flex items-center justify-center text-white font-semibold text-sm flex-shrink-0 mb-1`}>
+                  {avatarUrl ? (
+                    <Image
+                      src={avatarUrl}
+                      alt={message.sender.username}
+                      width={40}
+                      height={40}
+                      className="w-full h-full object-cover"
+                      unoptimized
+                    />
+                  ) : (
+                    getInitial(message.sender.username)
+                  )}
+                </div>
+              );
+            })()}
             
             {/* Пузырь сообщения */}
             <div className={`${isSupport ? 'max-w-[60%]' : 'max-w-[70%]'} min-w-0 flex-shrink-0 rounded-2xl px-4 py-3 ${
@@ -654,7 +671,7 @@ export default function SupportPanel() {
     };
 
     // Ждем загрузки всех изображений перед восстановлением скролла
-    const images = messagesContainerRef.current.querySelectorAll('img[src*="/api/support/files/"]');
+    const images = messagesContainerRef.current.querySelectorAll('img[src*="/support/files/"]');
     if (images.length === 0) {
       // Нет изображений, можно сразу скроллить
       setTimeout(performScroll, 100);
@@ -967,9 +984,36 @@ export default function SupportPanel() {
         return updated;
       });
 
-      // Формируем текст для last_message (если пустой, но есть вложения - используем текст из broadcast)
-      // Сервер уже формирует правильный текст, используем его как есть
-      const lastMessageText = data.message.message_text || '';
+      // Формируем текст для last_message (если пустой, но есть вложения - формируем без эмодзи и количества)
+      let lastMessageText = data.message.message_text || '';
+      
+      // Если текст пустой, но есть вложения - формируем текст без эмодзи и количества
+      if (!lastMessageText && data.message.attachments && data.message.attachments.length > 0) {
+        const images = data.message.attachments.filter((att: any) => att.file_type?.startsWith('image/'));
+        const files = data.message.attachments.filter((att: any) => !att.file_type?.startsWith('image/'));
+        
+        if (images.length > 0 && files.length === 0) {
+          // Только изображения
+          lastMessageText = 'Фотография';
+        } else if (files.length > 0 && images.length === 0) {
+          // Только файлы
+          lastMessageText = 'Файл';
+        } else {
+          // И изображения, и файлы
+          lastMessageText = 'Вложения';
+        }
+      } else if (lastMessageText) {
+        // Убираем эмодзи и количество из начала строки, если они есть
+        lastMessageText = lastMessageText.replace(/^[📷📎]\s*/, ''); // Убираем эмодзи в начале
+        lastMessageText = lastMessageText.replace(/^\d+\s+(фотографий|файлов|вложений|фотографий|изображений?|документов?)/, (match: string) => {
+          // Убираем количество, оставляем только тип
+          if (match.includes('фотографий') || match.includes('изображений')) return 'Фотография';
+          if (match.includes('файлов') || match.includes('документов')) return 'Файл';
+          return 'Вложения';
+        });
+        // Заменяем "1 Фотография" на "Фотография"
+        lastMessageText = lastMessageText.replace(/^1\s+(Фотография|Файл)$/, '$1');
+      }
       
       // Обновляем last_message_at и last_message в списке тикетов
       updateTicketInList(data.ticketId, {
@@ -2569,7 +2613,20 @@ export default function SupportPanel() {
                           {isSystemMessage ? 'Система:' : ticket.last_message.sender_type === 'user' ? 'Пользователь:' : 'Поддержка:'}
                         </span>
                         <span className="truncate flex-1 min-w-0">
-                          {ticket.last_message.message_text}
+                          {(() => {
+                            let text = ticket.last_message.message_text || '';
+                            // Убираем эмодзи и количество из текста
+                            text = text.replace(/^[📷📎]\s*/, ''); // Убираем эмодзи в начале
+                            text = text.replace(/^\d+\s+(фотографий|файлов|вложений|фотографий|изображений?|документов?)/i, (match: string) => {
+                              // Убираем количество, оставляем только тип
+                              if (match.includes('фотографий') || match.includes('изображений')) return 'Фотография';
+                              if (match.includes('файлов') || match.includes('документов')) return 'Файл';
+                              return 'Вложения';
+                            });
+                            // Заменяем "1 Фотография" на "Фотография"
+                            text = text.replace(/^1\s+(Фотография|Файл)$/, '$1');
+                            return text;
+                          })()}
                         </span>
                         {ticket.last_message.is_read === false && ticket.last_message.sender_type === 'user' && !isSystemMessage && (
                           <span className="flex-shrink-0 w-2 h-2 bg-blue-500 rounded-full"></span>
@@ -2681,9 +2738,27 @@ export default function SupportPanel() {
                 {activeTicket.user && (
                   <div className="border-b border-neutral-800 p-3 bg-neutral-900/50 flex-shrink-0">
                   <div className="flex items-center gap-3 mb-3">
-                    <div className={`w-10 h-10 rounded-full ${getGradientClasses(activeTicket.user.avatar)} flex items-center justify-center text-white font-semibold text-sm flex-shrink-0 shadow-glow`}>
-                      {getInitial(activeTicket.user.username)}
-                    </div>
+                    {(() => {
+                      const avatarUrl = getAvatarUrl(activeTicket.user.avatar);
+                      const gradientClasses = getGradientClasses(activeTicket.user.avatar);
+                      
+                      return (
+                        <div className={`w-10 h-10 rounded-full overflow-hidden ${avatarUrl ? '' : gradientClasses} flex items-center justify-center text-white font-semibold text-sm flex-shrink-0`}>
+                          {avatarUrl ? (
+                            <Image
+                              src={avatarUrl}
+                              alt={activeTicket.user.username}
+                              width={40}
+                              height={40}
+                              className="w-full h-full object-cover"
+                              unoptimized
+                            />
+                          ) : (
+                            getInitial(activeTicket.user.username)
+                          )}
+                        </div>
+                      );
+                    })()}
                     <div>
                       <div className="text-sm font-medium text-white">{activeTicket.user.username}</div>
                       <div className="text-xs text-neutral-400">#{activeTicket.user.user_id}</div>

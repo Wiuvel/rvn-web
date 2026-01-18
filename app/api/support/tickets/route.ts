@@ -219,15 +219,16 @@ export async function GET(request: NextRequest) {
                   const images = attachments.filter(att => att.file_type.startsWith('image/'));
                   const files = attachments.filter(att => !att.file_type.startsWith('image/'));
                   
+                  // Для всех пользователей (и пользователи, и поддержка) - без эмодзи и количества
                   if (images.length > 0 && files.length === 0) {
                     // Только изображения
-                    displayMessageText = images.length === 1 ? '📷 Фотография' : `📷 ${images.length} фотографий`;
+                    displayMessageText = 'Фотография';
                   } else if (files.length > 0 && images.length === 0) {
                     // Только файлы
-                    displayMessageText = files.length === 1 ? '📎 Файл' : `📎 ${files.length} файлов`;
+                    displayMessageText = 'Файл';
                   } else {
                     // И изображения, и файлы
-                    displayMessageText = `📎 ${images.length + files.length} вложений`;
+                    displayMessageText = 'Вложения';
                   }
                 }
 
@@ -290,15 +291,16 @@ export async function GET(request: NextRequest) {
               const images = attachments.filter(att => att.file_type.startsWith('image/'));
               const files = attachments.filter(att => !att.file_type.startsWith('image/'));
               
+              // Для всех пользователей (и пользователи, и поддержка) - без эмодзи и количества
               if (images.length > 0 && files.length === 0) {
                 // Только изображения
-                displayMessageText = images.length === 1 ? '📷 Фотография' : `📷 ${images.length} фотографий`;
+                displayMessageText = 'Фотография';
               } else if (files.length > 0 && images.length === 0) {
                 // Только файлы
-                displayMessageText = files.length === 1 ? '📎 Файл' : `📎 ${files.length} файлов`;
+                displayMessageText = 'Файл';
               } else {
                 // И изображения, и файлы
-                displayMessageText = `📎 ${images.length + files.length} вложений`;
+                displayMessageText = 'Вложения';
               }
             }
             

@@ -83,11 +83,23 @@ export default function ImageViewer({ isOpen, onClose, imageUrl, alt }: ImageVie
     setIsDragging(false);
   };
 
-  const handleWheel = (e: React.WheelEvent) => {
-    e.preventDefault();
-    const delta = e.deltaY > 0 ? -0.1 : 0.1;
-    setScale(prev => Math.max(0.5, Math.min(3, prev + delta)));
-  };
+  // Используем нативный addEventListener с passive: false для preventDefault
+  useEffect(() => {
+    if (!modalRef.current || !isOpen) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? -0.1 : 0.1;
+      setScale(prev => Math.max(0.5, Math.min(3, prev + delta)));
+    };
+
+    const element = modalRef.current;
+    element.addEventListener('wheel', handleWheel, { passive: false });
+
+    return () => {
+      element.removeEventListener('wheel', handleWheel);
+    };
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -102,7 +114,6 @@ export default function ImageViewer({ isOpen, onClose, imageUrl, alt }: ImageVie
       <div
         ref={modalRef}
         className="fixed inset-0 z-[2001] flex items-center justify-center p-4 pointer-events-none"
-        onWheel={handleWheel}
       >
         <div
           className="relative max-w-[95vw] max-h-[95vh] pointer-events-auto"

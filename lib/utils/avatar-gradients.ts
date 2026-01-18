@@ -75,7 +75,7 @@ export function getGradientClasses(avatarId: string | null | undefined, fallback
 
 /**
  * Получает URL аватара для отображения
- * Если avatarId начинается с 's3:', формирует URL к API endpoint
+ * Если avatarId начинается с 's3:', формирует URL к публичному endpoint для аватаров
  * Иначе возвращает null (используется градиент)
  */
 export function getAvatarUrl(avatarId: string | null | undefined): string | null {
@@ -87,8 +87,21 @@ export function getAvatarUrl(avatarId: string | null | undefined): string | null
   if (avatarId.startsWith('s3:')) {
     // Извлекаем путь (убираем префикс 's3:')
     const storagePath = avatarId.substring(3);
-    // Формируем URL к API endpoint
-    return `/api/support/files/${encodeURIComponent(storagePath)}`;
+    
+    // Проверяем, что путь начинается с 'avatars/'
+    if (!storagePath.startsWith('avatars/')) {
+      return null;
+    }
+    
+    // Убираем префикс 'avatars/' и формируем URL к публичному endpoint
+    // Формат: avatars/userId/timestamp.ext -> /images/users/userId/timestamp.ext
+    const relativePath = storagePath.substring('avatars/'.length);
+    
+    // Кодируем каждую часть пути отдельно для правильной обработки специальных символов
+    const pathParts = relativePath.split('/');
+    const encodedPath = pathParts.map(part => encodeURIComponent(part)).join('/');
+    
+    return `/images/users/${encodedPath}`;
   }
   
   return null;

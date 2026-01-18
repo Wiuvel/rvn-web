@@ -1,6 +1,8 @@
 /**
- * API endpoint для получения файлов из S3 с авторизацией
+ * API endpoint для получения файлов вложений поддержки из S3 с авторизацией
  * Проверяет права доступа пользователя к тикету перед выдачей файла
+ * 
+ * Примечание: Аватары обрабатываются через /images/users/ endpoint (публичный доступ)
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -27,17 +29,6 @@ export async function GET(
   { params }: { params: Promise<{ key: string }> }
 ) {
   try {
-    // Rate limiting
-    const rateLimitResult = await generalRateLimit.check(request);
-    if (!rateLimitResult.allowed) {
-      return setCorsHeaders(
-        NextResponse.json(
-          { error: ERROR_TOO_MANY_REQUESTS },
-          { status: 429 }
-        )
-      );
-    }
-
     // Проверка авторизации
     const cookieStore = await cookies();
     const isAuthenticated = cookieStore.get('user_authenticated')?.value === 'true';
@@ -68,22 +59,26 @@ export async function GET(
     // Декодируем key (может быть URL-encoded)
     const decodedKey = decodeURIComponent(key);
 
-    // Проверяем, что путь начинается с support/ или avatars/ (безопасность)
-    if (!decodedKey.startsWith('support/') && !decodedKey.startsWith('avatars/')) {
+    // Этот endpoint обрабатывает только файлы поддержки (вложения в тикетах)
+    // Аватары обрабатываются через /images/users/ endpoint
+    if (!decodedKey.startsWith('support/')) {
       return setCorsHeaders(
         NextResponse.json(
-          { error: 'Invalid file path' },
+          { error: 'Invalid file path. This endpoint only handles support attachments.' },
           { status: 400 }
         )
       );
     }
 
-    // Для аватаров просто выдаем файл без проверки прав доступа к тикету
-    if (decodedKey.startsWith('avatars/')) {
-      // Генерируем presigned URL (действителен 1 час)
-      const presignedUrl = await getPresignedUrl(decodedKey, 3600);
-      // Редиректим на presigned URL
-      return NextResponse.redirect(presignedUrl);
+    // Rate limiting для файлов поддержки
+    const rateLimitResult = await generalRateLimit.check(request);
+    if (!rateLimitResult.allowed) {
+      return setCorsHeaders(
+        NextResponse.json(
+          { error: ERROR_TOO_MANY_REQUESTS },
+          { status: 429 }
+        )
+      );
     }
 
     // Извлекаем ticketId из пути (формат: support/{ticketId}/...)

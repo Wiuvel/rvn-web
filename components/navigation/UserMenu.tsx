@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
@@ -28,12 +28,23 @@ export function UserMenu({
 }: UserMenuProps) {
   const router = useRouter();
   const { shouldRender, menuRef: animatedMenuRef } = useMenuAnimation(isOpen);
+  const [avatarLoading, setAvatarLoading] = useState(true);
   
   useEffect(() => {
     if (animatedMenuRef.current && externalMenuRef && 'current' in externalMenuRef) {
       (externalMenuRef as React.MutableRefObject<HTMLDivElement | null>).current = animatedMenuRef.current;
     }
   }, [shouldRender, animatedMenuRef, externalMenuRef]);
+
+  // Сбрасываем состояние загрузки аватара при смене аватара
+  useEffect(() => {
+    if (userData?.avatar) {
+      const avatarUrl = getAvatarUrl(userData.avatar);
+      if (avatarUrl) {
+        setAvatarLoading(true);
+      }
+    }
+  }, [userData?.avatar]);
 
   const getInitial = (username: string) => {
     return username.charAt(0).toUpperCase();
@@ -72,16 +83,28 @@ export function UserMenu({
               const gradientClasses = getGradientClasses(userData.avatar);
               
               return (
-                <div className={`w-12 h-12 rounded-full overflow-hidden ${avatarUrl ? '' : gradientClasses} flex items-center justify-center text-white font-semibold text-base flex-shrink-0`}>
+                <div className={`w-12 h-12 rounded-full overflow-hidden ${avatarUrl ? '' : gradientClasses} flex items-center justify-center text-white font-semibold text-base flex-shrink-0 relative`}>
                   {avatarUrl ? (
-                    <Image
-                      src={avatarUrl}
-                      alt={userData.username}
-                      width={48}
-                      height={48}
-                      className="w-full h-full object-cover"
-                      unoptimized
-                    />
+                    <>
+                      {avatarLoading && (
+                        <div 
+                          className="absolute inset-0 rounded-full animate-shimmer bg-[length:200%_100%]"
+                          style={{
+                            background: 'linear-gradient(90deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.15) 50%, rgba(255, 255, 255, 0.05) 100%)'
+                          }}
+                        />
+                      )}
+                      <Image
+                        src={avatarUrl}
+                        alt={userData.username}
+                        width={48}
+                        height={48}
+                        className={`w-full h-full object-cover transition-opacity duration-300 ${avatarLoading ? 'opacity-0' : 'opacity-100'}`}
+                        unoptimized
+                        onLoad={() => setAvatarLoading(false)}
+                        onError={() => setAvatarLoading(false)}
+                      />
+                    </>
                   ) : (
                     getInitial(userData.username)
                   )}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter, usePathname } from 'next/navigation';
@@ -28,6 +28,8 @@ export default function Header({ variant = 'main' }: HeaderProps = {}) {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [readNotifications, setReadNotifications] = useState<Set<string>>(new Set());
+  const [avatarLoading, setAvatarLoading] = useState(true);
+  const [mobileAvatarLoading, setMobileAvatarLoading] = useState(true);
   const userMenuRef = useRef<HTMLDivElement | null>(null);
   const notificationsMenuRef = useRef<HTMLDivElement | null>(null);
   const userMenuButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -42,6 +44,17 @@ export default function Header({ variant = 'main' }: HeaderProps = {}) {
   const { userData, loading } = useAuth({ silent: true });
 
   const headerRef = useRef<HTMLElement>(null);
+
+  // Сбрасываем состояние загрузки аватара при смене аватара
+  useEffect(() => {
+    if (userData?.avatar) {
+      const avatarUrl = getAvatarUrl(userData.avatar);
+      if (avatarUrl) {
+        setAvatarLoading(true);
+        setMobileAvatarLoading(true);
+      }
+    }
+  }, [userData?.avatar]);
 
   useEffect(() => {
     if (typeof window === 'undefined' || !headerRef.current) return;
@@ -324,30 +337,54 @@ export default function Header({ variant = 'main' }: HeaderProps = {}) {
                     const gradientClasses = getGradientClasses(userData.avatar);
                     
                     return (
-                      <button
-                        ref={userMenuButtonRef}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setUserMenuOpen(!userMenuOpen);
-                        }}
-                        className={`w-10 h-10 rounded-full overflow-hidden ${avatarUrl ? '' : gradientClasses} flex items-center justify-center text-white font-semibold text-sm shadow-glow transition-transform duration-200 hover:scale-110 cursor-pointer flex-shrink-0`}
-                        title={userData.username}
-                        aria-label="Меню пользователя"
-                        aria-expanded={userMenuOpen}
-                      >
+                  <button
+                    ref={userMenuButtonRef}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setUserMenuOpen(!userMenuOpen);
+                    }}
+                        className={`w-10 h-10 rounded-full overflow-hidden ${avatarUrl ? '' : gradientClasses} flex items-center justify-center text-white font-semibold text-sm transition-transform duration-200 hover:scale-110 cursor-pointer flex-shrink-0 relative`}
+                    title={userData.username}
+                    aria-label="Меню пользователя"
+                    aria-expanded={userMenuOpen}
+                  >
                         {avatarUrl ? (
-                          <Image
-                            src={avatarUrl}
-                            alt={userData.username}
-                            width={40}
-                            height={40}
-                            className="w-full h-full object-cover"
-                            unoptimized
-                          />
+                          <>
+                            {avatarLoading && (
+                              <div 
+                                className="absolute inset-0 rounded-full animate-shimmer bg-[length:200%_100%]"
+                                style={{
+                                  background: 'linear-gradient(90deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.15) 50%, rgba(255, 255, 255, 0.05) 100%)'
+                                }}
+                              />
+                            )}
+                            <Image
+                              src={avatarUrl}
+                              alt={userData.username}
+                              width={40}
+                              height={40}
+                              className={`w-full h-full object-cover transition-opacity duration-300 ${avatarLoading ? 'opacity-0' : 'opacity-100'}`}
+                              unoptimized
+                              onLoad={() => setAvatarLoading(false)}
+                              onError={() => setAvatarLoading(false)}
+                            />
+                          </>
                         ) : (
-                          getInitial(userData.username)
+                          <>
+                            {loading && (
+                              <div 
+                                className="absolute inset-0 rounded-full animate-shimmer bg-[length:200%_100%]"
+                                style={{
+                                  background: 'linear-gradient(90deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.15) 50%, rgba(255, 255, 255, 0.05) 100%)'
+                                }}
+                              />
+                            )}
+                            <div className={`${loading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300`}>
+                              {getInitial(userData.username)}
+                            </div>
+                          </>
                         )}
-                      </button>
+                  </button>
                     );
                   })()}
                   {userData && (
@@ -459,9 +496,51 @@ export default function Header({ variant = 'main' }: HeaderProps = {}) {
                     className="block p-4 border-b border-white/10 hover:bg-white/5 transition-colors duration-200 cursor-pointer mx-2 my-1 rounded-xl"
                   >
                     <div className="flex items-center gap-3">
-                      <div className={`w-12 h-12 rounded-full ${getGradientClasses(userData.avatar)} flex items-center justify-center text-white font-semibold text-base flex-shrink-0`}>
-                        {getInitial(userData.username)}
-                      </div>
+                      {(() => {
+                        const avatarUrl = getAvatarUrl(userData.avatar);
+                        const gradientClasses = getGradientClasses(userData.avatar);
+                        
+                        return (
+                          <div className={`w-12 h-12 rounded-full overflow-hidden ${avatarUrl ? '' : gradientClasses} flex items-center justify-center text-white font-semibold text-base flex-shrink-0 relative`}>
+                            {avatarUrl ? (
+                              <>
+                                {mobileAvatarLoading && (
+                                  <div 
+                                    className="absolute inset-0 rounded-full animate-shimmer bg-[length:200%_100%]"
+                                    style={{
+                                      background: 'linear-gradient(90deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.15) 50%, rgba(255, 255, 255, 0.05) 100%)'
+                                    }}
+                                  />
+                                )}
+                                <Image
+                                  src={avatarUrl}
+                                  alt={userData.username}
+                                  width={48}
+                                  height={48}
+                                  className={`w-full h-full object-cover transition-opacity duration-300 ${mobileAvatarLoading ? 'opacity-0' : 'opacity-100'}`}
+                                  unoptimized
+                                  onLoad={() => setMobileAvatarLoading(false)}
+                                  onError={() => setMobileAvatarLoading(false)}
+                                />
+                              </>
+                            ) : (
+                              <>
+                                {loading && (
+                                  <div 
+                                    className="absolute inset-0 rounded-full animate-shimmer bg-[length:200%_100%]"
+                                    style={{
+                                      background: 'linear-gradient(90deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.15) 50%, rgba(255, 255, 255, 0.05) 100%)'
+                                    }}
+                                  />
+                                )}
+                                <div className={`${loading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300`}>
+                                  {getInitial(userData.username)}
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        );
+                      })()}
                       <div className="min-w-0 flex-1">
                         <div className="text-white font-medium truncate">{userData.username}</div>
                       </div>

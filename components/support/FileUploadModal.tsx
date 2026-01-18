@@ -48,9 +48,11 @@ export default function FileUploadModal({
   const [error, setError] = useState<string | null>(null);
   const [previews, setPreviews] = useState<Map<string, string>>(new Map());
   const [showRateLimitCaptcha, setShowRateLimitCaptcha] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
+  const dropZoneRef = useRef<HTMLDivElement>(null);
   const isCaptchaOpenRef = useRef(false);
   const isProcessingCaptchaRef = useRef(false);
   const pendingUploadRef = useRef<{ files: File[] } | null>(null);
@@ -62,6 +64,7 @@ export default function FileUploadModal({
       // Сбрасываем состояние при открытии модального окна
       setUploading(false);
       setError(null);
+      setIsDragging(false);
       isCaptchaOpenRef.current = false;
       isProcessingCaptchaRef.current = false;
       setShowRateLimitCaptcha(false);
@@ -93,6 +96,7 @@ export default function FileUploadModal({
           setSelectedFiles([]);
           setPreviews(new Map());
           setError(null);
+          setIsDragging(false);
           // Сбрасываем состояние captcha при закрытии модального окна
           isCaptchaOpenRef.current = false;
           isProcessingCaptchaRef.current = false;
@@ -120,10 +124,10 @@ export default function FileUploadModal({
     });
   }, [selectedFiles]);
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
+  const processFiles = (files: FileList | File[]) => {
+    const filesArray = Array.from(files);
     
-    if (selectedFiles.length + files.length > maxFiles) {
+    if (selectedFiles.length + filesArray.length > maxFiles) {
       setError(`Можно загрузить максимум ${maxFiles} файла`);
       return;
     }
@@ -136,7 +140,7 @@ export default function FileUploadModal({
     const newFiles: File[] = [];
     const existingFileNames = new Set(selectedFiles.map(f => f.name.toLowerCase()));
     
-    files.forEach((file) => {
+    filesArray.forEach((file) => {
       // Проверка на дубликаты
       if (existingFileNames.has(file.name.toLowerCase())) {
         // Автоматическое исправление - добавляем номер
@@ -183,6 +187,47 @@ export default function FileUploadModal({
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+    processFiles(files);
+  };
+
+  const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!uploading && selectedFiles.length < maxFiles) {
+      setIsDragging(true);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // Проверяем, что мы действительно покинули зону (не перешли на дочерний элемент)
+    if (e.currentTarget === dropZoneRef.current && !e.currentTarget.contains(e.relatedTarget as Node)) {
+      setIsDragging(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    if (uploading || selectedFiles.length >= maxFiles) return;
+
+    const files = e.dataTransfer.files;
+    if (files.length === 0) return;
+
+    processFiles(files);
   };
 
   const removeFile = (index: number) => {
@@ -355,25 +400,33 @@ export default function FileUploadModal({
           </div>
 
           <div className="flex-1 overflow-y-auto p-4 sm:p-6">
-            <div className="mb-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-              <p className="text-sm text-blue-300">
-                До {maxFiles} файлов, максимум 10МБ каждый
-              </p>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploading || selectedFiles.length >= maxFiles}
-              className="w-full p-8 border-2 border-dashed border-white/20 rounded-xl hover:border-primary-500/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed mb-4"
+            <div
+              ref={dropZoneRef}
+              onDragEnter={handleDragEnter}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              onClick={() => !uploading && selectedFiles.length < maxFiles && fileInputRef.current?.click()}
+              className={`w-full p-8 border-2 border-dashed rounded-xl transition-all duration-200 mb-4 ${
+                isDragging
+                  ? 'border-blue-500 bg-blue-500/10 scale-[1.02]'
+                  : 'border-white/20 hover:border-primary-500/50'
+              } ${uploading || selectedFiles.length >= maxFiles ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
             >
               <div className="flex flex-col items-center gap-2">
-                <Upload className="w-8 h-8 text-neutral-400" />
-                <span className="text-sm text-neutral-300">
-                  {selectedFiles.length >= maxFiles ? 'Достигнут лимит' : 'Выбрать файлы'}
+                <Upload className={`w-8 h-8 transition-colors ${isDragging ? 'text-blue-400' : 'text-neutral-400'}`} />
+                <span className={`text-sm transition-colors ${isDragging ? 'text-blue-300' : 'text-neutral-300'}`}>
+                  {isDragging
+                    ? 'Отпустите для загрузки'
+                    : selectedFiles.length >= maxFiles
+                    ? 'Достигнут лимит'
+                    : 'Перетащите файлы или выберите их'}
+                </span>
+                <span className="text-xs text-neutral-500">
+                  До {maxFiles} файлов, максимум 10МБ каждый
                 </span>
               </div>
-            </button>
+            </div>
 
             <input
               ref={fileInputRef}

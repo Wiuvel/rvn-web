@@ -9,6 +9,8 @@ import { gsap } from 'gsap';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { getGradientClasses, getAvatarUrl } from '@/lib/utils/avatar-gradients';
 import { APP_VERSION } from '@/lib/utils/constants';
+import AvatarUploadModal from '@/components/auth/AvatarUploadModal';
+import { Pencil } from 'lucide-react';
 
 interface UserData {
   id: string;
@@ -38,6 +40,8 @@ export default function DashboardPage() {
   const [currentYear] = useState(new Date().getFullYear());
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [readNotifications, setReadNotifications] = useState<Set<string>>(new Set());
+  const [showAvatarModal, setShowAvatarModal] = useState(false);
+  const [avatarLoading, setAvatarLoading] = useState(true);
   const router = useRouter();
   const params = useParams();
   const token = params?.token as string;
@@ -103,6 +107,8 @@ export default function DashboardPage() {
               return;
             }
             setUserData(data);
+            // Сбрасываем состояние загрузки аватара при загрузке данных пользователя
+            setAvatarLoading(true);
           } else if (response.status === 404) {
             // Токен не существует в БД - очищаем сессию через API и редиректим на авторизацию
             try {
@@ -183,11 +189,10 @@ export default function DashboardPage() {
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('ru-RU', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = String(date.getFullYear()).slice(-2);
+    return `${day}.${month}.${year}`;
   };
 
   const getShortId = (userId: string) => {
@@ -462,13 +467,13 @@ export default function DashboardPage() {
                   const gradientClasses = getGradientClasses(userData?.avatar);
                   
                   return (
-                    <button
-                      onClick={() => setUserMenuOpen(!userMenuOpen)}
-                      className={`w-10 h-10 rounded-full overflow-hidden ${avatarUrl ? '' : gradientClasses} flex items-center justify-center text-white font-semibold text-sm shadow-glow transition-transform duration-200 hover:scale-110 cursor-pointer`}
-                      title={userData.username}
-                      aria-label="Меню пользователя"
-                      aria-expanded={userMenuOpen}
-                    >
+                <button
+                  onClick={() => setUserMenuOpen(!userMenuOpen)}
+                      className={`w-10 h-10 rounded-full overflow-hidden ${avatarUrl ? '' : gradientClasses} flex items-center justify-center text-white font-semibold text-sm transition-transform duration-200 hover:scale-110 cursor-pointer`}
+                  title={userData.username}
+                  aria-label="Меню пользователя"
+                  aria-expanded={userMenuOpen}
+                >
                       {avatarUrl ? (
                         <Image
                           src={avatarUrl}
@@ -481,7 +486,7 @@ export default function DashboardPage() {
                       ) : (
                         getInitial(userData.username)
                       )}
-                    </button>
+                </button>
                   );
                 })()}
                 {shouldRenderMenu && (
@@ -513,7 +518,7 @@ export default function DashboardPage() {
                               ) : (
                                 getInitial(userData.username)
                               )}
-                            </div>
+                        </div>
                           );
                         })()}
                         <div className="min-w-0 flex-1">
@@ -614,7 +619,7 @@ export default function DashboardPage() {
                           ) : (
                             getInitial(userData.username)
                           )}
-                        </div>
+                    </div>
                       );
                     })()}
                     <div className="min-w-0 flex-1">
@@ -699,26 +704,65 @@ export default function DashboardPage() {
             <p className="mt-2 text-neutral-400">Добро пожаловать. Здесь будут ваши подписки, ключи и настройки.</p>
           </div>
           {/* Profile section */}
-          <section ref={profileRef} className="mt-6 rounded-2xl border border-neutral-800 bg-neutral-900 p-5">
-            <div className="flex items-center gap-4">
+          <section ref={profileRef} className="mt-6 rounded-2xl border border-neutral-800 bg-neutral-900 p-5 relative">
+            {/* Кнопка редактирования аватара - видна на мобильных, скрыта на десктопе (где работает hover) */}
+            <button
+              onClick={() => setShowAvatarModal(true)}
+              className="md:hidden absolute top-4 right-4 p-2 hover:bg-white/10 rounded-lg transition-colors text-neutral-400 hover:text-white"
+              aria-label="Изменить аватар"
+            >
+              <Pencil className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-4 pr-10 md:pr-0">
               {(() => {
                 const avatarUrl = getAvatarUrl(userData?.avatar);
                 const gradientClasses = getGradientClasses(userData?.avatar);
                 
                 return (
-                  <div className={`shrink-0 h-14 w-14 rounded-full overflow-hidden ${avatarUrl ? '' : gradientClasses} flex items-center justify-center text-white font-semibold text-lg border border-white/10`}>
-                    {avatarUrl ? (
-                      <Image
-                        src={avatarUrl}
-                        alt={userData?.username || ''}
-                        width={56}
-                        height={56}
-                        className="w-full h-full object-cover"
-                        unoptimized
-                      />
-                    ) : (
-                      userData?.username ? userData.username.charAt(0).toUpperCase() : '—'
-                    )}
+                  <div className="relative shrink-0 group cursor-pointer md:cursor-pointer" onClick={() => setShowAvatarModal(true)}>
+                    <div className="shrink-0 h-14 w-14 rounded-full overflow-hidden border border-white/10 transition-all duration-200 md:group-hover:border-white/30 relative">
+                      {avatarUrl ? (
+                        <>
+                          {avatarLoading && (
+                            <div 
+                              className="absolute inset-0 rounded-full animate-shimmer bg-[length:200%_100%]"
+                              style={{
+                                background: 'linear-gradient(90deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.15) 50%, rgba(255, 255, 255, 0.05) 100%)'
+                              }}
+                            />
+                          )}
+                          <Image
+                            src={avatarUrl}
+                            alt={userData?.username || ''}
+                            width={56}
+                            height={56}
+                            className={`w-full h-full object-cover transition-all duration-200 md:group-hover:brightness-50 ${avatarLoading ? 'opacity-0' : 'opacity-100'}`}
+                            unoptimized
+                            onLoad={() => setAvatarLoading(false)}
+                            onError={() => setAvatarLoading(false)}
+                          />
+                        </>
+                      ) : (
+                        <>
+                          {loading && (
+                            <div 
+                              className="absolute inset-0 rounded-full animate-shimmer bg-[length:200%_100%]"
+                              style={{
+                                background: 'linear-gradient(90deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.15) 50%, rgba(255, 255, 255, 0.05) 100%)'
+                              }}
+                            />
+                          )}
+                          <div className={`w-full h-full ${gradientClasses} flex items-center justify-center text-white font-semibold text-lg rounded-full transition-opacity duration-300 ${loading ? 'opacity-0' : 'opacity-100'}`}>
+                            {userData?.username ? userData.username.charAt(0).toUpperCase() : '—'}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                    {/* Hover overlay с иконкой карандаша - только на десктопе */}
+                    <div className="hidden md:flex absolute inset-0 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 items-center justify-center pointer-events-none">
+                      <Pencil className="w-5 h-5 text-white" />
+                    </div>
                   </div>
                 );
               })()}
@@ -808,6 +852,24 @@ export default function DashboardPage() {
           </div>
         </div>
       </footer>
+
+      {/* Avatar Upload Modal */}
+      <AvatarUploadModal
+        isOpen={showAvatarModal}
+        onClose={() => setShowAvatarModal(false)}
+        onUploadComplete={(avatarPath, avatarUrl) => {
+          setAvatarLoading(true);
+          // Обновляем данные пользователя с новым аватаром
+          if (userData) {
+            setUserData({
+              ...userData,
+              avatar: avatarPath,
+            });
+          }
+          setShowAvatarModal(false);
+        }}
+        currentAvatarUrl={userData ? getAvatarUrl(userData.avatar) : null}
+      />
     </div>
   );
 }

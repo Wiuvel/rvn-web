@@ -8,7 +8,7 @@ import Image from 'next/image';
 import { gsap } from 'gsap';
 import { MESSAGE_MAX_LENGTH, TICKET_SUBJECT_MAX_LENGTH, MAX_TICKETS_PER_USER, MESSAGE_TIMEOUT, AUTH_FETCH_TIMEOUT, GSAP_DEFAULT_DURATION, GSAP_DEFAULT_EASE, MARK_AS_READ_DEBOUNCE } from '@/lib/utils/constants';
 import { translateError } from '@/lib/utils/error-translations';
-import { getGradientClasses } from '@/lib/utils/avatar-gradients';
+import { getGradientClasses, getAvatarUrl } from '@/lib/utils/avatar-gradients';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { debugPerformanceAsync, debugStart, debugEnd, debugError } from '@/lib/utils/debug';
 import TicketSkeleton from '@/components/ui/TicketSkeleton';
@@ -510,7 +510,7 @@ export default function SupportPage() {
               file_size: att.file_size,
               storage_path: att.storage_path,
               storage_url: att.storage_url || (att.storage_path 
-                ? `/api/support/files/${encodeURIComponent(att.storage_path)}` 
+                ? `/support/files/${encodeURIComponent(att.storage_path)}` 
                 : '')
             }))
           : undefined
@@ -852,18 +852,51 @@ export default function SupportPage() {
               file_size: att.file_size,
               storage_path: att.storage_path,
               storage_url: att.storage_url || (att.storage_path 
-                ? `/api/support/files/${encodeURIComponent(att.storage_path)}` 
+                ? `/support/files/${encodeURIComponent(att.storage_path)}` 
                 : '')
             }))
           : undefined,
       };
 
+      // Формируем текст для last_message (если пустой, но есть вложения - формируем без эмодзи и количества)
+      let lastMessageText = data.message.message_text || '';
+      const attachments = data.message.attachments || [];
+      
+      // Если текст пустой, но есть вложения - формируем текст без эмодзи и количества
+      if (!lastMessageText && attachments.length > 0) {
+        const images = attachments.filter((att: any) => att.file_type?.startsWith('image/'));
+        const files = attachments.filter((att: any) => !att.file_type?.startsWith('image/'));
+        
+        if (images.length > 0 && files.length === 0) {
+          // Только изображения
+          lastMessageText = 'Фотография';
+        } else if (files.length > 0 && images.length === 0) {
+          // Только файлы
+          lastMessageText = 'Файл';
+        } else {
+          // И изображения, и файлы
+          lastMessageText = 'Вложения';
+        }
+      } else if (lastMessageText) {
+        // Убираем эмодзи и количество из начала строки, если они есть
+        lastMessageText = lastMessageText.replace(/^[📷📎]\s*/, ''); // Убираем эмодзи в начале
+        lastMessageText = lastMessageText.replace(/^\d+\s+(фотографий|файлов|вложений|изображений?|документов?)/i, (match: string) => {
+          // Убираем количество, оставляем только тип
+          if (match.toLowerCase().includes('фотографий') || match.toLowerCase().includes('изображений')) return 'Фотография';
+          if (match.toLowerCase().includes('файлов') || match.toLowerCase().includes('документов')) return 'Файл';
+          return 'Вложения';
+        });
+        // Заменяем "1 Фотография" на "Фотография"
+        lastMessageText = lastMessageText.replace(/^1\s+(Фотография|Файл)$/, '$1');
+      }
+
       const lastMessageData = {
         id: data.message.id,
-        message_text: data.message.message_text,
+        message_text: lastMessageText,
         sender_type: data.message.sender_type,
         created_at: data.message.created_at,
-        is_read: data.message.is_read
+        is_read: data.message.is_read,
+        attachments: attachments.length > 0 ? attachments : undefined
       };
 
       // Используем startTransition для неблокирующих обновлений
@@ -1276,7 +1309,7 @@ export default function SupportPage() {
       };
       
       // Проверяем, загружены ли все изображения
-      const images = document.querySelectorAll('img[src*="/api/support/files/"]');
+      const images = document.querySelectorAll('img[src*="/support/files/"]');
       if (images.length === 0) {
         scrollToBottom();
         return;
@@ -1882,13 +1915,28 @@ export default function SupportPage() {
         
         // ОПТИМИЗАЦИЯ: Не обновляем список тикетов - WebSocket обновит last_message через событие
         // Обновляем только локально last_message для оптимистичного обновления UI
+        // Формируем текст для last_message (если пустой, но есть вложения - формируем без эмодзи и количества)
+        let optimisticLastMessageText = sentText || '';
+        if (!optimisticLastMessageText && sentFiles.length > 0) {
+          const images = sentFiles.filter(f => f.fileType.startsWith('image/'));
+          const files = sentFiles.filter(f => !f.fileType.startsWith('image/'));
+          
+          if (images.length > 0 && files.length === 0) {
+            optimisticLastMessageText = 'Фотография';
+          } else if (files.length > 0 && images.length === 0) {
+            optimisticLastMessageText = 'Файл';
+          } else {
+            optimisticLastMessageText = 'Вложения';
+          }
+        }
+        
         setTickets(prev => prev.map(t => 
           t.id === activeTicket.id 
             ? { 
                 ...t, 
                 last_message: {
                   id: optimisticMessage.id,
-                  message_text: optimisticMessage.text,
+                  message_text: optimisticLastMessageText,
                   sender_type: 'user',
                   created_at: optimisticMessage.timestamp.toISOString(),
                   is_read: false
@@ -2279,15 +2327,33 @@ export default function SupportPage() {
             </nav>
             {userData && (
               <div className="hidden lg:flex items-center gap-2 relative" ref={userMenuRef}>
-                <button
-                  onClick={() => setUserMenuOpen(!userMenuOpen)}
-                  className={`w-10 h-10 rounded-full ${getGradientClasses(userData.avatar)} flex items-center justify-center text-white font-semibold text-sm shadow-glow transition-transform duration-200 hover:scale-110 cursor-pointer`}
-                  title={userData.username}
-                  aria-label="Меню пользователя"
-                  aria-expanded={userMenuOpen}
-                >
-                  {getInitial(userData.username)}
-                </button>
+                {(() => {
+                  const avatarUrl = getAvatarUrl(userData.avatar);
+                  const gradientClasses = getGradientClasses(userData.avatar);
+                  
+                  return (
+                    <button
+                      onClick={() => setUserMenuOpen(!userMenuOpen)}
+                      className={`w-10 h-10 rounded-full overflow-hidden ${avatarUrl ? '' : gradientClasses} flex items-center justify-center text-white font-semibold text-sm transition-transform duration-200 hover:scale-110 cursor-pointer`}
+                      title={userData.username}
+                      aria-label="Меню пользователя"
+                      aria-expanded={userMenuOpen}
+                    >
+                      {avatarUrl ? (
+                        <Image
+                          src={avatarUrl}
+                          alt={userData.username}
+                          width={40}
+                          height={40}
+                          className="w-full h-full object-cover"
+                          unoptimized
+                        />
+                      ) : (
+                        getInitial(userData.username)
+                      )}
+                    </button>
+                  );
+                })()}
                 {shouldRenderMenu && (
                   <div 
                     ref={menuRef}
@@ -2299,9 +2365,27 @@ export default function SupportPage() {
                       className="block p-4 border-b border-white/10 hover:bg-white/5 transition-colors duration-200 cursor-pointer mx-2 my-1 rounded-xl"
                     >
                       <div className="flex items-center gap-3">
-                        <div className={`w-12 h-12 rounded-full ${getGradientClasses(userData.avatar)} flex items-center justify-center text-white font-semibold text-base flex-shrink-0`}>
-                          {getInitial(userData.username)}
-                        </div>
+                        {(() => {
+                          const avatarUrl = getAvatarUrl(userData.avatar);
+                          const gradientClasses = getGradientClasses(userData.avatar);
+                          
+                          return (
+                            <div className={`w-12 h-12 rounded-full overflow-hidden ${avatarUrl ? '' : gradientClasses} flex items-center justify-center text-white font-semibold text-base flex-shrink-0`}>
+                              {avatarUrl ? (
+                                <Image
+                                  src={avatarUrl}
+                                  alt={userData.username}
+                                  width={48}
+                                  height={48}
+                                  className="w-full h-full object-cover"
+                                  unoptimized
+                                />
+                              ) : (
+                                getInitial(userData.username)
+                              )}
+                            </div>
+                          );
+                        })()}
                         <div className="min-w-0 flex-1">
                           <div className="text-white font-medium truncate">{userData.username}</div>
                           <div className="text-neutral-400 text-xs truncate">ID: {userData.user_id}</div>
@@ -2385,9 +2469,27 @@ export default function SupportPage() {
                   className="block p-4 border-b border-white/10 hover:bg-white/5 transition-colors duration-200 cursor-pointer mx-2 my-1 rounded-xl"
                 >
                   <div className="flex items-center gap-3">
-                    <div className={`w-12 h-12 rounded-full ${getGradientClasses(userData.avatar)} flex items-center justify-center text-white font-semibold text-base flex-shrink-0`}>
-                      {getInitial(userData.username)}
-                    </div>
+                    {(() => {
+                      const avatarUrl = getAvatarUrl(userData.avatar);
+                      const gradientClasses = getGradientClasses(userData.avatar);
+                      
+                      return (
+                        <div className={`w-12 h-12 rounded-full overflow-hidden ${avatarUrl ? '' : gradientClasses} flex items-center justify-center text-white font-semibold text-base flex-shrink-0`}>
+                          {avatarUrl ? (
+                            <Image
+                              src={avatarUrl}
+                              alt={userData.username}
+                              width={48}
+                              height={48}
+                              className="w-full h-full object-cover"
+                              unoptimized
+                            />
+                          ) : (
+                            getInitial(userData.username)
+                          )}
+                        </div>
+                      );
+                    })()}
                     <div className="min-w-0 flex-1">
                       <div className="text-white font-medium truncate">{userData.username}</div>
                     </div>
@@ -2654,44 +2756,32 @@ export default function SupportPage() {
                           // Используем trim() для надежного сравнения
                           const isSystemMessage = lastMessageText.trim() === SYSTEM_MESSAGE_TEXT.trim() || isStatusChangeMessage;
                           
-                          const hasAttachments = ticket.last_message.attachments && ticket.last_message.attachments.length > 0;
-                          const imagesCount = hasAttachments ? ticket.last_message.attachments!.filter(a => a.file_type.startsWith('image/')).length : 0;
-                          const documentsCount = hasAttachments ? ticket.last_message.attachments!.filter(a => !a.file_type.startsWith('image/')).length : 0;
-                          
                           return (
                             <div className="text-xs text-neutral-500 mt-1.5">
                               <div className="truncate flex items-center gap-2">
                                 <span className="flex-shrink-0 text-neutral-600">
                                   {isSystemMessage ? 'Система:' : ticket.last_message.sender_type === 'user' ? 'Вы:' : 'Поддержка:'}
                                 </span>
-                                {ticket.last_message.message_text ? (
-                                  <span className="truncate flex-1 min-w-0">
-                                    {ticket.last_message.message_text}
-                                  </span>
-                                ) : hasAttachments ? (
-                                  <span className="truncate flex-1 min-w-0 text-neutral-400">
-                                    {imagesCount > 0 && documentsCount > 0 
-                                      ? `📎 ${imagesCount} изображений, ${documentsCount} документов`
-                                      : imagesCount > 0 
-                                        ? `📷 ${imagesCount} ${imagesCount === 1 ? 'изображение' : 'изображений'}`
-                                        : `📄 ${documentsCount} ${documentsCount === 1 ? 'документ' : 'документов'}`
-                                    }
-                                  </span>
-                                ) : null}
+                                <span className="truncate flex-1 min-w-0">
+                                  {(() => {
+                                    let text = ticket.last_message.message_text || '';
+                                    // Убираем эмодзи из начала строки
+                                    text = text.replace(/^[📷📎]\s*/, '');
+                                    // Убираем количество, оставляем только тип (например, "3 фотографий" -> "Фотография")
+                                    text = text.replace(/^\d+\s+(фотографий|файлов|вложений|изображений?|документов?)/i, (match: string) => {
+                                      if (match.toLowerCase().includes('фотографий') || match.toLowerCase().includes('изображений')) return 'Фотография';
+                                      if (match.toLowerCase().includes('файлов') || match.toLowerCase().includes('документов')) return 'Файл';
+                                      return 'Вложения';
+                                    });
+                                    // Заменяем "1 Фотография" на "Фотография"
+                                    text = text.replace(/^1\s+(Фотография|Файл)$/, '$1');
+                                    return text;
+                                  })()}
+                                </span>
                                 {ticket.last_message.is_read === false && ticket.last_message.sender_type === 'support' && !isSystemMessage && (
                                   <span className="flex-shrink-0 w-2 h-2 bg-blue-500 rounded-full"></span>
                                 )}
                               </div>
-                              {ticket.last_message.message_text && hasAttachments && (
-                                <div className="text-[10px] text-neutral-400 mt-0.5 truncate">
-                                  {imagesCount > 0 && documentsCount > 0 
-                                    ? `📎 ${imagesCount} изображений, ${documentsCount} документов`
-                                    : imagesCount > 0 
-                                      ? `📷 ${imagesCount} ${imagesCount === 1 ? 'изображение' : 'изображений'}`
-                                      : `📄 ${documentsCount} ${documentsCount === 1 ? 'документ' : 'документов'}`
-                                  }
-                                </div>
-                              )}
                             </div>
                           );
                         })()}
