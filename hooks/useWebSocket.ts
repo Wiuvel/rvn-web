@@ -46,9 +46,8 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
     // Если токен еще не получен, не создаем соединение
     // Это предотвращает множественные подключения при изменении token с undefined на значение
     if (!token) {
-      if (process.env.NODE_ENV === 'development') {
-        console.warn('WebSocket: No token available, skipping connection');
-      }
+      // Информационное сообщение для дебага загрузки сообщений (фиолетовая палитра)
+      console.info('%cWebSocket: No token available. Skipping connection..', 'color: #a855f7; font-weight: 500;');
       // Очищаем предыдущее соединение, если токен был удален
       if (cleanupRef.current) {
         cleanupRef.current();

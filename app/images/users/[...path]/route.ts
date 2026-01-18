@@ -6,10 +6,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getS3Client } from '@/lib/storage/s3-client';
 import { getEnv } from '@/lib/validation/env-validation';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { GetObjectCommand } from '@aws-sdk/client-s3';
 import { setCorsHeaders, handleCorsPreflight } from '@/lib/security/cors';
 import { logger } from '@/lib/utils/secure-logger';
+import { Readable } from 'stream';
 
 export async function OPTIONS() {
   return handleCorsPreflight();
@@ -88,20 +88,69 @@ export async function GET(
       );
     }
 
-    // Генерируем presigned URL для доступа к файлу
-    // Для публичных файлов можно использовать более долгий срок действия (24 часа)
+    // Получаем файл напрямую из S3
     const command = new GetObjectCommand({
       Bucket: env.S3_BUCKET,
       Key: s3Key,
     });
 
-    const presignedUrl = await getSignedUrl(client, command, { 
-      expiresIn: 86400 // 24 часа
-    });
+    try {
+      const response = await client.send(command);
+      
+      // Получаем тело файла как поток
+      const stream = response.Body;
+      if (!stream) {
+        throw new Error('Empty stream from S3');
+      }
 
-    // Редиректим на presigned URL
-    // Это позволяет использовать кеширование браузера и CDN
-    return NextResponse.redirect(presignedUrl);
+      // Определяем Content-Type из метаданных S3 или по расширению
+      const contentType = response.ContentType || 
+        (filename.endsWith('.png') ? 'image/png' :
+         filename.endsWith('.jpg') || filename.endsWith('.jpeg') ? 'image/jpeg' :
+         filename.endsWith('.webp') ? 'image/webp' :
+         filename.endsWith('.gif') ? 'image/gif' :
+         'application/octet-stream');
+
+      // Создаем Response с потоком данных
+      const headers = new Headers();
+      headers.set('Content-Type', contentType);
+      headers.set('Cache-Control', 'public, max-age=86400, immutable'); // 24 часа кеширования
+      
+      if (response.ContentLength) {
+        headers.set('Content-Length', response.ContentLength.toString());
+      }
+      
+      if (response.ETag) {
+        headers.set('ETag', response.ETag);
+      }
+      
+      if (response.LastModified) {
+        headers.set('Last-Modified', response.LastModified.toUTCString());
+      }
+
+      // Преобразуем Node.js Readable stream в Web ReadableStream
+      // В AWS SDK v3 для Node.js Body является Readable stream
+      const nodeStream = stream as Readable;
+      const webStream = Readable.toWeb(nodeStream) as ReadableStream<Uint8Array>;
+      
+      return setCorsHeaders(
+        new NextResponse(webStream, {
+          status: 200,
+          headers,
+        })
+      );
+    } catch (s3Error: any) {
+      // Если файл не найден, возвращаем 404
+      if (s3Error.name === 'NoSuchKey' || s3Error.$metadata?.httpStatusCode === 404) {
+        return setCorsHeaders(
+          NextResponse.json(
+            { error: 'Avatar not found' },
+            { status: 404 }
+          )
+        );
+      }
+      throw s3Error;
+    }
   } catch (error) {
     const resolvedParams = await params;
     logger.error('Error getting avatar from S3', {

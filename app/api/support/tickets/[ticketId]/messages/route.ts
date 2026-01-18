@@ -159,10 +159,22 @@ export async function POST(
     }
 
     // Проверяем права доступа
+    // Обычные пользователи могут писать только в свои тикеты
     if (!isSupport && ticket.user_id !== user.id) {
       return setCorsHeaders(
         NextResponse.json(
           { error: ERROR_ACCESS_DENIED },
+          { status: 403 }
+        )
+      );
+    }
+    
+    // Поддержка не может писать в свои старые тикеты (созданные до получения роли поддержки)
+    // Это предотвращает путаницу и сохраняет контекст тикета как тикета пользователя
+    if (isSupport && ticket.user_id === user.id) {
+      return setCorsHeaders(
+        NextResponse.json(
+          { error: 'Сотрудники поддержки не могут отправлять сообщения в свои старые тикеты.' },
           { status: 403 }
         )
       );
@@ -199,23 +211,70 @@ export async function POST(
     }
 
     // Создаем сообщение (разрешаем пустой текст, если есть вложения)
-    const { data: newMessage, error: messageError } = await supabaseAdmin
+    // Сохраняем sender_type на момент отправки сообщения, чтобы старые сообщения не меняли тип при изменении роли пользователя
+    // Пробуем сначала с sender_type, если поле не существует - используем fallback без него
+    const messageData: {
+      ticket_id: string;
+      sender_id: string;
+      message_text: string;
+      sender_type?: 'support' | 'user';
+    } = {
+      ticket_id: ticketId,
+      sender_id: user.id,
+      message_text: (message && typeof message === 'string' && message.trim()) ? message.trim() : '',
+      sender_type: isSupport ? 'support' : 'user'
+    };
+
+    let { data: newMessage, error: messageError } = await supabaseAdmin
       .from('support_messages')
-      .insert({
-        ticket_id: ticketId,
-        sender_id: user.id,
-        message_text: (message && typeof message === 'string' && message.trim()) ? message.trim() : ''
-      })
+      .insert(messageData)
       .select(`
         *,
         sender:users!support_messages_sender_id_fkey(id, username, user_id, avatar)
       `)
       .single();
 
-    if (messageError) {
-      logger.error('Error creating message', {
+    // Если ошибка связана с несуществующим полем sender_type, пробуем без него (обратная совместимость)
+    // Проверяем различные варианты ошибок: PostgreSQL коды, сообщения об отсутствующих колонках
+    if (messageError && (
+      messageError.message?.toLowerCase().includes('sender_type') || 
+      messageError.message?.toLowerCase().includes('column') ||
+      messageError.message?.toLowerCase().includes('does not exist') ||
+      messageError.code === '42703' || // PostgreSQL: undefined column
+      messageError.code === '42P01' || // PostgreSQL: undefined table (на всякий случай)
+      messageError.code === 'PGRST116' // PostgREST: column not found
+    )) {
+      logger.warn('sender_type field not available, using fallback', {
         error: messageError.message,
         code: messageError.code,
+        ticketId
+      });
+      
+      // Повторяем вставку без sender_type
+      const { ticket_id, sender_id, message_text } = messageData;
+      const fallbackData = {
+        ticket_id,
+        sender_id,
+        message_text
+      };
+      
+      const fallbackResult = await supabaseAdmin
+        .from('support_messages')
+        .insert(fallbackData)
+        .select(`
+          *,
+          sender:users!support_messages_sender_id_fkey(id, username, user_id, avatar)
+        `)
+        .single();
+      
+      newMessage = fallbackResult.data;
+      messageError = fallbackResult.error;
+    }
+
+    if (messageError || !newMessage) {
+      logger.error('Error creating message', {
+        error: messageError?.message || 'Unknown error',
+        code: messageError?.code,
         ticketId
       });
       return setCorsHeaders(

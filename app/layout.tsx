@@ -7,16 +7,16 @@ import { exo2 } from "./fonts";
 import HomeStructuredData from "@/components/seo/HomeStructuredData";
 import { domains, getStaticUrl } from "@/lib/utils";
 
-// Генерируем URL для favicon с поддержкой CDN
-const faviconUrl = process.env.NODE_ENV === 'production' 
-  ? getStaticUrl('/favicon.ico')
-  : '/favicon.ico';
+// Генерируем URL для favicon
+const getFaviconUrl = (path: string) => getStaticUrl(path);
 
 export const metadata: Metadata = {
   ...pageMetadata.home,
   icons: {
     icon: [
-      { url: faviconUrl, sizes: '48x48', type: 'image/x-icon' },
+      { url: getFaviconUrl('/favicon.ico'), type: 'image/x-icon' },
+      { url: getFaviconUrl('/favicon.svg'), type: 'image/svg+xml' },
+      { url: getFaviconUrl('/favicon-96x96.png'), sizes: '96x96', type: 'image/png' },
     ],
   },
   alternates: {

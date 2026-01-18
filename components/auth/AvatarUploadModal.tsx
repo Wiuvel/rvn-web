@@ -276,14 +276,14 @@ export default function AvatarUploadModal({
               >
                 <div className="flex flex-col items-center gap-2">
                   <ImageIcon className={`w-8 h-8 transition-colors ${isDragging ? 'text-blue-400' : 'text-neutral-400'}`} />
-                  <span className={`text-sm transition-colors ${isDragging ? 'text-blue-300' : 'text-neutral-300'}`}>
+                  <span className={`text-sm transition-colors text-center whitespace-normal break-words ${isDragging ? 'text-blue-300' : 'text-neutral-300'}`}>
                     {isDragging
                       ? 'Отпустите для загрузки'
                       : selectedFile
                       ? selectedFile.name
                       : 'Перетащите изображение или выберите файл'}
                   </span>
-                  <span className="text-xs text-neutral-500">
+                  <span className="text-xs text-neutral-500 text-center">
                     PNG, JPG, WEBP (макс. 2MB)
                   </span>
                 </div>

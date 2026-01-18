@@ -172,6 +172,7 @@ export async function GET(request: NextRequest) {
                   id, 
                   message_text, 
                   sender_id, 
+                  sender_type,
                   created_at, 
                   is_read,
                   attachments:support_message_attachments(id, file_name, file_type, file_size, storage_path)
@@ -184,16 +185,44 @@ export async function GET(request: NextRequest) {
             });
             
             const batchResults = await Promise.all(batchPromises);
-            const senderIds = batchResults
-              .map(({ lastMessage }) => lastMessage?.sender_id)
+            // Получаем sender_id только для сообщений без sender_type (для обратной совместимости)
+            const messagesNeedingRoleCheck = batchResults
+              .map(({ lastMessage }) => lastMessage)
+              .filter((msg): msg is NonNullable<typeof msg> => !!msg && !msg.sender_type);
+            const senderIds = messagesNeedingRoleCheck
+              .map(msg => msg.sender_id)
               .filter((id): id is string => !!id);
             const senderRolesMap = senderIds.length > 0 
               ? await batchHasUserRole(senderIds, 'support')
               : new Map<string, boolean>();
             
+            // Создаем map ticketId -> user_id для правильного определения sender_type старых сообщений
+            const ticketUserMap = new Map<string, string>();
+            for (const ticket of tickets || []) {
+              if (ticket.id) {
+                ticketUserMap.set(ticket.id, ticket.user_id);
+              }
+            }
+            
             batchResults.forEach(({ ticketId, lastMessage }) => {
               if (lastMessage) {
+                // Используем сохраненное значение sender_type из БД, если оно есть
+                // Для старых сообщений: если сообщение от создателя тикета (user_id === sender_id), это 'user'
+                // Иначе определяем по текущей роли (для обратной совместимости со старыми сообщениями)
+                let senderType: 'user' | 'support';
+                if (lastMessage.sender_type) {
+                  senderType = lastMessage.sender_type === 'support' ? 'support' : 'user';
+                } else {
+                  const ticketUserId = ticketUserMap.get(ticketId);
+                  // Если сообщение от создателя тикета - это 'user' (старое сообщение до получения роли поддержки)
+                  if (ticketUserId && ticketUserId === lastMessage.sender_id) {
+                    senderType = 'user';
+                  } else {
+                    // Иначе определяем по текущей роли отправителя
                 const senderIsSupport = senderRolesMap.get(lastMessage.sender_id) || false;
+                    senderType = senderIsSupport ? 'support' : 'user';
+                  }
+                }
                 // Обрабатываем вложения (могут быть массивом или объектом)
                 let attachments: Array<{
                   id: string;
@@ -236,7 +265,7 @@ export async function GET(request: NextRequest) {
                   id: lastMessage.id,
                   message_text: displayMessageText,
                   sender_id: lastMessage.sender_id,
-                  sender_type: senderIsSupport ? 'support' : 'user' as 'user' | 'support',
+                  sender_type: senderType,
                   created_at: lastMessage.created_at,
                   is_read: lastMessage.is_read,
                   attachments: attachments.length > 0 ? attachments : undefined
@@ -245,11 +274,62 @@ export async function GET(request: NextRequest) {
             });
           }
         } else if (lastMessages && lastMessages.length > 0) {
-          // Оптимизация: batch запрос для всех sender_id
-          const senderIds = lastMessages.map((msg: RpcLastMessage) => msg.sender_id).filter((id): id is string => !!id);
+          // Для RPC функции нужно получить sender_type из БД, так как RPC не возвращает это поле
+          const messageIds = lastMessages.map((msg: RpcLastMessage) => msg.id);
+          const { data: messagesWithSenderType } = await supabaseAdmin!
+            .from('support_messages')
+            .select('id, sender_id, sender_type')
+            .in('id', messageIds);
+          
+          // Создаем map для быстрого доступа к sender_type
+          const senderTypeMap = new Map<string, 'user' | 'support'>();
+          const messagesNeedingRoleCheck: Array<{ id: string; sender_id: string }> = [];
+          
+          if (messagesWithSenderType) {
+            for (const msg of messagesWithSenderType) {
+              if (msg.sender_type) {
+                senderTypeMap.set(msg.id, msg.sender_type === 'support' ? 'support' : 'user');
+              } else {
+                messagesNeedingRoleCheck.push({ id: msg.id, sender_id: msg.sender_id });
+              }
+            }
+          }
+          
+          // Оптимизация: batch запрос для всех sender_id только для сообщений без sender_type
+          const senderIds = messagesNeedingRoleCheck.map(msg => msg.sender_id).filter((id): id is string => !!id);
           const senderRolesMap = senderIds.length > 0 
             ? await batchHasUserRole(senderIds, 'support')
             : new Map<string, boolean>();
+          
+          // Создаем map ticketId -> user_id для правильного определения sender_type старых сообщений
+          const ticketUserMap = new Map<string, string>();
+          for (const ticket of tickets || []) {
+            if (ticket.id) {
+              ticketUserMap.set(ticket.id, ticket.user_id);
+            }
+          }
+          
+          // Заполняем senderTypeMap для сообщений без sender_type
+          // Нужно получить ticket_id для каждого сообщения
+          const messageIdsNeedingTicketInfo = messagesNeedingRoleCheck.map(msg => msg.id);
+          const { data: messagesWithTicketInfo } = await supabaseAdmin!
+            .from('support_messages')
+            .select('id, ticket_id, sender_id')
+            .in('id', messageIdsNeedingTicketInfo);
+          
+          if (messagesWithTicketInfo) {
+            for (const msgInfo of messagesWithTicketInfo) {
+              const ticketUserId = ticketUserMap.get(msgInfo.ticket_id);
+              // Если сообщение от создателя тикета - это 'user' (старое сообщение до получения роли поддержки)
+              if (ticketUserId && ticketUserId === msgInfo.sender_id) {
+                senderTypeMap.set(msgInfo.id, 'user');
+              } else {
+                // Иначе определяем по текущей роли отправителя
+                const senderIsSupport = senderRolesMap.get(msgInfo.sender_id) || false;
+                senderTypeMap.set(msgInfo.id, senderIsSupport ? 'support' : 'user');
+              }
+            }
+          }
           
           // Для сообщений с пустым текстом нужно проверить вложения
           const messagesNeedingAttachments = lastMessages.filter((msg: RpcLastMessage) => !msg.message_text);
@@ -280,8 +360,30 @@ export async function GET(request: NextRequest) {
           }
           
           // Создаем map из результатов RPC функции
+          // Для определения sender_type старых сообщений: если сообщение от создателя тикета (ticket.user_id === msg.sender_id),
+          // это 'user' (старое сообщение от пользователя до получения роли поддержки)
+          const ticketMap = new Map<string, string>(); // ticket_id -> user_id
+          for (const ticket of tickets || []) {
+            if (ticket.id) {
+              ticketMap.set(ticket.id, ticket.user_id);
+            }
+          }
+          
           for (const msg of lastMessages) {
+            let senderType = senderTypeMap.get(msg.id);
+            
+            // Если sender_type не найден, используем логику для старых сообщений
+            if (!senderType) {
+              const ticketUserId = ticketMap.get(msg.ticket_id);
+              // Если сообщение от создателя тикета, это 'user' (старое сообщение)
+              if (ticketUserId && ticketUserId === msg.sender_id) {
+                senderType = 'user';
+              } else {
+                // Иначе определяем по текущей роли
             const senderIsSupport = senderRolesMap.get(msg.sender_id) || false;
+                senderType = senderIsSupport ? 'support' : 'user';
+              }
+            }
             
             // Если текст сообщения пустой, но есть вложения - формируем текст на основе типа файлов
             let displayMessageText = msg.message_text;
@@ -308,7 +410,7 @@ export async function GET(request: NextRequest) {
               id: msg.id,
               message_text: displayMessageText,
               sender_id: msg.sender_id,
-              sender_type: senderIsSupport ? 'support' : 'user' as 'user' | 'support',
+              sender_type: senderType as 'user' | 'support',
               created_at: msg.created_at,
               is_read: msg.is_read,
               attachments: attachments.length > 0 ? attachments : undefined
@@ -389,6 +491,17 @@ export async function POST(request: NextRequest) {
         NextResponse.json(
           { error: ERROR_NOT_AUTHENTICATED },
           { status: 401 }
+        )
+      );
+    }
+
+    // Поддержка не может создавать новые тикеты (только отвечать на чужие)
+    const isSupport = await hasUserRole(user.id, 'support');
+    if (isSupport) {
+      return setCorsHeaders(
+        NextResponse.json(
+          { error: 'Сотрудники поддержки не могут создавать новые тикеты' },
+          { status: 403 }
         )
       );
     }

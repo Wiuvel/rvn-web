@@ -7,11 +7,8 @@
 export const domains = {
   // Основной домен приложения (без протокола)
   main: process.env.NEXT_PUBLIC_DOMAIN?.replace(/^https?:\/\//, '') || 'rvn.market',
-  // CDN домен для статических файлов (без протокола)
-  cdn: process.env.NEXT_PUBLIC_CDN_URL?.replace(/^https?:\/\//, '') || 'cdn.rvn.market',
-  // Полные URL (с протоколом)
+  // Полный URL (с протоколом)
   mainUrl: process.env.NEXT_PUBLIC_DOMAIN || 'https://rvn.market',
-  cdnUrl: process.env.NEXT_PUBLIC_CDN_URL || 'https://cdn.rvn.market',
 } as const;
 
 export const appConfig = {

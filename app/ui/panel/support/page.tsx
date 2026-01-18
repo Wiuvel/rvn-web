@@ -32,6 +32,7 @@ interface Ticket {
   updated_at: string;
   last_message_at: string;
   closed_at?: string | null;
+  user_id?: string; // ID пользователя, которому принадлежит тикет
   user?: {
     id: string;
     username: string;
@@ -295,7 +296,7 @@ function MessageItem({
                   ) : (
                     getInitial(message.sender.username)
                   )}
-                </div>
+              </div>
               );
             })()}
             
@@ -1014,7 +1015,7 @@ export default function SupportPanel() {
         // Заменяем "1 Фотография" на "Фотография"
         lastMessageText = lastMessageText.replace(/^1\s+(Фотография|Файл)$/, '$1');
       }
-      
+
       // Обновляем last_message_at и last_message в списке тикетов
       updateTicketInList(data.ticketId, {
         last_message_at: data.message.created_at,
@@ -1504,6 +1505,7 @@ export default function SupportPanel() {
           updated_at: t.updated_at,
           last_message_at: t.last_message_at,
           closed_at: t.closed_at,
+          user_id: (t as any).user_id, // Сохраняем user_id для проверки прав
           user: t.user,
           assigned_to: t.assigned_to,
           assigned_user: t.assigned_user,
@@ -1609,6 +1611,7 @@ export default function SupportPanel() {
           updated_at: t.updated_at,
           last_message_at: t.last_message_at,
           closed_at: t.closed_at,
+          user_id: (t as any).user_id, // Сохраняем user_id для проверки прав
           user: t.user,
           assigned_to: t.assigned_to,
           assigned_user: t.assigned_user,
@@ -1779,6 +1782,7 @@ export default function SupportPanel() {
               return {
                 ...prev,
                 status: data.ticket.status,
+                user_id: data.ticket.user_id ?? prev.user_id, // Сохраняем user_id для проверки прав
                 user: data.ticket.user || prev.user,
                 // КРИТИЧНО: API всегда возвращает assigned_to и assigned_user в ответе
                 // Используем их напрямую, даже если они null (тикет не назначен)
@@ -1791,6 +1795,7 @@ export default function SupportPanel() {
             } else if (data.ticket) {
               return {
                 ...data.ticket,
+                user_id: data.ticket.user_id, // Сохраняем user_id для проверки прав
                 assigned_to: data.ticket.assigned_to ?? null,
                 assigned_user: data.ticket.assigned_user ?? null
               };
@@ -2756,7 +2761,7 @@ export default function SupportPanel() {
                           ) : (
                             getInitial(activeTicket.user.username)
                           )}
-                        </div>
+                    </div>
                       );
                     })()}
                     <div>
@@ -2881,7 +2886,20 @@ export default function SupportPanel() {
                 </div>
                 
                 {/* Input */}
-                {activeTicket.status !== 'closed' && (
+                {activeTicket.status === 'closed' ? (
+                  <div className="border-t border-neutral-800 p-3 bg-neutral-900/50 flex-shrink-0">
+                    <div className="text-center py-2">
+                      <p className="text-sm text-neutral-400">Тикет закрыт. Новые сообщения недоступны.</p>
+                    </div>
+                  </div>
+                ) : authState.hasSupportAccess && authState.userId && 
+                  (activeTicket.user_id === authState.userId || activeTicket.user?.id === authState.userId) ? (
+                  <div className="border-t border-neutral-800 p-3 bg-neutral-900/50 flex-shrink-0">
+                    <div className="text-center py-2">
+                      <p className="text-sm text-neutral-400">Вы не можете отправлять сообщения в свои старые тикеты.</p>
+                    </div>
+                  </div>
+                ) : (
                   <>
                     {/* Для активных тикетов проверяем привязку, для архивных - не проверяем */}
                     {activeTicket.assigned_to && activeTicket.assigned_to !== authState.userId ? (
@@ -2917,13 +2935,6 @@ export default function SupportPanel() {
                       </div>
                     )}
                   </>
-                )}
-                {activeTicket.status === 'closed' && (
-                  <div className="border-t border-neutral-800 p-3 bg-neutral-900/50 flex-shrink-0">
-                    <div className="text-center py-2">
-                      <p className="text-sm text-neutral-400">Тикет закрыт. Новые сообщения недоступны.</p>
-                    </div>
-                  </div>
                 )}
               </div>
             </>

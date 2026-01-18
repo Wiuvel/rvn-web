@@ -19,24 +19,13 @@ export function generateSessionId(): string {
 export { domains };
 
 /**
- * Генерирует URL для статических файлов с поддержкой CDN
- * В продакшене использует CDN URL из переменной окружения или дефолтный
+ * Генерирует URL для статических файлов
  * @param path - Путь к статическому файлу (например, '/static/logo.svg')
- * @returns Полный URL с CDN префиксом в продакшене или относительный путь
+ * @returns Относительный путь к статическому файлу
  */
 export function getStaticUrl(path: string): string {
   // Убираем начальный слэш если есть, чтобы избежать двойных слэшей
   const cleanPath = path.startsWith('/') ? path : `/${path}`;
-  
-  // TODO: Раскомментировать для включения CDN
-  // В продакшене используем CDN, в dev - относительный путь
-  // if (process.env.NODE_ENV === 'production') {
-  //   // Убираем trailing slash из CDN URL если есть
-  //   const cleanCdnUrl = domains.cdnUrl.endsWith('/') ? domains.cdnUrl.slice(0, -1) : domains.cdnUrl;
-  //   return `${cleanCdnUrl}${cleanPath}`;
-  // }
-  
-  // CDN отключен - всегда возвращаем относительный путь
   return cleanPath;
 }
 

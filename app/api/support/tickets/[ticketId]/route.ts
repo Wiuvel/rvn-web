@@ -148,13 +148,32 @@ export async function GET(
       );
     }
 
-    // Оптимизация: batch запрос для всех sender_id вместо N запросов
-    const uniqueSenderIds = Array.from(new Set((messages || []).map(msg => msg.sender_id)));
-    const senderRolesMap = await batchHasUserRole(uniqueSenderIds, 'support');
+    // Оптимизация: batch запрос для всех sender_id вместо N запросов (только для старых сообщений без sender_type)
+    const messagesNeedingRoleCheck = (messages || []).filter((msg: any) => !msg.sender_type);
+    const uniqueSenderIds = Array.from(new Set(messagesNeedingRoleCheck.map((msg: any) => msg.sender_id)));
+    const senderRolesMap = uniqueSenderIds.length > 0 
+      ? await batchHasUserRole(uniqueSenderIds, 'support')
+      : new Map<string, boolean>();
     
     // Оптимизированная обработка сообщений с вложениями
-    const messagesWithSenderType = (messages || []).map((msg) => {
-      const senderIsSupport = senderRolesMap.get(msg.sender_id) || false;
+    const messagesWithSenderType = (messages || []).map((msg: any) => {
+      // Используем сохраненное значение sender_type из БД, если оно есть (самый надежный способ)
+      // Для старых сообщений без sender_type:
+      // - Если сообщение от создателя тикета (user_id === sender_id), это 'user' (старое сообщение до получения роли)
+      // - Иначе определяем по текущей роли отправителя (для обратной совместимости)
+      let senderType: 'user' | 'support';
+      if (msg.sender_type) {
+        // Используем сохраненное значение
+        senderType = msg.sender_type === 'support' ? 'support' : 'user';
+      } else if (ticket.user_id === msg.sender_id) {
+        // Старое сообщение от создателя тикета - всегда 'user' (даже если сейчас он поддержка)
+        senderType = 'user';
+      } else {
+        // Для сообщений не от создателя тикета - определяем по текущей роли
+        const senderIsSupport = senderRolesMap.get(msg.sender_id) || false;
+        senderType = senderIsSupport ? 'support' : 'user';
+      }
+      
       // Формируем правильные URL для вложений из storage_path (оптимизировано)
       let attachments = undefined;
       if (msg.attachments) {
@@ -176,7 +195,7 @@ export async function GET(
       }
       return {
         ...msg,
-        sender_type: senderIsSupport ? 'support' : 'user' as 'user' | 'support',
+        sender_type: senderType,
         attachments
       };
     });

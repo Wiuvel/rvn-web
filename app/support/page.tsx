@@ -30,6 +30,8 @@ interface UserData {
   created_at: string;
   last_login?: string;
   avatar?: string | null;
+  isSupport?: boolean;
+  isAdmin?: boolean;
 }
 
 interface MessageAttachment {
@@ -61,6 +63,7 @@ interface Ticket {
   status: 'open' | 'closed' | 'pending';
   createdAt: Date;
   messages: Message[];
+  user_id?: string; // ID пользователя, которому принадлежит тикет
   last_message?: {
     id: string;
     message_text: string;
@@ -139,14 +142,14 @@ function ImageWithError({
       ) : (
         <>
           {isLoading && (
-            <div className="absolute inset-0 bg-neutral-800 rounded-lg overflow-hidden">
+            <div className="w-full min-h-[120px] bg-neutral-800 rounded-lg overflow-hidden relative">
               <div 
-                className="w-full h-full rounded-lg" 
+                className="absolute inset-0 rounded-lg" 
                 style={{ 
-                  height: '100%', 
-                  width: '100%',
-                  background: skeletonGradient,
+                  backgroundImage: skeletonGradient,
                   backgroundSize: '200% 100%',
+                  backgroundRepeat: 'no-repeat',
+                  backgroundPosition: '0% 0%',
                   animation: 'shimmer 1.5s ease-in-out infinite'
                 }} 
               />
@@ -157,7 +160,7 @@ function ImageWithError({
               src={src}
               alt={alt}
               loading={loading}
-              className={`w-full h-auto object-contain ${isLoading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300 ${className || ''}`}
+              className={`w-full h-auto object-contain rounded-lg ${isLoading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300 ${className || ''}`}
               onLoad={() => setIsLoading(false)}
               onError={() => {
                 setHasError(true);
@@ -1628,6 +1631,7 @@ export default function SupportPage() {
                 subject: retryData.ticket.subject,
                 status: retryData.ticket.status,
                 createdAt: new Date(retryData.ticket.created_at),
+                user_id: retryData.ticket.user_id, // Сохраняем user_id для проверки прав
                 messages: (retryData.messages || []).map((m: { 
                   id: string; 
                   message_text: string; 
@@ -1664,6 +1668,7 @@ export default function SupportPage() {
             subject: ticketData.ticket.subject,
             status: ticketData.ticket.status,
             createdAt: new Date(ticketData.ticket.created_at),
+            user_id: ticketData.ticket.user_id, // Сохраняем user_id для проверки прав
             messages: (ticketData.messages || []).map((m: { 
               id: string; 
               message_text: string; 
@@ -1731,6 +1736,12 @@ export default function SupportPage() {
     // Проверка статуса тикета - нельзя отправлять сообщения в закрытые тикеты
     if (activeTicket.status === 'closed') {
       showNotification('Нельзя отправлять сообщения в закрытый тикет');
+      return;
+    }
+    
+    // Проверка: поддержка не может писать в свои старые тикеты
+    if (isSupport && activeTicket.user_id && userData?.id && (activeTicket.user_id === userData.id || activeTicket.user_id === userData.user_id)) {
+      showNotification('Вы не можете отправлять сообщения в свои старые тикеты');
       return;
     }
     
@@ -1980,6 +1991,7 @@ export default function SupportPage() {
           subject: string; 
           status: string; 
           created_at: string;
+          user_id?: string;
           last_message?: {
             id: string;
             message_text: string;
@@ -1992,6 +2004,7 @@ export default function SupportPage() {
           subject: t.subject,
           status: t.status,
           createdAt: new Date(t.created_at),
+          user_id: (t as any).user_id, // Сохраняем user_id для проверки прав
           messages: [],
           last_message: t.last_message || null
         }));
@@ -2165,6 +2178,7 @@ export default function SupportPage() {
             subject: data.ticket.subject,
             status: data.ticket.status,
             createdAt: new Date(data.ticket.created_at),
+            user_id: prev?.user_id || data.ticket.user_id, // Сохраняем user_id из предыдущего значения или из API
             messages: finalMessages
           };
           
@@ -2387,7 +2401,15 @@ export default function SupportPage() {
                           );
                         })()}
                         <div className="min-w-0 flex-1">
-                          <div className="text-white font-medium truncate">{userData.username}</div>
+                          <div className={`font-medium truncate ${
+                            userData.isAdmin 
+                              ? 'text-orange-500' 
+                              : userData.isSupport 
+                              ? 'text-green-500' 
+                              : 'text-white'
+                          }`}>
+                            {userData.username}
+                          </div>
                           <div className="text-neutral-400 text-xs truncate">ID: {userData.user_id}</div>
                         </div>
                       </div>
@@ -2491,7 +2513,15 @@ export default function SupportPage() {
                       );
                     })()}
                     <div className="min-w-0 flex-1">
-                      <div className="text-white font-medium truncate">{userData.username}</div>
+                      <div className={`font-medium truncate ${
+                        userData.isAdmin 
+                          ? 'text-orange-500' 
+                          : userData.isSupport 
+                          ? 'text-green-500' 
+                          : 'text-white'
+                      }`}>
+                        {userData.username}
+                      </div>
                     </div>
                   </div>
                 </Link>
@@ -2707,6 +2737,7 @@ export default function SupportPage() {
                             subject: ticket.subject,
                             status: ticket.status,
                             createdAt: ticket.createdAt,
+                            user_id: ticket.user_id, // Сохраняем user_id для проверки прав
                             messages: []
                           };
                           setActiveTicket(ticketData);
@@ -2884,6 +2915,10 @@ export default function SupportPage() {
                         <div className="text-center py-4 px-4 bg-neutral-800/50 border border-neutral-700 rounded-xl">
                           <p className="text-neutral-400 text-sm">Этот тикет закрыт. Вы не можете отправлять сообщения в закрытые тикеты.</p>
                         </div>
+                      ) : isSupport && activeTicket.user_id && userData?.id && (activeTicket.user_id === userData.id || activeTicket.user_id === userData.user_id) ? (
+                        <div className="text-center py-4 px-4 bg-neutral-800/50 border border-neutral-700 rounded-xl">
+                          <p className="text-neutral-400 text-sm">Вы не можете отправлять сообщения в свои старые тикеты.</p>
+                        </div>
                       ) : (
                         <>
                           {/* Список загруженных файлов */}
@@ -3007,23 +3042,23 @@ export default function SupportPage() {
       
       {/* Notification */}
       {notification.show && (
-        <div ref={notificationRef} className="fixed bottom-4 left-4 z-[1000]">
-          <div className={`rounded-xl px-4 py-3 shadow-xl backdrop-blur-xl border ${
+        <div ref={notificationRef} className="fixed bottom-4 left-2 right-2 sm:left-4 sm:right-auto z-[1000] max-w-sm sm:max-w-none">
+          <div className={`rounded-lg sm:rounded-xl px-3 py-2 sm:px-4 sm:py-3 shadow-xl backdrop-blur-xl border ${
             notification.type === 'error' 
               ? 'bg-red-500/90 border-red-400/50 text-white' 
               : 'bg-blue-500/90 border-blue-400/50 text-white'
           }`}>
-            <div className="flex items-center gap-2">
+            <div className="flex items-start gap-2">
               {notification.type === 'error' ? (
-                <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               ) : (
-                <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               )}
-              <p className="text-sm font-medium">{notification.message}</p>
+              <p className="text-xs sm:text-sm font-medium break-words">{notification.message}</p>
             </div>
           </div>
         </div>

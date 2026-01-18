@@ -415,14 +415,14 @@ export default function FileUploadModal({
             >
               <div className="flex flex-col items-center gap-2">
                 <Upload className={`w-8 h-8 transition-colors ${isDragging ? 'text-blue-400' : 'text-neutral-400'}`} />
-                <span className={`text-sm transition-colors ${isDragging ? 'text-blue-300' : 'text-neutral-300'}`}>
+                <span className={`text-sm transition-colors text-center whitespace-normal break-words ${isDragging ? 'text-blue-300' : 'text-neutral-300'}`}>
                   {isDragging
                     ? 'Отпустите для загрузки'
                     : selectedFiles.length >= maxFiles
                     ? 'Достигнут лимит'
                     : 'Перетащите файлы или выберите их'}
                 </span>
-                <span className="text-xs text-neutral-500">
+                <span className="text-xs text-neutral-500 text-center">
                   До {maxFiles} файлов, максимум 10МБ каждый
                 </span>
               </div>

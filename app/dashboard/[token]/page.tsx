@@ -20,6 +20,8 @@ interface UserData {
   created_at: string;
   last_login?: string;
   avatar?: string | null;
+  isSupport?: boolean;
+  isAdmin?: boolean;
 }
 
 interface Notification {
@@ -704,39 +706,89 @@ export default function DashboardPage() {
             <p className="mt-2 text-neutral-400">Добро пожаловать. Здесь будут ваши подписки, ключи и настройки.</p>
           </div>
           {/* Profile section */}
-          <section ref={profileRef} className="mt-6 rounded-2xl border border-neutral-800 bg-neutral-900 p-5 relative">
+          <section ref={profileRef} className="group mt-6 rounded-2xl border border-neutral-800 bg-neutral-900/50 p-5 relative overflow-hidden backdrop-blur-sm transition-all duration-500 hover:border-neutral-700 hover:bg-neutral-900/80 hover:shadow-xl">
+            {/* Animated background gradient */}
+            <div className={`absolute inset-0 bg-gradient-to-br ${
+              userData?.isAdmin 
+                ? 'from-orange-600/10 to-transparent' 
+                : userData?.isSupport 
+                ? 'from-green-600/10 to-transparent' 
+                : 'from-primary-600/10 to-transparent'
+            } opacity-0 group-hover:opacity-100 transition-opacity duration-500`} />
+            
+            {/* Animated border glow */}
+            <div
+              className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"
+              style={{
+                background: `linear-gradient(90deg, ${
+                  userData?.isAdmin 
+                    ? 'rgba(249, 115, 22, 0.2)' 
+                    : userData?.isSupport 
+                    ? 'rgba(34, 197, 94, 0.2)' 
+                    : 'rgba(15, 127, 219, 0.2)'
+                }, transparent, ${
+                  userData?.isAdmin 
+                    ? 'rgba(249, 115, 22, 0.2)' 
+                    : userData?.isSupport 
+                    ? 'rgba(34, 197, 94, 0.2)' 
+                    : 'rgba(15, 127, 219, 0.2)'
+                })`
+              }}
+            />
+            
+            {/* Hover border effect */}
+            <div
+              className="absolute inset-0 rounded-2xl border-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
+              style={{
+                borderColor: userData?.isAdmin 
+                  ? 'rgba(249, 115, 22, 0.3)' 
+                  : userData?.isSupport 
+                  ? 'rgba(34, 197, 94, 0.3)' 
+                  : 'rgba(15, 127, 219, 0.3)',
+                boxShadow: `0 0 20px ${
+                  userData?.isAdmin 
+                    ? 'rgba(249, 115, 22, 0.4)' 
+                    : userData?.isSupport 
+                    ? 'rgba(34, 197, 94, 0.4)' 
+                    : 'rgba(15, 127, 219, 0.4)'
+                }`
+              }}
+            />
             {/* Кнопка редактирования аватара - видна на мобильных, скрыта на десктопе (где работает hover) */}
             <button
               onClick={() => setShowAvatarModal(true)}
-              className="md:hidden absolute top-4 right-4 p-2 hover:bg-white/10 rounded-lg transition-colors text-neutral-400 hover:text-white"
+              className="md:hidden absolute top-4 right-4 z-20 p-2 hover:bg-white/10 rounded-lg transition-colors text-neutral-400 hover:text-white"
               aria-label="Изменить аватар"
             >
               <Pencil className="w-5 h-5" />
             </button>
 
-            <div className="flex items-center gap-4 pr-10 md:pr-0">
+            <div className="relative z-10 flex items-center gap-4 pr-10 md:pr-0">
               {(() => {
                 const avatarUrl = getAvatarUrl(userData?.avatar);
                 const gradientClasses = getGradientClasses(userData?.avatar);
                 
                 return (
                   <div className="relative shrink-0 group cursor-pointer md:cursor-pointer" onClick={() => setShowAvatarModal(true)}>
-                    <div className="shrink-0 h-14 w-14 rounded-full overflow-hidden border border-white/10 transition-all duration-200 md:group-hover:border-white/30 relative">
+                    <div className="shrink-0 h-20 w-20 rounded-full overflow-hidden border border-white/10 transition-all duration-200 md:group-hover:border-white/30 relative">
                       {avatarUrl ? (
                         <>
                           {avatarLoading && (
                             <div 
                               className="absolute inset-0 rounded-full animate-shimmer bg-[length:200%_100%]"
                               style={{
-                                background: 'linear-gradient(90deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.15) 50%, rgba(255, 255, 255, 0.05) 100%)'
+                                backgroundImage: 'linear-gradient(90deg, rgba(64, 64, 64, 0.5) 0%, rgba(115, 115, 115, 0.4) 20%, rgba(180, 180, 180, 0.25) 30%, rgba(115, 115, 115, 0.4) 40%, rgba(38, 38, 38, 0.5) 50%, rgba(0, 0, 0, 0.4) 60%, rgba(64, 64, 64, 0.5) 70%, rgba(64, 64, 64, 0.5) 100%)',
+                                backgroundSize: '200% 100%',
+                                backgroundRepeat: 'no-repeat',
+                                backgroundPosition: '0% 0%'
                               }}
                             />
                           )}
                           <Image
                             src={avatarUrl}
                             alt={userData?.username || ''}
-                            width={56}
-                            height={56}
+                            width={80}
+                            height={80}
                             className={`w-full h-full object-cover transition-all duration-200 md:group-hover:brightness-50 ${avatarLoading ? 'opacity-0' : 'opacity-100'}`}
                             unoptimized
                             onLoad={() => setAvatarLoading(false)}
@@ -749,13 +801,16 @@ export default function DashboardPage() {
                             <div 
                               className="absolute inset-0 rounded-full animate-shimmer bg-[length:200%_100%]"
                               style={{
-                                background: 'linear-gradient(90deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.15) 50%, rgba(255, 255, 255, 0.05) 100%)'
+                                backgroundImage: 'linear-gradient(90deg, rgba(64, 64, 64, 0.5) 0%, rgba(115, 115, 115, 0.4) 20%, rgba(180, 180, 180, 0.25) 30%, rgba(115, 115, 115, 0.4) 40%, rgba(38, 38, 38, 0.5) 50%, rgba(0, 0, 0, 0.4) 60%, rgba(64, 64, 64, 0.5) 70%, rgba(64, 64, 64, 0.5) 100%)',
+                                backgroundSize: '200% 100%',
+                                backgroundRepeat: 'no-repeat',
+                                backgroundPosition: '0% 0%'
                               }}
                             />
                           )}
-                          <div className={`w-full h-full ${gradientClasses} flex items-center justify-center text-white font-semibold text-lg rounded-full transition-opacity duration-300 ${loading ? 'opacity-0' : 'opacity-100'}`}>
-                            {userData?.username ? userData.username.charAt(0).toUpperCase() : '—'}
-                          </div>
+                          <div className={`w-full h-full ${gradientClasses} flex items-center justify-center text-white font-semibold text-xl rounded-full transition-opacity duration-300 ${loading ? 'opacity-0' : 'opacity-100'}`}>
+                {userData?.username ? userData.username.charAt(0).toUpperCase() : '—'}
+              </div>
                         </>
                       )}
                     </div>
@@ -767,7 +822,15 @@ export default function DashboardPage() {
                 );
               })()}
               <div className="flex-1">
-                <div className="text-lg font-medium">{userData?.username || '—'}</div>
+                <div className={`text-lg font-medium ${
+                  userData?.isAdmin 
+                    ? 'text-orange-500' 
+                    : userData?.isSupport 
+                    ? 'text-green-500' 
+                    : 'text-white'
+                }`}>
+                  {userData?.username || '—'}
+                </div>
                 <div className="mt-1 text-sm text-neutral-400 flex flex-wrap gap-x-4 gap-y-1">
                   <div><span className="text-neutral-500">ID:</span> {userData ? getShortId(userData.user_id) : '—'}</div>
                   <div><span className="text-neutral-500">Дата регистрации:</span> {userData ? formatDate(userData.created_at) : '—'}</div>

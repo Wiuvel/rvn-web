@@ -1,28 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { domains } from './lib/utils/config';
 
-// Домены из централизованной конфигурации
 const MAIN_DOMAIN = domains.main;
-const CDN_DOMAIN = domains.cdn;
 
 /**
- * Проверяет, является ли hostname CDN доменом или поддоменом основного домена
+ * Проверяет, является ли hostname поддоменом основного домена
  * @param hostname - Hostname для проверки
- * @returns True если это CDN или поддомен основного домена
+ * @returns True если это поддомен основного домена
  */
-function isCdnOrSubdomain(hostname: string): boolean {
-  return hostname === CDN_DOMAIN || 
-         hostname === `cdn.${MAIN_DOMAIN}` || 
-         hostname.endsWith(`.${MAIN_DOMAIN}`);
+function isSubdomain(hostname: string): boolean {
+  return hostname === MAIN_DOMAIN || hostname.endsWith(`.${MAIN_DOMAIN}`);
 }
 
 /**
- * Проверяет, является ли origin допустимым (CDN или основной домен)
+ * Проверяет, является ли origin допустимым (основной домен или его поддомены)
  * @param origin - Origin header для проверки
  * @returns True если origin допустим
  */
 function isValidOrigin(origin: string): boolean {
-  return origin.includes(CDN_DOMAIN) || origin.includes(MAIN_DOMAIN);
+  return origin.includes(MAIN_DOMAIN);
 }
 
 /**
@@ -35,8 +31,8 @@ function generateCSPHeader(isDev: boolean): string {
   const supabaseDomain = 'ljeklmajzfylmyqjxcck.supabase.co';
   const turnstileDomain = 'challenges.cloudflare.com';
   
-  // Base domains for CSP - explicitly include CDN domain
-  const baseDomains = `'self' ${MAIN_DOMAIN} *.${MAIN_DOMAIN} https://${CDN_DOMAIN} http://${CDN_DOMAIN}`;
+  // Base domains for CSP
+  const baseDomains = `'self' ${MAIN_DOMAIN} *.${MAIN_DOMAIN}`;
   
   // Localhost for dev mode
   const localhost = isDev ? ' localhost:* http://localhost:* ws://localhost:* wss://localhost:*' : '';
@@ -65,7 +61,7 @@ function generateCSPHeader(isDev: boolean): string {
  * Applies security headers to response
  * @param response - The NextResponse object
  * @param isStaticFile - Whether this is a static file request
- * @param request - The NextRequest object (for CDN detection)
+ * @param request - The NextRequest object (for origin detection)
  */
 function applySecurityHeaders(response: NextResponse, isStaticFile: boolean = false, request?: NextRequest): void {
   const isDev = process.env.NODE_ENV === 'development';
@@ -73,19 +69,19 @@ function applySecurityHeaders(response: NextResponse, isStaticFile: boolean = fa
   
   // For static files, apply minimal headers to avoid HTTP/2 protocol errors
   if (isStaticFile) {
-    // CORS headers for static files (CDN support)
+    // CORS headers for static files
     if (request) {
       const origin = request.headers.get('origin');
       const hostname = request.nextUrl.hostname;
       
-      // Allow requests from CDN domain or same origin
+      // Allow requests from same origin or subdomains
       if (origin && isValidOrigin(origin)) {
         response.headers.set('Access-Control-Allow-Origin', origin);
         response.headers.set('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
         response.headers.set('Access-Control-Allow-Headers', 'Content-Type');
         response.headers.set('Access-Control-Max-Age', '86400');
-      } else if (isCdnOrSubdomain(hostname)) {
-        // Allow all subdomains of main domain (including CDN)
+      } else if (isSubdomain(hostname)) {
+        // Allow all subdomains of main domain
         response.headers.set('Access-Control-Allow-Origin', '*');
         response.headers.set('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
         response.headers.set('Access-Control-Allow-Headers', 'Content-Type');
@@ -148,15 +144,10 @@ function isStaticFile(pathname: string): boolean {
  * Early exit for static files, API routes, and bots
  * @param pathname - The request pathname
  * @param userAgent - The request user agent
- * @param hostname - The request hostname (for CDN detection)
+ * @param hostname - The request hostname (for subdomain detection)
  * @returns True if the request should bypass all proxy checks
  */
 function shouldBypassProxy(pathname: string, userAgent: string, hostname?: string): boolean {
-  // CDN domain requests - always bypass protection for static files
-  if (hostname && isCdnOrSubdomain(hostname) && isStaticFile(pathname)) {
-    return true;
-  }
-  
   if (isStaticFile(pathname)) {
     return true;
   }
@@ -353,15 +344,12 @@ export function proxy(request: NextRequest) {
   const { pathname, hostname } = request.nextUrl;
   const userAgent = request.headers.get('user-agent') || '';
   const isStatic = isStaticFile(pathname);
-  
-  // Check if request is from CDN domain
-  const isCdnRequest = isCdnOrSubdomain(hostname);
 
   /** Early exit for static files, API routes, and bots */
   if (shouldBypassProxy(pathname, userAgent, hostname)) {
     const response = NextResponse.next();
-    // Apply CORS headers for static files to support CDN
-    if (isStatic || isCdnRequest) {
+    // Apply CORS headers for static files
+    if (isStatic) {
       applySecurityHeaders(response, true, request);
     }
     return response;

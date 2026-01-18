@@ -1,17 +1,10 @@
 import type { NextConfig } from "next";
 
-// CDN URL для статических файлов в продакшене
-// TODO: Раскомментировать для включения CDN
-// const CDN_URL = process.env.NEXT_PUBLIC_CDN_URL || 'https://cdn.rvn.market';
-
 const nextConfig: NextConfig = {
   output: 'standalone',
   compress: true,
   poweredByHeader: false,
-  // TODO: Раскомментировать для включения CDN
-  // Use CDN for static assets in production
-  // assetPrefix: process.env.NODE_ENV === 'production' ? CDN_URL : '',
-  assetPrefix: '', // CDN отключен - используем основной домен
+  assetPrefix: '',
   trailingSlash: false,
   outputFileTracingRoot: process.cwd(),
   outputFileTracingIncludes: {
@@ -43,7 +36,7 @@ const nextConfig: NextConfig = {
           },
         ],
       },
-      // CORS headers for static files (CDN support) - minimal headers to avoid HTTP/2 errors
+      // CORS headers for static files - minimal headers to avoid HTTP/2 errors
       {
         source: '/static/:path*',
         headers: [

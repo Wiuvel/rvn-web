@@ -108,11 +108,19 @@ export function UserMenu({
                   ) : (
                     getInitial(userData.username)
                   )}
-                </div>
+            </div>
               );
             })()}
             <div className="min-w-0 flex-1">
-              <div className="text-white font-medium truncate">{userData.username}</div>
+              <div className={`font-medium truncate ${
+                userData.isAdmin 
+                  ? 'text-orange-500' 
+                  : userData.isSupport 
+                  ? 'text-green-500' 
+                  : 'text-white'
+              }`}>
+                {userData.username}
+              </div>
               <div className="text-neutral-400 text-xs truncate">
                 {showUserId ? `ID: ${userData.user_id}` : 'Пользователь'}
               </div>

@@ -14,7 +14,10 @@ import { generalRateLimit } from '@/lib/security/rate-limit';
 import { logger } from '@/lib/utils/secure-logger';
 import { ERROR_INTERNAL_SERVER_ERROR, ERROR_NOT_AUTHENTICATED, ERROR_TOO_MANY_REQUESTS, ERROR_ACCESS_DENIED } from '@/lib/utils/constants';
 import { supabaseAdmin } from '@/lib/database/supabase';
-import { getPresignedUrl } from '@/lib/storage/s3-client';
+import { getS3Client } from '@/lib/storage/s3-client';
+import { getEnv } from '@/lib/validation/env-validation';
+import { GetObjectCommand } from '@aws-sdk/client-s3';
+import { Readable } from 'stream';
 import { isValidUUID } from '@/lib/utils/uuid-validation';
 
 export async function OPTIONS() {
@@ -171,11 +174,98 @@ export async function GET(
       }
     }
 
-    // Генерируем presigned URL (действителен 1 час)
-    const presignedUrl = await getPresignedUrl(decodedKey, 3600);
+    // Получаем файл напрямую из S3
+    const client = getS3Client();
+    const env = getEnv();
+    
+    if (!client || !env.S3_BUCKET) {
+      return setCorsHeaders(
+        NextResponse.json(
+          { error: ERROR_INTERNAL_SERVER_ERROR },
+          { status: 500 }
+        )
+      );
+    }
 
-    // Редиректим на presigned URL
-    return NextResponse.redirect(presignedUrl);
+    const command = new GetObjectCommand({
+      Bucket: env.S3_BUCKET,
+      Key: decodedKey,
+    });
+
+    try {
+      const response = await client.send(command);
+      
+      // Получаем тело файла как поток
+      const stream = response.Body;
+      if (!stream) {
+        throw new Error('Empty stream from S3');
+      }
+
+      // Определяем Content-Type из метаданных S3 или по расширению
+      const fileName = decodedKey.split('/').pop() || 'file';
+      const contentType = response.ContentType || 
+        (fileName.endsWith('.png') ? 'image/png' :
+         fileName.endsWith('.jpg') || fileName.endsWith('.jpeg') ? 'image/jpeg' :
+         fileName.endsWith('.webp') ? 'image/webp' :
+         fileName.endsWith('.gif') ? 'image/gif' :
+         fileName.endsWith('.pdf') ? 'application/pdf' :
+         fileName.endsWith('.txt') ? 'text/plain' :
+         'application/octet-stream');
+
+      // Создаем Response с потоком данных
+      const headers = new Headers();
+      headers.set('Content-Type', contentType);
+      headers.set('Cache-Control', 'private, max-age=3600'); // 1 час кеширования для приватных файлов
+      
+      // Добавляем заголовок для скачивания файла
+      headers.set('Content-Disposition', `inline; filename="${encodeURIComponent(fileName)}"`);
+      
+      if (response.ContentLength) {
+        headers.set('Content-Length', response.ContentLength.toString());
+      }
+      
+      if (response.ETag) {
+        headers.set('ETag', response.ETag);
+      }
+      
+      if (response.LastModified) {
+        headers.set('Last-Modified', response.LastModified.toUTCString());
+      }
+
+      // Преобразуем Node.js Readable stream в Web ReadableStream
+      // В AWS SDK v3 для Node.js Body является Readable stream
+      const nodeStream = stream as Readable;
+      const webStream = Readable.toWeb(nodeStream) as ReadableStream<Uint8Array>;
+      
+      return setCorsHeaders(
+        new NextResponse(webStream, {
+          status: 200,
+          headers,
+        })
+      );
+    } catch (s3Error: any) {
+      // Если файл не найден, возвращаем 404
+      if (s3Error.name === 'NoSuchKey' || s3Error.$metadata?.httpStatusCode === 404) {
+        return setCorsHeaders(
+          NextResponse.json(
+            { error: 'File not found' },
+            { status: 404 }
+          )
+        );
+      }
+      
+      logger.error('Error getting file from S3', {
+        error: s3Error instanceof Error ? s3Error.message : 'Unknown error',
+        key: decodedKey
+      });
+      
+      return setCorsHeaders(
+        NextResponse.json(
+          { error: ERROR_INTERNAL_SERVER_ERROR },
+          { status: 500 }
+        )
+      );
+    }
   } catch (error) {
     logger.error('Error getting presigned URL', {
       error: error instanceof Error ? error.message : 'Unknown error'
