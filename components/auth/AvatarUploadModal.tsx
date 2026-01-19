@@ -228,7 +228,7 @@ export default function AvatarUploadModal({
                 )}
               </div>
               
-              <div className="text-neutral-500">→</div>
+              <div className="text-neutral-500 text-2xl mt-8">→</div>
               
               <div className="text-center">
                 <div className="text-sm text-neutral-400 mb-2">Новый</div>

@@ -53,6 +53,7 @@ interface Message {
     id: string;
     username: string;
     user_id: string;
+    avatar?: string | null;
   };
   attachments?: MessageAttachment[];
 }
@@ -276,14 +277,21 @@ function MessageItem({
           )}
           <div className={`flex items-end gap-2 ${message.sender === 'user' ? 'flex-row-reverse' : 'flex-row'} w-full`}>
             {message.sender === 'support' && (
-              <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-full bg-neutral-800 flex items-center justify-center flex-shrink-0 mb-1">
-                <Image 
-                  src="/static/logo.svg" 
-                  alt="Support" 
-                  width={256} 
-                  height={256} 
-                  className="w-5 h-5 sm:w-9 sm:h-9"
-                />
+              <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-full overflow-hidden flex-shrink-0 mb-1 flex items-center justify-center">
+                {message.senderData?.avatar ? (
+                  <Image
+                    src={getAvatarUrl(message.senderData.avatar) || ''}
+                    alt={message.senderData.username || 'Support'}
+                    width={48}
+                    height={48}
+                    className="w-full h-full object-cover"
+                    unoptimized
+                  />
+                ) : (
+                  <div className={`w-full h-full ${getGradientClasses(message.senderData?.avatar)} flex items-center justify-center text-white font-semibold text-xs sm:text-sm`}>
+                    {message.senderData?.username ? message.senderData.username.charAt(0).toUpperCase() : 'S'}
+                  </div>
+                )}
               </div>
             )}
             <div className={`max-w-[85%] sm:max-w-[70%] min-w-0 flex-shrink-0 rounded-2xl px-3 py-2 sm:px-4 ${
@@ -526,7 +534,7 @@ export default function SupportPage() {
       return null;
     }
   }, []);
-
+  
   // Обертка для fetch с обработкой rate limit
   const fetchWithRateLimit = async (
     url: string,
@@ -732,11 +740,14 @@ export default function SupportPage() {
   }, [router]);
 
   // Инициализация WebSocket
+  // ВАЖНО: Токен передается только после загрузки userData для предотвращения преждевременных подключений
+  // Токен хранится только в памяти компонента, не в localStorage/sessionStorage для безопасности
   const { socket, isConnected: isWebSocketConnected, joinTicket, leaveTicket } = useWebSocket({
-    enabled: !!userData,
+    enabled: !!userData && !!userData.dashboard_token,
     userId: userData?.id,
     ticketId: activeTicket?.id,
     isSupport: false,
+    token: userData?.dashboard_token, // Передаем токен для аутентификации WebSocket
   });
 
   // Отметка сообщений как прочитанных с улучшенным debounce
@@ -849,14 +860,14 @@ export default function SupportPage() {
         // Вложения уже правильно сформированы на сервере при broadcast, используем как есть
         attachments: data.message.attachments && Array.isArray(data.message.attachments) && data.message.attachments.length > 0
           ? data.message.attachments.map((att: any) => ({
-              id: att.id,
-              file_name: att.file_name,
-              file_type: att.file_type,
-              file_size: att.file_size,
-              storage_path: att.storage_path,
-              storage_url: att.storage_url || (att.storage_path 
+          id: att.id,
+          file_name: att.file_name,
+          file_type: att.file_type,
+          file_size: att.file_size,
+          storage_path: att.storage_path,
+          storage_url: att.storage_url || (att.storage_path 
                 ? `/support/files/${encodeURIComponent(att.storage_path)}` 
-                : '')
+            : '')
             }))
           : undefined,
       };
@@ -1125,7 +1136,7 @@ export default function SupportPage() {
               sender_type: string; 
               created_at: string; 
               is_read: boolean; 
-              sender?: { id: string; username: string; user_id: string };
+              sender?: { id: string; username: string; user_id: string; avatar?: string | null };
               attachments?: Array<{
                 id: string;
                 file_name: string;
@@ -1139,7 +1150,12 @@ export default function SupportPage() {
               sender: m.sender_type,
               timestamp: new Date(m.created_at),
               isRead: m.is_read,
-              senderData: m.sender,
+              senderData: m.sender ? {
+                id: m.sender.id,
+                username: m.sender.username,
+                user_id: m.sender.user_id,
+                avatar: m.sender.avatar || null
+              } : undefined,
               attachments: m.attachments || []
             }));
 
@@ -1675,7 +1691,7 @@ export default function SupportPage() {
               sender_type: string; 
               created_at: string; 
               is_read: boolean; 
-              sender?: { id: string; username: string; user_id: string };
+              sender?: { id: string; username: string; user_id: string; avatar?: string | null };
               attachments?: Array<{
                 id: string;
                 file_name: string;
@@ -1689,7 +1705,12 @@ export default function SupportPage() {
               sender: m.sender_type,
               timestamp: new Date(m.created_at),
               isRead: m.is_read,
-              senderData: m.sender,
+              senderData: m.sender ? {
+                id: m.sender.id,
+                username: m.sender.username,
+                user_id: m.sender.user_id,
+                avatar: m.sender.avatar || null
+              } : undefined,
               attachments: m.attachments || []
             }))
           });
@@ -2109,7 +2130,7 @@ export default function SupportPage() {
           sender_type: string; 
           created_at: string; 
           is_read: boolean; 
-          sender?: { id: string; username: string; user_id: string };
+          sender?: { id: string; username: string; user_id: string; avatar?: string | null };
           attachments?: Array<{
             id: string;
             file_name: string;
@@ -2124,7 +2145,12 @@ export default function SupportPage() {
           sender: m.sender_type,
           timestamp: new Date(m.created_at),
           isRead: m.is_read,
-          senderData: m.sender,
+          senderData: m.sender ? {
+            id: m.sender.id,
+            username: m.sender.username,
+            user_id: m.sender.user_id,
+            avatar: m.sender.avatar || null
+          } : undefined,
           // Вложения уже правильно сформированы на сервере, используем как есть
           // Проверяем, что вложения есть и это массив с элементами
           attachments: m.attachments && Array.isArray(m.attachments) && m.attachments.length > 0
@@ -2346,13 +2372,13 @@ export default function SupportPage() {
                   const gradientClasses = getGradientClasses(userData.avatar);
                   
                   return (
-                    <button
-                      onClick={() => setUserMenuOpen(!userMenuOpen)}
+                <button
+                  onClick={() => setUserMenuOpen(!userMenuOpen)}
                       className={`w-10 h-10 rounded-full overflow-hidden ${avatarUrl ? '' : gradientClasses} flex items-center justify-center text-white font-semibold text-sm transition-transform duration-200 hover:scale-110 cursor-pointer`}
-                      title={userData.username}
-                      aria-label="Меню пользователя"
-                      aria-expanded={userMenuOpen}
-                    >
+                  title={userData.username}
+                  aria-label="Меню пользователя"
+                  aria-expanded={userMenuOpen}
+                >
                       {avatarUrl ? (
                         <Image
                           src={avatarUrl}
@@ -2365,7 +2391,7 @@ export default function SupportPage() {
                       ) : (
                         getInitial(userData.username)
                       )}
-                    </button>
+                </button>
                   );
                 })()}
                 {shouldRenderMenu && (
@@ -2397,7 +2423,7 @@ export default function SupportPage() {
                               ) : (
                                 getInitial(userData.username)
                               )}
-                            </div>
+                        </div>
                           );
                         })()}
                         <div className="min-w-0 flex-1">
@@ -2467,7 +2493,7 @@ export default function SupportPage() {
             )}
             <button 
               onClick={() => setOpen(!open)} 
-              className="lg:hidden p-2 text-white/80 hover:text-white transition-colors duration-300" 
+              className="lg:hidden flex flex-col items-center gap-1 p-2 text-white/80 hover:text-white transition-colors duration-300" 
               aria-label="Открыть меню"
             >
               {!open ? (
@@ -2479,6 +2505,7 @@ export default function SupportPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/>
                 </svg>
               )}
+              <span className="text-[10px] text-white/60">Меню</span>
             </button>
           </div>
           {/* Mobile menu */}
@@ -2509,7 +2536,7 @@ export default function SupportPage() {
                           ) : (
                             getInitial(userData.username)
                           )}
-                        </div>
+                    </div>
                       );
                     })()}
                     <div className="min-w-0 flex-1">
@@ -2793,7 +2820,7 @@ export default function SupportPage() {
                                 <span className="flex-shrink-0 text-neutral-600">
                                   {isSystemMessage ? 'Система:' : ticket.last_message.sender_type === 'user' ? 'Вы:' : 'Поддержка:'}
                                 </span>
-                                <span className="truncate flex-1 min-w-0">
+                                  <span className="truncate flex-1 min-w-0">
                                   {(() => {
                                     let text = ticket.last_message.message_text || '';
                                     // Убираем эмодзи из начала строки
@@ -2808,7 +2835,7 @@ export default function SupportPage() {
                                     text = text.replace(/^1\s+(Фотография|Файл)$/, '$1');
                                     return text;
                                   })()}
-                                </span>
+                                  </span>
                                 {ticket.last_message.is_read === false && ticket.last_message.sender_type === 'support' && !isSystemMessage && (
                                   <span className="flex-shrink-0 w-2 h-2 bg-blue-500 rounded-full"></span>
                                 )}

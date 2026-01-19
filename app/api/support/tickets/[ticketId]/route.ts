@@ -170,7 +170,7 @@ export async function GET(
         senderType = 'user';
       } else {
         // Для сообщений не от создателя тикета - определяем по текущей роли
-        const senderIsSupport = senderRolesMap.get(msg.sender_id) || false;
+      const senderIsSupport = senderRolesMap.get(msg.sender_id) || false;
         senderType = senderIsSupport ? 'support' : 'user';
       }
       

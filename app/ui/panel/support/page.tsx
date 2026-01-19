@@ -14,6 +14,7 @@ import { useWebSocket } from '@/hooks/useWebSocket';
 import TicketSkeleton from '@/components/ui/TicketSkeleton';
 import { FileText, AlertCircle, Image as ImageIcon } from 'lucide-react';
 import ImageViewer from '@/components/support/ImageViewer';
+import { debugPerformanceAsync, debugStart, debugEnd, debugError } from '@/lib/utils/debug';
 
 interface AuthState {
   isAuthenticated: boolean;
@@ -1403,11 +1404,11 @@ export default function SupportPanel() {
       
       // Сохраняем токен для WebSocket (если он есть в ответе)
       // ВАЖНО: Токен хранится только в памяти компонента, не в localStorage/sessionStorage
-      if (data.dashboard_token) {
-        setDashboardToken(data.dashboard_token);
-      } else {
-        // Если токен отсутствует, сбрасываем его
-        setDashboardToken(undefined);
+      // ОПТИМИЗАЦИЯ: Обновляем токен только если он изменился, чтобы избежать лишних переподключений WebSocket
+      const newToken = data.dashboard_token || undefined;
+      if (dashboardTokenRef.current !== newToken) {
+        dashboardTokenRef.current = newToken;
+        setDashboardToken(newToken);
       }
       
       setLoading(false);
@@ -1431,20 +1432,22 @@ export default function SupportPanel() {
   };
 
   const fetchTickets = async () => {
-    // Отменяем предыдущий запрос, если он еще выполняется
-    if (fetchTicketsAbortControllerRef.current) {
-      fetchTicketsAbortControllerRef.current.abort();
-    }
-    
-    // Создаем новый AbortController для этого запроса
-    const abortController = new AbortController();
-    fetchTicketsAbortControllerRef.current = abortController;
-    
-    // Проверяем, что фильтр не изменился во время запроса
-    const filterAtStart = currentFilterRef.current;
-    
-    setTicketsLoading(true);
-    try {
+    return debugPerformanceAsync('fetchTickets', async () => {
+      // Отменяем предыдущий запрос, если он еще выполняется
+      if (fetchTicketsAbortControllerRef.current) {
+        fetchTicketsAbortControllerRef.current.abort();
+      }
+      
+      // Создаем новый AbortController для этого запроса
+      const abortController = new AbortController();
+      fetchTicketsAbortControllerRef.current = abortController;
+      
+      // Проверяем, что фильтр не изменился во время запроса
+      const filterAtStart = currentFilterRef.current;
+      
+      setTicketsLoading(true);
+      try {
+        debugStart('fetchTickets', { statusFilter, filterAtStart });
       // Проверяем актуальность фильтра перед запросом
       if (currentFilterRef.current !== filterAtStart) {
         setTicketsLoading(false);
@@ -1548,6 +1551,10 @@ export default function SupportPanel() {
             }
           }
         }
+        debugEnd('fetchTickets', { 
+          statusFilter, 
+          ticketsCount: tickets.length 
+        });
         setTicketsLoading(false);
         return;
       } else {
@@ -1654,6 +1661,10 @@ export default function SupportPanel() {
             }
           }
         }
+        debugEnd('fetchTickets', { 
+          statusFilter, 
+          ticketsCount: tickets.length 
+        });
         setTicketsLoading(false);
         return;
       }
@@ -1672,13 +1683,15 @@ export default function SupportPanel() {
         setTicketsLoading(false);
         return;
       }
-      // Ошибка получения тикетов - не логируем
+      debugError('fetchTickets', { statusFilter, error });
+      // Ошибка получения тикетов
       setTicketsLoading(false);
       // Устанавливаем пустой список и сбрасываем скелетон
       setTickets([]);
       setSkeletonCount(null);
       showNotification(translateError('Ошибка загрузки тикетов'), 'error');
     }
+    });
   };
 
   const fetchMessages = async (ticketId: string) => {
@@ -1701,9 +1714,11 @@ export default function SupportPanel() {
     // Не блокируем загрузку сообщений заранее - мы должны получать актуальные данные с сервера
     // даже если тикет занят другим саппортом, чтобы корректно обновить состояние UI
     
-    setMessagesLoading(true);
-    try {
-      const response = await fetchWithRateLimit(
+    return debugPerformanceAsync('fetchMessages', async () => {
+      setMessagesLoading(true);
+      try {
+        debugStart('fetchMessages', { ticketId });
+        const response = await fetchWithRateLimit(
         `/api/support/tickets/${ticketId}`,
         {
           credentials: 'include'
@@ -1815,8 +1830,13 @@ export default function SupportPanel() {
         
         // Отмечаем сообщения как прочитанные (debounced)
         markMessagesAsRead(ticketId);
+        debugEnd('fetchMessages', { 
+          ticketId, 
+          messagesCount: mappedMessages.length 
+        });
       } else {
         const errorMessage = data.error || 'Ошибка загрузки сообщений';
+        debugError('fetchMessages', { ticketId, error: errorMessage });
         showNotification(translateError(errorMessage), 'error');
       }
     } catch (error) {
@@ -1825,11 +1845,12 @@ export default function SupportPanel() {
         setMessagesLoading(false);
         return;
       }
-      // Ошибка получения сообщений - не логируем
+      debugError('fetchMessages', { ticketId, error });
       showNotification(translateError('Ошибка загрузки сообщений'), 'error');
     } finally {
       setMessagesLoading(false);
     }
+    });
   };
 
   const handleSendMessage = async () => {

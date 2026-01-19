@@ -352,10 +352,7 @@ export default function Header({ variant = 'main' }: HeaderProps = {}) {
                           <>
                             {avatarLoading && (
                               <div 
-                                className="absolute inset-0 rounded-full animate-shimmer bg-[length:200%_100%]"
-                                style={{
-                                  background: 'linear-gradient(90deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.15) 50%, rgba(255, 255, 255, 0.05) 100%)'
-                                }}
+                                className="absolute inset-0 rounded-full bg-gradient-to-r from-neutral-700 via-neutral-600 to-neutral-700 bg-[length:200%_100%] animate-[shimmer_1.5s_ease-in-out_infinite]"
                               />
                             )}
                             <Image
@@ -373,10 +370,7 @@ export default function Header({ variant = 'main' }: HeaderProps = {}) {
                           <>
                             {loading && (
                               <div 
-                                className="absolute inset-0 rounded-full animate-shimmer bg-[length:200%_100%]"
-                                style={{
-                                  background: 'linear-gradient(90deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.15) 50%, rgba(255, 255, 255, 0.05) 100%)'
-                                }}
+                                className="absolute inset-0 rounded-full bg-gradient-to-r from-neutral-700 via-neutral-600 to-neutral-700 bg-[length:200%_100%] animate-[shimmer_1.5s_ease-in-out_infinite]"
                               />
                             )}
                             <div className={`${loading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300`}>
@@ -504,14 +498,11 @@ export default function Header({ variant = 'main' }: HeaderProps = {}) {
                           <div className={`w-12 h-12 rounded-full overflow-hidden ${avatarUrl ? '' : gradientClasses} flex items-center justify-center text-white font-semibold text-base flex-shrink-0 relative`}>
                             {avatarUrl ? (
                               <>
-                                {mobileAvatarLoading && (
-                                  <div 
-                                    className="absolute inset-0 rounded-full animate-shimmer bg-[length:200%_100%]"
-                                    style={{
-                                      background: 'linear-gradient(90deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.15) 50%, rgba(255, 255, 255, 0.05) 100%)'
-                                    }}
-                                  />
-                                )}
+                            {mobileAvatarLoading && (
+                              <div 
+                                className="absolute inset-0 rounded-full bg-gradient-to-r from-neutral-700 via-neutral-600 to-neutral-700 bg-[length:200%_100%] animate-[shimmer_1.5s_ease-in-out_infinite]"
+                              />
+                            )}
                                 <Image
                                   src={avatarUrl}
                                   alt={userData.username}
@@ -527,10 +518,7 @@ export default function Header({ variant = 'main' }: HeaderProps = {}) {
                               <>
                                 {loading && (
                                   <div 
-                                    className="absolute inset-0 rounded-full animate-shimmer bg-[length:200%_100%]"
-                                    style={{
-                                      background: 'linear-gradient(90deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.15) 50%, rgba(255, 255, 255, 0.05) 100%)'
-                                    }}
+                                    className="absolute inset-0 rounded-full bg-gradient-to-r from-neutral-700 via-neutral-600 to-neutral-700 bg-[length:200%_100%] animate-[shimmer_1.5s_ease-in-out_infinite]"
                                   />
                                 )}
                                 <div className={`${loading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300`}>
