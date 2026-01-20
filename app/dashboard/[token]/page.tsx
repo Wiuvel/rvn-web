@@ -7,9 +7,10 @@ import Image from 'next/image';
 import { useFadeIn, useStaggeredFadeIn } from '@/hooks/useGSAP';
 import { gsap } from 'gsap';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
-import { getGradientClasses, getAvatarUrl } from '@/lib/utils/avatar-gradients';
+import { getGradientClasses, getAvatarUrl, getBannerUrl } from '@/lib/utils/avatar-gradients';
 import { APP_VERSION } from '@/lib/utils/constants';
 import AvatarUploadModal from '@/components/auth/AvatarUploadModal';
+import BannerUploadModal from '@/components/auth/BannerUploadModal';
 import { Pencil } from 'lucide-react';
 
 interface UserData {
@@ -20,6 +21,7 @@ interface UserData {
   created_at: string;
   last_login?: string;
   avatar?: string | null;
+  banner?: string | null;
   isSupport?: boolean;
   isAdmin?: boolean;
 }
@@ -43,6 +45,7 @@ export default function DashboardPage() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [readNotifications, setReadNotifications] = useState<Set<string>>(new Set());
   const [showAvatarModal, setShowAvatarModal] = useState(false);
+  const [showBannerModal, setShowBannerModal] = useState(false);
   const [avatarLoading, setAvatarLoading] = useState(true);
   const router = useRouter();
   const params = useParams();
@@ -701,9 +704,35 @@ export default function DashboardPage() {
         <div className="pointer-events-none absolute -top-32 -right-20 w-80 h-80 bg-primary-500/10 blur-3xl rounded-full -z-10"></div>
         <div className="pointer-events-none absolute -bottom-24 -left-24 w-72 h-72 bg-white/5 blur-[100px] rounded-full -z-10"></div>
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div ref={titleRef}>
-            <h1 className="text-2xl md:text-3xl font-semibold">Панель управления</h1>
-            <p className="mt-2 text-neutral-400">Добро пожаловать. Здесь будут ваши подписки, ключи и настройки.</p>
+          <div ref={titleRef} className="w-full relative group">
+            <div className="rounded-xl border border-neutral-800 bg-neutral-900/50 backdrop-blur-sm overflow-hidden relative">
+              {(() => {
+                const bannerUrl = userData ? getBannerUrl(userData.banner) : null;
+                return bannerUrl ? (
+                  <div className="relative w-full h-[200px] sm:h-[250px] md:h-[300px]">
+                    <Image
+                      src={bannerUrl}
+                      alt="Баннер профиля"
+                      fill
+                      className="object-cover"
+                      priority
+                      unoptimized
+                    />
+                  </div>
+                ) : (
+                  <div className="w-full h-[200px] sm:h-[250px] md:h-[300px] bg-gradient-to-r from-neutral-800/50 to-neutral-900/50 flex items-center justify-center">
+                    <span className="text-neutral-500 text-sm">Баннер профиля</span>
+                  </div>
+                );
+              })()}
+              <button
+                onClick={() => setShowBannerModal(true)}
+                className="absolute bottom-3 right-3 px-3 py-1.5 text-xs font-medium text-white bg-white/10 hover:bg-white/15 backdrop-blur-sm rounded-lg transition-all duration-200 border-0"
+                aria-label="Изменить баннер"
+              >
+                Изменить баннер
+              </button>
+            </div>
           </div>
           {/* Profile section */}
           <section ref={profileRef} className="group mt-6 rounded-2xl border border-neutral-800 bg-neutral-900/50 p-5 relative overflow-hidden backdrop-blur-sm transition-all duration-500 hover:border-neutral-700 hover:bg-neutral-900/80 hover:shadow-xl">
@@ -932,6 +961,23 @@ export default function DashboardPage() {
           setShowAvatarModal(false);
         }}
         currentAvatarUrl={userData ? getAvatarUrl(userData.avatar) : null}
+      />
+
+      {/* Banner Upload Modal */}
+      <BannerUploadModal
+        isOpen={showBannerModal}
+        onClose={() => setShowBannerModal(false)}
+        onUploadComplete={(bannerPath, bannerUrl) => {
+          // Обновляем данные пользователя с новым баннером
+          if (userData) {
+            setUserData({
+              ...userData,
+              banner: bannerPath,
+            });
+          }
+          setShowBannerModal(false);
+        }}
+        currentBannerUrl={userData ? getBannerUrl(userData.banner) : null}
       />
     </div>
   );

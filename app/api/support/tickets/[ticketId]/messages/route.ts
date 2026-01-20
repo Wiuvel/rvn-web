@@ -365,7 +365,7 @@ export async function POST(
             file_type: att.file_type,
             file_size: att.file_size,
             storage_path: att.storage_path,
-            storage_url: `/api/support/files/${encodeURIComponent(att.storage_path)}`
+            storage_url: `/support/files/${encodeURIComponent(att.storage_path)}`
           }))
         : undefined;
 

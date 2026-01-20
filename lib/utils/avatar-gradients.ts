@@ -108,6 +108,41 @@ export function getAvatarUrl(avatarId: string | null | undefined): string | null
 }
 
 /**
+ * Получает URL баннера для отображения
+ * Если bannerId начинается с 's3:', формирует URL к публичному endpoint для баннеров
+ * Иначе возвращает null (используется градиент по умолчанию)
+ */
+export function getBannerUrl(bannerId: string | null | undefined): string | null {
+  if (!bannerId) {
+    return null;
+  }
+  
+  // Проверяем, является ли баннер путем к S3
+  if (bannerId.startsWith('s3:')) {
+    // Извлекаем путь (убираем префикс 's3:')
+    const storagePath = bannerId.substring(3);
+    
+    // Проверяем, что путь начинается с 'banners/'
+    if (!storagePath.startsWith('banners/')) {
+      return null;
+    }
+    
+    // Формируем URL к публичному endpoint
+    // Формат в S3: banners/userId/timestamp.ext
+    // Формат URL: /images/users/banners/userId/timestamp.ext
+    const relativePath = storagePath.substring('banners/'.length);
+    
+    // Кодируем каждую часть пути отдельно для правильной обработки специальных символов
+    const pathParts = relativePath.split('/');
+    const encodedPath = pathParts.map(part => encodeURIComponent(part)).join('/');
+    
+    return `/images/users/banners/${encodedPath}`;
+  }
+  
+  return null;
+}
+
+/**
  * Валидирует идентификатор аватарки
  */
 export function isValidAvatar(avatarId: string | null | undefined): avatarId is AvatarId {

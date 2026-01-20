@@ -99,15 +99,15 @@ function processAttachments(attachments?: Array<{
   storage_path?: string;
 }>): MessageAttachment[] | undefined {
   if (!attachments || attachments.length === 0) return undefined;
-  
+
   return attachments.map((att) => ({
     id: att.id,
     file_name: att.file_name,
     file_type: att.file_type,
     file_size: att.file_size,
     storage_path: att.storage_path,
-    storage_url: att.storage_url || (att.storage_path 
-      ? `/support/files/${encodeURIComponent(att.storage_path)}` 
+    storage_url: att.storage_url || (att.storage_path
+      ? `/support/files/${encodeURIComponent(att.storage_path)}`
       : '')
   }));
 }
@@ -118,14 +118,14 @@ function ImageWithError({ src, alt, className, loading = 'lazy' }: { src: string
   const [isLoading, setIsLoading] = useState(true);
   const [isInView, setIsInView] = useState(false);
   const imgRef = useRef<HTMLDivElement>(null);
-  
+
   // Intersection Observer для lazy loading
   useEffect(() => {
     if (!imgRef.current || loading !== 'lazy') {
       setIsInView(true);
       return;
     }
-    
+
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
@@ -137,12 +137,12 @@ function ImageWithError({ src, alt, className, loading = 'lazy' }: { src: string
       },
       { rootMargin: '50px' } // Начинаем загрузку за 50px до появления в viewport
     );
-    
+
     observer.observe(imgRef.current);
-    
+
     return () => observer.disconnect();
   }, [loading]);
-  
+
   return (
     <div className={`relative bg-neutral-800 ${className || ''}`} ref={imgRef}>
       {hasError ? (
@@ -156,15 +156,15 @@ function ImageWithError({ src, alt, className, loading = 'lazy' }: { src: string
         <>
           {isLoading && (
             <div className="absolute inset-0 bg-neutral-800 rounded-lg overflow-hidden">
-              <div 
-                className="w-full h-full rounded-lg" 
-                style={{ 
-                  height: '100%', 
+              <div
+                className="w-full h-full rounded-lg"
+                style={{
+                  height: '100%',
                   width: '100%',
                   background: 'linear-gradient(90deg, rgba(64,64,64,0.3) 0%, rgba(115,115,115,0.5) 50%, rgba(64,64,64,0.3) 100%)',
                   backgroundSize: '200% 100%',
                   animation: 'shimmer 1.5s ease-in-out infinite'
-                }} 
+                }}
               />
             </div>
           )}
@@ -188,21 +188,21 @@ function ImageWithError({ src, alt, className, loading = 'lazy' }: { src: string
 }
 
 // Компонент для анимированного сообщения
-function MessageItem({ 
-  message, 
-  showDate, 
+function MessageItem({
+  message,
+  showDate,
   isSystemMessage,
   isSupport,
   isUser,
-  formatDate, 
+  formatDate,
   formatTime,
   getInitial,
   isInitialLoad = false,
   onImageClick,
   formatFileSize
-}: { 
-  message: Message; 
-  showDate: boolean; 
+}: {
+  message: Message;
+  showDate: boolean;
   isSystemMessage: boolean;
   isSupport: boolean;
   isUser: boolean;
@@ -224,7 +224,7 @@ function MessageItem({
       }
       return;
     }
-    
+
     // Анимируем только новые сообщения (не при первой загрузке)
     if (messageRef.current && typeof window !== 'undefined' && !hasAnimatedRef.current) {
       hasAnimatedRef.current = true;
@@ -249,7 +249,7 @@ function MessageItem({
           <div className="mb-1.5 px-1 flex items-baseline gap-1.5">
             <span className="text-sm font-medium text-yellow-400 bg-white/10 px-2 py-1 rounded">Система</span>
           </div>
-          
+
           {/* Сообщение */}
           <div className="max-w-[70%] min-w-0 flex-shrink-0 rounded-2xl px-4 py-3 bg-neutral-700/50 text-neutral-300" style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>
             <p className="text-sm whitespace-pre-wrap break-words">
@@ -275,14 +275,14 @@ function MessageItem({
               <span className="text-xs text-white">Поддержка</span>
             </div>
           )}
-          
+
           {/* Сообщение с аватаркой */}
           <div className={`flex items-end gap-3 ${isSupport ? 'flex-row-reverse' : 'flex-row'} ${isSupport ? 'w-full' : 'w-full'}`}>
             {/* Аватарка для пользователя (слева) */}
             {isUser && message.sender && (() => {
               const avatarUrl = getAvatarUrl(message.sender.avatar);
               const gradientClasses = getGradientClasses(message.sender.avatar);
-              
+
               return (
                 <div className={`w-10 h-10 rounded-full overflow-hidden ${avatarUrl ? '' : gradientClasses} flex items-center justify-center text-white font-semibold text-sm flex-shrink-0 mb-1`}>
                   {avatarUrl ? (
@@ -297,36 +297,34 @@ function MessageItem({
                   ) : (
                     getInitial(message.sender.username)
                   )}
-              </div>
+                </div>
               );
             })()}
-            
+
             {/* Пузырь сообщения */}
-            <div className={`${isSupport ? 'max-w-[60%]' : 'max-w-[70%]'} min-w-0 flex-shrink-0 rounded-2xl px-4 py-3 ${
-              isSupport
+            <div className={`${isSupport ? 'max-w-[60%]' : 'max-w-[70%]'} min-w-0 flex-shrink-0 rounded-2xl px-4 py-3 ${isSupport
                 ? message.is_read
                   ? 'bg-blue-600 text-white rounded-br-sm'
                   : 'bg-neutral-800 text-neutral-100 rounded-br-sm'
                 : 'bg-neutral-800 text-neutral-100 rounded-bl-sm'
-            }`} style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>
+              }`} style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>
               {message.message_text && (
                 <p className="text-sm whitespace-pre-wrap break-words">
                   {message.message_text}
                 </p>
               )}
-              
+
               {/* Вложения */}
               {message.attachments && message.attachments.length > 0 && (() => {
                 const images = message.attachments!.filter(a => a.file_type.startsWith('image/'));
                 const documents = message.attachments!.filter(a => !a.file_type.startsWith('image/'));
-                
+
                 return (
                   <div className={`space-y-2 ${message.message_text ? 'mt-2' : ''}`}>
                     {/* Группировка изображений */}
                     {images.length > 0 && (
-                      <div className={`grid gap-1.5 max-w-xs ${
-                        images.length === 1 ? 'grid-cols-1' : images.length === 2 ? 'grid-cols-2' : 'grid-cols-2'
-                      }`}>
+                      <div className={`grid gap-1.5 max-w-xs ${images.length === 1 ? 'grid-cols-1' : images.length === 2 ? 'grid-cols-2' : 'grid-cols-2'
+                        }`}>
                         {images.map((attachment) => (
                           <button
                             key={attachment.id}
@@ -342,7 +340,7 @@ function MessageItem({
                         ))}
                       </div>
                     )}
-                    
+
                     {/* Документы */}
                     {documents.length > 0 && (
                       <div className="space-y-1.5">
@@ -365,14 +363,13 @@ function MessageItem({
                   </div>
                 );
               })()}
-              
-              <div className={`flex items-center gap-2 text-xs mt-1.5 ${
-                isSupport
+
+              <div className={`flex items-center gap-2 text-xs mt-1.5 ${isSupport
                   ? message.is_read
                     ? 'text-blue-100'
                     : 'text-neutral-400'
                   : 'text-neutral-400'
-              }`}>
+                }`}>
                 <span>{formatTime(message.created_at)}</span>
                 {/* Индикация прочитанных сообщений саппорта пользователем */}
                 {isSupport && message.is_read && (
@@ -460,7 +457,7 @@ export default function SupportPanel() {
         setIsLargeScreen(false);
       }
     };
-    
+
     if (typeof window !== 'undefined') {
       window.addEventListener('resize', handleResize);
       // Проверяем при монтировании
@@ -471,7 +468,7 @@ export default function SupportPanel() {
   const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
   const [shouldRenderMobileActions, setShouldRenderMobileActions] = useState(false);
   const mobileActionsRef = useRef<HTMLDivElement>(null);
-  
+
   // Анимация мобильного меню действий
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -481,12 +478,12 @@ export default function SupportPanel() {
       if (!shouldRenderMobileActions) {
         setShouldRenderMobileActions(true);
       }
-      
+
       requestAnimationFrame(() => {
         if (mobileActionsRef.current) {
           // Убиваем любые активные анимации на элементе
           gsap.killTweensOf(mobileActionsRef.current);
-          
+
           gsap.set(mobileActionsRef.current, {
             opacity: 0,
             y: -10,
@@ -507,7 +504,7 @@ export default function SupportPanel() {
         if (mobileActionsRef.current) {
           // Убиваем любые активные анимации на элементе
           gsap.killTweensOf(mobileActionsRef.current);
-          
+
           gsap.to(mobileActionsRef.current, {
             opacity: 0,
             y: -10,
@@ -525,7 +522,7 @@ export default function SupportPanel() {
       }
     }
   }, [mobileActionsOpen, activeTicket, shouldRenderMobileActions]);
-  
+
   // Очередь запросов вместо одного callback - исправляет race condition
   const pendingRequestsQueueRef = useRef<Array<() => Promise<void>>>([]);
   const isProcessingCaptchaRef = useRef(false); // Флаг обработки капчи - предотвращает повторные открытия
@@ -539,7 +536,7 @@ export default function SupportPanel() {
   const isInitialMessagesLoadRef = useRef(true); // Флаг первой загрузки сообщений
   const isRestoringScrollRef = useRef(false); // Флаг восстановления скролла
   const scrollSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  
+
   // Функция для получения инициалов
   const formatFileSize = (bytes: number): string => {
     if (bytes < 1024) return `${bytes} Б`;
@@ -554,12 +551,12 @@ export default function SupportPanel() {
   // Функции кэширования сообщений
   const CACHE_PREFIX = 'support_panel_messages_';
   const CACHE_TTL_MS = 5 * 60 * 1000; // 5 минут
-  
+
   const getCacheKey = (ticketId: string) => `${CACHE_PREFIX}${ticketId}`;
-  
+
   const saveMessagesToCache = useCallback((ticketId: string, messages: Message[]) => {
     if (typeof window === 'undefined') return;
-    
+
     try {
       const cacheData = {
         messages,
@@ -571,29 +568,29 @@ export default function SupportPanel() {
       console.warn('Failed to cache messages:', error);
     }
   }, []);
-  
+
   const loadMessagesFromCache = useCallback((ticketId: string): Message[] | null => {
     if (typeof window === 'undefined') return null;
-    
+
     try {
       const cached = localStorage.getItem(getCacheKey(ticketId));
       if (!cached) return null;
-      
+
       const cacheData = JSON.parse(cached);
       const age = Date.now() - cacheData.timestamp;
-      
+
       // Проверяем TTL
       if (age > CACHE_TTL_MS) {
         localStorage.removeItem(getCacheKey(ticketId));
         return null;
       }
-      
+
       // Обрабатываем вложения при загрузке из кэша
       const messages = (cacheData.messages || []).map((msg: any) => ({
         ...msg,
         attachments: processAttachments(msg.attachments)
       }));
-      
+
       return messages;
     } catch (error) {
       // Игнорируем ошибки парсинга
@@ -601,7 +598,7 @@ export default function SupportPanel() {
       return null;
     }
   }, []);
-  
+
   const clearMessagesCache = useCallback((ticketId: string) => {
     if (typeof window === 'undefined') return;
     localStorage.removeItem(getCacheKey(ticketId));
@@ -610,14 +607,14 @@ export default function SupportPanel() {
   // Сохранение позиции скролла
   const saveScrollPosition = useCallback((ticketId: string) => {
     if (!messagesContainerRef.current || isRestoringScrollRef.current || typeof window === 'undefined') return;
-    
+
     const scrollTop = messagesContainerRef.current.scrollTop;
     const scrollHeight = messagesContainerRef.current.scrollHeight;
     const clientHeight = messagesContainerRef.current.clientHeight;
-    
+
     // Сохраняем только если не в самом низу (с небольшим допуском)
     const isAtBottom = scrollHeight - scrollTop - clientHeight < 50;
-    
+
     if (isAtBottom) {
       // Если внизу, сохраняем специальный маркер
       localStorage.setItem(`support_panel_scroll_${ticketId}`, 'bottom');
@@ -630,15 +627,15 @@ export default function SupportPanel() {
   // Восстановление позиции скролла
   const restoreScrollPosition = useCallback((ticketId: string) => {
     if (!messagesContainerRef.current || typeof window === 'undefined') return;
-    
+
     const savedPosition = localStorage.getItem(`support_panel_scroll_${ticketId}`);
-    
+
     // Функция для выполнения скролла после загрузки всех элементов
     const performScroll = () => {
       if (!messagesContainerRef.current) return;
-      
+
       isRestoringScrollRef.current = true;
-      
+
       if (savedPosition === 'bottom' || savedPosition === null) {
         // Если был внизу или нет сохраненной позиции, скроллим к самому новому сообщению
         requestAnimationFrame(() => {
@@ -679,11 +676,11 @@ export default function SupportPanel() {
       setTimeout(performScroll, 100);
       return;
     }
-    
+
     let loadedCount = 0;
     const totalImages = images.length;
     let scrollPerformed = false;
-    
+
     const checkAllLoaded = () => {
       loadedCount++;
       if (loadedCount >= totalImages && !scrollPerformed) {
@@ -691,7 +688,7 @@ export default function SupportPanel() {
         performScroll();
       }
     };
-    
+
     images.forEach((img) => {
       if ((img as HTMLImageElement).complete) {
         checkAllLoaded();
@@ -700,7 +697,7 @@ export default function SupportPanel() {
         img.addEventListener('error', checkAllLoaded, { once: true });
       }
     });
-    
+
     // Таймаут на случай, если изображения не загрузятся
     setTimeout(() => {
       if (!scrollPerformed) {
@@ -713,7 +710,7 @@ export default function SupportPanel() {
   // Автоскролл при новых сообщениях с учетом загрузки изображений
   useEffect(() => {
     if (!messages || messages.length === 0 || isRestoringScrollRef.current) return;
-    
+
     // Проверяем, есть ли сохраненная позиция скролла
     if (typeof window !== 'undefined' && activeTicket?.id) {
       const savedPosition = localStorage.getItem(`support_panel_scroll_${activeTicket.id}`);
@@ -722,7 +719,7 @@ export default function SupportPanel() {
         return;
       }
     }
-    
+
     // Ждем загрузки всех изображений перед скроллом
     const scrollToBottom = () => {
       if (messagesEndRef.current && !isRestoringScrollRef.current) {
@@ -736,24 +733,24 @@ export default function SupportPanel() {
         });
       }
     };
-    
+
     // Проверяем, загружены ли все изображения
-    const images = document.querySelectorAll('img[src*="/api/support/files/"]');
+    const images = document.querySelectorAll('img[src*="/support/files/"]');
     if (images.length === 0) {
       scrollToBottom();
       return;
     }
-    
+
     let loadedCount = 0;
     const totalImages = images.length;
-    
+
     const checkAllLoaded = () => {
       loadedCount++;
       if (loadedCount >= totalImages) {
         scrollToBottom();
       }
     };
-    
+
     images.forEach((img) => {
       if ((img as HTMLImageElement).complete) {
         checkAllLoaded();
@@ -762,10 +759,10 @@ export default function SupportPanel() {
         img.addEventListener('error', checkAllLoaded, { once: true });
       }
     });
-    
+
     // Таймаут на случай, если изображения не загрузятся
     const timeout = setTimeout(scrollToBottom, 2000);
-    
+
     return () => {
       clearTimeout(timeout);
       images.forEach((img) => {
@@ -782,13 +779,13 @@ export default function SupportPanel() {
     retryCallback?: () => Promise<void>
   ): Promise<Response> => {
     const response = await fetch(url, options);
-    
+
     if (response.status === 429) {
       // Добавляем callback в очередь вместо перезаписи - исправляет race condition
       if (retryCallback) {
         pendingRequestsQueueRef.current.push(retryCallback);
       }
-      
+
       // Открываем модальное окно только если:
       // 1. Оно еще не открыто
       // 2. Капча не обрабатывается (предотвращает повторные открытия)
@@ -798,26 +795,26 @@ export default function SupportPanel() {
       }
       throw new Error('RATE_LIMIT_EXCEEDED');
     }
-    
+
     return response;
   };
 
   const handleRateLimitSuccess = async () => {
     // Устанавливаем флаг обработки капчи - предотвращает повторные открытия
     isProcessingCaptchaRef.current = true;
-    
+
     // Закрываем модальное окно
     isCaptchaOpenRef.current = false;
     setShowRateLimitCaptcha(false);
-    
+
     // Увеличиваем задержку для гарантированного применения иммунитета на сервере
     // Cookie устанавливается сразу, но store может обновиться с небольшой задержкой
     await new Promise(resolve => setTimeout(resolve, 1000));
-    
+
     // Обрабатываем ВСЕ запросы из очереди последовательно
     const queue = [...pendingRequestsQueueRef.current];
     pendingRequestsQueueRef.current = []; // Очищаем очередь сразу
-    
+
     for (const requestCallback of queue) {
       try {
         await requestCallback();
@@ -831,7 +828,7 @@ export default function SupportPanel() {
         }
       }
     }
-    
+
     // Сбрасываем флаг обработки только после обработки всех запросов
     isProcessingCaptchaRef.current = false;
   };
@@ -906,14 +903,14 @@ export default function SupportPanel() {
     if (markReadTimeoutRef.current) {
       clearTimeout(markReadTimeoutRef.current);
     }
-    
+
     // Устанавливаем новый таймер (debounce 2 секунды)
     markReadTimeoutRef.current = setTimeout(async () => {
       // Проверяем, что тикет не изменился
       if (currentTicketIdRef.current !== ticketId) {
         return;
       }
-      
+
       try {
         await fetchWithRateLimit(
           `/api/support/tickets/${ticketId}/messages/read`,
@@ -945,7 +942,7 @@ export default function SupportPanel() {
 
   // Ref для хранения текущих сообщений (для проверки в WebSocket обработчиках)
   const messagesRef = useRef<Message[]>([]);
-  
+
   // Синхронизируем ref с state
   useEffect(() => {
     messagesRef.current = messages;
@@ -988,12 +985,12 @@ export default function SupportPanel() {
 
       // Формируем текст для last_message (если пустой, но есть вложения - формируем без эмодзи и количества)
       let lastMessageText = data.message.message_text || '';
-      
+
       // Если текст пустой, но есть вложения - формируем текст без эмодзи и количества
       if (!lastMessageText && data.message.attachments && data.message.attachments.length > 0) {
         const images = data.message.attachments.filter((att: any) => att.file_type?.startsWith('image/'));
         const files = data.message.attachments.filter((att: any) => !att.file_type?.startsWith('image/'));
-        
+
         if (images.length > 0 && files.length === 0) {
           // Только изображения
           lastMessageText = 'Фотография';
@@ -1102,7 +1099,7 @@ export default function SupportPanel() {
       // Обновляем статус прочитанности сообщений
       setMessages(prev => {
         const messageIds = data.messageIds || [];
-        return prev.map(msg => 
+        return prev.map(msg =>
           messageIds.includes(msg.id)
             ? { ...msg, is_read: true }
             : msg
@@ -1166,18 +1163,18 @@ export default function SupportPanel() {
             });
             const retryData = await retryResponse.json();
             if (retryResponse.ok && activeTicket && currentTicketIdRef.current === activeTicket.id) {
-            // Маппим сообщения с вложениями (оптимизировано - используем данные с сервера)
-            const mappedMessages = (retryData.messages || []).map((m: any) => ({
-              id: m.id,
-              ticket_id: activeTicket.id,
-              sender_id: m.sender?.id || '',
-              sender_type: m.sender_type,
-              message_text: m.message_text,
-              is_read: m.is_read,
-              created_at: m.created_at,
-              sender: m.sender,
-              attachments: processAttachments(m.attachments)
-            }));
+              // Маппим сообщения с вложениями (оптимизировано - используем данные с сервера)
+              const mappedMessages = (retryData.messages || []).map((m: any) => ({
+                id: m.id,
+                ticket_id: activeTicket.id,
+                sender_id: m.sender?.id || '',
+                sender_type: m.sender_type,
+                message_text: m.message_text,
+                is_read: m.is_read,
+                created_at: m.created_at,
+                sender: m.sender,
+                attachments: processAttachments(m.attachments)
+              }));
               setMessages(mappedMessages);
               if (retryData.ticket && activeTicket && activeTicket.id === retryData.ticket.id) {
                 if (activeTicket.status !== retryData.ticket.status) {
@@ -1188,27 +1185,27 @@ export default function SupportPanel() {
           }
         );
         const data = await response.json();
-        
+
         // Проверяем, что тикет не изменился во время запроса
         if (currentTicketIdRef.current !== activeTicket.id) return;
-        
+
         if (response.ok && data.ticket && data.messages) {
           const currentMessageCount = data.messages.length;
           const currentMessagesHash = hashMessages(data.messages);
-          
+
           // Обновляем статус тикета (может измениться)
           const statusChanged = activeTicket.status !== data.ticket.status;
-          
+
           // Проверяем переход между активными и архивными статусами
           const wasActive = activeTicket.status === 'open' || activeTicket.status === 'pending';
           const isNowActive = data.ticket.status === 'open' || data.ticket.status === 'pending';
           const statusCategoryChanged = wasActive !== isNowActive;
-          
+
           // Обновляем только если появились новые сообщения, изменился статус или хэш сообщений
           if (currentMessageCount > lastMessageCount || statusChanged || currentMessagesHash !== lastMessagesHash) {
             // Еще раз проверяем, что тикет не изменился
             if (currentTicketIdRef.current !== activeTicket.id) return;
-            
+
             // Маппим сообщения с вложениями (оптимизировано - используем данные с сервера)
             const mappedMessages = (data.messages || []).map((m: any) => ({
               id: m.id,
@@ -1221,16 +1218,16 @@ export default function SupportPanel() {
               sender: m.sender,
               attachments: processAttachments(m.attachments)
             }));
-            
+
             setMessages(mappedMessages);
             lastMessageCount = currentMessageCount;
             lastMessagesHash = currentMessagesHash;
-            
+
             // Обновляем статус тикета
             if (statusChanged && activeTicket && currentTicketIdRef.current === activeTicket.id) {
               setActiveTicket({ ...activeTicket, status: data.ticket.status });
             }
-            
+
             // Обновляем список тикетов только при переходе между активными и архивными статусами
             // (тикет должен переместиться в другую категорию)
             if (statusCategoryChanged) {
@@ -1242,7 +1239,7 @@ export default function SupportPanel() {
                 updated_at: data.ticket.updated_at
               });
             }
-            
+
             // Отмечаем сообщения как прочитанные (debounced)
             markMessagesAsRead(activeTicket.id);
           }
@@ -1317,12 +1314,12 @@ export default function SupportPanel() {
     if (notification.show && notificationRef.current) {
       gsap.fromTo(notificationRef.current,
         { opacity: 0, y: -20, scale: 0.9 },
-        { 
-          opacity: 1, 
-          y: 0, 
-          scale: 1, 
-          duration: GSAP_DEFAULT_DURATION, 
-          ease: GSAP_DEFAULT_EASE 
+        {
+          opacity: 1,
+          y: 0,
+          scale: 1,
+          duration: GSAP_DEFAULT_DURATION,
+          ease: GSAP_DEFAULT_EASE
         }
       );
     }
@@ -1336,7 +1333,7 @@ export default function SupportPanel() {
         checkAuthStatus // Retry callback
       );
       const data = await response.json();
-      
+
       if (!data.isAuthenticated) {
         router.push('/auth');
         return;
@@ -1401,7 +1398,7 @@ export default function SupportPanel() {
         userId: data.userId,
         user_id: data.user_id || null
       });
-      
+
       // Сохраняем токен для WebSocket (если он есть в ответе)
       // ВАЖНО: Токен хранится только в памяти компонента, не в localStorage/sessionStorage
       // ОПТИМИЗАЦИЯ: Обновляем токен только если он изменился, чтобы избежать лишних переподключений WebSocket
@@ -1410,7 +1407,7 @@ export default function SupportPanel() {
         dashboardTokenRef.current = newToken;
         setDashboardToken(newToken);
       }
-      
+
       setLoading(false);
     } catch (error) {
       if (error instanceof Error && error.message === 'RATE_LIMIT_EXCEEDED') {
@@ -1437,270 +1434,270 @@ export default function SupportPanel() {
       if (fetchTicketsAbortControllerRef.current) {
         fetchTicketsAbortControllerRef.current.abort();
       }
-      
+
       // Создаем новый AbortController для этого запроса
       const abortController = new AbortController();
       fetchTicketsAbortControllerRef.current = abortController;
-      
+
       // Проверяем, что фильтр не изменился во время запроса
       const filterAtStart = currentFilterRef.current;
-      
+
       setTicketsLoading(true);
       try {
         debugStart('fetchTickets', { statusFilter, filterAtStart });
-      // Проверяем актуальность фильтра перед запросом
-      if (currentFilterRef.current !== filterAtStart) {
-        setTicketsLoading(false);
-        return; // Фильтр изменился, отменяем запрос
-      }
-      
-      if (statusFilter === 'archive') {
-        // Для архива получаем закрытые тикеты
-        const closedRes = await fetchWithRateLimit('/api/support/tickets?status=closed', { credentials: 'include' }, fetchTickets);
-        
-        // Проверяем актуальность фильтра после запроса
-        if (currentFilterRef.current !== 'archive' || abortController.signal.aborted) {
+        // Проверяем актуальность фильтра перед запросом
+        if (currentFilterRef.current !== filterAtStart) {
           setTicketsLoading(false);
-          return; // Фильтр изменился или запрос отменен
+          return; // Фильтр изменился, отменяем запрос
         }
-        
-        const closedData = await closedRes.json();
-        
-        // Еще раз проверяем актуальность перед обработкой данных
-        if (currentFilterRef.current !== 'archive' || abortController.signal.aborted) {
-          setTicketsLoading(false);
-          return;
-        }
-        
-        let tickets = (closedData.tickets || []).map((t: {
-          id: string;
-          subject: string;
-          status: 'open' | 'closed' | 'pending';
-          priority?: 'low' | 'normal' | 'high' | 'urgent';
-          created_at: string;
-          updated_at: string;
-          last_message_at: string;
-          closed_at?: string | null;
-          user?: {
+
+        if (statusFilter === 'archive') {
+          // Для архива получаем закрытые тикеты
+          const closedRes = await fetchWithRateLimit('/api/support/tickets?status=closed', { credentials: 'include' }, fetchTickets);
+
+          // Проверяем актуальность фильтра после запроса
+          if (currentFilterRef.current !== 'archive' || abortController.signal.aborted) {
+            setTicketsLoading(false);
+            return; // Фильтр изменился или запрос отменен
+          }
+
+          const closedData = await closedRes.json();
+
+          // Еще раз проверяем актуальность перед обработкой данных
+          if (currentFilterRef.current !== 'archive' || abortController.signal.aborted) {
+            setTicketsLoading(false);
+            return;
+          }
+
+          let tickets = (closedData.tickets || []).map((t: {
             id: string;
-            username: string;
-            user_id: string;
-          };
-          assigned_to?: string | null;
-          assigned_user?: {
-            id: string;
-            username: string;
-            user_id: string;
-          } | null;
-          last_message?: {
-            id: string;
-            message_text: string;
-            sender_type: 'user' | 'support' | 'system';
+            subject: string;
+            status: 'open' | 'closed' | 'pending';
+            priority?: 'low' | 'normal' | 'high' | 'urgent';
             created_at: string;
-            is_read: boolean;
-          } | null;
-        }) => ({
-          id: t.id,
-          subject: t.subject,
-          status: t.status,
-          priority: t.priority || 'normal',
-          created_at: t.created_at,
-          updated_at: t.updated_at,
-          last_message_at: t.last_message_at,
-          closed_at: t.closed_at,
-          user_id: (t as any).user_id, // Сохраняем user_id для проверки прав
-          user: t.user,
-          assigned_to: t.assigned_to,
-          assigned_user: t.assigned_user,
-          last_message: t.last_message || null
-        }));
-        
-        // Для архива сортируем по дате обновления/закрытия (убывание - новые сверху)
-        tickets = tickets.sort((a: Ticket, b: Ticket) => {
-          const dateA = new Date(a.updated_at || a.closed_at || a.created_at).getTime();
-          const dateB = new Date(b.updated_at || b.closed_at || b.created_at).getTime();
-          return dateB - dateA;
-        });
-        
-        // Финальная проверка перед обновлением состояния
-        if (currentFilterRef.current !== 'archive' || abortController.signal.aborted) {
-          setTicketsLoading(false);
-          return;
-        }
-        
-        setTickets(tickets);
-        // Сохраняем количество тикетов в localStorage для скелетонов (отдельно для каждого фильтра)
-        if (typeof window !== 'undefined') {
-          const count = tickets.length;
-          localStorage.setItem(`support_panel_tickets_count_${statusFilter}`, count.toString());
-          // Если тикетов нет (0), не показываем скелетоны (null)
-          setSkeletonCount(count === 0 ? null : count);
-          
-          // Восстанавливаем последний открытый тикет после загрузки
-          if (!activeTicket && count > 0) {
-            const lastTicketId = localStorage.getItem('support_panel_last_ticket_id');
-            if (lastTicketId) {
-              const ticket = tickets.find((t: Ticket) => t.id === lastTicketId);
-              if (ticket) {
-                // Небольшая задержка для корректного обновления state
-                setTimeout(() => {
-                  setActiveTicket(ticket);
-                  currentTicketIdRef.current = ticket.id;
-                }, 50);
+            updated_at: string;
+            last_message_at: string;
+            closed_at?: string | null;
+            user?: {
+              id: string;
+              username: string;
+              user_id: string;
+            };
+            assigned_to?: string | null;
+            assigned_user?: {
+              id: string;
+              username: string;
+              user_id: string;
+            } | null;
+            last_message?: {
+              id: string;
+              message_text: string;
+              sender_type: 'user' | 'support' | 'system';
+              created_at: string;
+              is_read: boolean;
+            } | null;
+          }) => ({
+            id: t.id,
+            subject: t.subject,
+            status: t.status,
+            priority: t.priority || 'normal',
+            created_at: t.created_at,
+            updated_at: t.updated_at,
+            last_message_at: t.last_message_at,
+            closed_at: t.closed_at,
+            user_id: (t as any).user_id, // Сохраняем user_id для проверки прав
+            user: t.user,
+            assigned_to: t.assigned_to,
+            assigned_user: t.assigned_user,
+            last_message: t.last_message || null
+          }));
+
+          // Для архива сортируем по дате обновления/закрытия (убывание - новые сверху)
+          tickets = tickets.sort((a: Ticket, b: Ticket) => {
+            const dateA = new Date(a.updated_at || a.closed_at || a.created_at).getTime();
+            const dateB = new Date(b.updated_at || b.closed_at || b.created_at).getTime();
+            return dateB - dateA;
+          });
+
+          // Финальная проверка перед обновлением состояния
+          if (currentFilterRef.current !== 'archive' || abortController.signal.aborted) {
+            setTicketsLoading(false);
+            return;
+          }
+
+          setTickets(tickets);
+          // Сохраняем количество тикетов в localStorage для скелетонов (отдельно для каждого фильтра)
+          if (typeof window !== 'undefined') {
+            const count = tickets.length;
+            localStorage.setItem(`support_panel_tickets_count_${statusFilter}`, count.toString());
+            // Если тикетов нет (0), не показываем скелетоны (null)
+            setSkeletonCount(count === 0 ? null : count);
+
+            // Восстанавливаем последний открытый тикет после загрузки
+            if (!activeTicket && count > 0) {
+              const lastTicketId = localStorage.getItem('support_panel_last_ticket_id');
+              if (lastTicketId) {
+                const ticket = tickets.find((t: Ticket) => t.id === lastTicketId);
+                if (ticket) {
+                  // Небольшая задержка для корректного обновления state
+                  setTimeout(() => {
+                    setActiveTicket(ticket);
+                    currentTicketIdRef.current = ticket.id;
+                  }, 50);
+                }
               }
             }
           }
-        }
-        debugEnd('fetchTickets', { 
-          statusFilter, 
-          ticketsCount: tickets.length 
-        });
-        setTicketsLoading(false);
-        return;
-      } else {
-        // Для активных получаем открытые и в ожидании
-        const [openRes, pendingRes] = await Promise.all([
-          fetchWithRateLimit('/api/support/tickets?status=open', { credentials: 'include' }, fetchTickets),
-          fetchWithRateLimit('/api/support/tickets?status=pending', { credentials: 'include' }, fetchTickets)
-        ]);
-        
-        // Проверяем актуальность фильтра после запросов
-        if (currentFilterRef.current !== 'active' || abortController.signal.aborted) {
-          setTicketsLoading(false);
-          return; // Фильтр изменился или запрос отменен
-        }
-        
-        const openData = await openRes.json();
-        const pendingData = await pendingRes.json();
-        
-        // Еще раз проверяем актуальность перед обработкой данных
-        if (currentFilterRef.current !== 'active' || abortController.signal.aborted) {
+          debugEnd('fetchTickets', {
+            statusFilter,
+            ticketsCount: tickets.length
+          });
           setTicketsLoading(false);
           return;
-        }
-        
-        let tickets = [
-          ...(openData.tickets || []),
-          ...(pendingData.tickets || [])
-        ].map((t: {
-          id: string;
-          subject: string;
-          status: 'open' | 'closed' | 'pending';
-          priority?: 'low' | 'normal' | 'high' | 'urgent';
-          created_at: string;
-          updated_at: string;
-          last_message_at: string;
-          closed_at?: string | null;
-          user?: {
+        } else {
+          // Для активных получаем открытые и в ожидании
+          const [openRes, pendingRes] = await Promise.all([
+            fetchWithRateLimit('/api/support/tickets?status=open', { credentials: 'include' }, fetchTickets),
+            fetchWithRateLimit('/api/support/tickets?status=pending', { credentials: 'include' }, fetchTickets)
+          ]);
+
+          // Проверяем актуальность фильтра после запросов
+          if (currentFilterRef.current !== 'active' || abortController.signal.aborted) {
+            setTicketsLoading(false);
+            return; // Фильтр изменился или запрос отменен
+          }
+
+          const openData = await openRes.json();
+          const pendingData = await pendingRes.json();
+
+          // Еще раз проверяем актуальность перед обработкой данных
+          if (currentFilterRef.current !== 'active' || abortController.signal.aborted) {
+            setTicketsLoading(false);
+            return;
+          }
+
+          let tickets = [
+            ...(openData.tickets || []),
+            ...(pendingData.tickets || [])
+          ].map((t: {
             id: string;
-            username: string;
-            user_id: string;
-          };
-          assigned_to?: string | null;
-          assigned_user?: {
-            id: string;
-            username: string;
-            user_id: string;
-          } | null;
-          last_message?: {
-            id: string;
-            message_text: string;
-            sender_type: 'user' | 'support' | 'system';
+            subject: string;
+            status: 'open' | 'closed' | 'pending';
+            priority?: 'low' | 'normal' | 'high' | 'urgent';
             created_at: string;
-            is_read: boolean;
-          } | null;
-        }) => ({
-          id: t.id,
-          subject: t.subject,
-          status: t.status,
-          priority: t.priority || 'normal',
-          created_at: t.created_at,
-          updated_at: t.updated_at,
-          last_message_at: t.last_message_at,
-          closed_at: t.closed_at,
-          user_id: (t as any).user_id, // Сохраняем user_id для проверки прав
-          user: t.user,
-          assigned_to: t.assigned_to,
-          assigned_user: t.assigned_user,
-          last_message: t.last_message || null
-        }));
-        
-        // Для активных сортируем по давности последнего ответа (убывание - старые сверху)
-        tickets = tickets.sort((a: Ticket, b: Ticket) => {
-          const dateA = new Date(a.last_message_at).getTime();
-          const dateB = new Date(b.last_message_at).getTime();
-          return dateA - dateB; // Старые сверху (дольше без ответа)
-        });
-        
-        // Финальная проверка перед обновлением состояния
-        if (currentFilterRef.current !== 'active' || abortController.signal.aborted) {
-          setTicketsLoading(false);
-          return;
-        }
-        
-        setTickets(tickets);
-        // Сохраняем количество тикетов в localStorage для скелетонов (отдельно для каждого фильтра)
-        if (typeof window !== 'undefined') {
-          const count = tickets.length;
-          localStorage.setItem(`support_panel_tickets_count_${statusFilter}`, count.toString());
-          // Если тикетов нет (0), не показываем скелетоны (null)
-          setSkeletonCount(count === 0 ? null : count);
-          
-          // Восстанавливаем последний открытый тикет после загрузки
-          if (!activeTicket && count > 0) {
-            const lastTicketId = localStorage.getItem('support_panel_last_ticket_id');
-            if (lastTicketId) {
-              const ticket = tickets.find((t: Ticket) => t.id === lastTicketId);
-              if (ticket) {
-                // Небольшая задержка для корректного обновления state
-                setTimeout(() => {
-                  setActiveTicket(ticket);
-                  currentTicketIdRef.current = ticket.id;
-                }, 50);
+            updated_at: string;
+            last_message_at: string;
+            closed_at?: string | null;
+            user?: {
+              id: string;
+              username: string;
+              user_id: string;
+            };
+            assigned_to?: string | null;
+            assigned_user?: {
+              id: string;
+              username: string;
+              user_id: string;
+            } | null;
+            last_message?: {
+              id: string;
+              message_text: string;
+              sender_type: 'user' | 'support' | 'system';
+              created_at: string;
+              is_read: boolean;
+            } | null;
+          }) => ({
+            id: t.id,
+            subject: t.subject,
+            status: t.status,
+            priority: t.priority || 'normal',
+            created_at: t.created_at,
+            updated_at: t.updated_at,
+            last_message_at: t.last_message_at,
+            closed_at: t.closed_at,
+            user_id: (t as any).user_id, // Сохраняем user_id для проверки прав
+            user: t.user,
+            assigned_to: t.assigned_to,
+            assigned_user: t.assigned_user,
+            last_message: t.last_message || null
+          }));
+
+          // Для активных сортируем по давности последнего ответа (убывание - старые сверху)
+          tickets = tickets.sort((a: Ticket, b: Ticket) => {
+            const dateA = new Date(a.last_message_at).getTime();
+            const dateB = new Date(b.last_message_at).getTime();
+            return dateA - dateB; // Старые сверху (дольше без ответа)
+          });
+
+          // Финальная проверка перед обновлением состояния
+          if (currentFilterRef.current !== 'active' || abortController.signal.aborted) {
+            setTicketsLoading(false);
+            return;
+          }
+
+          setTickets(tickets);
+          // Сохраняем количество тикетов в localStorage для скелетонов (отдельно для каждого фильтра)
+          if (typeof window !== 'undefined') {
+            const count = tickets.length;
+            localStorage.setItem(`support_panel_tickets_count_${statusFilter}`, count.toString());
+            // Если тикетов нет (0), не показываем скелетоны (null)
+            setSkeletonCount(count === 0 ? null : count);
+
+            // Восстанавливаем последний открытый тикет после загрузки
+            if (!activeTicket && count > 0) {
+              const lastTicketId = localStorage.getItem('support_panel_last_ticket_id');
+              if (lastTicketId) {
+                const ticket = tickets.find((t: Ticket) => t.id === lastTicketId);
+                if (ticket) {
+                  // Небольшая задержка для корректного обновления state
+                  setTimeout(() => {
+                    setActiveTicket(ticket);
+                    currentTicketIdRef.current = ticket.id;
+                  }, 50);
+                }
               }
             }
           }
+          debugEnd('fetchTickets', {
+            statusFilter,
+            ticketsCount: tickets.length
+          });
+          setTicketsLoading(false);
+          return;
         }
-        debugEnd('fetchTickets', { 
-          statusFilter, 
-          ticketsCount: tickets.length 
-        });
+      } catch (error) {
+        // Игнорируем ошибки отмененных запросов
+        if (error instanceof Error && error.name === 'AbortError') {
+          setTicketsLoading(false);
+          return;
+        }
+        // Rate limit обрабатывается через капчу, не сбрасываем loading и не показываем ошибку
+        if (error instanceof Error && error.message === 'RATE_LIMIT_EXCEEDED') {
+          return;
+        }
+        // Проверяем актуальность фильтра перед показом ошибки
+        if (currentFilterRef.current !== filterAtStart) {
+          setTicketsLoading(false);
+          return;
+        }
+        debugError('fetchTickets', { statusFilter, error });
+        // Ошибка получения тикетов
         setTicketsLoading(false);
-        return;
+        // Устанавливаем пустой список и сбрасываем скелетон
+        setTickets([]);
+        setSkeletonCount(null);
+        showNotification(translateError('Ошибка загрузки тикетов'), 'error');
       }
-    } catch (error) {
-      // Игнорируем ошибки отмененных запросов
-      if (error instanceof Error && error.name === 'AbortError') {
-        setTicketsLoading(false);
-        return;
-      }
-      // Rate limit обрабатывается через капчу, не сбрасываем loading и не показываем ошибку
-      if (error instanceof Error && error.message === 'RATE_LIMIT_EXCEEDED') {
-        return;
-      }
-      // Проверяем актуальность фильтра перед показом ошибки
-      if (currentFilterRef.current !== filterAtStart) {
-        setTicketsLoading(false);
-        return;
-      }
-      debugError('fetchTickets', { statusFilter, error });
-      // Ошибка получения тикетов
-      setTicketsLoading(false);
-      // Устанавливаем пустой список и сбрасываем скелетон
-      setTickets([]);
-      setSkeletonCount(null);
-      showNotification(translateError('Ошибка загрузки тикетов'), 'error');
-    }
     });
   };
 
   const fetchMessages = async (ticketId: string) => {
     // Обновляем ref текущего тикета
     currentTicketIdRef.current = ticketId;
-    
+
     // Определяем, является ли это первой загрузкой сообщений для этого тикета
     const isFirstLoad = isInitialMessagesLoadRef.current;
-    
+
     // Загружаем кэшированные сообщения для мгновенного отображения
     const cachedMessages = loadMessagesFromCache(ticketId);
     if (cachedMessages && cachedMessages.length > 0) {
@@ -1710,146 +1707,146 @@ export default function SupportPanel() {
         restoreScrollPosition(ticketId);
       });
     }
-    
+
     // Не блокируем загрузку сообщений заранее - мы должны получать актуальные данные с сервера
     // даже если тикет занят другим саппортом, чтобы корректно обновить состояние UI
-    
+
     return debugPerformanceAsync('fetchMessages', async () => {
       setMessagesLoading(true);
       try {
         debugStart('fetchMessages', { ticketId });
         const response = await fetchWithRateLimit(
-        `/api/support/tickets/${ticketId}`,
-        {
-          credentials: 'include'
-        },
-        async () => {
-          // Retry callback - проверяем, что тикет не изменился
-          if (currentTicketIdRef.current === ticketId) {
-            await fetchMessages(ticketId);
+          `/api/support/tickets/${ticketId}`,
+          {
+            credentials: 'include'
+          },
+          async () => {
+            // Retry callback - проверяем, что тикет не изменился
+            if (currentTicketIdRef.current === ticketId) {
+              await fetchMessages(ticketId);
+            }
           }
+        );
+        const data = await response.json();
+
+        // Проверяем, что тикет не изменился во время запроса
+        if (currentTicketIdRef.current !== ticketId) {
+          setMessagesLoading(false);
+          return;
         }
-      );
-      const data = await response.json();
-      
-      // Проверяем, что тикет не изменился во время запроса
-      if (currentTicketIdRef.current !== ticketId) {
-        setMessagesLoading(false);
-        return;
-      }
-      
-      if (response.ok) {
-        // Маппим сообщения с вложениями (оптимизировано - используем данные с сервера)
-        // Обрабатываем вложения, формируя storage_url если он отсутствует
-        const mappedMessages = (data.messages || []).map((m: { 
-          id: string; 
-          message_text: string; 
-          sender_type: string; 
-          created_at: string; 
-          is_read: boolean; 
-          sender?: { id: string; username: string; user_id: string; avatar?: string | null };
-          attachments?: Array<{
+
+        if (response.ok) {
+          // Маппим сообщения с вложениями (оптимизировано - используем данные с сервера)
+          // Обрабатываем вложения, формируя storage_url если он отсутствует
+          const mappedMessages = (data.messages || []).map((m: {
             id: string;
-            file_name: string;
-            file_type: string;
-            file_size: number;
-            storage_url?: string;
-            storage_path?: string;
-          }>;
-        }) => ({
-          id: m.id,
-          ticket_id: ticketId,
-          sender_id: m.sender?.id || '',
-          sender_type: m.sender_type,
-          message_text: m.message_text,
-          is_read: m.is_read,
-          created_at: m.created_at,
-          sender: m.sender,
-          attachments: processAttachments(m.attachments)
-        }));
-        
-        setMessages(mappedMessages);
-        
-        // Кэшируем сообщения
-        saveMessagesToCache(ticketId, mappedMessages);
-        
-        // После первой загрузки сбрасываем флаг и восстанавливаем скролл
-        if (isFirstLoad) {
-          // Используем setTimeout, чтобы дать React время отрендерить сообщения без анимации
-          setTimeout(() => {
-            isInitialMessagesLoadRef.current = false;
-            // Восстанавливаем позицию скролла только если не было кэша
-            if (!cachedMessages || cachedMessages.length === 0) {
-              restoreScrollPosition(ticketId);
-            }
-          }, 100);
-        }
-        
-        // Обновляем activeTicket с актуальными данными тикета (статус, назначение и т.д.)
-        // чтобы UI корректно отображал состояние тикета после получения новых сообщений
-        // Это особенно важно, когда приходит системное сообщение о взятии тикета
-        if (data.ticket && currentTicketIdRef.current === ticketId) {
-          setActiveTicket((prev) => {
-            if (prev && prev.id === ticketId) {
-              // ВАЖНО: всегда обновляем assigned_to и assigned_user из ответа API
-              // даже если они null - это означает, что тикет не назначен
-              // Используем явную проверку на undefined, чтобы не потерять данные
-              return {
-                ...prev,
-                status: data.ticket.status,
-                user_id: data.ticket.user_id ?? prev.user_id, // Сохраняем user_id для проверки прав
-                user: data.ticket.user || prev.user,
-                // КРИТИЧНО: API всегда возвращает assigned_to и assigned_user в ответе
-                // Используем их напрямую, даже если они null (тикет не назначен)
-                // Это гарантирует, что UI всегда синхронизирован с сервером
-                assigned_to: data.ticket.assigned_to ?? null,
-                assigned_user: data.ticket.assigned_user ?? null,
-                updated_at: data.ticket.updated_at,
-                closed_at: 'closed_at' in data.ticket ? data.ticket.closed_at : prev.closed_at
-              };
-            } else if (data.ticket) {
-              return {
-                ...data.ticket,
-                user_id: data.ticket.user_id, // Сохраняем user_id для проверки прав
-                assigned_to: data.ticket.assigned_to ?? null,
-                assigned_user: data.ticket.assigned_user ?? null
-              };
-            }
-            return prev;
+            message_text: string;
+            sender_type: string;
+            created_at: string;
+            is_read: boolean;
+            sender?: { id: string; username: string; user_id: string; avatar?: string | null };
+            attachments?: Array<{
+              id: string;
+              file_name: string;
+              file_type: string;
+              file_size: number;
+              storage_url?: string;
+              storage_path?: string;
+            }>;
+          }) => ({
+            id: m.id,
+            ticket_id: ticketId,
+            sender_id: m.sender?.id || '',
+            sender_type: m.sender_type,
+            message_text: m.message_text,
+            is_read: m.is_read,
+            created_at: m.created_at,
+            sender: m.sender,
+            attachments: processAttachments(m.attachments)
+          }));
+
+          setMessages(mappedMessages);
+
+          // Кэшируем сообщения
+          saveMessagesToCache(ticketId, mappedMessages);
+
+          // После первой загрузки сбрасываем флаг и восстанавливаем скролл
+          if (isFirstLoad) {
+            // Используем setTimeout, чтобы дать React время отрендерить сообщения без анимации
+            setTimeout(() => {
+              isInitialMessagesLoadRef.current = false;
+              // Восстанавливаем позицию скролла только если не было кэша
+              if (!cachedMessages || cachedMessages.length === 0) {
+                restoreScrollPosition(ticketId);
+              }
+            }, 100);
+          }
+
+          // Обновляем activeTicket с актуальными данными тикета (статус, назначение и т.д.)
+          // чтобы UI корректно отображал состояние тикета после получения новых сообщений
+          // Это особенно важно, когда приходит системное сообщение о взятии тикета
+          if (data.ticket && currentTicketIdRef.current === ticketId) {
+            setActiveTicket((prev) => {
+              if (prev && prev.id === ticketId) {
+                // ВАЖНО: всегда обновляем assigned_to и assigned_user из ответа API
+                // даже если они null - это означает, что тикет не назначен
+                // Используем явную проверку на undefined, чтобы не потерять данные
+                return {
+                  ...prev,
+                  status: data.ticket.status,
+                  user_id: data.ticket.user_id ?? prev.user_id, // Сохраняем user_id для проверки прав
+                  user: data.ticket.user || prev.user,
+                  // КРИТИЧНО: API всегда возвращает assigned_to и assigned_user в ответе
+                  // Используем их напрямую, даже если они null (тикет не назначен)
+                  // Это гарантирует, что UI всегда синхронизирован с сервером
+                  assigned_to: data.ticket.assigned_to ?? null,
+                  assigned_user: data.ticket.assigned_user ?? null,
+                  updated_at: data.ticket.updated_at,
+                  closed_at: 'closed_at' in data.ticket ? data.ticket.closed_at : prev.closed_at
+                };
+              } else if (data.ticket) {
+                return {
+                  ...data.ticket,
+                  user_id: data.ticket.user_id, // Сохраняем user_id для проверки прав
+                  assigned_to: data.ticket.assigned_to ?? null,
+                  assigned_user: data.ticket.assigned_user ?? null
+                };
+              }
+              return prev;
+            });
+
+            // Также обновляем тикет в списке, чтобы данные были синхронизированы
+            updateTicketInList(ticketId, {
+              status: data.ticket.status,
+              assigned_to: data.ticket.assigned_to ?? null,
+              assigned_user: data.ticket.assigned_user ?? null,
+              updated_at: data.ticket.updated_at,
+              closed_at: data.ticket.closed_at ?? undefined
+            });
+          }
+
+          // Отмечаем сообщения как прочитанные (debounced)
+          markMessagesAsRead(ticketId);
+          debugEnd('fetchMessages', {
+            ticketId,
+            messagesCount: mappedMessages.length
           });
-          
-          // Также обновляем тикет в списке, чтобы данные были синхронизированы
-          updateTicketInList(ticketId, {
-            status: data.ticket.status,
-            assigned_to: data.ticket.assigned_to ?? null,
-            assigned_user: data.ticket.assigned_user ?? null,
-            updated_at: data.ticket.updated_at,
-            closed_at: data.ticket.closed_at ?? undefined
-          });
+        } else {
+          const errorMessage = data.error || 'Ошибка загрузки сообщений';
+          debugError('fetchMessages', { ticketId, error: errorMessage });
+          showNotification(translateError(errorMessage), 'error');
         }
-        
-        // Отмечаем сообщения как прочитанные (debounced)
-        markMessagesAsRead(ticketId);
-        debugEnd('fetchMessages', { 
-          ticketId, 
-          messagesCount: mappedMessages.length 
-        });
-      } else {
-        const errorMessage = data.error || 'Ошибка загрузки сообщений';
-        debugError('fetchMessages', { ticketId, error: errorMessage });
-        showNotification(translateError(errorMessage), 'error');
-      }
-    } catch (error) {
-      if (error instanceof Error && error.message === 'RATE_LIMIT_EXCEEDED') {
-        // Rate limit обрабатывается через капчу, не показываем ошибку
+      } catch (error) {
+        if (error instanceof Error && error.message === 'RATE_LIMIT_EXCEEDED') {
+          // Rate limit обрабатывается через капчу, не показываем ошибку
+          setMessagesLoading(false);
+          return;
+        }
+        debugError('fetchMessages', { ticketId, error });
+        showNotification(translateError('Ошибка загрузки сообщений'), 'error');
+      } finally {
         setMessagesLoading(false);
-        return;
       }
-      debugError('fetchMessages', { ticketId, error });
-      showNotification(translateError('Ошибка загрузки сообщений'), 'error');
-    } finally {
-      setMessagesLoading(false);
-    }
     });
   };
 
@@ -1860,7 +1857,7 @@ export default function SupportPanel() {
       // Получаем CSRF токен для защиты от спама
       const { getCSRFToken } = await import('@/lib/utils/csrf-client');
       const csrfToken = await getCSRFToken();
-      
+
       const response = await fetchWithRateLimit(
         `/api/support/tickets/${activeTicket.id}/messages`,
         {
@@ -1869,7 +1866,7 @@ export default function SupportPanel() {
             'Content-Type': 'application/json'
           },
           credentials: 'include',
-          body: JSON.stringify({ 
+          body: JSON.stringify({
             message: messageText.trim(),
             csrfToken
           })
@@ -1941,13 +1938,13 @@ export default function SupportPanel() {
   const handleAssignTicket = async (ticketId: string, userId: string) => {
     try {
       const currentTicket = tickets.find(t => t.id === ticketId) || activeTicket;
-      
+
       // Архивные тикеты (closed) не могут быть закреплены/отвязаны
       if (currentTicket && currentTicket.status === 'closed') {
         showNotification('Архивные тикеты не могут быть закреплены или отвязаны', 'error');
         return;
       }
-      
+
       // Если тикет уже взят текущим саппортом - отвязываем его
       if (currentTicket?.assigned_to === userId) {
         const response = await fetchWithRateLimit(
@@ -1969,8 +1966,8 @@ export default function SupportPanel() {
           if (activeTicket?.id === ticketId) {
             setActiveTicket((prev) => {
               if (prev && prev.id === ticketId) {
-                return { 
-                  ...prev, 
+                return {
+                  ...prev,
                   assigned_to: null,
                   assigned_user: null
                 };
@@ -2016,8 +2013,8 @@ export default function SupportPanel() {
         if (activeTicket?.id === ticketId) {
           setActiveTicket((prev) => {
             if (prev && prev.id === ticketId) {
-              return { 
-                ...prev, 
+              return {
+                ...prev,
                 assigned_to: data.ticket.assigned_to || null,
                 assigned_user: data.ticket.assigned_user || null,
                 status: data.ticket.status || 'pending'
@@ -2032,7 +2029,7 @@ export default function SupportPanel() {
           assigned_user: data.ticket.assigned_user || null,
           status: data.ticket.status || 'pending'
         });
-        
+
         // ВАЖНО: Обновляем сообщения, чтобы показать системное сообщение о взятии тикета
         // Это обновит activeTicket с актуальными данными из API, включая assigned_to и assigned_user
         if (activeTicket?.id === ticketId) {
@@ -2077,7 +2074,7 @@ export default function SupportPanel() {
         showNotification('Статус архивных тикетов нельзя изменить', 'error');
         return;
       }
-      
+
       const response = await fetchWithRateLimit(
         `/api/support/tickets/${ticketId}`,
         {
@@ -2101,8 +2098,8 @@ export default function SupportPanel() {
 
         // Обновляем активный тикет с полными данными (включая assigned_to)
         if (activeTicket?.id === ticketId) {
-          setActiveTicket({ 
-            ...activeTicket, 
+          setActiveTicket({
+            ...activeTicket,
             status: newStatus,
             assigned_to: data.ticket.assigned_to || null,
             assigned_user: data.ticket.assigned_user || null
@@ -2232,11 +2229,11 @@ export default function SupportPanel() {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const isTicketOld = (_ticket: Ticket): boolean => {
     if (_ticket.status === 'closed') return false;
-    
+
     const lastMessageTime = new Date(_ticket.last_message_at).getTime();
     const now = Date.now();
     const minutesSinceLastMessage = (now - lastMessageTime) / (1000 * 60);
-    
+
     return minutesSinceLastMessage >= 37;
   };
 
@@ -2244,11 +2241,11 @@ export default function SupportPanel() {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const getUpLabelColor = (_ticket: Ticket): string => {
     if (_ticket.status === 'closed') return '';
-    
+
     const lastMessageTime = new Date(_ticket.last_message_at).getTime();
     const now = Date.now();
     const minutesSinceLastMessage = (now - lastMessageTime) / (1000 * 60);
-    
+
     // 2 часа = 120 минут - красный
     if (minutesSinceLastMessage >= 120) {
       return 'text-red-400';
@@ -2257,7 +2254,7 @@ export default function SupportPanel() {
     if (minutesSinceLastMessage >= 37) {
       return 'text-yellow-400';
     }
-    
+
     return '';
   };
 
@@ -2266,16 +2263,16 @@ export default function SupportPanel() {
   const getTicketUrgencyText = (ticket: Ticket): string => {
     if (statusFilter === 'archive') return '';
     if (ticket.status === 'closed') return '';
-    
+
     const lastMessageTime = new Date(ticket.last_message_at).getTime();
     const now = Date.now();
     const minutesSinceLastMessage = (now - lastMessageTime) / (1000 * 60);
-    
+
     // 37+ минут - показываем "UP!"
     if (minutesSinceLastMessage >= 37) {
       return 'UP!';
     }
-    
+
     return '';
   };
 
@@ -2283,18 +2280,18 @@ export default function SupportPanel() {
   const getTicketUrgencyTextColor = (ticket: Ticket): string => {
     if (statusFilter === 'archive') return '';
     if (ticket.status === 'closed') return '';
-    
+
     const lastMessageTime = new Date(ticket.last_message_at).getTime();
     const now = Date.now();
     const minutesSinceLastMessage = (now - lastMessageTime) / (1000 * 60);
-    
+
     if (minutesSinceLastMessage >= 120) {
       return 'text-red-400';
     }
     if (minutesSinceLastMessage >= 30) {
       return 'text-yellow-400';
     }
-    
+
     return '';
   };
 
@@ -2302,7 +2299,7 @@ export default function SupportPanel() {
   const filteredTickets = (() => {
     const searchQuery = statusFilter === 'archive' ? archiveSearchQuery : activeSearchQuery;
     if (!searchQuery.trim()) return tickets;
-    
+
     const query = searchQuery.trim().toLowerCase();
     return tickets.filter((ticket) => {
       if (statusFilter === 'archive') {
@@ -2357,7 +2354,7 @@ export default function SupportPanel() {
     <div className="flex h-screen bg-neutral-950 text-neutral-100 overflow-hidden">
       {/* Notification */}
       {notification.show && (
-        <div 
+        <div
           ref={notificationRef}
           className="hidden lg:block fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-3 rounded-lg shadow-lg bg-red-500/20 text-red-400 border border-red-500/30"
         >
@@ -2367,7 +2364,7 @@ export default function SupportPanel() {
 
       {/* Mobile Menu Overlay */}
       {mobileMenuOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
           onClick={() => setMobileMenuOpen(false)}
         />
@@ -2411,11 +2408,10 @@ export default function SupportPanel() {
                 }, 100);
               }}
               disabled={isFilterChanging || ticketsLoading}
-              className={`flex-1 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                statusFilter === 'active'
+              className={`flex-1 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${statusFilter === 'active'
                   ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20'
                   : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700 hover:text-white'
-              } ${(isFilterChanging || ticketsLoading) ? 'opacity-50' : ''}`}
+                } ${(isFilterChanging || ticketsLoading) ? 'opacity-50' : ''}`}
             >
               Активные
             </button>
@@ -2442,16 +2438,15 @@ export default function SupportPanel() {
                 }, 100);
               }}
               disabled={isFilterChanging || ticketsLoading}
-              className={`flex-1 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                statusFilter === 'archive'
+              className={`flex-1 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${statusFilter === 'archive'
                   ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20'
                   : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700 hover:text-white'
-              } ${(isFilterChanging || ticketsLoading) ? 'opacity-50' : ''}`}
+                } ${(isFilterChanging || ticketsLoading) ? 'opacity-50' : ''}`}
             >
               Архив
             </button>
           </div>
-          
+
           {/* Поиск в архиве */}
           {statusFilter === 'archive' && (
             <div className="relative">
@@ -2462,10 +2457,10 @@ export default function SupportPanel() {
                 placeholder="Поиск по логину или теме"
                 className="w-full px-3 py-2 pl-10 bg-neutral-800 border border-neutral-700 rounded-lg text-sm text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
-              <svg 
-                className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-neutral-500" 
-                fill="none" 
-                stroke="currentColor" 
+              <svg
+                className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-neutral-500"
+                fill="none"
+                stroke="currentColor"
                 viewBox="0 0 24 24"
               >
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -2482,7 +2477,7 @@ export default function SupportPanel() {
               )}
             </div>
           )}
-          
+
           {/* Поиск в активных тикетах */}
           {statusFilter === 'active' && (
             <div className="relative">
@@ -2493,10 +2488,10 @@ export default function SupportPanel() {
                 placeholder="Поиск по логину или ID"
                 className="w-full px-3 py-2 pl-10 bg-neutral-800 border border-neutral-700 rounded-lg text-sm text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
-              <svg 
-                className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-neutral-500" 
-                fill="none" 
-                stroke="currentColor" 
+              <svg
+                className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-neutral-500"
+                fill="none"
+                stroke="currentColor"
                 viewBox="0 0 24 24"
               >
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -2543,7 +2538,7 @@ export default function SupportPanel() {
               const urgencyColor = getTicketUrgencyColor(ticket);
               const urgencyText = getTicketUrgencyText(ticket);
               const urgencyTextColor = getTicketUrgencyTextColor(ticket);
-              
+
               return (
                 <div
                   key={ticket.id}
@@ -2565,40 +2560,39 @@ export default function SupportPanel() {
                   }}
                   className={`p-4 rounded-lg border transition-all select-none ${
                     // Для архивных тикетов не блокируем, для активных - только если назначен другому
-                    ticket.status === 'closed' || 
-                    !(ticket.assigned_to && ticket.assigned_to !== authState.userId)
+                    ticket.status === 'closed' ||
+                      !(ticket.assigned_to && ticket.assigned_to !== authState.userId)
                       ? 'cursor-pointer'
                       : ''
-                  } ${
-                    activeTicket?.id === ticket.id
+                    } ${activeTicket?.id === ticket.id
                       ? 'bg-blue-500/10 border-blue-500/50 shadow-lg'
                       : `bg-neutral-800/50 border-neutral-700 hover:bg-neutral-800 hover:border-neutral-600 ${urgencyColor}`
-                  }`}
+                    }`}
                 >
                   <div className={`flex items-start justify-between mb-2 ${
                     // Применяем opacity только к заголовку и статусу, если тикет назначен другому
-                    ticket.status !== 'closed' && 
-                    ticket.assigned_to && ticket.assigned_to !== authState.userId
+                    ticket.status !== 'closed' &&
+                      ticket.assigned_to && ticket.assigned_to !== authState.userId
                       ? 'opacity-50'
                       : ''
-                  }`}>
+                    }`}>
                     <h3 className="text-sm font-medium text-white line-clamp-1 flex-1">
                       {ticket.subject}
                     </h3>
                     <span className={`ml-2 px-2 py-0.5 text-xs rounded border flex-shrink-0 ${getStatusColor(ticket.status)}`}>
                       {ticket.status === 'open' ? 'Открыт' :
-                       ticket.status === 'pending' ? 'В работе' :
-                       'Закрыт'}
+                        ticket.status === 'pending' ? 'В работе' :
+                          'Закрыт'}
                     </span>
                   </div>
                   {ticket.user && (
                     <div className={`flex items-baseline gap-1 mb-1 ${
                       // Применяем opacity к информации о пользователе, если тикет назначен другому
-                      ticket.status !== 'closed' && 
-                      ticket.assigned_to && ticket.assigned_to !== authState.userId
+                      ticket.status !== 'closed' &&
+                        ticket.assigned_to && ticket.assigned_to !== authState.userId
                         ? 'opacity-50'
                         : ''
-                    }`}>
+                      }`}>
                       <span className="text-xs font-medium text-white">{ticket.user.username}</span>
                       <span className="text-xs text-neutral-400">#{ticket.user.user_id}</span>
                     </div>
@@ -2606,11 +2600,11 @@ export default function SupportPanel() {
                   <div className="flex items-center justify-between">
                     <p className={`text-xs text-neutral-500 ${
                       // Применяем opacity к дате, если тикет назначен другому
-                      ticket.status !== 'closed' && 
-                      ticket.assigned_to && ticket.assigned_to !== authState.userId
+                      ticket.status !== 'closed' &&
+                        ticket.assigned_to && ticket.assigned_to !== authState.userId
                         ? 'opacity-50'
                         : ''
-                    }`}>
+                      }`}>
                       {formatDate(ticket.last_message_at)}
                     </p>
                     <div className="flex items-center gap-2">
@@ -2627,12 +2621,12 @@ export default function SupportPanel() {
                   {ticket.last_message && ticket.status !== 'closed' && statusFilter !== 'archive' && (() => {
                     const SYSTEM_MESSAGE_TEXT = 'Спасибо за ваше обращение. Мы получили ваш запрос и ответим в ближайшее время.';
                     const lastMessageText = ticket.last_message.message_text || '';
-                    const isStatusChangeMessage = lastMessageText.includes('Статус тикета изменен') || 
+                    const isStatusChangeMessage = lastMessageText.includes('Статус тикета изменен') ||
                       lastMessageText.includes('Ваше обращение приняли в обработку') ||
                       lastMessageText.includes('Ваше обращение было закрыто');
                     // Используем trim() для надежного сравнения
                     const isSystemMessage = lastMessageText.trim() === SYSTEM_MESSAGE_TEXT.trim() || isStatusChangeMessage;
-                    
+
                     return (
                       <div className="text-xs text-neutral-500 mt-1.5 truncate flex items-center gap-2">
                         <span className="flex-shrink-0 text-neutral-600">
@@ -2711,11 +2705,10 @@ export default function SupportPanel() {
                           setMobileActionsOpen(false);
                         }
                       }}
-                      className={`w-full px-4 py-2 text-white text-sm rounded-lg transition-colors font-medium ${
-                        activeTicket.assigned_to === authState.userId
+                      className={`w-full px-4 py-2 text-white text-sm rounded-lg transition-colors font-medium ${activeTicket.assigned_to === authState.userId
                           ? 'bg-orange-600 hover:bg-orange-700'
                           : 'bg-blue-600 hover:bg-blue-700'
-                      }`}
+                        }`}
                     >
                       {activeTicket.assigned_to === authState.userId ? 'Отвязать тикет' : 'Взять тикет'}
                     </button>
@@ -2763,59 +2756,59 @@ export default function SupportPanel() {
                 {/* User Actions Block */}
                 {activeTicket.user && (
                   <div className="border-b border-neutral-800 p-3 bg-neutral-900/50 flex-shrink-0">
-                  <div className="flex items-center gap-3 mb-3">
-                    {(() => {
-                      const avatarUrl = getAvatarUrl(activeTicket.user.avatar);
-                      const gradientClasses = getGradientClasses(activeTicket.user.avatar);
-                      
-                      return (
-                        <div className={`w-10 h-10 rounded-full overflow-hidden ${avatarUrl ? '' : gradientClasses} flex items-center justify-center text-white font-semibold text-sm flex-shrink-0`}>
-                          {avatarUrl ? (
-                            <Image
-                              src={avatarUrl}
-                              alt={activeTicket.user.username}
-                              width={40}
-                              height={40}
-                              className="w-full h-full object-cover"
-                              unoptimized
-                            />
-                          ) : (
-                            getInitial(activeTicket.user.username)
-                          )}
+                    <div className="flex items-center gap-3 mb-3">
+                      {(() => {
+                        const avatarUrl = getAvatarUrl(activeTicket.user.avatar);
+                        const gradientClasses = getGradientClasses(activeTicket.user.avatar);
+
+                        return (
+                          <div className={`w-10 h-10 rounded-full overflow-hidden ${avatarUrl ? '' : gradientClasses} flex items-center justify-center text-white font-semibold text-sm flex-shrink-0`}>
+                            {avatarUrl ? (
+                              <Image
+                                src={avatarUrl}
+                                alt={activeTicket.user.username}
+                                width={40}
+                                height={40}
+                                className="w-full h-full object-cover"
+                                unoptimized
+                              />
+                            ) : (
+                              getInitial(activeTicket.user.username)
+                            )}
+                          </div>
+                        );
+                      })()}
+                      <div>
+                        <div className="text-sm font-medium text-white">{activeTicket.user.username}</div>
+                        <div className="text-xs text-neutral-400">#{activeTicket.user.user_id}</div>
+                      </div>
                     </div>
-                      );
-                    })()}
-                    <div>
-                      <div className="text-sm font-medium text-white">{activeTicket.user.username}</div>
-                      <div className="text-xs text-neutral-400">#{activeTicket.user.user_id}</div>
+                    <div className="flex gap-2 flex-wrap">
+                      <button className="px-2 sm:px-3 py-1 sm:py-1.5 text-[10px] sm:text-xs bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded-lg transition-colors border border-neutral-700">
+                        Заблокировать создание тикетов
+                      </button>
+                      <button className="px-2 sm:px-3 py-1 sm:py-1.5 text-[10px] sm:text-xs bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded-lg transition-colors border border-neutral-700">
+                        Продлить подписку
+                      </button>
+                      <button className="px-2 sm:px-3 py-1 sm:py-1.5 text-[10px] sm:text-xs bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded-lg transition-colors border border-neutral-700">
+                        Добавить
+                      </button>
                     </div>
                   </div>
-                  <div className="flex gap-2 flex-wrap">
-                    <button className="px-2 sm:px-3 py-1 sm:py-1.5 text-[10px] sm:text-xs bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded-lg transition-colors border border-neutral-700">
-                      Заблокировать создание тикетов
-                    </button>
-                    <button className="px-2 sm:px-3 py-1 sm:py-1.5 text-[10px] sm:text-xs bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded-lg transition-colors border border-neutral-700">
-                      Продлить подписку
-                    </button>
-                    <button className="px-2 sm:px-3 py-1 sm:py-1.5 text-[10px] sm:text-xs bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded-lg transition-colors border border-neutral-700">
-                      Добавить
-                    </button>
-                  </div>
-                </div>
-              )}
-              
+                )}
+
                 {/* Messages */}
-                <div 
+                <div
                   ref={messagesContainerRef}
                   className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar min-h-0"
                   onScroll={() => {
                     // Debounce сохранения позиции скролла
                     if (isRestoringScrollRef.current || !activeTicket) return;
-                    
+
                     if (scrollSaveTimeoutRef.current) {
                       clearTimeout(scrollSaveTimeoutRef.current);
                     }
-                    
+
                     scrollSaveTimeoutRef.current = setTimeout(() => {
                       if (activeTicket) {
                         saveScrollPosition(activeTicket.id);
@@ -2823,89 +2816,89 @@ export default function SupportPanel() {
                     }, 300);
                   }}
                 >
-                {messagesLoading ? (
-                  <div className="flex items-center justify-center h-full">
-                    <div className="text-center">
-                      <div className="spinner mx-auto"></div>
-                      <p className="mt-2 text-sm text-neutral-400">Загрузка сообщений...</p>
+                  {messagesLoading ? (
+                    <div className="flex items-center justify-center h-full">
+                      <div className="text-center">
+                        <div className="spinner mx-auto"></div>
+                        <p className="mt-2 text-sm text-neutral-400">Загрузка сообщений...</p>
+                      </div>
                     </div>
-                  </div>
-                ) : messages.length === 0 ? (
-                  <div className="text-center py-8 text-neutral-400 text-sm">
-                    Нет сообщений
-                  </div>
-                ) : (
-                  messages.map((message, index) => {
-                    // Проверяем, является ли сообщение системным (автоматическим или о смене статуса)
-                    const SYSTEM_MESSAGE_TEXT = 'Спасибо за ваше обращение. Мы получили ваш запрос и ответим в ближайшее время.';
-                    const messageText = message.message_text || '';
-                    const isStatusChangeMessage = messageText.includes('Статус тикета изменен') || 
-                      messageText.includes('Ваше обращение приняли в обработку') ||
-                      messageText.includes('Ваше обращение было закрыто');
-                    // Системное сообщение определяется по тексту, независимо от sender_type
-                    // Используем trim() для надежного сравнения
-                    const isSystemMessage = messageText.trim() === SYSTEM_MESSAGE_TEXT.trim() || isStatusChangeMessage;
-                    
-                    // Показываем дату если это первое сообщение или дата изменилась
-                    const showDate = index === 0 || 
-                      new Date(message.created_at).getDate() !== 
-                      new Date(messages[index - 1].created_at).getDate();
-                    
-                    const formatTime = (dateString: string) => {
-                      return new Intl.DateTimeFormat('ru-RU', {
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      }).format(new Date(dateString));
-                    };
-                    
-                    const formatMessageDate = (dateString: string) => {
-                      const today = new Date();
-                      today.setHours(0, 0, 0, 0);
-                      const messageDate = new Date(dateString);
-                      messageDate.setHours(0, 0, 0, 0);
-                      const diffTime = today.getTime() - messageDate.getTime();
-                      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+                  ) : messages.length === 0 ? (
+                    <div className="text-center py-8 text-neutral-400 text-sm">
+                      Нет сообщений
+                    </div>
+                  ) : (
+                    messages.map((message, index) => {
+                      // Проверяем, является ли сообщение системным (автоматическим или о смене статуса)
+                      const SYSTEM_MESSAGE_TEXT = 'Спасибо за ваше обращение. Мы получили ваш запрос и ответим в ближайшее время.';
+                      const messageText = message.message_text || '';
+                      const isStatusChangeMessage = messageText.includes('Статус тикета изменен') ||
+                        messageText.includes('Ваше обращение приняли в обработку') ||
+                        messageText.includes('Ваше обращение было закрыто');
+                      // Системное сообщение определяется по тексту, независимо от sender_type
+                      // Используем trim() для надежного сравнения
+                      const isSystemMessage = messageText.trim() === SYSTEM_MESSAGE_TEXT.trim() || isStatusChangeMessage;
 
-                      if (diffDays === 0) {
-                        return 'Сегодня';
-                      } else if (diffDays === 1) {
-                        return 'Вчера';
-                      } else {
-                        return messageDate.toLocaleDateString('ru-RU', {
-                          day: 'numeric',
-                          month: 'long'
-                        });
-                      }
-                    };
-                    
-                    // Перевернутая логика: саппорт слева, пользователь справа
-                    // Fallback: если sender_type не определен, определяем по sender_id
-                    // (в админ-панели текущий пользователь всегда саппорт)
-                    const senderType = message.sender_type || (authState.hasSupportAccess ? 'support' : 'user');
-                    const isSupport = senderType === 'support' && !isSystemMessage;
-                    const isUser = senderType === 'user';
-                    
-                    return (
-                      <MessageItem
-                        key={message.id}
-                        message={message}
-                        showDate={showDate}
-                        isSystemMessage={isSystemMessage}
-                        isSupport={isSupport}
-                        isUser={isUser}
-                        formatDate={formatMessageDate}
-                        formatTime={formatTime}
-                        getInitial={getInitial}
-                        isInitialLoad={isInitialMessagesLoadRef.current}
-                        onImageClick={(url, alt) => setViewingImage({ url, alt })}
-                        formatFileSize={formatFileSize}
-                      />
-                    );
-                  })
-                )}
+                      // Показываем дату если это первое сообщение или дата изменилась
+                      const showDate = index === 0 ||
+                        new Date(message.created_at).getDate() !==
+                        new Date(messages[index - 1].created_at).getDate();
+
+                      const formatTime = (dateString: string) => {
+                        return new Intl.DateTimeFormat('ru-RU', {
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        }).format(new Date(dateString));
+                      };
+
+                      const formatMessageDate = (dateString: string) => {
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0);
+                        const messageDate = new Date(dateString);
+                        messageDate.setHours(0, 0, 0, 0);
+                        const diffTime = today.getTime() - messageDate.getTime();
+                        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+                        if (diffDays === 0) {
+                          return 'Сегодня';
+                        } else if (diffDays === 1) {
+                          return 'Вчера';
+                        } else {
+                          return messageDate.toLocaleDateString('ru-RU', {
+                            day: 'numeric',
+                            month: 'long'
+                          });
+                        }
+                      };
+
+                      // Перевернутая логика: саппорт слева, пользователь справа
+                      // Fallback: если sender_type не определен, определяем по sender_id
+                      // (в админ-панели текущий пользователь всегда саппорт)
+                      const senderType = message.sender_type || (authState.hasSupportAccess ? 'support' : 'user');
+                      const isSupport = senderType === 'support' && !isSystemMessage;
+                      const isUser = senderType === 'user';
+
+                      return (
+                        <MessageItem
+                          key={message.id}
+                          message={message}
+                          showDate={showDate}
+                          isSystemMessage={isSystemMessage}
+                          isSupport={isSupport}
+                          isUser={isUser}
+                          formatDate={formatMessageDate}
+                          formatTime={formatTime}
+                          getInitial={getInitial}
+                          isInitialLoad={isInitialMessagesLoadRef.current}
+                          onImageClick={(url, alt) => setViewingImage({ url, alt })}
+                          formatFileSize={formatFileSize}
+                        />
+                      );
+                    })
+                  )}
                   <div ref={messagesEndRef} />
                 </div>
-                
+
                 {/* Input */}
                 {activeTicket.status === 'closed' ? (
                   <div className="border-t border-neutral-800 p-3 bg-neutral-900/50 flex-shrink-0">
@@ -2913,7 +2906,7 @@ export default function SupportPanel() {
                       <p className="text-sm text-neutral-400">Тикет закрыт. Новые сообщения недоступны.</p>
                     </div>
                   </div>
-                ) : authState.hasSupportAccess && authState.userId && 
+                ) : authState.hasSupportAccess && authState.userId &&
                   (activeTicket.user_id === authState.userId || activeTicket.user?.id === authState.userId) ? (
                   <div className="border-t border-neutral-800 p-3 bg-neutral-900/50 flex-shrink-0">
                     <div className="text-center py-2">
@@ -2964,157 +2957,153 @@ export default function SupportPanel() {
               <p className="text-neutral-400">Выберите тикет из списка</p>
             </div>
           )}
-          
+
           {/* Правая панель с кнопками управления - третья колонка на ПК (всегда видна) */}
           {isLargeScreen ? (
-            <div className={`bg-neutral-900 border-l border-neutral-800 transition-all duration-300 flex-shrink-0 ${
-              rightPanelCollapsed ? 'w-12' : 'w-64'
-            } flex flex-col ${
-              rightPanelCollapsed ? 'items-center' : ''
-            }`}>
-            {rightPanelCollapsed ? (
-              <button
-                onClick={() => setRightPanelCollapsed(false)}
-                className="p-3 text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors"
-                title="Развернуть панель"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </button>
-            ) : (
-              <>
-                {!activeTicket && !rightPanelCollapsed && (
-                  <div className="p-4 flex items-center justify-between border-b border-neutral-800">
-                    <button
-                      onClick={() => setRightPanelCollapsed(true)}
-                      className="p-1 text-neutral-400 hover:text-white hover:bg-neutral-800 rounded transition-colors"
-                      title="Свернуть панель"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                      </svg>
-                    </button>
+            <div className={`bg-neutral-900 border-l border-neutral-800 transition-all duration-300 flex-shrink-0 ${rightPanelCollapsed ? 'w-12' : 'w-64'
+              } flex flex-col ${rightPanelCollapsed ? 'items-center' : ''
+              }`}>
+              {rightPanelCollapsed ? (
+                <button
+                  onClick={() => setRightPanelCollapsed(false)}
+                  className="p-3 text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors"
+                  title="Развернуть панель"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              ) : (
+                <>
+                  {!activeTicket && !rightPanelCollapsed && (
+                    <div className="p-4 flex items-center justify-between border-b border-neutral-800">
+                      <button
+                        onClick={() => setRightPanelCollapsed(true)}
+                        className="p-1 text-neutral-400 hover:text-white hover:bg-neutral-800 rounded transition-colors"
+                        title="Свернуть панель"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                        </svg>
+                      </button>
+                    </div>
+                  )}
+                  {activeTicket && (
+                    <div className="p-4 flex items-center justify-between border-b border-neutral-800">
+                      <span className="text-sm font-medium text-white">Управление</span>
+                      <button
+                        onClick={() => setRightPanelCollapsed(true)}
+                        className="p-1 text-neutral-400 hover:text-white hover:bg-neutral-800 rounded transition-colors"
+                        title="Свернуть панель"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                        </svg>
+                      </button>
+                    </div>
+                  )}
+                  <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3">
+                    {activeTicket ? (
+                      <>
+                        {(activeTicket.status === 'open' || activeTicket.status === 'pending') && (
+                          <>
+                            <button
+                              onClick={() => {
+                                if (authState.userId) {
+                                  handleAssignTicket(activeTicket.id, authState.userId);
+                                }
+                              }}
+                              className={`w-full px-4 py-2 text-white text-sm rounded-lg transition-colors font-medium ${activeTicket.assigned_to === authState.userId
+                                  ? 'bg-orange-600 hover:bg-orange-700'
+                                  : 'bg-blue-600 hover:bg-blue-700'
+                                }`}
+                            >
+                              {activeTicket.assigned_to === authState.userId ? 'Отвязать тикет' : 'Взять тикет'}
+                            </button>
+                            <button
+                              onClick={() => {
+                                // Динамическая проверка перед закрытием
+                                if (activeTicket.status !== 'pending') {
+                                  showNotification('Тикет должен быть в статусе "В работе" для закрытия', 'error');
+                                  return;
+                                }
+                                if (activeTicket.assigned_to !== authState.userId) {
+                                  showNotification('Тикет должен быть назначен вам для закрытия', 'error');
+                                  return;
+                                }
+                                handleCloseTicket(activeTicket.id);
+                              }}
+                              disabled={activeTicket.assigned_to !== authState.userId || activeTicket.status !== 'pending'}
+                              className={`w-full px-4 py-2 text-white text-sm rounded-lg transition-colors font-medium ${activeTicket.assigned_to !== authState.userId || activeTicket.status !== 'pending'
+                                  ? 'bg-neutral-700 opacity-50'
+                                  : 'bg-red-600 hover:bg-red-700'
+                                }`}
+                            >
+                              Закрыть тикет
+                            </button>
+                          </>
+                        )}
+                        {/* Селект статуса доступен только для активных тикетов */}
+                        {(activeTicket.status === 'open' || activeTicket.status === 'pending') && (
+                          <div className="mt-3 bg-neutral-800 border border-neutral-700 rounded-lg overflow-hidden">
+                            <div className="px-3 py-2 border-b border-neutral-700">
+                              <span className="text-xs text-neutral-400">Укажите статус:</span>
+                            </div>
+                            <select
+                              value={activeTicket.status}
+                              onChange={(e) => {
+                                handleUpdateTicketStatus(activeTicket.id, e.target.value);
+                              }}
+                              className="w-full px-3 py-2 bg-transparent border-0 text-white text-sm focus:outline-none"
+                            >
+                              <option value="open" className="bg-neutral-800 text-white">Открыт</option>
+                              <option value="pending" className="bg-neutral-800 text-white">В работе</option>
+                              <option value="closed" className="bg-neutral-800 text-white">Закрыт</option>
+                            </select>
+                          </div>
+                        )}
+                        {/* Для архивных тикетов показываем только информацию о статусе */}
+                        {activeTicket.status === 'closed' && (
+                          <div className="mt-3 bg-neutral-800 border border-neutral-700 rounded-lg overflow-hidden">
+                            <div className="px-3 py-2 border-b border-neutral-700">
+                              <span className="text-xs text-neutral-400">Статус:</span>
+                            </div>
+                            <div className="px-3 py-2 text-white text-sm">
+                              Закрыт
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        {messagesLoading ? (
+                          <>
+                            {/* Скелетон лоадеры для кнопок */}
+                            <div className="space-y-3">
+                              <div className="h-10 bg-neutral-800 skeleton-shimmer rounded-lg"></div>
+                              <div className="h-10 bg-neutral-800 skeleton-shimmer rounded-lg"></div>
+                            </div>
+                            {/* Скелетон лоадер для карточки выпадающего меню */}
+                            <div className="mt-3 bg-neutral-800 border border-neutral-700 rounded-lg overflow-hidden">
+                              <div className="px-3 py-2 border-b border-neutral-700">
+                                <div className="h-4 bg-neutral-700 skeleton-shimmer rounded w-24"></div>
+                              </div>
+                              <div className="px-3 py-2">
+                                <div className="h-8 bg-neutral-700 skeleton-shimmer rounded"></div>
+                              </div>
+                            </div>
+                          </>
+                        ) : null}
+                      </>
+                    )}
                   </div>
-                )}
-                {activeTicket && (
-                  <div className="p-4 flex items-center justify-between border-b border-neutral-800">
-                    <span className="text-sm font-medium text-white">Управление</span>
-                    <button
-                      onClick={() => setRightPanelCollapsed(true)}
-                      className="p-1 text-neutral-400 hover:text-white hover:bg-neutral-800 rounded transition-colors"
-                      title="Свернуть панель"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                      </svg>
-                    </button>
-                  </div>
-                )}
-                <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3">
-            {activeTicket ? (
-              <>
-                {(activeTicket.status === 'open' || activeTicket.status === 'pending') && (
-                  <>
-                    <button
-                      onClick={() => {
-                        if (authState.userId) {
-                          handleAssignTicket(activeTicket.id, authState.userId);
-                        }
-                      }}
-                      className={`w-full px-4 py-2 text-white text-sm rounded-lg transition-colors font-medium ${
-                        activeTicket.assigned_to === authState.userId
-                          ? 'bg-orange-600 hover:bg-orange-700'
-                          : 'bg-blue-600 hover:bg-blue-700'
-                      }`}
-                    >
-                      {activeTicket.assigned_to === authState.userId ? 'Отвязать тикет' : 'Взять тикет'}
-                    </button>
-                    <button
-                      onClick={() => {
-                        // Динамическая проверка перед закрытием
-                        if (activeTicket.status !== 'pending') {
-                          showNotification('Тикет должен быть в статусе "В работе" для закрытия', 'error');
-                          return;
-                        }
-                        if (activeTicket.assigned_to !== authState.userId) {
-                          showNotification('Тикет должен быть назначен вам для закрытия', 'error');
-                          return;
-                        }
-                        handleCloseTicket(activeTicket.id);
-                      }}
-                      disabled={activeTicket.assigned_to !== authState.userId || activeTicket.status !== 'pending'}
-                      className={`w-full px-4 py-2 text-white text-sm rounded-lg transition-colors font-medium ${
-                        activeTicket.assigned_to !== authState.userId || activeTicket.status !== 'pending'
-                          ? 'bg-neutral-700 opacity-50'
-                          : 'bg-red-600 hover:bg-red-700'
-                      }`}
-                    >
-                      Закрыть тикет
-                    </button>
-                  </>
-                )}
-                {/* Селект статуса доступен только для активных тикетов */}
-                {(activeTicket.status === 'open' || activeTicket.status === 'pending') && (
-                  <div className="mt-3 bg-neutral-800 border border-neutral-700 rounded-lg overflow-hidden">
-                    <div className="px-3 py-2 border-b border-neutral-700">
-                      <span className="text-xs text-neutral-400">Укажите статус:</span>
-                    </div>
-                    <select
-                      value={activeTicket.status}
-                      onChange={(e) => {
-                        handleUpdateTicketStatus(activeTicket.id, e.target.value);
-                      }}
-                      className="w-full px-3 py-2 bg-transparent border-0 text-white text-sm focus:outline-none"
-                    >
-                      <option value="open" className="bg-neutral-800 text-white">Открыт</option>
-                      <option value="pending" className="bg-neutral-800 text-white">В работе</option>
-                      <option value="closed" className="bg-neutral-800 text-white">Закрыт</option>
-                    </select>
-                  </div>
-                )}
-                {/* Для архивных тикетов показываем только информацию о статусе */}
-                {activeTicket.status === 'closed' && (
-                  <div className="mt-3 bg-neutral-800 border border-neutral-700 rounded-lg overflow-hidden">
-                    <div className="px-3 py-2 border-b border-neutral-700">
-                      <span className="text-xs text-neutral-400">Статус:</span>
-                    </div>
-                    <div className="px-3 py-2 text-white text-sm">
-                      Закрыт
-                    </div>
-                  </div>
-                )}
-              </>
-            ) : (
-              <>
-                {messagesLoading ? (
-                  <>
-                    {/* Скелетон лоадеры для кнопок */}
-                    <div className="space-y-3">
-                      <div className="h-10 bg-neutral-800 skeleton-shimmer rounded-lg"></div>
-                      <div className="h-10 bg-neutral-800 skeleton-shimmer rounded-lg"></div>
-                    </div>
-                    {/* Скелетон лоадер для карточки выпадающего меню */}
-                    <div className="mt-3 bg-neutral-800 border border-neutral-700 rounded-lg overflow-hidden">
-                      <div className="px-3 py-2 border-b border-neutral-700">
-                        <div className="h-4 bg-neutral-700 skeleton-shimmer rounded w-24"></div>
-                      </div>
-                      <div className="px-3 py-2">
-                        <div className="h-8 bg-neutral-700 skeleton-shimmer rounded"></div>
-                      </div>
-                    </div>
-                  </>
-                ) : null}
-              </>
-            )}
-                </div>
-              </>
-            )}
+                </>
+              )}
             </div>
           ) : null}
         </div>
       </div>
-      
+
       <RateLimitCaptcha
         isOpen={showRateLimitCaptcha}
         onSuccess={handleRateLimitSuccess}
@@ -3163,7 +3152,7 @@ export default function SupportPanel() {
           </div>
         </div>
       )}
-      
+
       {/* ImageViewer для просмотра изображений */}
       {viewingImage && (
         <ImageViewer

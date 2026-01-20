@@ -279,7 +279,7 @@ function MessageItem({
             {message.sender === 'support' && (
               <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-full overflow-hidden flex-shrink-0 mb-1 flex items-center justify-center">
                 {message.senderData?.avatar ? (
-                  <Image
+                <Image 
                     src={getAvatarUrl(message.senderData.avatar) || ''}
                     alt={message.senderData.username || 'Support'}
                     width={48}

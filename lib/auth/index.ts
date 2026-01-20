@@ -169,6 +169,7 @@ export interface User {
   username: string;
   password_hash: string | null;
   avatar?: string | null;
+  banner?: string | null;
   dashboard_token: string;
   is_active: boolean;
   last_login?: string;

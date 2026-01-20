@@ -1,6 +1,6 @@
 /**
- * API endpoint для публичного доступа к аватарам из S3
- * Аватары хранятся с публичным доступом и доступны без авторизации
+ * API endpoint для публичного доступа к аватарам и баннерам из S3
+ * Аватары и баннеры хранятся с публичным доступом и доступны без авторизации
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -31,23 +31,43 @@ export async function GET(
       );
     }
 
-    // Формируем путь к файлу в S3
-    // path будет массивом: ['userId', 'timestamp.ext']
-    // Полный путь: avatars/userId/timestamp.ext
-    const s3Key = `avatars/${path.join('/')}`;
-
-    // Валидация: путь должен начинаться с avatars/ и содержать userId и filename
-    if (!s3Key.startsWith('avatars/') || path.length < 2) {
+    // Определяем тип ресурса (avatars или banners) и формируем путь к файлу в S3
+    // Для avatars: path = ['userId', 'timestamp.ext'] -> avatars/userId/timestamp.ext
+    // Для banners: path = ['banners', 'userId', 'timestamp.ext'] -> banners/userId/timestamp.ext
+    let s3Key: string;
+    let resourceType: 'avatar' | 'banner';
+    
+    if (path[0] === 'banners' && path.length >= 3) {
+      // Баннер: path = ['banners', 'userId', 'timestamp.ext']
+      resourceType = 'banner';
+      s3Key = `banners/${path.slice(1).join('/')}`;
+    } else if (path.length >= 2) {
+      // Аватар: path = ['userId', 'timestamp.ext']
+      resourceType = 'avatar';
+      s3Key = `avatars/${path.join('/')}`;
+    } else {
       return setCorsHeaders(
         NextResponse.json(
-          { error: 'Invalid avatar path' },
+          { error: 'Invalid image path' },
+          { status: 400 }
+        )
+      );
+    }
+
+    // Валидация: путь должен начинаться с avatars/ или banners/ и содержать userId и filename
+    if ((!s3Key.startsWith('avatars/') && !s3Key.startsWith('banners/')) || 
+        (resourceType === 'avatar' && path.length < 2) ||
+        (resourceType === 'banner' && path.length < 3)) {
+      return setCorsHeaders(
+        NextResponse.json(
+          { error: 'Invalid image path' },
           { status: 400 }
         )
       );
     }
 
     // Валидация: userId должен быть UUID
-    const userId = path[0];
+    const userId = resourceType === 'banner' ? path[1] : path[0];
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (!uuidRegex.test(userId)) {
       return setCorsHeaders(
@@ -144,7 +164,7 @@ export async function GET(
       if (s3Error.name === 'NoSuchKey' || s3Error.$metadata?.httpStatusCode === 404) {
         return setCorsHeaders(
           NextResponse.json(
-            { error: 'Avatar not found' },
+            { error: 'Image not found' },
             { status: 404 }
           )
         );
@@ -162,7 +182,7 @@ export async function GET(
     if (error instanceof Error && (error.message.includes('NoSuchKey') || error.message.includes('does not exist'))) {
       return setCorsHeaders(
         NextResponse.json(
-          { error: 'Avatar not found' },
+          { error: 'Image not found' },
           { status: 404 }
         )
       );

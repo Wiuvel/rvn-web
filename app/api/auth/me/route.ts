@@ -128,6 +128,7 @@ export async function GET(request: NextRequest) {
       created_at: user.created_at,
       last_login: user.last_login,
       avatar: user.avatar,
+      banner: user.banner || null,
       isSupport,
       isAdmin
     });

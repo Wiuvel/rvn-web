@@ -6,6 +6,7 @@ export interface UserData {
   created_at: string;
   last_login?: string;
   avatar?: string | null;
+  banner?: string | null;
   isSupport?: boolean;
   isAdmin?: boolean;
 }
