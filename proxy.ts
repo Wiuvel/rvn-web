@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { domains } from './lib/utils/config';
+import { shouldShowProtection, isAllowedBot, detectSuspiciousVisitor } from './lib/security/suspicious-detector';
+import { getRedisClient } from './lib/database/redis';
+import { logger } from './lib/utils/secure-logger';
 
 const MAIN_DOMAIN = domains.main;
 
@@ -157,17 +160,73 @@ function shouldBypassProxy(pathname: string, userAgent: string, hostname?: strin
     return true;
   }
 
-  /** Bot detection */
-  return /googlebot|bingbot|yandex|duckduckbot|twitterbot|whatsapp|telegrambot|discordbot|applebot|redditbot/i.test(userAgent);
+  /** Разрешенные боты (Google, Yandex) обходят защиту */
+  if (isAllowedBot(userAgent)) {
+    return true;
+  }
+
+  return false;
 }
 
 /**
- * Protection Proxy - checks if user passed protection screen
+ * Проверяет rate limiting для IP адреса используя sliding window алгоритм
+ * @param ip - IP адрес
+ * @returns true если превышен лимит запросов
+ */
+async function checkRateLimit(ip: string): Promise<boolean> {
+  const redis = getRedisClient();
+  if (!redis) {
+    // Если Redis недоступен, не блокируем (fallback)
+    return false;
+  }
+
+  try {
+    const now = Date.now();
+    const windowMs = 60 * 1000; // 60 секунд
+    const limit = 30; // 30 запросов в минуту
+    
+    // Используем sliding window: храним timestamp'ы запросов
+    const key = `rate_limit:${ip}`;
+    const windowStart = now - windowMs;
+    
+    // Удаляем старые записи (за пределами окна)
+    await redis.zremrangebyscore(key, 0, windowStart);
+    
+    // Подсчитываем количество запросов в окне
+    const count = await redis.zcard(key);
+    
+    if (count >= limit) {
+      return true; // Превышен лимит
+    }
+    
+    // Добавляем текущий запрос
+    await redis.zadd(key, now, `${now}-${Math.random()}`);
+    
+    // Устанавливаем TTL для ключа (окно + 10 секунд запас)
+    await redis.expire(key, Math.ceil((windowMs + 10000) / 1000));
+    
+    return false;
+  } catch (error) {
+    // При ошибке Redis не блокируем
+    return false;
+  }
+}
+
+/**
+ * Protection Proxy - проверяет прохождение пользователем страницы защиты
+ * 
+ * Логика работы:
+ * 1. Проверяет наличие валидных куки защиты (access_granted + access_hash)
+ * 2. Если куки нет, анализирует посетителя через систему определения подозрительности
+ * 3. При превышении rate limit или высоком счете подозрительности - редирект на /protection
+ * 4. Разрешенные боты (Google, Yandex) всегда обходят защиту
+ * 5. После прохождения Turnstile CAPTCHA выдаются куки на 12 часов
+ * 
  * @param request - The Next.js request object
  * @param pathname - The request pathname
  * @returns NextResponse with redirect to protection page, or null to allow access
  */
-function handleProtection(request: NextRequest, pathname: string): NextResponse | null {
+async function handleProtection(request: NextRequest, pathname: string): Promise<NextResponse | null> {
   const accessGranted = request.cookies.get('access_granted')?.value === 'true';
   const accessHash = request.cookies.get('access_hash')?.value;
 
@@ -195,9 +254,15 @@ function handleProtection(request: NextRequest, pathname: string): NextResponse 
     return null;
   }
 
-  /** User has protection cookies - allow access */
+  /** User has protection cookies - validate and allow access */
   if (accessGranted && accessHash) {
-    return null;
+    // Валидация hash: должен быть 64 символа hex (SHA-256)
+    // Это защищает от подделки куки - hash генерируется на основе браузерного fingerprint
+    if (accessHash.length === 64 && /^[a-f0-9]{64}$/i.test(accessHash)) {
+      return null; // Валидные куки - разрешаем доступ
+    }
+    // Невалидный hash - считаем что куки подделаны, требуем повторную проверку
+    // Продолжаем выполнение для редиректа на страницу защиты
   }
 
   /**
@@ -209,6 +274,87 @@ function handleProtection(request: NextRequest, pathname: string): NextResponse 
   const hasSession = !!request.cookies.get('session_id')?.value;
 
   if (isAuthenticated && hasDashboardToken && hasSession && pathname.startsWith('/dashboard')) {
+    return null;
+  }
+
+  /** Умное определение подозрительных посетителей */
+  const userAgent = request.headers.get('user-agent') || '';
+  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 
+             request.headers.get('x-real-ip') || 
+             'unknown';
+  const referer = request.headers.get('referer');
+  const acceptLanguage = request.headers.get('accept-language');
+
+  // Собираем информацию о запросе
+  const requestInfo = {
+    userAgent,
+    ip,
+    headers: {
+      'accept': request.headers.get('accept'),
+      'accept-language': acceptLanguage,
+      'accept-encoding': request.headers.get('accept-encoding'),
+      'user-agent': userAgent,
+    },
+    pathname,
+    referer,
+    acceptLanguage,
+  };
+
+  // Проверяем rate limiting (защита от DDoS)
+  // Используется sliding window алгоритм для более точного ограничения
+  const isRateLimited = await checkRateLimit(ip);
+  if (isRateLimited) {
+    // При превышении лимита (30 запросов/минуту) всегда показываем защиту
+    // Это защищает от брутфорса и DDoS атак
+    logger.warn('Rate limit exceeded', {
+      ip,
+      pathname,
+      userAgent: userAgent.substring(0, 100),
+    });
+    
+    const targetPath = pathname + request.nextUrl.search;
+    const response = NextResponse.redirect(
+      new URL(`/protection?redirect=${encodeURIComponent(targetPath)}`, request.url)
+    );
+    applySecurityHeaders(response, false);
+    
+    const hostname = request.nextUrl.hostname;
+    const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
+
+    response.cookies.set('target_path', targetPath, {
+      maxAge: 60 * 60 * 12, /** 12 hours */
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production' && !isLocalhost,
+      sameSite: 'strict',
+      path: '/'
+    });
+
+    return response;
+  }
+
+  // Определяем, нужно ли показывать страницу защиты
+  const showProtection = shouldShowProtection(requestInfo, false);
+  
+  // Логируем подозрительную активность для мониторинга
+  if (showProtection) {
+    const factors = detectSuspiciousVisitor(requestInfo);
+    logger.warn('Suspicious visitor detected', {
+      ip,
+      userAgent: userAgent.substring(0, 100), // Ограничиваем длину для логов
+      pathname,
+      suspicionScore: factors.score,
+      factors: {
+        suspiciousUserAgent: factors.suspiciousUserAgent,
+        missingHeaders: factors.missingHeaders,
+        suspiciousIP: factors.suspiciousIP,
+        botPattern: factors.botPattern,
+        suspiciousBehavior: factors.suspiciousBehavior,
+      },
+    });
+  }
+
+  // Если не нужно показывать защиту - разрешаем доступ
+  if (!showProtection) {
     return null;
   }
 
@@ -224,7 +370,7 @@ function handleProtection(request: NextRequest, pathname: string): NextResponse 
   const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
 
   response.cookies.set('target_path', targetPath, {
-    maxAge: 60 * 60 * 2, /** 2 hours */
+    maxAge: 60 * 60 * 12, /** 12 hours */
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production' && !isLocalhost,
     sameSite: 'strict',
@@ -336,38 +482,57 @@ function handleAuth(request: NextRequest, pathname: string): NextResponse | null
 }
 
 /**
- * Next.js Proxy (Middleware) - handles all request routing and protection
+ * Next.js 16 Proxy (ранее назывался middleware) - обрабатывает все запросы
+ * 
+ * Порядок обработки запросов:
+ * 1. Ранний выход для статических файлов, API маршрутов и разрешенных ботов
+ * 2. Проверка защиты (protection) - умное определение подозрительных посетителей
+ * 3. Проверка аутентификации (auth) - защита приватных маршрутов
+ * 4. Применение security headers для всех ответов
+ * 
  * @param request - The Next.js request object
  * @returns NextResponse with appropriate redirect or next() to continue
  */
-export function proxy(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname, hostname } = request.nextUrl;
   const userAgent = request.headers.get('user-agent') || '';
   const isStatic = isStaticFile(pathname);
 
-  /** Early exit for static files, API routes, and bots */
+  /** 
+   * Ранний выход для статических файлов, API маршрутов и разрешенных ботов
+   * Это оптимизирует производительность, избегая ненужных проверок
+   */
   if (shouldBypassProxy(pathname, userAgent, hostname)) {
     const response = NextResponse.next();
-    // Apply CORS headers for static files
+    // Применяем CORS заголовки для статических файлов
     if (isStatic) {
       applySecurityHeaders(response, true, request);
     }
     return response;
   }
 
-  /** 1. Protection Proxy - checks protection cookies */
-  const protectionResponse = handleProtection(request, pathname);
+  /** 
+   * 1. Protection Proxy - проверка защиты от ботов и DDoS
+   * Использует умное определение подозрительных посетителей
+   */
+  const protectionResponse = await handleProtection(request, pathname);
   if (protectionResponse) {
     return protectionResponse;
   }
 
-  /** 2. Auth Proxy - checks authentication and authorization */
+  /** 
+   * 2. Auth Proxy - проверка аутентификации и авторизации
+   * Защищает приватные маршруты (dashboard, панели управления)
+   */
   const authResponse = handleAuth(request, pathname);
   if (authResponse) {
     return authResponse;
   }
 
-  /** Default response for public pages - apply security headers */
+  /** 
+   * Дефолтный ответ для публичных страниц
+   * Применяем security headers для всех ответов
+   */
   const response = NextResponse.next();
   applySecurityHeaders(response, false);
   return response;

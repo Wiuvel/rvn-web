@@ -4,6 +4,15 @@ import { useEffect, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import Script from 'next/script';
 
+/**
+ * Страница защиты от ботов и DDoS атак
+ * 
+ * Функциональность:
+ * - Отображает Cloudflare Turnstile CAPTCHA для проверки человечности
+ * - Показывает IP адрес пользователя (с возможностью раскрытия)
+ * - После успешной проверки устанавливает куки доступа на 12 часов
+ * - Автоматически перенаправляет на исходную страницу после проверки
+ */
 export default function ProtectionPage() {
   const [isMounted, setIsMounted] = useState(false);
   const [ipAddress, setIpAddress] = useState<string | null>(null);

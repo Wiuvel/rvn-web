@@ -322,7 +322,7 @@ function isValidBrowser(): boolean {
 async function setSecureCookie(): Promise<boolean> {
   try {
     const expiration = new Date();
-    expiration.setTime(expiration.getTime() + 2 * 60 * 60 * 1000);
+    expiration.setTime(expiration.getTime() + 12 * 60 * 60 * 1000); // 12 hours
     const secureHash = await generateSecureHash();
     const hostname = window.location.hostname;
     const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';

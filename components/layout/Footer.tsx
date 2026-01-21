@@ -117,7 +117,7 @@ export default function Footer() {
         <div className="mt-8 md:mt-10 pt-6 md:pt-8 border-t border-neutral-800/50">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4 md:gap-6">
             <div className="text-center md:text-left order-2 md:order-1">
-              © {currentYear} RVNPrivate. Все права защищены.
+              © {currentYear} RVN. Все права защищены.
             </div>
             <div className="hidden md:flex items-center gap-3 md:gap-4 flex-wrap justify-center order-1 md:order-2 select-none drop-shadow-[0_0_50px_rgba(22,163,255,0.8)]">
               <Link href="/payments" prefetch={false} className="flex items-center gap-1 text-neutral-300 hover:text-neutral-200 transition-colors duration-200">

@@ -1031,7 +1031,7 @@ export default function DashboardPage() {
         <div className="mx-auto max-w-6xl px-4 py-8">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <p className="text-sm text-neutral-500">
-              © {currentYear} RVNPrivate. Все права защищены.
+              © {currentYear} RVN. Все права защищены.
             </p>
             <div className="flex items-center gap-6 text-xs text-neutral-500">
               <span>v{APP_VERSION}</span>

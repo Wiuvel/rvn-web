@@ -67,5 +67,5 @@ export const ERROR_MAXIMUM_TICKET_LIMIT_REACHED = 'Maximum ticket limit reached'
 export const ERROR_DEFAULT = 'Произошла ошибка';
 
 // Application version
-export const APP_VERSION = '1.0.1';
+export const APP_VERSION = '1.0.2';
 
