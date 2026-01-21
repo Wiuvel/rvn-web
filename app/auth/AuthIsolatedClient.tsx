@@ -90,7 +90,7 @@ export default function AuthIsolatedClient() {
                 className="w-6 h-6"
                 loading="lazy"
               />
-              <span className="font-semibold text-white">Raven Private</span>
+              <span className="font-semibold text-white">RVN</span>
             </Link>
             <div className="hidden lg:flex">
             <Link href="/support/" prefetch={false} className="rounded-xl bg-primary-500 hover:bg-primary-400 px-4 py-2 text-sm font-medium text-white shadow-glow transition">

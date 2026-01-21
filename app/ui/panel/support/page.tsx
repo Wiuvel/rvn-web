@@ -929,16 +929,8 @@ export default function SupportPanel() {
     }, 2000);
   }, []);
 
-  // WebSocket: присоединение/отсоединение от тикета
-  useEffect(() => {
-    if (!socket || !activeTicket || !authState.userId || !authState.hasSupportAccess) return;
-
-    joinTicket(activeTicket.id);
-
-    return () => {
-      leaveTicket(activeTicket.id);
-    };
-  }, [socket, activeTicket, authState.userId, authState.hasSupportAccess, joinTicket, leaveTicket]);
+  // WebSocket: присоединение/отсоединение от тикета теперь обрабатывается автоматически в useWebSocket
+  // joinTicket и leaveTicket вызываются автоматически при изменении ticketId в useWebSocket
 
   // Ref для хранения текущих сообщений (для проверки в WebSocket обработчиках)
   const messagesRef = useRef<Message[]>([]);

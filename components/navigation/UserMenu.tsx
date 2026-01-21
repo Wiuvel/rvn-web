@@ -8,6 +8,7 @@ import { UserData } from '@/types';
 import { useMenuAnimation } from '@/hooks/useMenuAnimation';
 import { getGradientClasses, getAvatarUrl } from '@/lib/utils/avatar-gradients';
 import { getStaticUrl } from '@/lib/utils';
+import { Wallet } from 'lucide-react';
 
 interface UserMenuProps {
   userData: UserData;
@@ -15,6 +16,7 @@ interface UserMenuProps {
   onClose: () => void;
   showProfile?: boolean;
   showUserId?: boolean;
+  hideBalance?: boolean;
   menuRef?: React.RefObject<HTMLDivElement | null>;
 }
 
@@ -24,6 +26,7 @@ export function UserMenu({
   onClose,
   showProfile = true,
   showUserId = true,
+  hideBalance = false,
   menuRef: externalMenuRef
 }: UserMenuProps) {
   const router = useRouter();
@@ -118,8 +121,17 @@ export function UserMenu({
               }`}>
                 {userData.username}
               </div>
-              <div className="text-neutral-400 text-xs truncate">
-                {showUserId ? `ID: ${userData.user_id}` : 'Пользователь'}
+              <div className="flex items-center gap-2 text-neutral-400 text-sm truncate">
+                <span>{showUserId ? `ID: ${userData.user_id}` : 'Пользователь'}</span>
+                {!hideBalance && (
+                  <>
+                    <span className="text-neutral-500">•</span>
+                    <span className="flex items-center gap-1">
+                      <Wallet className="w-4 h-4 text-neutral-500" />
+                      {userData.balance !== undefined ? `${userData.balance} ₽` : '0 ₽'}
+                    </span>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -188,4 +200,3 @@ export function UserMenu({
     </div>
   );
 }
-

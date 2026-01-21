@@ -11,7 +11,24 @@ import { getGradientClasses, getAvatarUrl, getBannerUrl } from '@/lib/utils/avat
 import { APP_VERSION } from '@/lib/utils/constants';
 import AvatarUploadModal from '@/components/auth/AvatarUploadModal';
 import BannerUploadModal from '@/components/auth/BannerUploadModal';
-import { Pencil } from 'lucide-react';
+import { 
+  Pencil, 
+  Key, 
+  Server, 
+  Activity,
+  ChevronRight,
+  Settings,
+  Zap,
+  Clock,
+  TrendingUp,
+  CreditCard,
+  Wallet,
+  HeadphonesIcon,
+  Hash,
+  Calendar,
+  Smartphone,
+  ShoppingBag
+} from 'lucide-react';
 
 interface UserData {
   id: string;
@@ -24,6 +41,7 @@ interface UserData {
   banner?: string | null;
   isSupport?: boolean;
   isAdmin?: boolean;
+  balance?: number;
 }
 
 interface Notification {
@@ -31,6 +49,105 @@ interface Notification {
   title: string;
   message: string;
   created_at: string;
+}
+
+// Компонент карточки статистики
+function StatCard({ 
+  icon: Icon, 
+  label, 
+  value, 
+  subtext,
+  gradient = 'from-primary-500/20 to-primary-600/5',
+  iconColor = 'text-primary-400',
+  delay = 0
+}: { 
+  icon: React.ElementType; 
+  label: string; 
+  value: string; 
+  subtext?: string;
+  gradient?: string;
+  iconColor?: string;
+  delay?: number;
+}) {
+  return (
+    <div 
+      className="group relative overflow-hidden rounded-2xl border border-neutral-800/50 bg-neutral-900/50 p-4 sm:p-5 backdrop-blur-sm transition-all duration-300 hover:border-neutral-700 hover:bg-neutral-900/80 hover:shadow-lg hover:shadow-primary-500/5"
+      style={{ animationDelay: `${delay}ms` }}
+    >
+      <div className={`absolute inset-0 bg-gradient-to-br ${gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-500`} />
+      <div className="relative z-10">
+        <div className="flex items-center gap-3 mb-3">
+          <div className={`flex h-10 w-10 items-center justify-center rounded-xl bg-neutral-800/80 ${iconColor} group-hover:scale-110 transition-transform duration-300`}>
+            <Icon className="h-5 w-5" />
+          </div>
+          <span className="text-sm text-neutral-400 font-medium">{label}</span>
+        </div>
+        <div className="text-xl sm:text-2xl font-bold text-white">{value}</div>
+        {subtext && <div className="mt-1 text-xs text-neutral-500">{subtext}</div>}
+      </div>
+    </div>
+  );
+}
+
+// Компонент статуса сервера
+function ServerStatus({ name, status, ping }: { name: string; status: 'ok' | 'load' | 'down'; ping?: number }) {
+  const statusConfig = {
+    ok: { color: 'bg-green-500', text: 'text-green-400', label: 'Online', glow: 'shadow-green-500/50' },
+    load: { color: 'bg-yellow-500', text: 'text-yellow-400', label: 'Load', glow: 'shadow-yellow-500/50' },
+    down: { color: 'bg-red-500', text: 'text-red-400', label: 'Offline', glow: 'shadow-red-500/50' }
+  };
+  
+  const config = statusConfig[status];
+  
+  return (
+    <div className="group flex items-center justify-between rounded-xl border border-neutral-800/50 bg-neutral-950/60 p-3 sm:p-4 hover:bg-neutral-900/60 hover:border-neutral-700/50 transition-all duration-200">
+      <div className="flex items-center gap-3">
+        <div className={`h-2.5 w-2.5 rounded-full ${config.color} ${config.glow} shadow-lg`} />
+        <span className="text-sm font-medium text-neutral-200">{name}</span>
+      </div>
+      <div className="flex items-center gap-3">
+        {ping && <span className="text-xs text-neutral-500">{ping}ms</span>}
+        <span className={`text-xs font-medium ${config.text}`}>{config.label}</span>
+      </div>
+    </div>
+  );
+}
+
+// Компонент быстрого действия
+function QuickAction({ 
+  icon: Icon, 
+  label, 
+  href, 
+  onClick,
+  variant = 'default'
+}: { 
+  icon: React.ElementType; 
+  label: string; 
+  href?: string;
+  onClick?: () => void;
+  variant?: 'default' | 'primary' | 'danger';
+}) {
+  const variants = {
+    default: 'border-neutral-800/50 bg-neutral-900/50 hover:bg-neutral-800/80 hover:border-neutral-700 text-neutral-300 hover:text-white',
+    primary: 'border-primary-500/30 bg-primary-500/10 hover:bg-primary-500/20 hover:border-primary-500/50 text-primary-400 hover:text-primary-300',
+    danger: 'border-red-500/30 bg-red-500/10 hover:bg-red-500/20 hover:border-red-500/50 text-red-400 hover:text-red-300'
+  };
+  
+  const content = (
+    <>
+      <Icon className="h-5 w-5" />
+      <span className="text-sm font-medium">{label}</span>
+      <ChevronRight className="h-4 w-4 ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
+    </>
+  );
+  
+  const className = `group flex items-center gap-3 rounded-xl border p-3 sm:p-4 transition-all duration-200 ${variants[variant]}`;
+  
+  if (href) {
+    return <Link href={href} className={className}>{content}</Link>;
+  }
+  
+  return <button onClick={onClick} className={className}>{content}</button>;
 }
 
 export default function DashboardPage() {
@@ -55,11 +172,10 @@ export default function DashboardPage() {
   const notificationsMenuRef = useRef<HTMLDivElement>(null);
   const notificationsMenuContainerRef = useRef<HTMLDivElement>(null);
   
-  const titleRef = useFadeIn(0.1) as React.RefObject<HTMLDivElement>;
-  const profileRef = useFadeIn(0.2) as React.RefObject<HTMLDivElement>;
-  const cardsRef = useStaggeredFadeIn(0.3, 0.1) as React.RefObject<HTMLDivElement>;
+  const heroRef = useFadeIn(0.1) as React.RefObject<HTMLDivElement>;
+  const statsRef = useStaggeredFadeIn(0.2, 0.08) as React.RefObject<HTMLDivElement>;
+  const actionsRef = useFadeIn(0.3) as React.RefObject<HTMLDivElement>;
   const serversRef = useFadeIn(0.4) as React.RefObject<HTMLDivElement>;
-  const eventsRef = useFadeIn(0.5) as React.RefObject<HTMLDivElement>;
 
   useEffect(() => {
     if (!token) {
@@ -73,7 +189,6 @@ export default function DashboardPage() {
 
     const fetchUserData = async () => {
       try {
-        // Создаем AbortController для таймаута
         controller = new AbortController();
         timeoutId = setTimeout(() => controller!.abort(), 10000);
 
@@ -91,38 +206,32 @@ export default function DashboardPage() {
 
           if (response.ok) {
             const data = await response.json();
-            // Проверяем, что пользователь авторизован
             if (data.authenticated === false || !data.dashboard_token) {
-              // Очищаем сессию через API и редиректим на авторизацию
               try {
                 await fetch('/api/auth/logout', {
                   method: 'POST',
                   credentials: 'include'
                 });
               } catch {
-                // Игнорируем ошибки logout
+                // Ignore logout errors
               }
               router.push('/auth');
               return;
             }
-            // Проверяем что токен совпадает
             if (data.dashboard_token !== token) {
-              // Если токен в URL не совпадает с токеном пользователя, редиректим на правильный dashboard
               router.push(`/dashboard/${data.dashboard_token}`);
               return;
             }
             setUserData(data);
-            // Сбрасываем состояние загрузки аватара при загрузке данных пользователя
             setAvatarLoading(true);
           } else if (response.status === 404) {
-            // Токен не существует в БД - очищаем сессию через API и редиректим на авторизацию
             try {
               await fetch('/api/auth/logout', {
                 method: 'POST',
                 credentials: 'include'
               });
             } catch {
-              // Игнорируем ошибки logout
+              // Ignore logout errors
             }
             router.push('/auth');
             return;
@@ -137,9 +246,7 @@ export default function DashboardPage() {
 
           if (!isMounted) return;
 
-          // Если запрос был прерван из-за таймаута
           if (fetchError instanceof Error && fetchError.name === 'AbortError') {
-            // Перенаправляем на страницу 500
             router.push('/error/500');
             return;
           }
@@ -148,8 +255,6 @@ export default function DashboardPage() {
       } catch (error) {
         if (!isMounted) return;
 
-        // Ошибка получения данных пользователя - не логируем
-        // Проверяем, не является ли это таймаутом
         if (error instanceof Error && error.name === 'AbortError') {
           router.push('/error/500');
         } else {
@@ -173,8 +278,7 @@ export default function DashboardPage() {
         controller.abort();
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+  }, [token, router]);
 
   const handleLogout = async () => {
     try {
@@ -183,11 +287,8 @@ export default function DashboardPage() {
         credentials: 'include'
       });
     } catch (error) {
-      // Ошибка выхода - все равно редиректим на страницу авторизации
       console.error('Logout error:', error);
     } finally {
-      // Всегда выполняем редирект, даже если запрос не успешен
-      // Используем window.location для гарантированного редиректа
       window.location.href = '/auth/';
     }
   };
@@ -201,27 +302,34 @@ export default function DashboardPage() {
   };
 
   const getShortId = (userId: string) => {
-    return `#${userId}`;
+    return userId;
   };
 
   const getInitial = (username: string) => {
     return username.charAt(0).toUpperCase();
   };
 
-  // Инициализация уведомлений и загрузка из localStorage
+  // Получение информации о роли
+  const getRoleInfo = () => {
+    if (userData?.isAdmin) {
+      return { label: 'Администратор', color: 'text-orange-500' };
+    }
+    if (userData?.isSupport) {
+      return { label: 'Поддержка', color: 'text-green-500' };
+    }
+    return { label: 'Пользователь', color: 'text-neutral-400' };
+  };
+
+  // Инициализация уведомлений
   useEffect(() => {
     if (typeof window === 'undefined') return;
-
-    // Загружаем прочитанные уведомления из localStorage
     const storedRead = localStorage.getItem('readNotifications');
     const readSet = storedRead ? new Set<string>(JSON.parse(storedRead)) : new Set<string>();
     setReadNotifications(readSet);
-
-    // Пока уведомления пустые, в будущем можно загружать с сервера
     setNotifications([]);
   }, []);
 
-  // Обработка открытия/закрытия меню
+  // Обработка меню пользователя
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
@@ -233,7 +341,6 @@ export default function DashboardPage() {
           { opacity: 1, y: 0, scale: 1, duration: 0.2, ease: "power2.out" }
         );
       }
-      // Блокируем скролл
       document.body.style.overflow = 'hidden';
     } else {
       if (menuRef.current) {
@@ -243,14 +350,11 @@ export default function DashboardPage() {
           scale: 0.95,
           duration: 0.15,
           ease: "power2.in",
-          onComplete: () => {
-            setShouldRenderMenu(false);
-          }
+          onComplete: () => setShouldRenderMenu(false)
         });
       } else {
         setShouldRenderMenu(false);
       }
-      // Разблокируем скролл
       document.body.style.overflow = '';
     }
 
@@ -259,7 +363,7 @@ export default function DashboardPage() {
     };
   }, [userMenuOpen]);
 
-  // Блокировка скролла при открытом меню уведомлений
+  // Блокировка скролла
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
@@ -276,24 +380,20 @@ export default function DashboardPage() {
     };
   }, [notificationsOpen, userMenuOpen]);
 
-  // Взаимное закрытие меню - закрываем другое меню при открытии нового
+  // Взаимное закрытие меню
   useEffect(() => {
-    // Если открывается меню уведомлений, закрываем меню пользователя
     if (notificationsOpen && userMenuOpen) {
       setUserMenuOpen(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [notificationsOpen]); // Срабатывает только при изменении notificationsOpen
+  }, [notificationsOpen, userMenuOpen]);
 
   useEffect(() => {
-    // Если открывается меню пользователя, закрываем меню уведомлений
     if (userMenuOpen && notificationsOpen) {
       setNotificationsOpen(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userMenuOpen]); // Срабатывает только при изменении userMenuOpen
+  }, [userMenuOpen, notificationsOpen]);
 
-  // Управление рендерингом и анимацией меню уведомлений
+  // Анимация меню уведомлений
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
@@ -322,21 +422,18 @@ export default function DashboardPage() {
         scale: 0.95,
         duration: 0.15,
         ease: "power2.in",
-        onComplete: () => {
-          setShouldRenderNotificationsMenu(false);
-        }
+        onComplete: () => setShouldRenderNotificationsMenu(false)
       });
     }
   }, [notificationsOpen, shouldRenderNotificationsMenu]);
 
-  // Обработка кликов вне меню
+  // Клики вне меню
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Node;
       
-      // Закрываем только то меню, которое действительно открыто
       if (userMenuOpen && userMenuRef.current && !userMenuRef.current.contains(target)) {
         setUserMenuOpen(false);
       }
@@ -346,7 +443,6 @@ export default function DashboardPage() {
     };
 
     if (userMenuOpen || notificationsOpen) {
-      // Используем небольшую задержку, чтобы onClick кнопки успел сработать первым
       const timeoutId = setTimeout(() => {
         document.addEventListener('mousedown', handleClickOutside);
       }, 0);
@@ -358,38 +454,37 @@ export default function DashboardPage() {
     }
   }, [userMenuOpen, notificationsOpen]);
 
-  // Функция для отметки уведомления как прочитанного
   const markNotificationAsRead = (notificationId: string) => {
     const newReadSet = new Set(readNotifications);
     newReadSet.add(notificationId);
     setReadNotifications(newReadSet);
     
-    // Сохраняем в localStorage
     if (typeof window !== 'undefined') {
       localStorage.setItem('readNotifications', JSON.stringify(Array.from(newReadSet)));
     }
   };
 
-  // Проверка наличия непрочитанных уведомлений
   const hasUnreadNotifications = notifications.some(n => !readNotifications.has(n.id));
 
   if (loading) {
     return <LoadingSpinner />;
   }
 
+  const roleInfo = getRoleInfo();
+
   return (
     <div className="dashboard-page">
-      {/* Header */}
+      {/* Header - старый стиль */}
       <header className="fixed top-0 left-0 right-0 pt-4 z-[999]">
         <div className="mx-auto max-w-6xl px-4">
           <div className="backdrop-blur-lg bg-neutral-900/40 border border-white/10 rounded-full px-6 py-3 flex items-center justify-between shadow-lg">
             <Link href="/" className="flex items-center gap-2">
               <Image src="/static/logo.svg" alt="Raven Logo" width={256} height={256} className="w-6 h-6" priority/>
-              <span className="font-semibold text-white">Raven Private</span>
+              <span className="font-semibold text-white">RVN</span>
             </Link>
             <nav className="hidden lg:flex items-center gap-8 text-sm text-neutral-300">
               <Link href="/" className="hover:text-white transition">Главная</Link>
-              <Link href="/dashboard/${userData.dashboard_token}" className="hover:text-white transition">Профиль</Link>
+              <Link href={`/dashboard/${userData?.dashboard_token}`} className="hover:text-white transition">Профиль</Link>
               <Link href="/support" className="hover:text-white transition">Поддержка</Link>
             </nav>
             {userData && (
@@ -528,7 +623,7 @@ export default function DashboardPage() {
                         })()}
                         <div className="min-w-0 flex-1">
                           <div className="text-white font-medium truncate">{userData.username}</div>
-                          <div className="text-neutral-400 text-xs truncate">Пользователь</div>
+                          <div className={`text-sm truncate ${roleInfo.color}`}>{roleInfo.label}</div>
                         </div>
                       </div>
                     </Link>
@@ -684,10 +779,11 @@ export default function DashboardPage() {
           )}
         </div>
       </header>
+
       {/* Main content */}
       <main className="pt-32 pb-16 relative overflow-hidden">
         {/* Background Decoration */}
-        <svg className="absolute inset-0 w-full h-full opacity-20 -z-10" xmlns="https://www.w3.org/2000/svg" preserveAspectRatio="none" aria-hidden="true">
+        <svg className="absolute inset-0 w-full h-full opacity-20 -z-10" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none" aria-hidden="true">
           <defs>
             <radialGradient id="dash-grad" cx="50%" cy="50%" r="75%" fx="50%" fy="50%">
               <stop offset="0%" stopColor="#16a3ff" stopOpacity="0.18"/>
@@ -703,235 +799,234 @@ export default function DashboardPage() {
         </svg>
         <div className="pointer-events-none absolute -top-32 -right-20 w-80 h-80 bg-primary-500/10 blur-3xl rounded-full -z-10"></div>
         <div className="pointer-events-none absolute -bottom-24 -left-24 w-72 h-72 bg-white/5 blur-[100px] rounded-full -z-10"></div>
+        
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div ref={titleRef} className="w-full relative group">
-            <div className="rounded-xl border border-neutral-800 bg-neutral-900/50 backdrop-blur-sm overflow-hidden relative">
+          {/* Hero Section with Banner */}
+          <div ref={heroRef} className="relative mb-8">
+            {/* Banner */}
+            <div className="relative h-40 sm:h-48 md:h-56 lg:h-64 rounded-xl overflow-hidden border border-neutral-800">
               {(() => {
                 const bannerUrl = userData ? getBannerUrl(userData.banner) : null;
                 return bannerUrl ? (
-                  <div className="relative w-full h-[200px] sm:h-[250px] md:h-[300px]">
-                    <Image
-                      src={bannerUrl}
-                      alt="Баннер профиля"
-                      fill
-                      className="object-cover"
-                      priority
-                      unoptimized
-                    />
-                  </div>
+                  <Image
+                    src={bannerUrl}
+                    alt="Баннер профиля"
+                    fill
+                    className="object-cover"
+                    priority
+                    unoptimized
+                  />
                 ) : (
-                  <div className="w-full h-[200px] sm:h-[250px] md:h-[300px] bg-gradient-to-r from-neutral-800/50 to-neutral-900/50 flex items-center justify-center">
-                    <span className="text-neutral-500 text-sm">Баннер профиля</span>
-                  </div>
+                  <div className="absolute inset-0 bg-gradient-to-br from-primary-600/30 via-neutral-900 to-neutral-950" />
                 );
               })()}
+              
+              {/* Edit Banner Button */}
               <button
                 onClick={() => setShowBannerModal(true)}
-                className="absolute bottom-3 right-3 px-3 py-1.5 text-xs font-medium text-white bg-white/10 hover:bg-white/15 backdrop-blur-sm rounded-lg transition-all duration-200 border-0"
-                aria-label="Изменить баннер"
+                className="absolute top-4 right-4 px-3 py-1.5 text-xs font-medium text-white/80 bg-black/30 hover:bg-black/50 backdrop-blur-md rounded-lg transition-all duration-200 flex items-center gap-1.5 border-0"
               >
-                Изменить баннер
+                <Pencil className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Изменить баннер</span>
               </button>
             </div>
-          </div>
-          {/* Profile section */}
-          <section ref={profileRef} className="group mt-6 rounded-2xl border border-neutral-800 bg-neutral-900/50 p-5 relative overflow-hidden backdrop-blur-sm transition-all duration-500 hover:border-neutral-700 hover:bg-neutral-900/80 hover:shadow-xl">
-            {/* Animated background gradient */}
-            <div className={`absolute inset-0 bg-gradient-to-br ${
-              userData?.isAdmin 
-                ? 'from-orange-600/10 to-transparent' 
-                : userData?.isSupport 
-                ? 'from-green-600/10 to-transparent' 
-                : 'from-primary-600/10 to-transparent'
-            } opacity-0 group-hover:opacity-100 transition-opacity duration-500`} />
-            
-            {/* Animated border glow */}
-            <div
-              className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"
-              style={{
-                background: `linear-gradient(90deg, ${
-                  userData?.isAdmin 
-                    ? 'rgba(249, 115, 22, 0.2)' 
-                    : userData?.isSupport 
-                    ? 'rgba(34, 197, 94, 0.2)' 
-                    : 'rgba(15, 127, 219, 0.2)'
-                }, transparent, ${
-                  userData?.isAdmin 
-                    ? 'rgba(249, 115, 22, 0.2)' 
-                    : userData?.isSupport 
-                    ? 'rgba(34, 197, 94, 0.2)' 
-                    : 'rgba(15, 127, 219, 0.2)'
-                })`
-              }}
-            />
-            
-            {/* Hover border effect */}
-            <div
-              className="absolute inset-0 rounded-2xl border-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
-              style={{
-                borderColor: userData?.isAdmin 
-                  ? 'rgba(249, 115, 22, 0.3)' 
-                  : userData?.isSupport 
-                  ? 'rgba(34, 197, 94, 0.3)' 
-                  : 'rgba(15, 127, 219, 0.3)',
-                boxShadow: `0 0 20px ${
-                  userData?.isAdmin 
-                    ? 'rgba(249, 115, 22, 0.4)' 
-                    : userData?.isSupport 
-                    ? 'rgba(34, 197, 94, 0.4)' 
-                    : 'rgba(15, 127, 219, 0.4)'
-                }`
-              }}
-            />
-            {/* Кнопка редактирования аватара - видна на мобильных, скрыта на десктопе (где работает hover) */}
-            <button
-              onClick={() => setShowAvatarModal(true)}
-              className="md:hidden absolute top-4 right-4 z-20 p-2 hover:bg-white/10 rounded-lg transition-colors text-neutral-400 hover:text-white"
-              aria-label="Изменить аватар"
-            >
-              <Pencil className="w-5 h-5" />
-            </button>
 
-            <div className="relative z-10 flex items-center gap-4 pr-10 md:pr-0">
-              {(() => {
-                const avatarUrl = getAvatarUrl(userData?.avatar);
-                const gradientClasses = getGradientClasses(userData?.avatar);
-                
-                return (
-                  <div className="relative shrink-0 group cursor-pointer md:cursor-pointer" onClick={() => setShowAvatarModal(true)}>
-                    <div className="shrink-0 h-20 w-20 rounded-full overflow-hidden border border-white/10 transition-all duration-200 md:group-hover:border-white/30 relative">
-                      {avatarUrl ? (
-                        <>
-                          {avatarLoading && (
-                            <div 
-                              className="absolute inset-0 rounded-full animate-shimmer bg-[length:200%_100%]"
-                              style={{
-                                backgroundImage: 'linear-gradient(90deg, rgba(64, 64, 64, 0.5) 0%, rgba(115, 115, 115, 0.4) 20%, rgba(180, 180, 180, 0.25) 30%, rgba(115, 115, 115, 0.4) 40%, rgba(38, 38, 38, 0.5) 50%, rgba(0, 0, 0, 0.4) 60%, rgba(64, 64, 64, 0.5) 70%, rgba(64, 64, 64, 0.5) 100%)',
-                                backgroundSize: '200% 100%',
-                                backgroundRepeat: 'no-repeat',
-                                backgroundPosition: '0% 0%'
-                              }}
+            {/* Profile Info - под баннером */}
+            <div className="relative mt-[-40px] sm:mt-[-50px] px-4 sm:px-6">
+              <div className="flex items-end gap-4 sm:gap-6">
+                {/* Avatar - выступает над нижним краем баннера */}
+                {(() => {
+                  const avatarUrl = getAvatarUrl(userData?.avatar);
+                  const gradientClasses = getGradientClasses(userData?.avatar);
+                  
+                  return (
+                    <div 
+                      className="relative group cursor-pointer shrink-0"
+                      onClick={() => setShowAvatarModal(true)}
+                    >
+                      <div className={`h-24 w-24 sm:h-28 sm:w-28 lg:h-32 lg:w-32 rounded-xl overflow-hidden border border-neutral-800 ${avatarUrl ? '' : gradientClasses} flex items-center justify-center text-white font-bold text-3xl sm:text-4xl lg:text-5xl shadow-2xl transition-all duration-200 group-hover:scale-105 bg-neutral-900`}>
+                        {avatarUrl ? (
+                          <>
+                            {avatarLoading && (
+                              <div className="absolute inset-0 bg-neutral-800 animate-pulse rounded-xl" />
+                            )}
+                            <Image
+                              src={avatarUrl}
+                              alt={userData?.username || ''}
+                              fill
+                              className={`object-cover rounded-xl transition-opacity duration-300 ${avatarLoading ? 'opacity-0' : 'opacity-100'}`}
+                              unoptimized
+                              onLoad={() => setAvatarLoading(false)}
+                              onError={() => setAvatarLoading(false)}
                             />
-                          )}
-                          <Image
-                            src={avatarUrl}
-                            alt={userData?.username || ''}
-                            width={80}
-                            height={80}
-                            className={`w-full h-full object-cover transition-all duration-200 md:group-hover:brightness-50 ${avatarLoading ? 'opacity-0' : 'opacity-100'}`}
-                            unoptimized
-                            onLoad={() => setAvatarLoading(false)}
-                            onError={() => setAvatarLoading(false)}
-                          />
-                        </>
-                      ) : (
-                        <>
-                          {loading && (
-                            <div 
-                              className="absolute inset-0 rounded-full animate-shimmer bg-[length:200%_100%]"
-                              style={{
-                                backgroundImage: 'linear-gradient(90deg, rgba(64, 64, 64, 0.5) 0%, rgba(115, 115, 115, 0.4) 20%, rgba(180, 180, 180, 0.25) 30%, rgba(115, 115, 115, 0.4) 40%, rgba(38, 38, 38, 0.5) 50%, rgba(0, 0, 0, 0.4) 60%, rgba(64, 64, 64, 0.5) 70%, rgba(64, 64, 64, 0.5) 100%)',
-                                backgroundSize: '200% 100%',
-                                backgroundRepeat: 'no-repeat',
-                                backgroundPosition: '0% 0%'
-                              }}
-                            />
-                          )}
-                          <div className={`w-full h-full ${gradientClasses} flex items-center justify-center text-white font-semibold text-xl rounded-full transition-opacity duration-300 ${loading ? 'opacity-0' : 'opacity-100'}`}>
-                {userData?.username ? userData.username.charAt(0).toUpperCase() : '—'}
-              </div>
-                        </>
-                      )}
+                          </>
+                        ) : (
+                          userData?.username ? userData.username.charAt(0).toUpperCase() : '—'
+                        )}
+                        {/* Dark overlay on hover */}
+                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center rounded-xl">
+                          <Pencil className="w-5 h-5 text-white" />
+                        </div>
+                      </div>
                     </div>
-                    {/* Hover overlay с иконкой карандаша - только на десктопе */}
-                    <div className="hidden md:flex absolute inset-0 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 items-center justify-center pointer-events-none">
-                      <Pencil className="w-5 h-5 text-white" />
+                  );
+                })()}
+
+                {/* User Info - справа от аватарки */}
+                <div className="flex-1 min-w-0 pb-2">
+                  <h1 className={`text-xl sm:text-2xl lg:text-3xl font-bold truncate mb-1 ${
+                    userData?.isAdmin 
+                      ? 'text-orange-500' 
+                      : userData?.isSupport 
+                      ? 'text-green-500' 
+                      : 'text-white'
+                  }`}>
+                    {userData?.username || '—'}
+                  </h1>
+                  <div className="flex flex-wrap items-center gap-3 sm:gap-5 text-sm sm:text-base text-neutral-400">
+                    <div className="group/info relative" title="Ваш ID">
+                      <span className="cursor-help">ID: {userData ? getShortId(userData.user_id) : '—'}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 sm:gap-2 group/info relative" title="Дата регистрации">
+                      <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-neutral-500" />
+                      <span className="cursor-help">{userData ? formatDate(userData.created_at) : '—'}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 sm:gap-2 group/info relative" title="Ваш баланс">
+                      <Wallet className="w-4 h-4 sm:w-5 sm:h-5 text-neutral-500" />
+                      <span className="cursor-help">{userData?.balance !== undefined ? `${userData.balance} ₽` : '0 ₽'}</span>
                     </div>
                   </div>
-                );
-              })()}
-              <div className="flex-1">
-                <div className={`text-lg font-medium ${
-                  userData?.isAdmin 
-                    ? 'text-orange-500' 
-                    : userData?.isSupport 
-                    ? 'text-green-500' 
-                    : 'text-white'
-                }`}>
-                  {userData?.username || '—'}
-                </div>
-                <div className="mt-1 text-sm text-neutral-400 flex flex-wrap gap-x-4 gap-y-1">
-                  <div><span className="text-neutral-500">ID:</span> {userData ? getShortId(userData.user_id) : '—'}</div>
-                  <div><span className="text-neutral-500">Дата регистрации:</span> {userData ? formatDate(userData.created_at) : '—'}</div>
-                </div>
-              </div>
-            </div>
-          </section>
-          {/* Cards grid */}
-          <div ref={cardsRef} className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-6">
-            <section className="rounded-2xl border border-neutral-800 bg-neutral-900 p-5">
-              <div className="text-sm text-neutral-400">Статус подписки</div>
-              <div className="mt-2 text-xl font-semibold">Нет активной подписки</div>
-            </section>
-            <section className="rounded-2xl border border-neutral-800 bg-neutral-900 p-5">
-              <div className="text-sm text-neutral-400">Ваши ключи</div>
-              <div className="mt-2 text-neutral-300 text-sm">Появятся после покупки.</div>
-            </section>
-            <section className="rounded-2xl border border-neutral-800 bg-neutral-900 p-5">
-              <div className="text-sm text-neutral-400">Информация</div>
-              <div className="mt-2 text-neutral-300 text-sm">
-                ...
-              </div>
-            </section>
-          </div>
-          {/* Servers status */}
-          <div ref={serversRef} className="mt-6 rounded-2xl border border-neutral-800 bg-neutral-900 p-5">
-            <div className="flex items-center justify-between">
-              <div className="font-medium">Статус серверов</div>
-              <div className="text-xs text-neutral-500">Скоро</div>
-            </div>
-            <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3">
-              <div className="rounded-xl border border-neutral-800 bg-neutral-950/40 p-3 flex items-center justify-between hover:bg-neutral-950/60 transition-colors">
-                <div className="text-sm">DE-1</div>
-                <div className="flex items-center gap-1 text-green-400">
-                  <span className="h-2 w-2 rounded-full bg-green-400"></span>
-                  <span className="text-xs">OK</span>
-                </div>
-              </div>
-              <div className="rounded-xl border border-neutral-800 bg-neutral-950/40 p-3 flex items-center justify-between hover:bg-neutral-950/60 transition-colors">
-                <div className="text-sm">DE-2</div>
-                <div className="flex items-center gap-1 text-green-400">
-                  <span className="h-2 w-2 rounded-full bg-green-400"></span>
-                  <span className="text-xs">OK</span>
-                </div>
-              </div>
-              <div className="rounded-xl border border-neutral-800 bg-neutral-950/40 p-3 flex items-center justify-between hover:bg-neutral-950/60 transition-colors">
-                <div className="text-sm">SWE-1</div>
-                <div className="flex items-center gap-1 text-yellow-400">
-                  <span className="h-2 w-2 rounded-full bg-yellow-400"></span>
-                  <span className="text-xs">LOAD</span>
-                </div>
-              </div>
-              <div className="rounded-xl border border-neutral-800 bg-neutral-950/40 p-3 flex items-center justify-between hover:bg-neutral-950/60 transition-colors">
-                <div className="text-sm">SWE-2</div>
-                <div className="flex items-center gap-1 text-green-400">
-                  <span className="h-2 w-2 rounded-full bg-green-400"></span>
-                  <span className="text-xs">OK</span>
                 </div>
               </div>
             </div>
           </div>
-          {/* Recent events */}
-          <div ref={eventsRef} className="mt-6 rounded-2xl border border-neutral-800 bg-neutral-900 p-5">
-            <div className="flex items-center justify-between">
-              <div className="font-medium">Последние события</div>
-              <div className="text-xs text-neutral-500">Скоро</div>
+
+          {/* Stats Grid */}
+          <div ref={statsRef} className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
+            <StatCard
+              icon={CreditCard}
+              label="Подписка"
+              value="Нет"
+              subtext="Не активна"
+              delay={0}
+            />
+            <StatCard
+              icon={Smartphone}
+              label="Устройства"
+              value="0"
+              subtext="Нет активных"
+              gradient="from-purple-500/20 to-purple-600/5"
+              iconColor="text-purple-400"
+              delay={80}
+            />
+            <StatCard
+              icon={Clock}
+              label="Осталось"
+              value="—"
+              subtext="Дней подписки"
+              gradient="from-emerald-500/20 to-emerald-600/5"
+              iconColor="text-emerald-400"
+              delay={160}
+            />
+            <StatCard
+              icon={TrendingUp}
+              label="Трафик"
+              value="∞"
+              subtext="Безлимитный"
+              gradient="from-amber-500/20 to-amber-600/5"
+              iconColor="text-amber-400"
+              delay={240}
+            />
+          </div>
+
+          {/* Two Column Layout */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
+            {/* Left Column - Quick Actions */}
+            <div ref={actionsRef} className="lg:col-span-2 space-y-6">
+              {/* Quick Actions */}
+              <div className="rounded-2xl border border-neutral-800 bg-neutral-900/50 p-4 sm:p-6 backdrop-blur-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-semibold text-white">Быстрые действия</h2>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <QuickAction
+                    icon={CreditCard}
+                    label="Приобрести подписку"
+                    href="/#pricing"
+                    variant="primary"
+                  />
+                  <QuickAction
+                    icon={Smartphone}
+                    label="Мои устройства"
+                    href={`/dashboard/${userData?.dashboard_token}#keys`}
+                  />
+                  <QuickAction
+                    icon={HeadphonesIcon}
+                    label="Связаться с поддержкой"
+                    href="/support"
+                  />
+                  <QuickAction
+                    icon={Settings}
+                    label="Настройки аккаунта"
+                    href={`/dashboard/${userData?.dashboard_token}#settings`}
+                  />
+                </div>
+              </div>
+
+              {/* Subscription Info */}
+              <div className="rounded-2xl border border-neutral-800 bg-neutral-900/50 p-4 sm:p-6 backdrop-blur-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-semibold text-white">Мои покупки</h2>
+                  <span className="text-xs text-neutral-500">0 из 3</span>
+                </div>
+                <div className="rounded-xl border border-dashed border-neutral-700/50 bg-neutral-950/30 p-8 text-center">
+                  <div className="w-12 h-12 rounded-xl bg-neutral-800/50 flex items-center justify-center mx-auto mb-4">
+                    <ShoppingBag className="w-6 h-6 text-neutral-500" />
+                  </div>
+                  <p className="text-neutral-400 text-sm">У вас пока нет покупок</p>
+                </div>
+              </div>
             </div>
-            <div className="mt-3 text-neutral-400 text-sm">История активности будет доступна после интеграции API.</div>
+
+            {/* Right Column - Server Status */}
+            <div ref={serversRef} className="space-y-6">
+              {/* Server Status */}
+              <div className="rounded-2xl border border-neutral-800 bg-neutral-900/50 p-4 sm:p-6 backdrop-blur-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <Server className="w-5 h-5 text-neutral-400" />
+                    <h2 className="text-lg font-semibold text-white">Серверы</h2>
+                  </div>
+                  <span className="text-xs text-neutral-500">Скоро</span>
+                </div>
+                <div className="rounded-xl border border-dashed border-neutral-700/50 bg-neutral-950/30 p-6 text-center">
+                  <p className="text-neutral-500 text-sm">
+                    Информация о серверах недоступна
+                  </p>
+                </div>
+              </div>
+
+              {/* Recent Activity */}
+              <div className="rounded-2xl border border-neutral-800 bg-neutral-900/50 p-4 sm:p-6 backdrop-blur-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <Activity className="w-5 h-5 text-neutral-400" />
+                    <h2 className="text-lg font-semibold text-white">Активность</h2>
+                  </div>
+                  <span className="text-xs text-neutral-500">Скоро</span>
+                </div>
+                <div className="rounded-xl border border-dashed border-neutral-700/50 bg-neutral-950/30 p-6 text-center">
+                  <p className="text-neutral-500 text-sm">
+                    История активности недоступна
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </main>
-      {/* Footer */}
+
+      {/* Footer - старый стиль */}
       <footer className="mt-20 border-t border-neutral-800/50">
         <div className="mx-auto max-w-6xl px-4 py-8">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
@@ -945,13 +1040,12 @@ export default function DashboardPage() {
         </div>
       </footer>
 
-      {/* Avatar Upload Modal */}
+      {/* Modals */}
       <AvatarUploadModal
         isOpen={showAvatarModal}
         onClose={() => setShowAvatarModal(false)}
-        onUploadComplete={(avatarPath, avatarUrl) => {
+        onUploadComplete={(avatarPath) => {
           setAvatarLoading(true);
-          // Обновляем данные пользователя с новым аватаром
           if (userData) {
             setUserData({
               ...userData,
@@ -963,12 +1057,10 @@ export default function DashboardPage() {
         currentAvatarUrl={userData ? getAvatarUrl(userData.avatar) : null}
       />
 
-      {/* Banner Upload Modal */}
       <BannerUploadModal
         isOpen={showBannerModal}
         onClose={() => setShowBannerModal(false)}
-        onUploadComplete={(bannerPath, bannerUrl) => {
-          // Обновляем данные пользователя с новым баннером
+        onUploadComplete={(bannerPath) => {
           if (userData) {
             setUserData({
               ...userData,
@@ -982,4 +1074,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-

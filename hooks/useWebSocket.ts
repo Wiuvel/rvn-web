@@ -45,6 +45,8 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
     };
   }, []);
 
+  // Эффект для подключения WebSocket - подключается один раз при наличии токена
+  // НЕ зависит от ticketId, чтобы избежать переподключений при смене тикета
   useEffect(() => {
     // Очищаем предыдущий таймер переподключения
     if (reconnectTimeoutRef.current) {
@@ -59,7 +61,6 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
         cleanupRef.current = null;
       }
       currentTokenRef.current = undefined;
-      currentTicketIdRef.current = undefined;
       isConnectingRef.current = false;
       return;
     }
@@ -77,15 +78,15 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
         cleanupRef.current = null;
       }
       currentTokenRef.current = undefined;
-      currentTicketIdRef.current = undefined;
       isConnectingRef.current = false;
       return;
     }
 
-    // ИСПРАВЛЕНО: Убрано переиспользование socket объекта для гарантии перерегистрации обработчиков событий
-    // Проблема: когда socket переиспользовался, socket объект не менялся, и useEffect в компонентах
-    // не перезапускался, поэтому обработчики событий не перерегистрировались после переподключения
-    // Решение: всегда создаем новый socket объект, Socket.IO переиспользует физическое соединение через forceNew: false
+    // Проверяем, нужно ли переподключаться (только если токен изменился)
+    if (currentTokenRef.current === token && socketRef.current?.connected) {
+      // Токен не изменился и соединение активно - не переподключаемся
+      return;
+    }
 
     // Debounce для переподключения - предотвращаем множественные попытки при быстрой смене токена
     // Это особенно важно при первой загрузке страницы, когда токен загружается асинхронно
@@ -93,125 +94,121 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
     reconnectTimeoutRef.current = setTimeout(() => {
       isConnectingRef.current = false;
 
-    // Очищаем предыдущее соединение перед созданием нового
-    if (cleanupRef.current) {
-      cleanupRef.current();
-      cleanupRef.current = null;
-    }
-    
-    // Сохраняем текущий токен для проверки в следующий раз
-    currentTokenRef.current = token;
-      currentTicketIdRef.current = ticketId || undefined;
-
-    // Создаем новое соединение (используем текущий домен)
-    const wsUrl = process.env.NEXT_PUBLIC_WS_URL || (typeof window !== 'undefined' ? window.location.origin : '');
-    
-    // Получаем токен из параметров
-    // ВАЖНО: dashboard_token установлен как httpOnly cookie, поэтому JavaScript не может его прочитать
-    // Токен должен быть передан через параметр token из компонента, который получает его из API ответа
-    const authToken = token;
-    
-    const socket = io(wsUrl, {
-      path: '/api/socket',
-      transports: ['websocket', 'polling'],
-      reconnection: true,
-      reconnectionDelay: 1000,
-      reconnectionAttempts: 5,
-      reconnectionDelayMax: 5000,
-      timeout: 20000,
-      forceNew: false,
-      autoConnect: true,
-      auth: {
-        token: authToken || undefined // Передаем токен для аутентификации
+      // Очищаем предыдущее соединение перед созданием нового (только если токен изменился)
+      if (cleanupRef.current && currentTokenRef.current !== token) {
+        cleanupRef.current();
+        cleanupRef.current = null;
       }
-    });
+      
+      // Сохраняем текущий токен для проверки в следующий раз
+      currentTokenRef.current = token;
 
-    socketRef.current = socket;
-
-    socket.on('connect', () => {
-      setIsConnected(true);
-        isConnectingRef.current = false;
-      // Логируем только в dev режиме
-      if (process.env.NODE_ENV === 'development') {
-        console.log('WebSocket connected');
+      // Если соединение уже существует и токен не изменился, не переподключаемся
+      if (socketRef.current?.connected && currentTokenRef.current === token) {
+        return;
       }
-    });
 
-    socket.on('disconnect', () => {
-      setIsConnected(false);
-        isConnectingRef.current = false;
-      // Логируем только в dev режиме
-      if (process.env.NODE_ENV === 'development') {
-        console.log('WebSocket disconnected');
-      }
-    });
-
-    socket.on('connect_error', (error: Error) => {
-      setIsConnected(false);
-        isConnectingRef.current = false;
-      // Логируем ошибки подключения для диагностики
-      console.error('WebSocket connection error:', {
-        message: error.message,
-        type: error.name,
-        url: wsUrl,
-        path: '/api/socket'
+      // Создаем новое соединение (используем текущий домен)
+      const wsUrl = process.env.NEXT_PUBLIC_WS_URL || (typeof window !== 'undefined' ? window.location.origin : '');
+      
+      // Получаем токен из параметров
+      // ВАЖНО: dashboard_token установлен как httpOnly cookie, поэтому JavaScript не может его прочитать
+      // Токен должен быть передан через параметр token из компонента, который получает его из API ответа
+      const authToken = token;
+      
+      const socket = io(wsUrl, {
+        path: '/api/socket',
+        transports: ['websocket', 'polling'],
+        reconnection: true,
+        reconnectionDelay: 1000,
+        reconnectionAttempts: 5,
+        reconnectionDelayMax: 5000,
+        timeout: 20000,
+        forceNew: false,
+        autoConnect: true,
+        auth: {
+          token: authToken || undefined // Передаем токен для аутентификации
+        }
       });
-      
-      // Специальная обработка ошибок аутентификации
-      if (error.message.includes('Authentication') || error.message.includes('Invalid token') || error.message.includes('Authentication required')) {
-        console.error('WebSocket authentication failed - token may be invalid or expired');
-        // Токен может быть невалидным или истекшим
-        // В этом случае нужно обновить токен через API или перенаправить на страницу входа
-        // НЕ пытаемся переподключиться автоматически с невалидным токеном
-          currentTokenRef.current = undefined; // Сбрасываем токен чтобы не пытаться снова
-      }
-      
-      // Если ошибка связана с CORS или origin, показываем более детальную информацию
-      if (error.message.includes('CORS') || error.message.includes('origin')) {
-        console.error('WebSocket CORS error - check server CORS configuration');
-      }
-    });
 
-    // Обработчик общих ошибок WebSocket
-    // Socket.IO автоматически обрабатывает большинство ошибок через connect_error
-    // Этот обработчик нужен только для критических ошибок
-    socket.on('error', (error: Error) => {
-      // Игнорируем ошибки транспорта, которые нормальны при переподключении
-      if (error.message && !error.message.includes('transport')) {
+      socketRef.current = socket;
+
+      socket.on('connect', () => {
+        setIsConnected(true);
+        isConnectingRef.current = false;
         // Логируем только в dev режиме
         if (process.env.NODE_ENV === 'development') {
-          console.warn('WebSocket error:', error.message);
+          console.log('WebSocket connected');
         }
-      }
-    });
-
-    // Автоматически присоединяемся к тикету после подключения
-    const onConnect = () => {
+        // При подключении автоматически присоединяемся к текущему тикету, если он есть
         if (currentTicketIdRef.current) {
-        // userId и isSupport теперь не нужны - они берутся из аутентификации
           socket.emit('support:join', { ticketId: currentTicketIdRef.current });
-      }
-    };
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`WebSocket: Auto-joined room ticket:${currentTicketIdRef.current} after connection`);
+          }
+        }
+      });
 
-    // Если уже подключен, присоединяемся сразу
-    if (socket.connected) {
-      onConnect();
-    } else {
-      socket.once('connect', onConnect);
-    }
+      socket.on('disconnect', () => {
+        setIsConnected(false);
+        isConnectingRef.current = false;
+        // Логируем только в dev режиме
+        if (process.env.NODE_ENV === 'development') {
+          console.log('WebSocket disconnected');
+        }
+      });
 
-    // Функция очистки
-    const cleanup = () => {
-        if (currentTicketIdRef.current && socket.connected) {
-          socket.emit('support:leave', { ticketId: currentTicketIdRef.current });
-      }
-      socket.off('connect', onConnect);
-      // Всегда отключаем socket при cleanup для предотвращения утечек памяти
-      socket.disconnect();
-      socketRef.current = null;
-    };
+      socket.on('connect_error', (error: Error) => {
+        setIsConnected(false);
+        isConnectingRef.current = false;
+        // Логируем ошибки подключения для диагностики
+        console.error('WebSocket connection error:', {
+          message: error.message,
+          type: error.name,
+          url: wsUrl,
+          path: '/api/socket'
+        });
+        
+        // Специальная обработка ошибок аутентификации
+        if (error.message.includes('Authentication') || error.message.includes('Invalid token') || error.message.includes('Authentication required')) {
+          console.error('WebSocket authentication failed - token may be invalid or expired');
+          // Токен может быть невалидным или истекшим
+          // В этом случае нужно обновить токен через API или перенаправить на страницу входа
+          // НЕ пытаемся переподключиться автоматически с невалидным токеном
+          currentTokenRef.current = undefined; // Сбрасываем токен чтобы не пытаться снова
+        }
+        
+        // Если ошибка связана с CORS или origin, показываем более детальную информацию
+        if (error.message.includes('CORS') || error.message.includes('origin')) {
+          console.error('WebSocket CORS error - check server CORS configuration');
+        }
+      });
 
-    cleanupRef.current = cleanup;
+      // Обработчик общих ошибок WebSocket
+      // Socket.IO автоматически обрабатывает большинство ошибок через connect_error
+      // Этот обработчик нужен только для критических ошибок
+      socket.on('error', (error: Error) => {
+        // Игнорируем ошибки транспорта, которые нормальны при переподключении
+        if (error.message && !error.message.includes('transport')) {
+          // Логируем только в dev режиме
+          if (process.env.NODE_ENV === 'development') {
+            console.warn('WebSocket error:', error.message);
+          }
+        }
+      });
+
+      // Функция очистки
+      const cleanup = () => {
+        socket.off('connect');
+        socket.off('disconnect');
+        socket.off('connect_error');
+        socket.off('error');
+        // Всегда отключаем socket при cleanup для предотвращения утечек памяти
+        socket.disconnect();
+        socketRef.current = null;
+      };
+
+      cleanupRef.current = cleanup;
       isConnectingRef.current = true;
     }, 100); // Debounce 100ms для предотвращения циклических переподключений
 
@@ -226,9 +223,53 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
         cleanupRef.current = null;
       }
     };
-    // ВАЖНО: token в зависимостях - при изменении токена WebSocket переподключится
-    // Это важно для обновления токена после истечения или изменения
-  }, [enabled, ticketId, userId, isSupport, token]);
+    // ВАЖНО: только enabled и token в зависимостях - при изменении токена WebSocket переподключится
+    // ticketId, userId, isSupport НЕ должны вызывать переподключение
+  }, [enabled, token]);
+
+  // Отдельный эффект для отслеживания изменений ticketId и автоматического join/leave комнат
+  // Это позволяет менять комнаты без переподключения WebSocket
+  useEffect(() => {
+    const socket = socketRef.current;
+    const previousTicketId = currentTicketIdRef.current;
+
+    // Если ticketId не изменился, ничего не делаем
+    if (previousTicketId === ticketId) {
+      return;
+    }
+
+    // Если есть предыдущий тикет и соединение активно, выходим из старой комнаты
+    if (previousTicketId && socket?.connected) {
+      socket.emit('support:leave', { ticketId: previousTicketId });
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`WebSocket: Left room ticket:${previousTicketId}`);
+      }
+    }
+
+    // Обновляем текущий ticketId
+    currentTicketIdRef.current = ticketId || undefined;
+
+    // Если есть новый тикет и соединение активно, присоединяемся к новой комнате
+    if (ticketId && socket?.connected) {
+      socket.emit('support:join', { ticketId });
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`WebSocket: Joined room ticket:${ticketId}`);
+      }
+    } else if (ticketId && socket && !socket.connected) {
+      // Если соединение еще не установлено, присоединимся после подключения
+      // Используем once, чтобы избежать множественных подписок
+      const onConnect = () => {
+        // Проверяем, что ticketId не изменился пока мы ждали подключения
+        if (currentTicketIdRef.current === ticketId && socket.connected) {
+          socket.emit('support:join', { ticketId });
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`WebSocket: Joined room ticket:${ticketId} after connection`);
+          }
+        }
+      };
+      socket.once('connect', onConnect);
+    }
+  }, [ticketId]);
 
   const joinTicket = useCallback((ticketId: string) => {
     if (socketRef.current) {

@@ -798,22 +798,13 @@ export default function SupportPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userData]);
 
-  // WebSocket: присоединение/отсоединение от тикета
+  // WebSocket: присоединение/отсоединение от тикета теперь обрабатывается автоматически в useWebSocket
+  // Очищаем ref при изменении активного тикета
   useEffect(() => {
-    if (!socket || !activeTicket || !userData) {
-      // Очищаем ref при отсутствии активного тикета
+    if (!activeTicket) {
       activeTicketMessagesRef.current = [];
-      return;
     }
-
-    joinTicket(activeTicket.id);
-
-    return () => {
-      leaveTicket(activeTicket.id);
-      // Очищаем ref при выходе из тикета
-      activeTicketMessagesRef.current = [];
-    };
-  }, [socket, activeTicket, userData, joinTicket, leaveTicket]);
+  }, [activeTicket]);
 
   // WebSocket: обработка новых сообщений
   useEffect(() => {
@@ -2359,7 +2350,7 @@ export default function SupportPage() {
           <div className="backdrop-blur-lg bg-neutral-900/40 border border-white/10 rounded-full px-6 py-3 flex items-center justify-between shadow-lg">
             <Link href="/" className="flex items-center gap-2">
               <Image src="/static/logo.svg" alt="Raven Logo" width={256} height={256} className="w-6 h-6" priority/>
-              <span className="font-semibold text-white">Raven Private</span>
+              <span className="font-semibold text-white">RVN</span>
             </Link>
             <nav className="hidden lg:flex items-center gap-8 text-sm text-neutral-300">
               <Link href="/" className="hover:text-white transition">Главная</Link>

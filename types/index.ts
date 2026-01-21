@@ -9,6 +9,7 @@ export interface UserData {
   banner?: string | null;
   isSupport?: boolean;
   isAdmin?: boolean;
+  balance?: number;
 }
 
 export interface Notification {

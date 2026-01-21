@@ -13,6 +13,7 @@ import { GSAP_DEFAULT_DURATION, GSAP_DEFAULT_EASE } from '@/lib/utils/constants'
 import { getGradientClasses, getAvatarUrl } from '@/lib/utils/avatar-gradients';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { getStaticUrl } from "@/lib/utils";
+import { Wallet } from 'lucide-react';
 
 if (typeof window !== 'undefined') {
   gsap.registerPlugin(ScrollTrigger);
@@ -281,7 +282,7 @@ export default function Header({ variant = 'main' }: HeaderProps = {}) {
               className="w-6 h-6"
               priority
             />
-            <span className="font-semibold text-white">Raven Private</span>
+            <span className="font-semibold text-white">RVN</span>
           </Link>
           {variant === 'main' && (
             <nav className="hidden lg:flex items-center gap-8 text-sm text-neutral-300">
@@ -538,6 +539,14 @@ export default function Header({ variant = 'main' }: HeaderProps = {}) {
                             : 'text-white'
                         }`}>
                           {userData.username}
+                        </div>
+                        <div className="flex items-center gap-2 text-neutral-400 text-sm truncate">
+                          <span>ID: {userData.user_id}</span>
+                          <span className="text-neutral-500">•</span>
+                          <span className="flex items-center gap-1">
+                            <Wallet className="w-4 h-4 text-neutral-500" />
+                            {userData.balance !== undefined ? `${userData.balance} ₽` : '0 ₽'}
+                          </span>
                         </div>
                       </div>
                     </div>
