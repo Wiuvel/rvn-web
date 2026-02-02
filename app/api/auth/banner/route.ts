@@ -12,7 +12,9 @@ import { logger } from '@/lib/utils/secure-logger';
 import { ERROR_INTERNAL_SERVER_ERROR, ERROR_NOT_AUTHENTICATED, ERROR_TOO_MANY_REQUESTS } from '@/lib/utils/constants';
 import { supabaseAdmin } from '@/lib/database/supabase';
 import { uploadAvatarToS3, deleteFileFromS3, validateFile } from '@/lib/storage/s3-client';
+import { setMediaCache } from '@/lib/storage/media-cache';
 import { isValidUUID } from '@/lib/utils/uuid-validation';
+import { BANNER_MAX_BYTES } from '@/lib/utils/constants';
 
 export async function OPTIONS() {
   return handleCorsPreflight();
@@ -118,9 +120,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Ограничиваем размер файла (максимум 5MB для баннеров)
-    const MAX_BANNER_SIZE = 5 * 1024 * 1024;
-    if (file.size > MAX_BANNER_SIZE) {
+    // Ограничиваем размер файла (лимит из конфига)
+    if (file.size > BANNER_MAX_BYTES) {
       return setCorsHeaders(
         NextResponse.json(
           { error: 'File size must not exceed 5MB' },
@@ -182,6 +183,8 @@ export async function POST(request: NextRequest) {
     // Загружаем новый баннер в S3 с публичным доступом
     try {
       await uploadAvatarToS3(buffer, storagePath, file.type);
+      // Прогрев кэша: первый запрос изображения будет HIT
+      await setMediaCache(storagePath, buffer, file.type, { isAvatarOrBanner: true });
     } catch (error) {
       logger.error('Error uploading banner to S3', {
         error: error instanceof Error ? error.message : 'Unknown error',

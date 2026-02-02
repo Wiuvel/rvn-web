@@ -1,15 +1,15 @@
 import localFont from 'next/font/local';
 
-// Оптимизированная загрузка Exo 2 через next/font
+// Exo2; next/font.
 export const exo2 = localFont({
   src: [
     {
-      path: '../public/static/fonts/7cHmv4okm5zmbtYoK-4.woff2',
+      path: '../public/fonts/7cHmv4okm5zmbtYoK-4.woff2',
       weight: '100 900',
       style: 'normal',
     },
     {
-      path: '../public/static/fonts/7cHmv4okm5zmbtYsK-4E4Q.woff2',
+      path: '../public/fonts/7cHmv4okm5zmbtYsK-4E4Q.woff2',
       weight: '100 900',
       style: 'normal',
     },

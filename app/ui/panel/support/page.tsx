@@ -521,7 +521,7 @@ export default function SupportPanel() {
         }
       }
     }
-  }, [mobileActionsOpen, activeTicket, shouldRenderMobileActions]);
+  }, [mobileActionsOpen, activeTicket?.id, shouldRenderMobileActions]);
 
   // Очередь запросов вместо одного callback - исправляет race condition
   const pendingRequestsQueueRef = useRef<Array<() => Promise<void>>>([]);
@@ -530,6 +530,8 @@ export default function SupportPanel() {
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const markReadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const currentTicketIdRef = useRef<string | null>(null);
+  const activeTicketRef = useRef<Ticket | null>(null); // Ref для актуального activeTicket в обработчиках WebSocket (избегаем переподписок при каждом обновлении)
+  activeTicketRef.current = activeTicket;
   const notificationRef = useRef<HTMLDivElement>(null);
   const currentFilterRef = useRef<'active' | 'archive'>('active');
   const fetchTicketsAbortControllerRef = useRef<AbortController | null>(null);
@@ -945,7 +947,7 @@ export default function SupportPanel() {
     if (!socket || !activeTicket || !authState.hasSupportAccess) return;
 
     const handleNewMessage = (data: { ticketId: string; message: any }) => {
-      if (data.ticketId !== activeTicket.id) return;
+      if (data.ticketId !== activeTicketRef.current?.id) return;
 
       // Проверяем, что сообщение еще не добавлено (используем ref для актуальных данных)
       const messageExists = messagesRef.current.some(m => m.id === data.message.id);
@@ -1039,7 +1041,7 @@ export default function SupportPanel() {
       });
 
       // Обновляем активный тикет только если это текущий тикет
-      if (data.ticketId === activeTicket?.id) {
+      if (data.ticketId === activeTicketRef.current?.id) {
         setActiveTicket(prev => {
           if (!prev || prev.id !== data.ticketId) return prev;
           return {
@@ -1069,7 +1071,7 @@ export default function SupportPanel() {
       });
 
       // Обновляем активный тикет только если это текущий тикет
-      if (data.ticketId === activeTicket?.id) {
+      if (data.ticketId === activeTicketRef.current?.id) {
         setActiveTicket(prev => {
           if (!prev || prev.id !== data.ticketId) return prev;
           return {
@@ -1086,7 +1088,7 @@ export default function SupportPanel() {
       messageIds: string[];
       readBy: 'user' | 'support';
     }) => {
-      if (data.ticketId !== activeTicket.id) return;
+      if (data.ticketId !== activeTicketRef.current?.id) return;
 
       // Обновляем статус прочитанности сообщений
       setMessages(prev => {
@@ -1110,7 +1112,7 @@ export default function SupportPanel() {
       socket.off('support:ticket:assigned', handleTicketAssignment);
       socket.off('support:message:read', handleMessageRead);
     };
-  }, [socket, activeTicket, authState.hasSupportAccess, markMessagesAsRead]);
+  }, [socket, activeTicket?.id, authState.hasSupportAccess, markMessagesAsRead]);
 
   // Умное обновление сообщений: только когда страница активна и только проверка новых
   useEffect(() => {

@@ -196,8 +196,12 @@ const initPromise = app && typeof app.prepare === 'function'
 
 initPromise.then(() => {
   const httpServer = createServer(async (req, res) => {
+    const parsedUrl = parse(req.url || '', true);
+    // WebSocket upgrade для /api/socket обрабатывает Socket.IO — не отдавать в Next.js
+    if (req.headers.upgrade === 'websocket' && parsedUrl.pathname?.startsWith('/api/socket')) {
+      return;
+    }
     try {
-      const parsedUrl = parse(req.url, true);
       await handle(req, res, parsedUrl);
     } catch (err) {
       logger.error('Error handling request', { url: req.url, error: err instanceof Error ? err.message : 'Unknown error' });
@@ -610,9 +614,7 @@ initPromise.then(() => {
       }, 500);
       
       if (dev) {
-        setTimeout(async () => {
-          await initWebSocket();
-        }, 1000);
+        initWebSocket().catch(() => {});
       } else {
         const initialized = initWebSocket();
         if (!initialized) {

@@ -22,6 +22,8 @@ interface UseWebSocketReturn {
   isConnected: boolean;
   joinTicket: (ticketId: string) => void;
   leaveTicket: (ticketId: string) => void;
+  joinProfile: (profileId: string) => void;
+  leaveProfile: (profileId: string) => void;
   sendTyping: (ticketId: string, isTyping: boolean) => void;
 }
 
@@ -99,7 +101,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
         cleanupRef.current();
         cleanupRef.current = null;
       }
-      
+
       // Сохраняем текущий токен для проверки в следующий раз
       currentTokenRef.current = token;
 
@@ -110,12 +112,12 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
 
       // Создаем новое соединение (используем текущий домен)
       const wsUrl = process.env.NEXT_PUBLIC_WS_URL || (typeof window !== 'undefined' ? window.location.origin : '');
-      
+
       // Получаем токен из параметров
       // ВАЖНО: dashboard_token установлен как httpOnly cookie, поэтому JavaScript не может его прочитать
       // Токен должен быть передан через параметр token из компонента, который получает его из API ответа
       const authToken = token;
-      
+
       const socket = io(wsUrl, {
         path: '/api/socket',
         transports: ['websocket', 'polling'],
@@ -168,7 +170,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
           url: wsUrl,
           path: '/api/socket'
         });
-        
+
         // Специальная обработка ошибок аутентификации
         if (error.message.includes('Authentication') || error.message.includes('Invalid token') || error.message.includes('Authentication required')) {
           console.error('WebSocket authentication failed - token may be invalid or expired');
@@ -177,7 +179,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
           // НЕ пытаемся переподключиться автоматически с невалидным токеном
           currentTokenRef.current = undefined; // Сбрасываем токен чтобы не пытаться снова
         }
-        
+
         // Если ошибка связана с CORS или origin, показываем более детальную информацию
         if (error.message.includes('CORS') || error.message.includes('origin')) {
           console.error('WebSocket CORS error - check server CORS configuration');
@@ -291,11 +293,25 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
     }
   }, []);
 
+  const joinProfile = useCallback((profileId: string) => {
+    if (socketRef.current) {
+      socketRef.current.emit('profile:join', { profileId });
+    }
+  }, []);
+
+  const leaveProfile = useCallback((profileId: string) => {
+    if (socketRef.current) {
+      socketRef.current.emit('profile:leave', { profileId });
+    }
+  }, []);
+
   return {
     socket: socketRef.current,
     isConnected,
     joinTicket,
     leaveTicket,
+    joinProfile,
+    leaveProfile,
     sendTyping,
   };
 }

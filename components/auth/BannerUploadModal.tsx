@@ -3,6 +3,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { gsap } from 'gsap';
 import { X, Upload, Image as ImageIcon } from 'lucide-react';
+import { truncateFileName } from '@/lib/utils/truncate';
+import { BANNER_MAX_BYTES } from '@/lib/utils/constants';
 
 interface BannerUploadModalProps {
   isOpen: boolean;
@@ -105,9 +107,8 @@ export default function BannerUploadModal({
       return false;
     }
 
-    // Валидация размера (максимум 5MB для баннеров)
-    const MAX_SIZE = 5 * 1024 * 1024;
-    if (file.size > MAX_SIZE) {
+    // Валидация размера (лимит из конфига)
+    if (file.size > BANNER_MAX_BYTES) {
       setError('Размер файла не должен превышать 5MB');
       return false;
     }
@@ -604,6 +605,11 @@ export default function BannerUploadModal({
             ) : (
               /* Область обрезки изображения */
               <div className="mb-4">
+                {selectedFile && (
+                  <p className="text-sm text-neutral-400 truncate max-w-full mb-2" title={selectedFile.name}>
+                    {truncateFileName(selectedFile.name)}
+                  </p>
+                )}
                 <div
                   ref={imageContainerRef}
                   className="relative w-full bg-neutral-950 rounded-lg overflow-hidden border border-neutral-800"

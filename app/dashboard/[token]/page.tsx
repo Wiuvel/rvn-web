@@ -724,6 +724,7 @@ export default function DashboardPage() {
                     })()}
                     <div className="min-w-0 flex-1">
                       <div className="text-white font-medium truncate">{userData.username}</div>
+                      <div className={`text-sm truncate ${roleInfo.color}`}>{roleInfo.label}</div>
                     </div>
                   </div>
                 </Link>

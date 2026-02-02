@@ -4,12 +4,12 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getS3Client } from '@/lib/storage/s3-client';
-import { getEnv } from '@/lib/validation/env-validation';
-import { GetObjectCommand } from '@aws-sdk/client-s3';
+import { getS3Client, getObjectAsBuffer } from '@/lib/storage/s3-client';
+import { getMediaFromCache, setMediaCache } from '@/lib/storage/media-cache';
+import { processImage } from '@/lib/wasm/image-processor';
 import { setCorsHeaders, handleCorsPreflight } from '@/lib/security/cors';
 import { logger } from '@/lib/utils/secure-logger';
-import { Readable } from 'stream';
+import { CACHE_CONTROL_IMAGES_PUBLIC } from '@/lib/utils/constants';
 
 export async function OPTIONS() {
   return handleCorsPreflight();
@@ -94,11 +94,22 @@ export async function GET(
       );
     }
 
-    // Получаем клиент S3 и конфигурацию
+    // Проверка кэша Redis (Фаза 1: media cache)
+    const cached = await getMediaFromCache(s3Key);
+    if (cached) {
+      const headers = new Headers();
+      headers.set('Content-Type', cached.contentType);
+      headers.set('Cache-Control', CACHE_CONTROL_IMAGES_PUBLIC);
+      headers.set('Content-Length', cached.body.length.toString());
+      headers.set('X-Cache', 'HIT');
+      return setCorsHeaders(
+        new NextResponse(new Uint8Array(cached.body), { status: 200, headers })
+      );
+    }
+
+    // Cache miss: получаем файл из S3
     const client = getS3Client();
-    const env = getEnv();
-    
-    if (!client || !env.S3_BUCKET) {
+    if (!client) {
       logger.error('S3 storage is not configured');
       return setCorsHeaders(
         NextResponse.json(
@@ -108,60 +119,9 @@ export async function GET(
       );
     }
 
-    // Получаем файл напрямую из S3
-    const command = new GetObjectCommand({
-      Bucket: env.S3_BUCKET,
-      Key: s3Key,
-    });
-
     try {
-      const response = await client.send(command);
-      
-      // Получаем тело файла как поток
-      const stream = response.Body;
-      if (!stream) {
-        throw new Error('Empty stream from S3');
-      }
-
-      // Определяем Content-Type из метаданных S3 или по расширению
-      const contentType = response.ContentType || 
-        (filename.endsWith('.png') ? 'image/png' :
-         filename.endsWith('.jpg') || filename.endsWith('.jpeg') ? 'image/jpeg' :
-         filename.endsWith('.webp') ? 'image/webp' :
-         filename.endsWith('.gif') ? 'image/gif' :
-         'application/octet-stream');
-
-      // Создаем Response с потоком данных
-      const headers = new Headers();
-      headers.set('Content-Type', contentType);
-      headers.set('Cache-Control', 'public, max-age=86400, immutable'); // 24 часа кеширования
-      
-      if (response.ContentLength) {
-        headers.set('Content-Length', response.ContentLength.toString());
-      }
-      
-      if (response.ETag) {
-        headers.set('ETag', response.ETag);
-      }
-      
-      if (response.LastModified) {
-        headers.set('Last-Modified', response.LastModified.toUTCString());
-      }
-
-      // Преобразуем Node.js Readable stream в Web ReadableStream
-      // В AWS SDK v3 для Node.js Body является Readable stream
-      const nodeStream = stream as Readable;
-      const webStream = Readable.toWeb(nodeStream) as ReadableStream<Uint8Array>;
-      
-      return setCorsHeaders(
-        new NextResponse(webStream, {
-          status: 200,
-          headers,
-        })
-      );
-    } catch (s3Error: any) {
-      // Если файл не найден, возвращаем 404
-      if (s3Error.name === 'NoSuchKey' || s3Error.$metadata?.httpStatusCode === 404) {
+      const s3Result = await getObjectAsBuffer(s3Key);
+      if (!s3Result) {
         return setCorsHeaders(
           NextResponse.json(
             { error: 'Image not found' },
@@ -169,7 +129,31 @@ export async function GET(
           )
         );
       }
-      throw s3Error;
+
+      let { body, contentType } = s3Result;
+      body = await processImage(body, {}).catch(() => body);
+      await setMediaCache(s3Key, body, contentType, { isAvatarOrBanner: true });
+
+      const headers = new Headers();
+      headers.set('Content-Type', contentType);
+      headers.set('Cache-Control', CACHE_CONTROL_IMAGES_PUBLIC);
+      headers.set('Content-Length', body.length.toString());
+      headers.set('X-Cache', 'MISS');
+
+      return setCorsHeaders(
+        new NextResponse(new Uint8Array(body), { status: 200, headers })
+      );
+    } catch (s3Error: unknown) {
+      const err = s3Error as { name?: string; $metadata?: { httpStatusCode?: number } };
+      if (err.name === 'NoSuchKey' || err.$metadata?.httpStatusCode === 404) {
+        return setCorsHeaders(
+          NextResponse.json(
+            { error: 'Image not found' },
+            { status: 404 }
+          )
+        );
+      }
+      throw err;
     }
   } catch (error) {
     const resolvedParams = await params;

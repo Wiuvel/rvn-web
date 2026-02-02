@@ -4,10 +4,13 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
+import { useAuth } from '@/hooks/useAuth';
 import { getGradientClasses, getAvatarUrl, getBannerUrl } from '@/lib/utils/avatar-gradients';
 import { APP_VERSION } from '@/lib/utils/constants';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import Header from '@/components/layout/Header';
+import CommentsSection from '@/components/profile/CommentsSection';
+import { Lock } from 'lucide-react';
 
 interface PublicUserData {
   id: string;
@@ -28,6 +31,7 @@ export default function PublicProfilePage() {
   const [error, setError] = useState(false);
   const [avatarLoading, setAvatarLoading] = useState(true);
   const [currentYear] = useState(new Date().getFullYear());
+  const { userData: authUserData } = useAuth({ silent: true });
 
   useEffect(() => {
     if (!token) {
@@ -39,7 +43,7 @@ export default function PublicProfilePage() {
     const fetchUserData = async () => {
       try {
         const response = await fetch(`/api/user/${token}`);
-        
+
         if (response.ok) {
           const data = await response.json();
           setUserData(data);
@@ -135,20 +139,20 @@ export default function PublicProfilePage() {
         <svg className="absolute inset-0 w-full h-full opacity-20 -z-10" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none" aria-hidden="true">
           <defs>
             <radialGradient id="user-grad" cx="50%" cy="50%" r="75%" fx="50%" fy="50%">
-              <stop offset="0%" stopColor="#16a3ff" stopOpacity="0.18"/>
-              <stop offset="100%" stopColor="transparent" stopOpacity="0"/>
+              <stop offset="0%" stopColor="#16a3ff" stopOpacity="0.18" />
+              <stop offset="100%" stopColor="transparent" stopOpacity="0" />
             </radialGradient>
           </defs>
           <rect width="100%" height="100%" fill="url(#user-grad)" />
           <g stroke="rgba(255,255,255,0.04)" strokeWidth="1">
-            <line x1="0" y1="25%" x2="100%" y2="25%"/>
-            <line x1="0" y1="50%" x2="100%" y2="50%"/>
-            <line x1="0" y1="75%" x2="100%" y2="75%"/>
+            <line x1="0" y1="25%" x2="100%" y2="25%" />
+            <line x1="0" y1="50%" x2="100%" y2="50%" />
+            <line x1="0" y1="75%" x2="100%" y2="75%" />
           </g>
         </svg>
         <div className="pointer-events-none absolute -top-32 -right-20 w-80 h-80 bg-primary-500/10 blur-3xl rounded-full -z-10"></div>
         <div className="pointer-events-none absolute -bottom-24 -left-24 w-72 h-72 bg-white/5 blur-[100px] rounded-full -z-10"></div>
-        
+
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           {/* Profile Card - новая структура как на скриншоте */}
           <div className="relative mb-8">
@@ -166,19 +170,28 @@ export default function PublicProfilePage() {
               ) : (
                 <div className="absolute inset-0 bg-gradient-to-br from-primary-600/30 via-neutral-900 to-neutral-950" />
               )}
-              
-              {/* ID в glass-карточке слева вверху */}
-              <div className="absolute top-4 left-4 backdrop-blur-xl bg-black/30 border border-white/10 rounded-lg px-3 py-1.5 shadow-lg">
+
+              {!authUserData && (
+                <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/20 backdrop-blur-sm transition-all duration-300">
+                  <div className="flex items-center gap-2 px-4 py-2 bg-neutral-900/60 border border-white/10 rounded-full backdrop-blur-md shadow-xl">
+                    <Lock className="w-4 h-4 text-neutral-300" />
+                    <span className="text-sm font-medium text-neutral-200">Доступ ограничен</span>
+                  </div>
+                </div>
+              )}
+
+              {/* ID в glass-карточке справа вверху */}
+              <div className="absolute top-4 right-4 backdrop-blur-xl bg-black/30 border border-white/10 rounded-lg px-3 py-1.5 shadow-lg z-20">
                 <span className="text-sm font-medium text-white">ID: {getShortId(userData.user_id)}</span>
               </div>
             </div>
 
             {/* Profile Info - под баннером */}
-            <div className="relative mt-[-40px] sm:mt-[-50px] px-4 sm:px-6">
+            <div className="relative mt-[-40px] sm:mt-[-50px] px-4 sm:px-6 z-30">
               <div className="flex items-end gap-4 sm:gap-6">
                 {/* Avatar - выступает над нижним краем баннера */}
                 <div className="relative shrink-0">
-                  <div className={`h-24 w-24 sm:h-28 sm:w-28 lg:h-32 lg:w-32 rounded-xl overflow-hidden border border-neutral-800 ${avatarUrl ? '' : gradientClasses} flex items-center justify-center text-white font-bold text-3xl sm:text-4xl lg:text-5xl shadow-2xl bg-neutral-900`}>
+                  <div className={`h-24 w-24 sm:h-28 sm:w-28 lg:h-32 lg:w-32 rounded-xl overflow-hidden border border-neutral-800 ${avatarUrl ? '' : gradientClasses} flex items-center justify-center text-white font-bold text-3xl sm:text-4xl lg:text-5xl shadow-2xl bg-neutral-900 ${!authUserData ? 'blur-[5px]' : ''}`}>
                     {avatarUrl ? (
                       <>
                         {avatarLoading && (
@@ -202,13 +215,12 @@ export default function PublicProfilePage() {
 
                 {/* User Info - справа от аватарки, на уровне нижней части */}
                 <div className="flex-1 min-w-0 pb-2">
-                  <h1 className={`text-xl sm:text-2xl lg:text-3xl font-bold truncate ${
-                    userData.isAdmin 
-                      ? 'text-orange-500' 
-                      : userData.isSupport 
-                      ? 'text-green-500' 
+                  <h1 className={`text-xl sm:text-2xl lg:text-3xl font-bold truncate ${userData.isAdmin
+                    ? 'text-orange-500'
+                    : userData.isSupport
+                      ? 'text-green-500'
                       : 'text-white'
-                  }`}>
+                    }`}>
                     {userData.username}
                   </h1>
                 </div>
@@ -216,18 +228,10 @@ export default function PublicProfilePage() {
             </div>
           </div>
 
-          {/* Заглушка для комментариев */}
-          <div className="rounded-2xl border border-neutral-800 bg-neutral-900/50 p-8 backdrop-blur-sm text-center">
-            <div className="max-w-md mx-auto">
-              <div className="w-16 h-16 rounded-full bg-neutral-800/50 flex items-center justify-center mx-auto mb-4">
-                <svg className="w-8 h-8 text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                </svg>
-              </div>
-              <h3 className="text-lg font-semibold text-white mb-2">Комментарии</h3>
-              <p className="text-sm text-neutral-400">Функция комментариев будет доступна в ближайшее время</p>
-            </div>
-          </div>
+          {/* Комментарии */}
+          {userData && (
+            <CommentsSection profileId={userData.id} profileToken={token} />
+          )}
         </div>
       </main>
 

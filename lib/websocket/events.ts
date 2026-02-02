@@ -67,6 +67,28 @@ export interface SupportWebSocketEvents {
     readBy: 'user' | 'support';
   }) => void;
   'support:error': (data: { message: string; code?: string }) => void;
+
+  // Profile Comments
+  'profile:join': (data: { profileId: string }) => void;
+  'profile:leave': (data: { profileId: string }) => void;
+  'profile:comment:new': (data: {
+    profileId: string;
+    comment: {
+      id: string;
+      profile_id: string;
+      author_id: string;
+      parent_id?: string | null;
+      content: string;
+      is_pinned: boolean;
+      created_at: string;
+      author: {
+        id: string;
+        username: string;
+        user_id: string;
+        avatar?: string | null;
+      };
+    };
+  }) => void;
 }
 
 export type SupportEventName = keyof SupportWebSocketEvents;

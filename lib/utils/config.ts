@@ -76,6 +76,19 @@ export const appConfig = {
   scrollTrigger: {
     start: 'top 85%',
     end: 'bottom 15%'
-  }
+  },
+
+  // Медиа: лимиты загрузки и отображения
+  media: {
+    avatarMaxBytes: 2 * 1024 * 1024, // 2 MB
+    bannerMaxBytes: 5 * 1024 * 1024, // 5 MB
+    fileNameTruncateLen: 28, // макс. символов имени файла в UI (остальное «..»)
+  },
+
+  // Cache-Control для отдачи медиа
+  cacheControl: {
+    imagesPublic: 'public, max-age=86400, immutable', // аватары/баннеры: 24 ч
+    supportFiles: 'private, max-age=3600', // вложения поддержки: 1 ч
+  },
 } as const;
 

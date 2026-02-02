@@ -18,14 +18,13 @@ ENV NODE_OPTIONS="--max-old-space-size=1536"
 
 ARG NEXT_PUBLIC_SUPABASE_URL
 ARG NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
-ARG SUPABASE_SECRET_KEY
 
 ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
 ENV NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
-ENV SUPABASE_SECRET_KEY=$SUPABASE_SECRET_KEY
 
 RUN echo "SUPABASE_URL: $NEXT_PUBLIC_SUPABASE_URL"
 RUN npm run build
+RUN npm run build:wasm
 
 FROM base AS runner
 WORKDIR /app
@@ -41,11 +40,11 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/server.js ./
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/next ./node_modules/next
-# Копируем ioredis и его зависимости явно
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/ioredis ./node_modules/ioredis
+COPY --from=builder /app/lib/wasm/pkg ./lib/wasm/pkg
 RUN [ -d ".next/standalone/node_modules" ] && cp -r .next/standalone/node_modules/* ./node_modules/ 2>/dev/null || true; \
     [ -d "node_modules/next" ] || (echo "❌ NextJS not found." && exit 1); \
-    [ -d "node_modules/ioredis" ] || (echo "⚠️ ioredis not found, but continuing..." && true)
+    [ -d "node_modules/ioredis" ] || (echo "⚠️ ioredis not found, but continuing.." && true)
 
 USER nextjs
 

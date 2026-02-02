@@ -1,6 +1,7 @@
 /**
- * Простое in-memory кэширование с TTL
- * Для production рекомендуется использовать Redis
+ * In-memory кэш с TTL для данных приложения (тикеты, роли).
+ * Не путать с lib/storage/media-cache.ts — тот кэширует тела медиа в Redis.
+ * Здесь: без Redis, один процесс; подходит для dev и когда Redis занят только медиа-кэшем.
  */
 
 interface CacheEntry<T> {

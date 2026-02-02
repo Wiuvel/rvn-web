@@ -4,6 +4,8 @@ import { useState, useRef, useEffect } from 'react';
 import { gsap } from 'gsap';
 import { X, Upload, Image as ImageIcon } from 'lucide-react';
 import Image from 'next/image';
+import { truncateFileName } from '@/lib/utils/truncate';
+import { AVATAR_MAX_BYTES } from '@/lib/utils/constants';
 
 interface AvatarUploadModalProps {
   isOpen: boolean;
@@ -74,9 +76,8 @@ export default function AvatarUploadModal({
       return false;
     }
 
-    // Валидация размера (максимум 2MB)
-    const MAX_SIZE = 2 * 1024 * 1024;
-    if (file.size > MAX_SIZE) {
+    // Валидация размера (лимит из конфига)
+    if (file.size > AVATAR_MAX_BYTES) {
       setError('Размер файла не должен превышать 2MB');
       return false;
     }
@@ -276,11 +277,11 @@ export default function AvatarUploadModal({
               >
                 <div className="flex flex-col items-center gap-2">
                   <ImageIcon className={`w-8 h-8 transition-colors ${isDragging ? 'text-blue-400' : 'text-neutral-400'}`} />
-                  <span className={`text-sm transition-colors text-center whitespace-normal break-words ${isDragging ? 'text-blue-300' : 'text-neutral-300'}`}>
+                  <span className={`text-sm transition-colors text-center truncate max-w-full ${isDragging ? 'text-blue-300' : 'text-neutral-300'}`} title={selectedFile?.name}>
                     {isDragging
                       ? 'Отпустите для загрузки'
                       : selectedFile
-                      ? selectedFile.name
+                      ? truncateFileName(selectedFile.name)
                       : 'Перетащите изображение или выберите файл'}
                   </span>
                   <span className="text-xs text-neutral-500 text-center">

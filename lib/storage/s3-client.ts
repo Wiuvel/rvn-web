@@ -1,6 +1,8 @@
 import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { getEnv } from '@/lib/validation/env-validation';
+import { AVATAR_MAX_BYTES } from '@/lib/utils/constants';
+import { Readable } from 'stream';
 
 /**
  * Создает и возвращает клиент S3 для Object Storage
@@ -101,6 +103,44 @@ export async function getPresignedUrl(key: string, expiresIn: number = 3600): Pr
 
   const url = await getSignedUrl(client, command, { expiresIn });
   return url;
+}
+
+/**
+ * Скачивает объект из S3 и возвращает тело как Buffer (для кэширования).
+ * @param key - Путь к файлу в бакете
+ * @returns { body: Buffer, contentType: string, contentLength?: number } или null при ошибке/отсутствии
+ */
+export async function getObjectAsBuffer(key: string): Promise<{
+  body: Buffer;
+  contentType: string;
+  contentLength?: number;
+} | null> {
+  const client = getS3Client();
+  const env = getEnv();
+  if (!client || !env.S3_BUCKET) {
+    return null;
+  }
+  try {
+    const command = new GetObjectCommand({ Bucket: env.S3_BUCKET, Key: key });
+    const response = await client.send(command);
+    const stream = response.Body;
+    if (!stream) {
+      return null;
+    }
+    const chunks: Buffer[] = [];
+    const nodeStream = stream as Readable;
+    for await (const chunk of nodeStream) {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    }
+    const body = Buffer.concat(chunks);
+    const contentType = response.ContentType || 'application/octet-stream';
+    return { body, contentType, contentLength: response.ContentLength ?? body.length };
+  } catch (err: unknown) {
+    if (err && typeof err === 'object' && 'name' in err && (err as { name: string }).name === 'NoSuchKey') {
+      return null;
+    }
+    throw err;
+  }
 }
 
 /**
@@ -217,9 +257,9 @@ export async function uploadAvatarFromUrl(
       return null;
     }
 
-    // Ограничиваем размер файла (максимум 2MB для аватаров)
+    // Ограничиваем размер файла (лимит из конфига)
     const contentLength = imageResponse.headers.get('content-length');
-    if (contentLength && parseInt(contentLength) > 2 * 1024 * 1024) {
+    if (contentLength && parseInt(contentLength) > AVATAR_MAX_BYTES) {
       console.warn(`Avatar file too large: ${contentLength} bytes`);
       return null;
     }
@@ -229,7 +269,7 @@ export async function uploadAvatarFromUrl(
     const buffer = Buffer.from(arrayBuffer);
 
     // Проверяем фактический размер
-    if (buffer.length > 2 * 1024 * 1024) {
+    if (buffer.length > AVATAR_MAX_BYTES) {
       console.warn(`Avatar file too large: ${buffer.length} bytes`);
       return null;
     }

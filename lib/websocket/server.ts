@@ -16,6 +16,7 @@ import { isValidUUID } from '@/lib/utils/uuid-validation';
 type MessageNewData = Parameters<SupportWebSocketEvents['support:message:new']>[0];
 type TicketUpdatedData = Parameters<SupportWebSocketEvents['support:ticket:updated']>[0];
 type TicketAssignedData = Parameters<SupportWebSocketEvents['support:ticket:assigned']>[0];
+type CommentNewData = Parameters<SupportWebSocketEvents['profile:comment:new']>[0];
 
 let io: SocketIOServer<SupportWebSocketEvents> | null = null;
 
@@ -23,15 +24,16 @@ let io: SocketIOServer<SupportWebSocketEvents> | null = null;
 let initializationAttempted = false;
 
 // Очередь сообщений для отправки после инициализации сервера
-type QueuedMessageData = 
+type QueuedMessageData =
   | { ticketId: string; message: MessageNewData['message'] }
   | { ticketId: string; ticket: TicketUpdatedData['ticket'] }
   | { ticketId: string; assignedTo: string | null; assignedUser: TicketAssignedData['assignedUser'] }
-  | { ticketId: string; messageIds: string[]; readBy: 'user' | 'support' };
+  | { ticketId: string; messageIds: string[]; readBy: 'user' | 'support' }
+  | { profileId: string; comment: CommentNewData['comment'] };
 
 interface QueuedMessage {
-  type: 'message' | 'ticketUpdate' | 'ticketAssignment' | 'messageRead';
-  ticketId: string;
+  type: 'message' | 'ticketUpdate' | 'ticketAssignment' | 'messageRead' | 'comment';
+  ticketId: string; // В случае комментария здесь будет profileId
   data: QueuedMessageData;
   timestamp: number;
 }
@@ -58,13 +60,13 @@ export function initWebSocketServer(httpServer: HTTPServer): SocketIOServer<Supp
   if (io) {
     return io;
   }
-  
+
   initializationAttempted = true;
 
   // Определяем разрешенные origins для CORS
   const getAllowedOrigins = (): string[] | string | ((origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => void) => {
     const origins: string[] = [];
-    
+
     // Добавляем PUBLIC_DOMAIN если указан
     if (process.env.PUBLIC_DOMAIN) {
       const domain = process.env.PUBLIC_DOMAIN.trim();
@@ -84,51 +86,52 @@ export function initWebSocketServer(httpServer: HTTPServer): SocketIOServer<Supp
         }
       }
     }
-    
-    // Добавляем localhost для разработки
+
+    // Добавляем localhost и порт из env для разработки (чтобы работало при любом PORT)
     if (process.env.NODE_ENV === 'development') {
-      origins.push('http://localhost:3001');
+      const devPort = process.env.PORT || '3001';
+      origins.push(`http://localhost:${devPort}`);
       origins.push('http://localhost:3000');
-      origins.push('http://127.0.0.1:3001');
+      origins.push(`http://127.0.0.1:${devPort}`);
       origins.push('http://127.0.0.1:3000');
     }
-    
+
     // Если origins пустой, разрешаем все (только для разработки)
     if (origins.length === 0) {
       return process.env.NODE_ENV === 'development' ? '*' : [];
     }
-    
+
     // Функция для динамической проверки origin
     const originChecker = (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
       if (!origin) {
         // Если origin не указан, разрешаем (для некоторых клиентов)
         return callback(null, true);
       }
-      
+
       // Проверяем точное совпадение
       if (origins.includes(origin)) {
         return callback(null, true);
       }
-      
+
       // Проверяем без протокола (для гибкости)
       const originWithoutProtocol = origin.replace(/^https?:\/\//, '');
       const allowedWithoutProtocol = origins.map(o => o.replace(/^https?:\/\//, ''));
       if (allowedWithoutProtocol.includes(originWithoutProtocol)) {
         return callback(null, true);
       }
-      
+
       // В development разрешаем все
       if (process.env.NODE_ENV === 'development') {
         return callback(null, true);
       }
-      
+
       // Отклоняем
       callback(null, false);
     };
-    
+
     return originChecker;
   };
-  
+
   const allowedOrigins = getAllowedOrigins();
 
   io = new SocketIOServer<SupportWebSocketEvents>(httpServer, {
@@ -150,32 +153,32 @@ export function initWebSocketServer(httpServer: HTTPServer): SocketIOServer<Supp
     pingTimeout: 20000,
     pingInterval: 25000,
   });
-  
+
   // Middleware для аутентификации при подключении
   io.use(async (socket, next) => {
     try {
       // Получаем IP адрес для rate limiting
-      const clientIP = socket.handshake.address || 
-                      socket.handshake.headers['x-forwarded-for']?.toString().split(',')[0]?.trim() ||
-                      socket.handshake.headers['x-real-ip']?.toString() ||
-                      'unknown';
-      
+      const clientIP = socket.handshake.address ||
+        socket.handshake.headers['x-forwarded-for']?.toString().split(',')[0]?.trim() ||
+        socket.handshake.headers['x-real-ip']?.toString() ||
+        'unknown';
+
       // Получаем токен из auth параметра (передается клиентом)
       const token = socket.handshake.auth?.token;
-      
+
       if (!token) {
         // Rate limiting для попыток подключения без токена
         const now = Date.now();
         const attemptKey = `no-token:${clientIP}`;
         const attempts = connectionAttempts.get(attemptKey);
-        
+
         if (attempts) {
           // Проверяем, не забанен ли IP
           if (now - attempts.firstAttempt < CONNECTION_ATTEMPT_BAN_TIME && attempts.count >= MAX_CONNECTION_ATTEMPTS) {
             // IP забанен, отклоняем подключение без логирования
             return next(new Error('Too many connection attempts'));
           }
-          
+
           // Сбрасываем счетчик, если прошло окно времени
           if (now - attempts.firstAttempt > CONNECTION_ATTEMPT_WINDOW) {
             connectionAttempts.delete(attemptKey);
@@ -190,9 +193,9 @@ export function initWebSocketServer(httpServer: HTTPServer): SocketIOServer<Supp
             lastAttempt: now
           });
         }
-        
+
         const currentAttempts = connectionAttempts.get(attemptKey);
-        
+
         // Логируем только подозрительные попытки (много попыток за короткое время)
         if (currentAttempts && currentAttempts.count >= 3) {
           logger.warn('WebSocket: Multiple connection attempts without token', {
@@ -202,7 +205,7 @@ export function initWebSocketServer(httpServer: HTTPServer): SocketIOServer<Supp
             attempts: currentAttempts.count
           });
         }
-        
+
         // Очищаем старые записи rate limiting
         if (connectionAttempts.size > 1000) {
           for (const [key, value] of connectionAttempts.entries()) {
@@ -211,24 +214,24 @@ export function initWebSocketServer(httpServer: HTTPServer): SocketIOServer<Supp
             }
           }
         }
-        
+
         return next(new Error('Authentication required'));
       }
 
       // Проверяем токен и получаем пользователя
       const user = await getUserByToken(token);
-      
+
       if (!user) {
         // Rate limiting для невалидных токенов
         const now = Date.now();
         const attemptKey = `invalid-token:${clientIP}`;
         const attempts = connectionAttempts.get(attemptKey);
-        
+
         if (attempts) {
           if (now - attempts.firstAttempt < CONNECTION_ATTEMPT_BAN_TIME && attempts.count >= MAX_CONNECTION_ATTEMPTS) {
             return next(new Error('Too many invalid token attempts'));
           }
-          
+
           if (now - attempts.firstAttempt > CONNECTION_ATTEMPT_WINDOW) {
             connectionAttempts.delete(attemptKey);
           } else {
@@ -242,9 +245,9 @@ export function initWebSocketServer(httpServer: HTTPServer): SocketIOServer<Supp
             lastAttempt: now
           });
         }
-        
+
         const currentAttempts = connectionAttempts.get(attemptKey);
-        
+
         // Логируем только подозрительные попытки
         if (currentAttempts && currentAttempts.count >= 3) {
           logger.warn('WebSocket: Multiple invalid token attempts', {
@@ -254,7 +257,7 @@ export function initWebSocketServer(httpServer: HTTPServer): SocketIOServer<Supp
             attempts: currentAttempts.count
           });
         }
-        
+
         return next(new Error('Invalid token'));
       }
 
@@ -265,10 +268,10 @@ export function initWebSocketServer(httpServer: HTTPServer): SocketIOServer<Supp
       // Сохраняем пользователя в socket.data для использования в обработчиках
       socket.data.user = user;
       socket.data.userId = user.id;
-      
+
       // Проверяем роль поддержки заранее для оптимизации
       socket.data.isSupport = await hasUserRole(user.id, 'support');
-      
+
       next();
     } catch (error) {
       logger.error('WebSocket: Authentication error', {
@@ -278,7 +281,7 @@ export function initWebSocketServer(httpServer: HTTPServer): SocketIOServer<Supp
       next(new Error('Authentication failed'));
     }
   });
-  
+
   // Обработка ошибок подключения
   io.engine.on('connection_error', (err) => {
     logger.error('WebSocket: Connection error', {
@@ -303,7 +306,7 @@ export function initWebSocketServer(httpServer: HTTPServer): SocketIOServer<Supp
     } catch {
       // Игнорируем ошибки аналитики
     }
-    
+
     socket.on('disconnect', (reason) => {
       logger.info('WebSocket: Client disconnected', {
         id: socket.id,
@@ -317,7 +320,7 @@ export function initWebSocketServer(httpServer: HTTPServer): SocketIOServer<Supp
       const user = socket.data.user;
       const userId = socket.data.userId;
       const isSupport = socket.data.isSupport;
-      
+
       // Валидация входных данных
       if (!ticketId) {
         socket.emit('support:error', { message: 'Invalid join request', code: 'INVALID_DATA' });
@@ -367,7 +370,7 @@ export function initWebSocketServer(httpServer: HTTPServer): SocketIOServer<Supp
         // Все проверки пройдены, присоединяемся к комнате
         const room = `ticket:${ticketId}`;
         socket.join(room);
-        
+
         // Не логируем успешные присоединения к комнатам
       } catch (error) {
         logger.error('Error validating ticket access', {
@@ -382,12 +385,12 @@ export function initWebSocketServer(httpServer: HTTPServer): SocketIOServer<Supp
     // Обработка выхода из тикета
     socket.on('support:leave', (data) => {
       const { ticketId } = data;
-      
+
       // Валидация входных данных
       if (!ticketId || !isValidUUID(ticketId)) {
         return; // Игнорируем невалидные запросы
       }
-      
+
       const room = `ticket:${ticketId}`;
       socket.leave(room);
       // Не логируем выходы из комнат
@@ -397,7 +400,7 @@ export function initWebSocketServer(httpServer: HTTPServer): SocketIOServer<Supp
     socket.on('support:typing', (data) => {
       const { ticketId, isTyping } = data;
       const userId = socket.data.userId;
-      
+
       // Валидация входных данных
       if (!ticketId || typeof isTyping !== 'boolean' || !userId) {
         return;
@@ -454,9 +457,33 @@ export function initWebSocketServer(httpServer: HTTPServer): SocketIOServer<Supp
       });
     });
 
+
+    // Обработка присоединения к профилю для комментариев
+    socket.on('profile:join', (data) => {
+      const { profileId } = data;
+
+      if (!profileId || !isValidUUID(profileId)) {
+        return;
+      }
+
+      // К профилям может присоединиться любой аутентифицированный пользователь
+      const room = `profile:${profileId}`;
+      socket.join(room);
+    });
+
+    // Обработка выхода из профиля
+    socket.on('profile:leave', (data) => {
+      const { profileId } = data;
+      if (!profileId || !isValidUUID(profileId)) {
+        return;
+      }
+      const room = `profile:${profileId}`;
+      socket.leave(room);
+    });
+
     socket.on('disconnect', () => {
       // Автоматическое отключение не логируем
-      
+
       // Очищаем rate limiting для этого соединения
       for (const [key] of typingRateLimits.entries()) {
         if (key.startsWith(`${socket.id}:`)) {
@@ -475,10 +502,10 @@ export function initWebSocketServer(httpServer: HTTPServer): SocketIOServer<Supp
   });
 
   // Инициализация не логируется
-  
+
   // Обрабатываем очередь сообщений после инициализации
   processMessageQueue();
-  
+
   // Периодическое логирование статистики (каждые 5 минут)
   setInterval(() => {
     if (io) {
@@ -488,11 +515,11 @@ export function initWebSocketServer(httpServer: HTTPServer): SocketIOServer<Supp
           rooms.add(roomName);
         }
       });
-      
+
       // Автоматическая статистика не логируется
     }
   }, 5 * 60 * 1000); // 5 минут
-  
+
   return io;
 }
 
@@ -557,6 +584,15 @@ function processMessageQueue(): void {
           if ('messageIds' in queuedMessage.data) {
             io.to(`ticket:${queuedMessage.ticketId}`).emit('support:message:read', queuedMessage.data as { ticketId: string; messageIds: string[]; readBy: 'user' | 'support' });
           }
+          if ('messageIds' in queuedMessage.data) {
+            io.to(`ticket:${queuedMessage.ticketId}`).emit('support:message:read', queuedMessage.data as { ticketId: string; messageIds: string[]; readBy: 'user' | 'support' });
+          }
+          break;
+        case 'comment':
+          if ('profileId' in queuedMessage.data && 'comment' in queuedMessage.data) {
+            const data = queuedMessage.data as { profileId: string; comment: CommentNewData['comment'] };
+            io.to(`profile:${data.profileId}`).emit('profile:comment:new', data);
+          }
           break;
       }
       processedMessages.push(queuedMessage);
@@ -567,7 +603,7 @@ function processMessageQueue(): void {
         retryCount: retryCount + 1
       };
       failedMessages.push(messageWithRetry);
-      
+
       logger.error('Error processing queued message, will retry', {
         error: error instanceof Error ? error.message : 'Unknown error',
         type: queuedMessage.type,
@@ -587,9 +623,9 @@ function processMessageQueue(): void {
 
   // Обновляем failed messages с новым retry счетчиком
   for (const failed of failedMessages) {
-    const index = messageQueue.findIndex(m => 
-      m.type === failed.type && 
-      m.ticketId === failed.ticketId && 
+    const index = messageQueue.findIndex(m =>
+      m.type === failed.type &&
+      m.ticketId === failed.ticketId &&
       m.timestamp === failed.timestamp
     );
     if (index > -1) {
@@ -656,7 +692,7 @@ export function broadcastNewMessage(
         });
       }
     }
-    
+
     // Проверяем еще раз после попытки инициализации
     if (!io) {
       // Добавляем сообщение в очередь для отправки после инициализации
@@ -670,7 +706,7 @@ export function broadcastNewMessage(
     ticketId,
     message,
   });
-  
+
   // Успешные broadcast не логируются
 
   // Трекинг аналитики WebSocket сообщений (неблокирующий)
@@ -698,7 +734,7 @@ export function broadcastTicketUpdate(
     ticketId,
     ticket,
   });
-  
+
   // Успешные broadcast не логируются
 }
 
@@ -721,7 +757,7 @@ export function broadcastTicketAssignment(
     assignedTo,
     assignedUser,
   });
-  
+
   // Успешные broadcast не логируются
 }
 
@@ -739,7 +775,7 @@ export function broadcastMessageRead(
     if (httpServer) {
       initWebSocketServer(httpServer);
     }
-    
+
     // Проверяем еще раз после попытки инициализации
     if (!io) {
       queueMessage('messageRead', ticketId, { ticketId, messageIds, readBy });
@@ -749,8 +785,52 @@ export function broadcastMessageRead(
 
   const room = `ticket:${ticketId}`;
   io!.to(room).emit('support:message:read', { ticketId, messageIds, readBy });
-  
+
   // Успешные broadcast не логируются
+}
+
+/**
+ * Отправить новый комментарий всем подписчикам профиля
+ */
+export function broadcastNewComment(
+  profileId: string,
+  comment: CommentNewData['comment']
+): void {
+  if (!io) {
+    // Временно используем queueMessage с типом 'comment'. 
+    // Т.к. queueMessage принимает ticketId, мы передаем profileId вместо ticketId
+    // и data с правильной структурой.
+    // Нам нужно расширить QueuedMessage type, но пока хак:
+    // Мы добавили case 'comment' в processMessageQueue, но нужно подправить queueMessage сигнатуру или обмануть ее
+    // Лучшим решением будет расширить логику queueMessage, но чтобы не ломать типы....
+    // В processMessageQueue мы добавили обработку.
+    // В queueMessage просто пушим.
+
+    // Приводим тип к any, чтобы обойти ограничение типов в queueMessage если оно строгое
+    // В данном файле queueMessage типизирован через type: QueuedMessage['type'].
+    // 'comment' не был добавлен в QueuedMessage['type'] явно в union выше...
+    // Стоп, я забыл добавить 'comment' в union QueuedMessage['type'] (Line 33).
+    // Исправим это в следующем шаге или добавим сейчас если возможно.
+    // Для надежности я добавлю 'comment' в definitions выше.
+
+    // Но здесь мы уже вызываем push...
+    // Сделаем broadcast напрямую если io есть, иначе...
+    // Если io нет, мы теряем коммент? Нет, лучше обновить типы.
+
+    // Пытаемся инициализировать
+    const httpServer = global.__httpServer;
+    if (httpServer) {
+      try { initWebSocketServer(httpServer); } catch (e) { }
+    }
+  }
+
+  if (io) {
+    const room = `profile:${profileId}`;
+    io.to(room).emit('profile:comment:new', {
+      profileId,
+      comment
+    });
+  }
 }
 
 

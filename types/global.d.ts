@@ -1,11 +1,11 @@
 /**
- * Глобальные типы для проекта
+ * Global types for project
  */
 
 import type { Server as HTTPServer } from 'http';
 
 declare global {
-  // HTTP сервер для инициализации WebSocket сервера
+  // HTTP server for initialization WebSocket server
   // eslint-disable-next-line no-var
   var __httpServer: HTTPServer | undefined;
 }
