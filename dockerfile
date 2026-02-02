@@ -1,4 +1,11 @@
 FROM node:20-alpine AS base
+FROM rust:1-alpine AS wasm
+RUN apk add --no-cache musl-dev build-base
+RUN rustup target add wasm32-unknown-unknown
+RUN cargo install wasm-pack
+COPY wasm /app/wasm
+WORKDIR /app/wasm
+RUN wasm-pack build --target nodejs --out-dir /app/lib/wasm/pkg
 
 FROM base AS deps
 RUN apk add --no-cache libc6-compat
@@ -12,6 +19,7 @@ FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+COPY --from=wasm /app/lib/wasm/pkg ./lib/wasm/pkg
 
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_OPTIONS="--max-old-space-size=1536"
@@ -23,7 +31,6 @@ ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
 ENV NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
 
 RUN echo "SUPABASE_URL: $NEXT_PUBLIC_SUPABASE_URL"
-RUN npm run build:wasm
 RUN npm run build
 
 FROM base AS runner
