@@ -77,4 +77,3 @@ export const FILE_NAME_TRUNCATE_LEN = appConfig.media.fileNameTruncateLen;
 // Cache-Control для медиа-роутов
 export const CACHE_CONTROL_IMAGES_PUBLIC = appConfig.cacheControl.imagesPublic;
 export const CACHE_CONTROL_SUPPORT_FILES = appConfig.cacheControl.supportFiles;
-

@@ -10,6 +10,7 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     '/lib/websocket/**/*': ['./lib/websocket/**/*'],
     '/lib/database/redis': ['./lib/database/redis.ts'],
+    '/lib/wasm/pkg': ['./lib/wasm/pkg/*'],
   },
   serverExternalPackages: ['ioredis'],
   devIndicators: {

@@ -1,6 +1,7 @@
 /**
  * Обёртка над WASM-модулем обработки изображений (docs/IMAGE_CACHE_IMPLEMENTATION_PLAN.md, Фаза 2).
  * При отсутствии или ошибке WASM возвращает исходный буфер (fallback).
+ * Только относительный импорт — без process.cwd(), иначе Turbopack резолвит ./ROOT/... и падает.
  */
 
 export interface ProcessImageOptions {
@@ -15,12 +16,32 @@ let wasmModule: {
 } | null = null;
 let initPromise: Promise<boolean> | null = null;
 
+/** Загрузка WASM-пакета: сначала относительный импорт, при ошибке — по cwd (dev: бандл не в lib/wasm). */
+async function loadWasmPkg(): Promise<{
+  default?: unknown;
+  resize_image: (input: Uint8Array, width: number, height: number) => Uint8Array;
+  convert_to_webp: (input: Uint8Array) => Uint8Array;
+}> {
+  try {
+    return await import('./pkg/image_processor_wasm.js');
+  } catch {
+    // Fallback: путь из cwd в рантайме (строка собирается по частям, чтобы Turbopack не подставлял ROOT)
+    const path = await import('path');
+    const { createRequire } = await import('module');
+    const cwd = typeof process !== 'undefined' ? process.cwd() : '';
+    const sub = ['lib', 'wasm', 'pkg', 'image_processor_wasm.js'];
+    const pkgPath = path.join(cwd, ...sub);
+    const req = createRequire(path.join(cwd, 'package.json'));
+    return req(pkgPath);
+  }
+}
+
 async function initWasm(): Promise<boolean> {
   if (wasmModule) return true;
   if (initPromise) return initPromise;
   initPromise = (async () => {
     try {
-      const pkg = await import('./pkg/image_processor_wasm.js');
+      const pkg = await loadWasmPkg();
       const init = pkg.default as unknown as (() => Promise<void>) | undefined;
       if (typeof init === 'function') {
         await init();
