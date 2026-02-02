@@ -369,23 +369,8 @@ export async function POST(
           }))
         : undefined;
 
-      // Если текст сообщения пустой, но есть вложения - формируем текст на основе типа файлов
-      let displayMessageText = newMessage.message_text;
-      if (!displayMessageText && attachmentsData.length > 0) {
-        const images = attachmentsData.filter(att => att.file_type.startsWith('image/'));
-        const files = attachmentsData.filter(att => !att.file_type.startsWith('image/'));
-        
-        if (images.length > 0 && files.length === 0) {
-          // Только изображения
-          displayMessageText = images.length === 1 ? '📷 Фотография' : `📷 ${images.length} фотографий`;
-        } else if (files.length > 0 && images.length === 0) {
-          // Только файлы
-          displayMessageText = files.length === 1 ? '📎 Файл' : `📎 ${files.length} файлов`;
-        } else {
-          // И изображения, и файлы
-          displayMessageText = `📎 ${images.length + files.length} вложений`;
-        }
-      }
+      // В broadcast — пустой message_text при только вложениях (подпись только в last_message в списке)
+      const displayMessageText = newMessage.message_text || '';
 
       const messageForBroadcast = {
         id: newMessage.id,

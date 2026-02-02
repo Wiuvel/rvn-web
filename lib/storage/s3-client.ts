@@ -1,7 +1,7 @@
 import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { getEnv } from '@/lib/validation/env-validation';
-import { AVATAR_MAX_BYTES } from '@/lib/utils/constants';
+import { AVATAR_MAX_BYTES, SUPPORT_ATTACHMENT_MAX_BYTES, SUPPORT_FILE_SIZE_LIMIT_ERROR } from '@/lib/utils/constants';
 import { Readable } from 'stream';
 
 /**
@@ -311,12 +311,10 @@ export function validateFile(file: { size: number; type: string; name: string })
   valid: boolean;
   error?: string;
 } {
-  const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-  
-  if (file.size > MAX_FILE_SIZE) {
+  if (file.size > SUPPORT_ATTACHMENT_MAX_BYTES) {
     return {
       valid: false,
-      error: 'Размер файла не должен превышать 10МБ',
+      error: SUPPORT_FILE_SIZE_LIMIT_ERROR,
     };
   }
 

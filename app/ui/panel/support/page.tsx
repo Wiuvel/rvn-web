@@ -8,6 +8,7 @@ import { gsap } from 'gsap';
 import { translateError } from '@/lib/utils/error-translations';
 import RateLimitCaptcha from '@/components/auth/RateLimitCaptcha';
 import { GSAP_DEFAULT_DURATION, GSAP_DEFAULT_EASE } from '@/lib/utils/constants';
+import { getLastMessageLabelForAttachments, messageTextForBubble, normalizeLastMessageDisplayText } from '@/lib/utils/support-messages';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { getGradientClasses, getAvatarUrl } from '@/lib/utils/avatar-gradients';
 import { useWebSocket } from '@/hooks/useWebSocket';
@@ -252,9 +253,10 @@ function MessageItem({
 
           {/* Сообщение */}
           <div className="max-w-[70%] min-w-0 flex-shrink-0 rounded-2xl px-4 py-3 bg-neutral-700/50 text-neutral-300" style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>
-            <p className="text-sm whitespace-pre-wrap break-words">
-              {message.message_text}
-            </p>
+            {(() => {
+              const bubbleText = messageTextForBubble(message.message_text || '', !!(message.attachments && message.attachments.length));
+              return bubbleText ? <p className="text-sm whitespace-pre-wrap break-words">{bubbleText}</p> : null;
+            })()}
             <div className="flex items-center gap-2 text-xs mt-1.5 text-neutral-400">
               <span>{formatTime(message.created_at)}</span>
             </div>
@@ -308,19 +310,23 @@ function MessageItem({
                   : 'bg-neutral-800 text-neutral-100 rounded-br-sm'
                 : 'bg-neutral-800 text-neutral-100 rounded-bl-sm'
               }`} style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>
-              {message.message_text && (
-                <p className="text-sm whitespace-pre-wrap break-words">
-                  {message.message_text}
-                </p>
-              )}
+              {(() => {
+                const bubbleText = messageTextForBubble(message.message_text || '', !!(message.attachments && message.attachments.length));
+                return bubbleText ? (
+                  <p className="text-sm whitespace-pre-wrap break-words">
+                    {bubbleText}
+                  </p>
+                ) : null;
+              })()}
 
               {/* Вложения */}
               {message.attachments && message.attachments.length > 0 && (() => {
                 const images = message.attachments!.filter(a => a.file_type.startsWith('image/'));
                 const documents = message.attachments!.filter(a => !a.file_type.startsWith('image/'));
+                const bubbleText = messageTextForBubble(message.message_text || '', true);
 
                 return (
-                  <div className={`space-y-2 ${message.message_text ? 'mt-2' : ''}`}>
+                  <div className={`space-y-2 ${bubbleText ? 'mt-2' : ''}`}>
                     {/* Группировка изображений */}
                     {images.length > 0 && (
                       <div className={`grid gap-1.5 max-w-xs ${images.length === 1 ? 'grid-cols-1' : images.length === 2 ? 'grid-cols-2' : 'grid-cols-2'
@@ -977,35 +983,11 @@ export default function SupportPanel() {
         return updated;
       });
 
-      // Формируем текст для last_message (если пустой, но есть вложения - формируем без эмодзи и количества)
       let lastMessageText = data.message.message_text || '';
-
-      // Если текст пустой, но есть вложения - формируем текст без эмодзи и количества
       if (!lastMessageText && data.message.attachments && data.message.attachments.length > 0) {
-        const images = data.message.attachments.filter((att: any) => att.file_type?.startsWith('image/'));
-        const files = data.message.attachments.filter((att: any) => !att.file_type?.startsWith('image/'));
-
-        if (images.length > 0 && files.length === 0) {
-          // Только изображения
-          lastMessageText = 'Фотография';
-        } else if (files.length > 0 && images.length === 0) {
-          // Только файлы
-          lastMessageText = 'Файл';
-        } else {
-          // И изображения, и файлы
-          lastMessageText = 'Вложения';
-        }
+        lastMessageText = getLastMessageLabelForAttachments(data.message.attachments);
       } else if (lastMessageText) {
-        // Убираем эмодзи и количество из начала строки, если они есть
-        lastMessageText = lastMessageText.replace(/^[📷📎]\s*/, ''); // Убираем эмодзи в начале
-        lastMessageText = lastMessageText.replace(/^\d+\s+(фотографий|файлов|вложений|фотографий|изображений?|документов?)/, (match: string) => {
-          // Убираем количество, оставляем только тип
-          if (match.includes('фотографий') || match.includes('изображений')) return 'Фотография';
-          if (match.includes('файлов') || match.includes('документов')) return 'Файл';
-          return 'Вложения';
-        });
-        // Заменяем "1 Фотография" на "Фотография"
-        lastMessageText = lastMessageText.replace(/^1\s+(Фотография|Файл)$/, '$1');
+        lastMessageText = normalizeLastMessageDisplayText(lastMessageText);
       }
 
       // Обновляем last_message_at и last_message в списке тикетов
@@ -2627,20 +2609,7 @@ export default function SupportPanel() {
                           {isSystemMessage ? 'Система:' : ticket.last_message.sender_type === 'user' ? 'Пользователь:' : 'Поддержка:'}
                         </span>
                         <span className="truncate flex-1 min-w-0">
-                          {(() => {
-                            let text = ticket.last_message.message_text || '';
-                            // Убираем эмодзи и количество из текста
-                            text = text.replace(/^[📷📎]\s*/, ''); // Убираем эмодзи в начале
-                            text = text.replace(/^\d+\s+(фотографий|файлов|вложений|фотографий|изображений?|документов?)/i, (match: string) => {
-                              // Убираем количество, оставляем только тип
-                              if (match.includes('фотографий') || match.includes('изображений')) return 'Фотография';
-                              if (match.includes('файлов') || match.includes('документов')) return 'Файл';
-                              return 'Вложения';
-                            });
-                            // Заменяем "1 Фотография" на "Фотография"
-                            text = text.replace(/^1\s+(Фотография|Файл)$/, '$1');
-                            return text;
-                          })()}
+                          {normalizeLastMessageDisplayText(ticket.last_message.message_text || '') || '—'}
                         </span>
                         {ticket.last_message.is_read === false && ticket.last_message.sender_type === 'user' && !isSystemMessage && (
                           <span className="flex-shrink-0 w-2 h-2 bg-blue-500 rounded-full"></span>

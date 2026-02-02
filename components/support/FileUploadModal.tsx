@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { gsap } from 'gsap';
 import { X, Upload, FileText, Image as ImageIcon } from 'lucide-react';
 import dynamic from 'next/dynamic';
+import { SUPPORT_ATTACHMENT_MAX_BYTES, SUPPORT_ATTACHMENT_MAX_MB, SUPPORT_FILE_SIZE_LIMIT_ERROR } from '@/lib/utils/constants';
 
 // Lazy load RateLimitCaptcha для оптимизации bundle size
 const RateLimitCaptcha = dynamic(() => import('@/components/auth/RateLimitCaptcha'), {
@@ -132,11 +133,11 @@ export default function FileUploadModal({
       return;
     }
 
-    const MAX_FILE_SIZE = 10 * 1024 * 1024;
     const allowedImageTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp', 'image/svg+xml'];
     const allowedDocumentTypes = ['application/pdf', 'text/plain'];
 
-    const invalidFiles: string[] = [];
+    const sizeLimitExceeded: boolean[] = [];
+    const invalidFormatFiles: string[] = [];
     const newFiles: File[] = [];
     const existingFileNames = new Set(selectedFiles.map(f => f.name.toLowerCase()));
     
@@ -167,16 +168,22 @@ export default function FileUploadModal({
       }
       
       // Валидация размера и типа
-      if (file.size > MAX_FILE_SIZE) {
-        invalidFiles.push(`${file.name} (превышен лимит 10МБ)`);
-      } else if (!allowedImageTypes.includes(file.type) && !allowedDocumentTypes.includes(file.type) && 
-                 !file.name.toLowerCase().endsWith('.pdf') && !file.name.toLowerCase().endsWith('.txt')) {
-        invalidFiles.push(`${file.name} (неподдерживаемый формат)`);
+      if (file.size > SUPPORT_ATTACHMENT_MAX_BYTES) {
+        sizeLimitExceeded.push(true);
+      } else {
+        sizeLimitExceeded.push(false);
+        if (!allowedImageTypes.includes(file.type) && !allowedDocumentTypes.includes(file.type) && 
+            !file.name.toLowerCase().endsWith('.pdf') && !file.name.toLowerCase().endsWith('.txt')) {
+          invalidFormatFiles.push(`${file.name} (неподдерживаемый формат)`);
+        }
       }
     });
 
-    if (invalidFiles.length > 0) {
-      setError(`Ошибка: ${invalidFiles.join(', ')}`);
+    if (sizeLimitExceeded.some(Boolean) || invalidFormatFiles.length > 0) {
+      const parts: string[] = [];
+      if (sizeLimitExceeded.some(Boolean)) parts.push(SUPPORT_FILE_SIZE_LIMIT_ERROR);
+      if (invalidFormatFiles.length > 0) parts.push(`Ошибка: ${invalidFormatFiles.join(', ')}`);
+      setError(parts.join('. '));
       return;
     }
 
@@ -423,7 +430,7 @@ export default function FileUploadModal({
                     : 'Перетащите файлы или выберите их'}
                 </span>
                 <span className="text-xs text-neutral-500 text-center">
-                  До {maxFiles} файлов, максимум 10МБ каждый
+                  До {maxFiles} файлов, максимум {SUPPORT_ATTACHMENT_MAX_MB} МБ каждый
                 </span>
               </div>
             </div>

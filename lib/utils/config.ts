@@ -85,6 +85,18 @@ export const appConfig = {
     fileNameTruncateLen: 28, // макс. символов имени файла в UI (остальное «..»)
   },
 
+  // Поддержка: вложения и last_message
+  support: {
+    attachmentMaxBytes: 10 * 1024 * 1024, // 10 MB на файл
+    attachmentMaxMb: 10, // для подсказки в UI («максимум 10 МБ каждый»)
+    lastMessageLabels: {
+      photo: 'Фотография',
+      file: 'Файл',
+      attachments: 'Вложения',
+    } as const,
+    fileSizeLimitError: 'Превышен лимит файлов 10MB',
+  },
+
   // Cache-Control для отдачи медиа
   cacheControl: {
     imagesPublic: 'public, max-age=86400, immutable', // аватары/баннеры: 24 ч

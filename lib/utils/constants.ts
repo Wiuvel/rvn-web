@@ -77,3 +77,11 @@ export const FILE_NAME_TRUNCATE_LEN = appConfig.media.fileNameTruncateLen;
 // Cache-Control для медиа-роутов
 export const CACHE_CONTROL_IMAGES_PUBLIC = appConfig.cacheControl.imagesPublic;
 export const CACHE_CONTROL_SUPPORT_FILES = appConfig.cacheControl.supportFiles;
+
+// Поддержка: лимиты и сообщения
+export const SUPPORT_ATTACHMENT_MAX_BYTES = appConfig.support.attachmentMaxBytes;
+export const SUPPORT_ATTACHMENT_MAX_MB = appConfig.support.attachmentMaxMb;
+export const SUPPORT_FILE_SIZE_LIMIT_ERROR = appConfig.support.fileSizeLimitError;
+export const LAST_MESSAGE_LABEL_PHOTO = appConfig.support.lastMessageLabels.photo;
+export const LAST_MESSAGE_LABEL_FILE = appConfig.support.lastMessageLabels.file;
+export const LAST_MESSAGE_LABEL_ATTACHMENTS = appConfig.support.lastMessageLabels.attachments;

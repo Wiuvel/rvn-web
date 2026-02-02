@@ -7,6 +7,7 @@ import { getUserByToken } from '@/lib/auth/index';
 import { hasUserRole, batchHasUserRole } from '@/lib/auth/user-roles';
 import { supabaseAdmin } from '@/lib/database/supabase';
 import { ERROR_INTERNAL_SERVER_ERROR, ERROR_NOT_AUTHENTICATED, ERROR_INVALID_REQUEST_DATA, ERROR_MAXIMUM_TICKET_LIMIT_REACHED, ERROR_TOO_MANY_REQUESTS, TICKET_SUBJECT_MAX_LENGTH, MESSAGE_MAX_LENGTH, ERROR_MESSAGE_TOO_LONG, ERROR_SUBJECT_TOO_LONG, MAX_TICKETS_PER_USER } from '@/lib/utils/constants';
+import { getLastMessageLabelForAttachments } from '@/lib/utils/support-messages';
 import { cached, cache } from '@/lib/database/cache';
 
 interface LastMessage {
@@ -243,23 +244,9 @@ export async function GET(request: NextRequest) {
                     }));
                   }
                 }
-                // Если текст сообщения пустой, но есть вложения - формируем текст на основе типа файлов
                 let displayMessageText = lastMessage.message_text;
                 if (!displayMessageText && attachments.length > 0) {
-                  const images = attachments.filter(att => att.file_type.startsWith('image/'));
-                  const files = attachments.filter(att => !att.file_type.startsWith('image/'));
-                  
-                  // Для всех пользователей (и пользователи, и поддержка) - без эмодзи и количества
-                  if (images.length > 0 && files.length === 0) {
-                    // Только изображения
-                    displayMessageText = 'Фотография';
-                  } else if (files.length > 0 && images.length === 0) {
-                    // Только файлы
-                    displayMessageText = 'Файл';
-                  } else {
-                    // И изображения, и файлы
-                    displayMessageText = 'Вложения';
-                  }
+                  displayMessageText = getLastMessageLabelForAttachments(attachments);
                 }
 
                 lastMessagesMap[ticketId] = {
@@ -392,27 +379,12 @@ export async function GET(request: NextRequest) {
               }
             }
             
-            // Если текст сообщения пустой, но есть вложения - формируем текст на основе типа файлов
-            let displayMessageText = msg.message_text;
             const attachments = attachmentsMap[msg.id] || [];
-            
+            let displayMessageText = msg.message_text || '';
             if (!displayMessageText && attachments.length > 0) {
-              const images = attachments.filter(att => att.file_type.startsWith('image/'));
-              const files = attachments.filter(att => !att.file_type.startsWith('image/'));
-              
-              // Для всех пользователей (и пользователи, и поддержка) - без эмодзи и количества
-              if (images.length > 0 && files.length === 0) {
-                // Только изображения
-                displayMessageText = 'Фотография';
-              } else if (files.length > 0 && images.length === 0) {
-                // Только файлы
-                displayMessageText = 'Файл';
-              } else {
-                // И изображения, и файлы
-                displayMessageText = 'Вложения';
-              }
+              displayMessageText = getLastMessageLabelForAttachments(attachments);
             }
-            
+
             lastMessagesMap[msg.ticket_id] = {
               id: msg.id,
               message_text: displayMessageText,

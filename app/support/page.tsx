@@ -7,6 +7,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { gsap } from 'gsap';
 import { MESSAGE_MAX_LENGTH, TICKET_SUBJECT_MAX_LENGTH, MAX_TICKETS_PER_USER, MESSAGE_TIMEOUT, AUTH_FETCH_TIMEOUT, GSAP_DEFAULT_DURATION, GSAP_DEFAULT_EASE, MARK_AS_READ_DEBOUNCE } from '@/lib/utils/constants';
+import { getLastMessageLabelForAttachments, messageTextForBubble, normalizeLastMessageDisplayText } from '@/lib/utils/support-messages';
 import { translateError } from '@/lib/utils/error-translations';
 import { getGradientClasses, getAvatarUrl } from '@/lib/utils/avatar-gradients';
 import { useWebSocket } from '@/hooks/useWebSocket';
@@ -122,9 +123,9 @@ function ImageWithError({
     : 'linear-gradient(90deg, rgba(64,64,64,0.3) 0%, rgba(115,115,115,0.5) 50%, rgba(64,64,64,0.3) 100%)'; // Стандартная палитра
 
   return (
-    <div className={`relative bg-neutral-800 ${className || ''}`} ref={imgRef}>
+    <div className={`relative w-full aspect-square bg-neutral-800 rounded-lg overflow-hidden ${className || ''}`} ref={imgRef}>
       {hasError ? (
-        <div className="aspect-video flex items-center justify-center">
+        <div className="absolute inset-0 flex items-center justify-center">
           <div className="text-center p-4">
             <AlertCircle className="w-8 h-8 text-red-400 mx-auto mb-2" />
             <p className="text-xs text-red-300">Изображение недоступно</p>
@@ -133,25 +134,23 @@ function ImageWithError({
       ) : (
         <>
           {isLoading && (
-            <div className="w-full min-h-[120px] bg-neutral-800 rounded-lg overflow-hidden relative">
-              <div
-                className="absolute inset-0 rounded-lg"
-                style={{
-                  backgroundImage: skeletonGradient,
-                  backgroundSize: '200% 100%',
-                  backgroundRepeat: 'no-repeat',
-                  backgroundPosition: '0% 0%',
-                  animation: 'shimmer 1.5s ease-in-out infinite'
-                }}
-              />
-            </div>
+            <div
+              className="absolute inset-0 rounded-lg"
+              style={{
+                backgroundImage: skeletonGradient,
+                backgroundSize: '200% 100%',
+                backgroundRepeat: 'no-repeat',
+                backgroundPosition: '0% 0%',
+                animation: 'shimmer 1.5s ease-in-out infinite'
+              }}
+            />
           )}
           {isInView && (
             <img
               src={src}
               alt={alt}
               loading={loading}
-              className={`w-full h-auto object-contain rounded-lg ${isLoading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300 ${className || ''}`}
+              className={`absolute inset-0 w-full h-full object-contain rounded-lg ${isLoading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300`}
               onLoad={() => setIsLoading(false)}
               onError={() => {
                 setHasError(true);
@@ -217,6 +216,7 @@ function MessageItem({
     }
   }, [message.id, isInitialLoad]);
 
+  const bubbleText = messageTextForBubble(message.text || '', !!(message.attachments && message.attachments.length));
   // Определяем, является ли сообщение системным
   const SYSTEM_MESSAGE_TEXT = 'Спасибо за ваше обращение. Мы получили ваш запрос и ответим в ближайшее время.';
   const messageText = message.text || '';
@@ -243,9 +243,11 @@ function MessageItem({
 
           {/* Сообщение */}
           <div className="max-w-[85%] sm:max-w-[70%] min-w-0 flex-shrink-0 rounded-2xl px-3 py-2 sm:px-4 bg-neutral-700/50 text-neutral-300" style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>
-            <p className="text-xs sm:text-sm whitespace-pre-wrap break-words">
-              {message.text}
-            </p>
+            {bubbleText && (
+              <p className="text-xs sm:text-sm whitespace-pre-wrap break-words">
+                {bubbleText}
+              </p>
+            )}
             <div className="flex items-center gap-2 text-[10px] sm:text-xs mt-1 text-neutral-400">
               <span>{formatTime(message.timestamp)}</span>
             </div>
@@ -290,9 +292,9 @@ function MessageItem({
                   : 'bg-neutral-600 text-white rounded-br-sm'
                 : 'bg-neutral-800 text-neutral-100 rounded-bl-sm'
               }`} style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>
-              {message.text && (
+              {bubbleText && (
                 <p className="text-xs sm:text-sm whitespace-pre-wrap break-words">
-                  {message.text}
+                  {bubbleText}
                 </p>
               )}
 
@@ -302,7 +304,7 @@ function MessageItem({
                 const documents = message.attachments.filter(a => !a.file_type.startsWith('image/'));
 
                 return (
-                  <div className={`mt-2 space-y-2 ${message.text ? 'mt-2' : ''}`}>
+                  <div className={`mt-2 space-y-2 ${bubbleText ? 'mt-2' : ''}`}>
                     {/* Группировка изображений */}
                     {images.length > 0 && (
                       <div className={`grid gap-1.5 max-w-xs ${images.length === 1 ? 'grid-cols-1' : images.length === 2 ? 'grid-cols-2' : 'grid-cols-2'
@@ -848,36 +850,12 @@ export default function SupportPage() {
           : undefined,
       };
 
-      // Формируем текст для last_message (если пустой, но есть вложения - формируем без эмодзи и количества)
-      let lastMessageText = data.message.message_text || '';
       const attachments = data.message.attachments || [];
-
-      // Если текст пустой, но есть вложения - формируем текст без эмодзи и количества
+      let lastMessageText = data.message.message_text || '';
       if (!lastMessageText && attachments.length > 0) {
-        const images = attachments.filter((att: any) => att.file_type?.startsWith('image/'));
-        const files = attachments.filter((att: any) => !att.file_type?.startsWith('image/'));
-
-        if (images.length > 0 && files.length === 0) {
-          // Только изображения
-          lastMessageText = 'Фотография';
-        } else if (files.length > 0 && images.length === 0) {
-          // Только файлы
-          lastMessageText = 'Файл';
-        } else {
-          // И изображения, и файлы
-          lastMessageText = 'Вложения';
-        }
+        lastMessageText = getLastMessageLabelForAttachments(attachments);
       } else if (lastMessageText) {
-        // Убираем эмодзи и количество из начала строки, если они есть
-        lastMessageText = lastMessageText.replace(/^[📷📎]\s*/, ''); // Убираем эмодзи в начале
-        lastMessageText = lastMessageText.replace(/^\d+\s+(фотографий|файлов|вложений|изображений?|документов?)/i, (match: string) => {
-          // Убираем количество, оставляем только тип
-          if (match.toLowerCase().includes('фотографий') || match.toLowerCase().includes('изображений')) return 'Фотография';
-          if (match.toLowerCase().includes('файлов') || match.toLowerCase().includes('документов')) return 'Файл';
-          return 'Вложения';
-        });
-        // Заменяем "1 Фотография" на "Фотография"
-        lastMessageText = lastMessageText.replace(/^1\s+(Фотография|Файл)$/, '$1');
+        lastMessageText = normalizeLastMessageDisplayText(lastMessageText);
       }
 
       const lastMessageData = {
@@ -1849,22 +1827,7 @@ export default function SupportPage() {
         // Отмечаем сообщения как прочитанные
         markMessagesAsRead(activeTicket.id);
 
-        // ОПТИМИЗАЦИЯ: Не обновляем список тикетов - WebSocket обновит last_message через событие
-        // Обновляем только локально last_message для оптимистичного обновления UI
-        // Формируем текст для last_message (если пустой, но есть вложения - формируем без эмодзи и количества)
-        let optimisticLastMessageText = sentText || '';
-        if (!optimisticLastMessageText && sentFiles.length > 0) {
-          const images = sentFiles.filter(f => f.fileType.startsWith('image/'));
-          const files = sentFiles.filter(f => !f.fileType.startsWith('image/'));
-
-          if (images.length > 0 && files.length === 0) {
-            optimisticLastMessageText = 'Фотография';
-          } else if (files.length > 0 && images.length === 0) {
-            optimisticLastMessageText = 'Файл';
-          } else {
-            optimisticLastMessageText = 'Вложения';
-          }
-        }
+        const optimisticLastMessageText = sentText || (sentFiles.length > 0 ? getLastMessageLabelForAttachments(sentFiles) : '');
 
         setTickets(prev => prev.map(t =>
           t.id === activeTicket.id
@@ -2541,20 +2504,7 @@ export default function SupportPage() {
                                     {isSystemMessage ? 'Система:' : ticket.last_message.sender_type === 'user' ? 'Вы:' : 'Поддержка:'}
                                   </span>
                                   <span className="truncate flex-1 min-w-0">
-                                    {(() => {
-                                      let text = ticket.last_message.message_text || '';
-                                      // Убираем эмодзи из начала строки
-                                      text = text.replace(/^[📷📎]\s*/, '');
-                                      // Убираем количество, оставляем только тип (например, "3 фотографий" -> "Фотография")
-                                      text = text.replace(/^\d+\s+(фотографий|файлов|вложений|изображений?|документов?)/i, (match: string) => {
-                                        if (match.toLowerCase().includes('фотографий') || match.toLowerCase().includes('изображений')) return 'Фотография';
-                                        if (match.toLowerCase().includes('файлов') || match.toLowerCase().includes('документов')) return 'Файл';
-                                        return 'Вложения';
-                                      });
-                                      // Заменяем "1 Фотография" на "Фотография"
-                                      text = text.replace(/^1\s+(Фотография|Файл)$/, '$1');
-                                      return text;
-                                    })()}
+                                    {normalizeLastMessageDisplayText(ticket.last_message.message_text || '') || '—'}
                                   </span>
                                   {ticket.last_message.is_read === false && ticket.last_message.sender_type === 'support' && !isSystemMessage && (
                                     <span className="flex-shrink-0 w-2 h-2 bg-blue-500 rounded-full"></span>
