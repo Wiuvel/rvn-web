@@ -30,6 +30,7 @@ interface RpcLastMessage {
   id: string;
   message_text: string;
   sender_id: string;
+  sender_type?: string | null;
   created_at: string;
   is_read: boolean;
 }
@@ -274,23 +275,29 @@ export async function GET(request: NextRequest) {
             });
           }
         } else if (lastMessages && lastMessages.length > 0) {
-          // Для RPC функции нужно получить sender_type из БД, так как RPC не возвращает это поле
-          const messageIds = lastMessages.map((msg: RpcLastMessage) => msg.id);
-          const { data: messagesWithSenderType } = await supabaseAdmin!
-            .from('support_messages')
-            .select('id, sender_id, sender_type')
-            .in('id', messageIds);
-          
-          // Создаем map для быстрого доступа к sender_type
+          // Используем sender_type из RPC, если есть; для старых сообщений без sender_type — запрос к БД
           const senderTypeMap = new Map<string, 'user' | 'support'>();
           const messagesNeedingRoleCheck: Array<{ id: string; sender_id: string }> = [];
-          
+          for (const msg of lastMessages) {
+            if (msg.sender_type) {
+              senderTypeMap.set(msg.id, msg.sender_type === 'support' ? 'support' : 'user');
+            } else {
+              messagesNeedingRoleCheck.push({ id: msg.id, sender_id: msg.sender_id });
+            }
+          }
+          const messageIdsNeedingSenderType = messagesNeedingRoleCheck.map(m => m.id);
+          let messagesWithSenderType: Array<{ id: string; sender_id: string; sender_type?: string | null }> | null = null;
+          if (messageIdsNeedingSenderType.length > 0) {
+            const { data } = await supabaseAdmin!
+              .from('support_messages')
+              .select('id, sender_id, sender_type')
+              .in('id', messageIdsNeedingSenderType);
+            messagesWithSenderType = data;
+          }
           if (messagesWithSenderType) {
             for (const msg of messagesWithSenderType) {
               if (msg.sender_type) {
                 senderTypeMap.set(msg.id, msg.sender_type === 'support' ? 'support' : 'user');
-              } else {
-                messagesNeedingRoleCheck.push({ id: msg.id, sender_id: msg.sender_id });
               }
             }
           }

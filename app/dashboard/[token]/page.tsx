@@ -845,7 +845,7 @@ export default function DashboardPage() {
                       className="relative group cursor-pointer shrink-0"
                       onClick={() => setShowAvatarModal(true)}
                     >
-                      <div className={`h-24 w-24 sm:h-28 sm:w-28 lg:h-32 lg:w-32 rounded-xl overflow-hidden border border-neutral-800 ${avatarUrl ? '' : gradientClasses} flex items-center justify-center text-white font-bold text-3xl sm:text-4xl lg:text-5xl shadow-2xl transition-all duration-200 group-hover:scale-105 bg-neutral-900`}>
+                      <div className={`h-24 w-24 sm:h-28 sm:w-28 lg:h-32 lg:w-32 rounded-xl overflow-hidden ring-1 ring-neutral-800 ${avatarUrl ? '' : gradientClasses} flex items-center justify-center text-white font-bold text-3xl sm:text-4xl lg:text-5xl shadow-2xl transition-all duration-200 group-hover:scale-105 bg-neutral-900`}>
                         {avatarUrl ? (
                           <>
                             {avatarLoading && (
@@ -864,7 +864,7 @@ export default function DashboardPage() {
                         ) : (
                           userData?.username ? userData.username.charAt(0).toUpperCase() : '—'
                         )}
-                        {/* Dark overlay on hover */}
+                        {/* Dark overlay on hover — ring вместо border, чтобы закругление совпадало с аватаркой */}
                         <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center rounded-xl">
                           <Pencil className="w-5 h-5 text-white" />
                         </div>
