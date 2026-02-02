@@ -145,10 +145,13 @@ function ImageWithError({ src, alt, className, loading = 'lazy' }: { src: string
   }, [loading]);
 
   return (
-    <div className={`relative bg-neutral-800 ${className || ''}`} ref={imgRef}>
+    <div
+      className={`relative w-full rounded-lg overflow-hidden bg-neutral-800 ${isLoading ? 'min-h-[200px]' : ''} ${className || ''}`}
+      ref={imgRef}
+    >
       {hasError ? (
-        <div className="aspect-video flex items-center justify-center">
-          <div className="text-center p-4">
+        <div className="min-h-[160px] flex items-center justify-center p-4">
+          <div className="text-center">
             <AlertCircle className="w-8 h-8 text-red-400 mx-auto mb-2" />
             <p className="text-xs text-red-300">Изображение недоступно</p>
           </div>
@@ -156,25 +159,21 @@ function ImageWithError({ src, alt, className, loading = 'lazy' }: { src: string
       ) : (
         <>
           {isLoading && (
-            <div className="absolute inset-0 bg-neutral-800 rounded-lg overflow-hidden">
-              <div
-                className="w-full h-full rounded-lg"
-                style={{
-                  height: '100%',
-                  width: '100%',
-                  background: 'linear-gradient(90deg, rgba(64,64,64,0.3) 0%, rgba(115,115,115,0.5) 50%, rgba(64,64,64,0.3) 100%)',
-                  backgroundSize: '200% 100%',
-                  animation: 'shimmer 1.5s ease-in-out infinite'
-                }}
-              />
-            </div>
+            <div
+              className="absolute inset-0 rounded-lg"
+              style={{
+                background: 'linear-gradient(90deg, rgba(64,64,64,0.3) 0%, rgba(115,115,115,0.5) 50%, rgba(64,64,64,0.3) 100%)',
+                backgroundSize: '200% 100%',
+                animation: 'shimmer 1.5s ease-in-out infinite'
+              }}
+            />
           )}
           {isInView && (
             <img
               src={src}
               alt={alt}
               loading={loading}
-              className={`w-full h-auto object-contain ${isLoading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300 ${className || ''}`}
+              className={`w-full h-auto max-h-[63vh] object-contain rounded-lg transition-opacity duration-300 ${isLoading ? 'absolute inset-0 opacity-0 pointer-events-none' : 'opacity-100 block'}`}
               onLoad={() => setIsLoading(false)}
               onError={() => {
                 setHasError(true);
@@ -329,13 +328,12 @@ function MessageItem({
                   <div className={`space-y-2 ${bubbleText ? 'mt-2' : ''}`}>
                     {/* Группировка изображений */}
                     {images.length > 0 && (
-                      <div className={`grid gap-1.5 max-w-xs ${images.length === 1 ? 'grid-cols-1' : images.length === 2 ? 'grid-cols-2' : 'grid-cols-2'
-                        }`}>
+                      <div className={`grid gap-1.5 ${images.length === 1 ? 'max-w-[29rem]' : 'max-w-[37.5rem] grid-cols-2'}`}>
                         {images.map((attachment) => (
                           <button
                             key={attachment.id}
                             onClick={() => onImageClick?.(attachment.storage_url, attachment.file_name)}
-                            className="block rounded-lg overflow-hidden cursor-pointer hover:opacity-90 transition-opacity"
+                            className="block w-full min-w-0 rounded-lg overflow-hidden cursor-pointer hover:opacity-90 transition-opacity"
                           >
                             <ImageWithError
                               src={attachment.storage_url}

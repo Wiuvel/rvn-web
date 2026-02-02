@@ -14,7 +14,7 @@ import { useWebSocket } from '@/hooks/useWebSocket';
 import { debugPerformanceAsync, debugStart, debugEnd, debugError } from '@/lib/utils/debug';
 import TicketSkeleton from '@/components/ui/TicketSkeleton';
 import FileUploadModal from '@/components/support/FileUploadModal';
-import { Paperclip, X, Image as ImageIcon, FileText, AlertCircle } from 'lucide-react';
+import { Paperclip, X, Image as ImageIcon, FileText, AlertCircle, PanelLeftClose, PanelLeft } from 'lucide-react';
 import ImageViewer from '@/components/support/ImageViewer';
 import { UserMenu } from '@/components/navigation/UserMenu';
 import { UserData } from '@/types';
@@ -123,10 +123,13 @@ function ImageWithError({
     : 'linear-gradient(90deg, rgba(64,64,64,0.3) 0%, rgba(115,115,115,0.5) 50%, rgba(64,64,64,0.3) 100%)'; // Стандартная палитра
 
   return (
-    <div className={`relative w-full aspect-square bg-neutral-800 rounded-lg overflow-hidden ${className || ''}`} ref={imgRef}>
+    <div
+      className={`relative w-full rounded-lg overflow-hidden bg-neutral-800 ${isLoading ? 'min-h-[200px]' : ''} ${className || ''}`}
+      ref={imgRef}
+    >
       {hasError ? (
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="text-center p-4">
+        <div className="min-h-[160px] flex items-center justify-center p-4">
+          <div className="text-center">
             <AlertCircle className="w-8 h-8 text-red-400 mx-auto mb-2" />
             <p className="text-xs text-red-300">Изображение недоступно</p>
           </div>
@@ -150,7 +153,7 @@ function ImageWithError({
               src={src}
               alt={alt}
               loading={loading}
-              className={`absolute inset-0 w-full h-full object-contain rounded-lg ${isLoading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300`}
+              className={`w-full h-auto max-h-[63vh] object-contain rounded-lg transition-opacity duration-300 ${isLoading ? 'absolute inset-0 opacity-0 pointer-events-none' : 'opacity-100 block'}`}
               onLoad={() => setIsLoading(false)}
               onError={() => {
                 setHasError(true);
@@ -307,13 +310,12 @@ function MessageItem({
                   <div className={`mt-2 space-y-2 ${bubbleText ? 'mt-2' : ''}`}>
                     {/* Группировка изображений */}
                     {images.length > 0 && (
-                      <div className={`grid gap-1.5 max-w-xs ${images.length === 1 ? 'grid-cols-1' : images.length === 2 ? 'grid-cols-2' : 'grid-cols-2'
-                        }`}>
+                      <div className={`grid gap-1.5 ${images.length === 1 ? 'max-w-[29rem]' : 'max-w-[37.5rem] grid-cols-2'}`}>
                         {images.map((attachment) => (
                           <button
                             key={attachment.id}
                             onClick={() => onImageClick?.(attachment.storage_url, attachment.file_name)}
-                            className="block rounded-lg overflow-hidden cursor-pointer hover:opacity-90 transition-opacity"
+                            className="block w-full min-w-0 rounded-lg overflow-hidden cursor-pointer hover:opacity-90 transition-opacity"
                           >
                             <ImageWithError
                               src={attachment.storage_url}
@@ -412,6 +414,14 @@ export default function SupportPage() {
 
   // Подсчет активных тикетов (только open и pending)
   const activeTicketsCount = tickets.filter(t => t.status === 'open' || t.status === 'pending').length;
+
+  const toggleSidebarCollapsed = useCallback(() => {
+    setSidebarCollapsed(prev => {
+      const next = !prev;
+      if (typeof window !== 'undefined') localStorage.setItem('support_sidebar_collapsed', String(next));
+      return next;
+    });
+  }, []);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const notificationRef = useRef<HTMLDivElement>(null);
   const messageInputRef = useRef<HTMLInputElement>(null);
@@ -428,6 +438,10 @@ export default function SupportPage() {
   const [showRateLimitCaptcha, setShowRateLimitCaptcha] = useState(false);
   const isCaptchaOpenRef = useRef(false);
   const [ticketsListVisible, setTicketsListVisible] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem('support_sidebar_collapsed') === 'true';
+  });
   const [showFileUploadModal, setShowFileUploadModal] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<Array<{
     fileName: string;
@@ -2313,13 +2327,75 @@ export default function SupportPage() {
             <p className="text-xs sm:text-sm text-neutral-400">Обратитесь в службу поддержки. Создайте новое обращение или выберите существующее для продолжения диалога.</p>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-6 flex-1 min-h-0">
-            {/* Список тикетов - скрыт на мобильном когда открыт чат */}
-            <div className={`lg:col-span-1 flex flex-col min-h-0 ${activeTicket ? 'hidden lg:flex' : 'flex'}`}>
-              <div className="bg-neutral-900 border border-white/10 rounded-2xl p-2 sm:p-4 flex-1 flex flex-col overflow-hidden">
-                <div className="flex items-center justify-between mb-2 sm:mb-4 flex-shrink-0">
-                  <h2 className="text-base sm:text-lg font-semibold">Мои тикеты</h2>
+          <div className={`grid grid-cols-1 gap-3 sm:gap-6 flex-1 min-h-0 ${sidebarCollapsed ? 'lg:grid-cols-[4rem_1fr]' : 'lg:grid-cols-3'}`}>
+            {/* Левая панель: на ПК при свёрнутом виде — узкая панель с номерами; иначе — полный список (на мобильном всегда список) */}
+            <div className={`flex flex-col min-h-0 ${activeTicket ? 'hidden lg:flex' : 'flex'} ${sidebarCollapsed ? 'lg:w-16 lg:min-w-16' : 'lg:col-span-1'}`}>
+              {sidebarCollapsed && (
+                <div className="hidden lg:flex flex-col w-16 flex-shrink-0 bg-neutral-900 border border-white/10 rounded-2xl overflow-hidden">
                   <button
+                    type="button"
+                    onClick={toggleSidebarCollapsed}
+                    className="flex-shrink-0 p-2.5 border-b border-white/10 text-neutral-400 hover:text-white hover:bg-white/5 transition-colors"
+                    title="Показать список тикетов"
+                    aria-label="Показать список тикетов"
+                  >
+                    <PanelLeft className="w-5 h-5 mx-auto" />
+                  </button>
+                  <div className="flex-1 overflow-y-auto py-1 flex flex-col items-center gap-1">
+                    {tickets.map((ticket, index) => (
+                      <button
+                        key={ticket.id}
+                        type="button"
+                        onClick={async () => {
+                          if (activeTicket?.id === ticket.id) return;
+                          const ticketData = {
+                            id: ticket.id,
+                            subject: ticket.subject,
+                            status: ticket.status,
+                            createdAt: ticket.createdAt,
+                            user_id: ticket.user_id,
+                            messages: []
+                          };
+                          setActiveTicket(ticketData);
+                          if (typeof window !== 'undefined') localStorage.setItem('support_last_ticket_id', ticket.id);
+                          setMessagesSentCount(0);
+                          setLastMessageTime(null);
+                          setTimeoutSeconds(0);
+                          await fetchTicketMessages(ticket.id, 25, 0, true);
+                        }}
+                        className={`w-9 h-9 flex-shrink-0 rounded-lg flex items-center justify-center text-sm font-medium transition-colors ${
+                          activeTicket?.id === ticket.id
+                            ? 'bg-primary-500 text-white'
+                            : 'bg-neutral-800/80 text-neutral-300 hover:bg-neutral-700'
+                        }`}
+                        title={ticket.subject}
+                      >
+                        {index + 1}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div className={`bg-neutral-900 border border-white/10 rounded-2xl p-2 sm:p-4 flex-1 flex flex-col overflow-hidden ${sidebarCollapsed ? 'lg:hidden' : ''}`}>
+                <div className="flex items-center justify-between gap-2 mb-2 sm:mb-4 flex-shrink-0">
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <button
+                      type="button"
+                      onClick={toggleSidebarCollapsed}
+                      className="flex-shrink-0 p-1.5 rounded-lg text-neutral-400 hover:text-white hover:bg-white/5 transition-colors"
+                      title={sidebarCollapsed ? 'Показать список тикетов' : 'Свернуть в панель с номерами'}
+                      aria-label={sidebarCollapsed ? 'Показать список тикетов' : 'Свернуть список тикетов'}
+                    >
+                      {sidebarCollapsed ? (
+                        <PanelLeft className="w-5 h-5" />
+                      ) : (
+                        <PanelLeftClose className="w-5 h-5" />
+                      )}
+                    </button>
+                    <h2 className="text-base sm:text-lg font-semibold truncate">Мои тикеты</h2>
+                  </div>
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <button
                     onClick={() => {
                       if (activeTicketsCount >= MAX_TICKETS_PER_USER) {
                         alert('Вы можете создать максимум 2 активных обращения');
@@ -2333,6 +2409,7 @@ export default function SupportPage() {
                   >
                     + Новый
                   </button>
+                  </div>
                 </div>
 
                 {!isSupport && (
@@ -2522,19 +2599,19 @@ export default function SupportPage() {
               </div>
             </div>
 
-            {/* Чат - занимает весь экран на мобильном */}
-            <div className={`lg:col-span-2 flex flex-col min-h-0 ${activeTicket ? 'flex' : 'hidden lg:flex'}`}>
+            {/* Чат — при свёрнутой панели занимает почти весь экран на ПК */}
+            <div className={`flex flex-col min-h-0 ${activeTicket ? 'flex' : 'hidden lg:flex'} ${sidebarCollapsed ? 'lg:col-span-1' : 'lg:col-span-2'}`}>
               <div className="bg-neutral-900 border border-white/10 rounded-2xl flex-1 flex flex-col overflow-hidden">
                 {activeTicket ? (
                   <>
                     <div ref={chatAreaRef} className="flex-1 flex flex-col min-h-0 overflow-hidden transition-opacity duration-200">
                       <div className="p-3 sm:p-4 border-b border-white/10 flex-shrink-0">
                         <div className="flex items-center justify-between gap-2">
-                          {/* Кнопка возврата к списку тикетов на мобильных */}
+                          {/* Кнопка возврата к списку на мобильных; на ПК при свёрнутой панели — развернуть список */}
                           <button
-                            onClick={() => setActiveTicket(null)}
-                            className="lg:hidden mr-2 p-1.5 text-neutral-400 hover:text-white transition-colors rounded-lg hover:bg-white/5"
-                            aria-label="Вернуться к списку тикетов"
+                            onClick={() => sidebarCollapsed ? toggleSidebarCollapsed() : setActiveTicket(null)}
+                            className={`${sidebarCollapsed ? 'lg:flex' : 'lg:hidden'} mr-2 p-1.5 text-neutral-400 hover:text-white transition-colors rounded-lg hover:bg-white/5`}
+                            aria-label={sidebarCollapsed ? 'Показать список тикетов' : 'Вернуться к списку тикетов'}
                           >
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
