@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import '../../../globals.css';
 
 export const metadata: Metadata = {
-  title: 'Панель поддержки | Raven Private',
+  title: 'Панель поддержки | RVN',
   robots: {
     index: false,
     follow: false,

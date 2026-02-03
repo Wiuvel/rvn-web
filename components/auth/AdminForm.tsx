@@ -170,7 +170,7 @@ export default function AdminAuthForm({ onAuthSuccess }: AdminAuthFormProps) {
               <div className="w-16 h-16 flex items-center justify-center">
                 <Image
                   src="/static/logo.svg"
-                  alt="Raven Private Logo"
+                  alt="RVN Logo"
                   width={256}
                   height={256}
                   className="w-full h-full object-contain"
@@ -181,7 +181,7 @@ export default function AdminAuthForm({ onAuthSuccess }: AdminAuthFormProps) {
             </div>
 
             <h2 className="text-2xl sm:text-3xl font-bold text-white">
-              Raven Private
+              RVN
             </h2>
             <p className="mt-2 text-sm sm:text-base text-white/70">
               Войдите в систему для доступа к панели
@@ -350,7 +350,7 @@ export default function AdminAuthForm({ onAuthSuccess }: AdminAuthFormProps) {
             <div className="w-16 h-16 flex items-center justify-center">
               <Image 
                 src="/static/logo.svg" 
-                alt="Raven Private Logo" 
+                alt="RVN Logo" 
                 width={256}
                 height={256}
                 className="w-full h-full object-contain"

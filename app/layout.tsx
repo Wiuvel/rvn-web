@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { Suspense } from "react";
 import "./globals.css";
 import SmoothScroll from "@/components/utils/SmoothScroll";
 import ConditionalLayout from "@/components/layout/Conditional";
@@ -38,9 +39,11 @@ export default function RootLayout({
       <body className={`h-full bg-neutral-950 text-neutral-100 antialiased relative ${exo2.className}`}>
         <HomeStructuredData />
         <SmoothScroll />
-        <ConditionalLayout>
-          {children}
-        </ConditionalLayout>
+        <Suspense fallback={<main className="min-h-screen" />}>
+          <ConditionalLayout>
+            {children}
+          </ConditionalLayout>
+        </Suspense>
       </body>
     </html>
   );

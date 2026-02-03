@@ -5,7 +5,9 @@ import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 
-// Heavy WebGL effect — load client-side only
+const MOBILE_BREAKPOINT_PX = 768;
+
+// Heavy WebGL effect — load client-side only; disabled on mobile
 const LightRays = dynamic(() => import('@/components/LightRays'), {
   ssr: false,
   loading: () => <div className="absolute inset-0" aria-hidden="true" />
@@ -15,6 +17,7 @@ export default function AboutPage() {
   const titleRef = useFadeIn(0.1);
   const contentRef = useStaggeredFadeIn(0.2, 0.1);
   const [isLoading, setIsLoading] = useState(true);
+  const [isMobile, setIsMobile] = useState(true);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -23,13 +26,20 @@ export default function AboutPage() {
     return () => clearTimeout(timer);
   }, []);
 
+  useEffect(() => {
+    const check = () => setIsMobile(typeof window !== 'undefined' && window.innerWidth < MOBILE_BREAKPOINT_PX);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+
   if (isLoading) {
     return <LoadingSpinner />;
   }
 
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100 relative overflow-hidden">
-      {/* LightRays эффект */}
+      {!isMobile && (
       <div className="absolute inset-0 w-full h-full pointer-events-none">
         <LightRays
           raysOrigin="top-center"
@@ -44,6 +54,7 @@ export default function AboutPage() {
           mouseInfluence={0.15}
         />
       </div>
+      )}
 
       <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-24 sm:py-32">
         {/* Hero Section */}
@@ -63,7 +74,7 @@ export default function AboutPage() {
               О сервисе
             </h2>
             <p className="text-neutral-300 text-base sm:text-lg leading-relaxed mb-4" style={{ textAlign: 'justify', textJustify: 'inter-word', hyphens: 'auto', wordSpacing: 'normal' }}>
-              Raven Private — это современный сервис приватного доступа в сеть, созданный с целью обеспечения 
+              RVN — это современный сервис приватного доступа в сеть, созданный с целью обеспечения 
               анонимности и безопасности пользователей в цифровом пространстве.
             </p>
             <p className="text-neutral-300 text-base sm:text-lg leading-relaxed" style={{ textAlign: 'justify', textJustify: 'inter-word', hyphens: 'auto', wordSpacing: 'normal' }}>

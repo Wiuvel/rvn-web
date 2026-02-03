@@ -3,7 +3,7 @@ import '../../../globals.css';
 import './panel.css';
 
 export const metadata: Metadata = {
-  title: 'Серверная панель | Raven Private',
+  title: 'Серверная панель | RVN',
   robots: {
     index: false,
     follow: false,

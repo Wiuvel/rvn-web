@@ -37,10 +37,11 @@ export default function Header({ variant = 'main' }: HeaderProps = {}) {
   const notificationsButtonRef = useRef<HTMLButtonElement | null>(null);
   const spinnerRef = useRef<HTMLDivElement>(null);
   const mobileSpinnerRef = useRef<HTMLDivElement>(null);
+  const avatarLoadFallbackRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const router = useRouter();
   const pathname = usePathname();
   const authContainerRef = useRef<HTMLDivElement>(null);
-  
+
   // Используем новый хук useAuth
   const { userData, loading } = useAuth({ silent: true });
 
@@ -55,6 +56,27 @@ export default function Header({ variant = 'main' }: HeaderProps = {}) {
         setMobileAvatarLoading(true);
       }
     }
+  }, [userData?.avatar]);
+
+  // Страховка: при кешированном изображении onLoad может не сработать при навигации — снимаем скелетон по таймауту
+  const AVATAR_LOAD_FALLBACK_MS = 800;
+  useEffect(() => {
+    if (!userData?.avatar) return;
+    const avatarUrl = getAvatarUrl(userData.avatar);
+    if (!avatarUrl) return;
+
+    avatarLoadFallbackRef.current = setTimeout(() => {
+      avatarLoadFallbackRef.current = null;
+      setAvatarLoading(false);
+      setMobileAvatarLoading(false);
+    }, AVATAR_LOAD_FALLBACK_MS);
+
+    return () => {
+      if (avatarLoadFallbackRef.current) {
+        clearTimeout(avatarLoadFallbackRef.current);
+        avatarLoadFallbackRef.current = null;
+      }
+    };
   }, [userData?.avatar]);
 
   useEffect(() => {
@@ -363,8 +385,22 @@ export default function Header({ variant = 'main' }: HeaderProps = {}) {
                               height={40}
                               className={`w-full h-full object-cover transition-opacity duration-300 ${avatarLoading ? 'opacity-0' : 'opacity-100'}`}
                               unoptimized
-                              onLoad={() => setAvatarLoading(false)}
-                              onError={() => setAvatarLoading(false)}
+                              onLoad={() => {
+                                if (avatarLoadFallbackRef.current) {
+                                  clearTimeout(avatarLoadFallbackRef.current);
+                                  avatarLoadFallbackRef.current = null;
+                                }
+                                setAvatarLoading(false);
+                                setMobileAvatarLoading(false);
+                              }}
+                              onError={() => {
+                                if (avatarLoadFallbackRef.current) {
+                                  clearTimeout(avatarLoadFallbackRef.current);
+                                  avatarLoadFallbackRef.current = null;
+                                }
+                                setAvatarLoading(false);
+                                setMobileAvatarLoading(false);
+                              }}
                             />
                           </>
                         ) : (
@@ -511,8 +547,22 @@ export default function Header({ variant = 'main' }: HeaderProps = {}) {
                                   height={48}
                                   className={`w-full h-full object-cover transition-opacity duration-300 ${mobileAvatarLoading ? 'opacity-0' : 'opacity-100'}`}
                                   unoptimized
-                                  onLoad={() => setMobileAvatarLoading(false)}
-                                  onError={() => setMobileAvatarLoading(false)}
+                                  onLoad={() => {
+                                    if (avatarLoadFallbackRef.current) {
+                                      clearTimeout(avatarLoadFallbackRef.current);
+                                      avatarLoadFallbackRef.current = null;
+                                    }
+                                    setAvatarLoading(false);
+                                    setMobileAvatarLoading(false);
+                                  }}
+                                  onError={() => {
+                                    if (avatarLoadFallbackRef.current) {
+                                      clearTimeout(avatarLoadFallbackRef.current);
+                                      avatarLoadFallbackRef.current = null;
+                                    }
+                                    setAvatarLoading(false);
+                                    setMobileAvatarLoading(false);
+                                  }}
                                 />
                               </>
                             ) : (

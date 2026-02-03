@@ -2,7 +2,7 @@ import { Metadata } from 'next';
 import { domains } from './config';
 
 const baseUrl = domains.mainUrl;
-const siteName = 'Raven Private';
+const siteName = 'RVN';
 
 interface SEOProps {
   title?: string;
@@ -32,16 +32,16 @@ export function generateMetadata({
   noindex = false
 }: SEOProps): Metadata {
   const fullTitle = title ? 
-    (title.includes('Raven Private — безопасный доступ в сеть') ? title : `${title} | ${siteName}`) : 
-    `${siteName} — безопасный доступ в сеть`;
-  const fullDescription = description || 'RVN.MARKET — современный сервис приватного доступа в сеть. Высокая скорость и полная анонимность. Стабильные сервера с минимальным пингом.';
+    (title === siteName || title.includes('RVN - безопасный доступ в сеть') ? title : `${title} | ${siteName}`) : 
+    `${siteName} - безопасный доступ в сеть`;
+  const fullDescription = description || 'RVN.MARKET - современный сервис приватного доступа в сеть. Высокая скорость и полная анонимность. Стабильные сервера с минимальным пингом.';
   const fullUrl = url ? `${baseUrl}${url}` : baseUrl;
 
   const metadata: Metadata = {
     title: fullTitle,
     description: fullDescription,
     keywords: [
-      'Raven Private',
+      'RVN',
       'rvn.market',
       'Vless',
       'Hysteria',
@@ -101,15 +101,15 @@ export function generateMetadata({
 
 export const pageMetadata = {
   home: generateMetadata({
-    title: 'Raven Private — безопасный доступ в сеть',
-    description: 'RVN.MARKET — современный сервис приватного доступа в сеть. Высокая скорость и полная анонимность. Стабильные сервера с минимальным пингом.',
+    title: 'RVN',
+    description: 'RVN.MARKET - современный сервис приватного доступа в сеть. Высокая скорость и полная анонимность. Стабильные сервера с минимальным пингом.',
     keywords: ['Main Page', 'Home Page', 'Main'],
     url: '/'
   }),
 
   auth: generateMetadata({
     title: 'Авторизация',
-    description: 'Регистрация и вход в личный кабинет Raven Private.',
+    description: 'Регистрация и вход в личный кабинет RVN.',
     keywords: ['login', 'registration', 'authorization'],
     url: '/auth'
   }),
@@ -124,7 +124,7 @@ export const pageMetadata = {
 
   protection: generateMetadata({
     title: 'Проверка безопасности',
-    description: 'Подтвердите, что вы человек, чтобы получить доступ к сайту Raven Private.',
+    description: 'Подтвердите, что вы человек, чтобы получить доступ к сайту RVN.',
     keywords: ['captcha'],
     url: '/protection',
     noindex: true
@@ -132,14 +132,14 @@ export const pageMetadata = {
 
   legal: generateMetadata({
     title: 'Правовая информация',
-    description: 'Соглашения и политики. Другие правовые документы Raven Private.',
+    description: 'Соглашения и политики. Другие правовые документы RVN.',
     keywords: ['legal information', 'user agreement', 'privacy policy'],
     url: '/legal'
   }),
 
   support: generateMetadata({
     title: 'Поддержка',
-    description: 'Служба поддержки сервиса Raven Private.',
+    description: 'Служба поддержки сервиса RVN.',
     keywords: ['support', 'technical support', 'help'],
     url: '/support'
   }),
@@ -158,7 +158,7 @@ export function createArticleMetadata({
   description,
   publishedTime,
   modifiedTime,
-  author = 'Raven Private',
+  author = 'RVN',
   section = 'Новости',
   tags = [],
   url

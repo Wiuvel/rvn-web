@@ -13,7 +13,9 @@ interface HeroSectionProps {
   onLightRaysLoad?: () => void;
 }
 
-// Heavy WebGL effect — load client-side only; include gentle fade-in on mount.
+const MOBILE_BREAKPOINT_PX = 768;
+
+// Heavy WebGL effect — load client-side only; include gentle fade-in on mount. Disabled on mobile.
 const LightRays = dynamic(() => import('@/components/LightRays'), {
   ssr: false,
   loading: () => <div className="absolute inset-0" aria-hidden="true" />
@@ -23,6 +25,14 @@ export default function HeroSection({ onLightRaysLoad }: HeroSectionProps = {}) 
   const [ping, setPing] = useState(0);
   const [connected, setConnected] = useState(false);
   const [serverInfo, setServerInfo] = useState<{ country: string, code: string, flag: string } | null>(null);
+  const [isMobile, setIsMobile] = useState(true);
+
+  useEffect(() => {
+    const check = () => setIsMobile(typeof window !== 'undefined' && window.innerWidth < MOBILE_BREAKPOINT_PX);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
 
   useEffect(() => {
     const servers = [
@@ -64,12 +74,19 @@ export default function HeroSection({ onLightRaysLoad }: HeroSectionProps = {}) 
     return "text-orange-400";
   };
 
-  // Отслеживаем загрузку LightRays
+  // На мобильных LightRays не рендерится — сразу сигнализируем загрузку
   useEffect(() => {
-    if (!onLightRaysLoad) return;
+    if (onLightRaysLoad && isMobile) {
+      onLightRaysLoad();
+    }
+  }, [onLightRaysLoad, isMobile]);
+
+  // Отслеживаем загрузку LightRays (только для десктопа)
+  useEffect(() => {
+    if (!onLightRaysLoad || isMobile) return;
 
     let hasCalled = false;
-    
+
     const checkLightRaysLoaded = () => {
       if (hasCalled) return;
       
@@ -131,11 +148,12 @@ export default function HeroSection({ onLightRaysLoad }: HeroSectionProps = {}) 
       clearInterval(interval);
       clearTimeout(timeout);
     };
-  }, [onLightRaysLoad]);
+  }, [onLightRaysLoad, isMobile]);
 
   return (
     <section id="home" className="relative overflow-visible bg-neutral-950">
       <div className="absolute inset-0 w-full h-full pointer-events-none" style={{ overflow: 'visible' }}>
+        {!isMobile && (
         <LightRays
           raysOrigin="top-center"
           raysColor="#45beff"
@@ -149,6 +167,7 @@ export default function HeroSection({ onLightRaysLoad }: HeroSectionProps = {}) 
           fadeDistance={2.0}
           className="custom-rays"
         />
+        )}
       </div>
       <div className="absolute bottom-0 left-0 right-0 h-32 pointer-events-none z-10 bg-gradient-to-t from-neutral-950 to-transparent" />
       <div className="mx-auto max-w-7xl px-6 sm:px-8 lg:px-12 xl:px-16 pt-24 pb-24 md:pt-32 md:pb-36 relative z-10">

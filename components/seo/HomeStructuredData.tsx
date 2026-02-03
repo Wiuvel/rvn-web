@@ -6,11 +6,11 @@ export default function HomeStructuredData() {
   const organizationData = {
     '@context': 'https://schema.org',
     '@type': 'Organization',
-    name: 'Raven Private',
+    name: 'RVN',
     alternateName: 'RVN.MARKET',
     url: baseUrl,
     logo: `${baseUrl}/logo.svg`,
-    description: 'RVN.MARKET — современный сервис приватного доступа в сеть. Высокая скорость и полная анонимность.',
+    description: 'RVN.MARKET - современный сервис приватного доступа в сеть. Высокая скорость и полная анонимность.',
     sameAs: [
       'https://twitter.com/rvnprivate',
     ],
@@ -24,10 +24,10 @@ export default function HomeStructuredData() {
   const websiteData = {
     '@context': 'https://schema.org',
     '@type': 'WebSite',
-    name: 'Raven Private',
+    name: 'RVN',
     alternateName: 'RVN.MARKET',
     url: baseUrl,
-    description: 'RVN.MARKET — современный сервис приватного доступа в сеть. Высокая скорость и полная анонимность.',
+    description: 'RVN.MARKET - современный сервис приватного доступа в сеть. Высокая скорость и полная анонимность.',
     potentialAction: {
       '@type': 'SearchAction',
       target: {
@@ -44,7 +44,7 @@ export default function HomeStructuredData() {
     serviceType: 'VPN Service',
     provider: {
       '@type': 'Organization',
-      name: 'Raven Private',
+      name: 'RVN',
     },
     areaServed: 'Worldwide',
     description: 'Приватный доступ в сеть с использованием VLESS протокола. Высокая скорость, полная анонимность и защита данных.',

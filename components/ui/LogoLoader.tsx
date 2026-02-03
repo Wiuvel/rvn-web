@@ -10,7 +10,7 @@ export default function LogoLoader() {
         {/* Логотип с анимацией яркости и переливания */}
         <Image
           src={getStaticUrl("/static/large-logo.svg")}
-          alt="Raven Private"
+          alt="RVN"
           width={200}
           height={97}
           className="logo-pulse w-[200px] h-auto"

@@ -1,5 +1,5 @@
 //! WASM модуль для обработки изображений (docs/IMAGE_CACHE_IMPLEMENTATION_PLAN.md, Фаза 2).
-//! Ресайз через crate `image`; WebP — passthrough (в pure Rust WASM нет кодировщика без C-зависимостей).
+//! Ресайз через crate `image` (PNG/JPEG/GIF).
 
 use image::{imageops::FilterType, ImageOutputFormat};
 use std::io::Cursor;
@@ -40,11 +40,4 @@ pub fn resize_image(input: &[u8], width: u32, height: u32) -> Vec<u8> {
         return input.to_vec();
     }
     out
-}
-
-/// Passthrough: в pure Rust WASM нет WebP-энкодера без C (libwebp).
-/// Опционально конвертацию в WebP можно делать на стороне Node (например через sharp).
-#[wasm_bindgen]
-pub fn convert_to_webp(input: &[u8]) -> Vec<u8> {
-    input.to_vec()
 }

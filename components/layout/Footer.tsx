@@ -52,7 +52,7 @@ export default function Footer() {
             <div className="flex items-center text-neutral-200">
               <Image 
                 src={getStaticUrl("/static/large-logo.svg")} 
-                alt="Raven Private" 
+                alt="RVN" 
                 width={905} 
                 height={440} 
                 className="h-12 md:h-14 w-auto"

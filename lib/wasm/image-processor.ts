@@ -7,12 +7,10 @@
 export interface ProcessImageOptions {
   width?: number;
   height?: number;
-  format?: 'webp' | 'jpeg';
 }
 
 let wasmModule: {
   resize_image: (input: Uint8Array, width: number, height: number) => Uint8Array;
-  convert_to_webp: (input: Uint8Array) => Uint8Array;
 } | null = null;
 let initPromise: Promise<boolean> | null = null;
 
@@ -20,7 +18,6 @@ let initPromise: Promise<boolean> | null = null;
 async function loadWasmPkg(): Promise<{
   default?: unknown;
   resize_image: (input: Uint8Array, width: number, height: number) => Uint8Array;
-  convert_to_webp: (input: Uint8Array) => Uint8Array;
 }> {
   try {
     return await import('./pkg/image_processor_wasm.js');
@@ -48,7 +45,6 @@ async function initWasm(): Promise<boolean> {
       }
       wasmModule = {
         resize_image: pkg.resize_image,
-        convert_to_webp: pkg.convert_to_webp,
       };
       return true;
     } catch {
@@ -67,7 +63,7 @@ export async function checkWasmReady(): Promise<boolean> {
 }
 
 /**
- * Обработка изображения через WASM (ресайз/конвертация).
+ * Обработка изображения через WASM (ресайз).
  * Если WASM недоступен или произошла ошибка — возвращает исходный buffer.
  */
 export async function processImage(
@@ -82,10 +78,6 @@ export async function processImage(
     const input = new Uint8Array(buffer);
     if (options.width != null && options.height != null) {
       const out = wasmModule.resize_image(input, options.width, options.height);
-      return Buffer.from(out);
-    }
-    if (options.format === 'webp') {
-      const out = wasmModule.convert_to_webp(input);
       return Buffer.from(out);
     }
     return buffer;
