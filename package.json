@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "node server.js",
     "dev:next": "next dev --turbopack",
-    "build": "next build",
+    "build": "npm run build:wasm && next build",
     "build:wasm": "cd wasm && wasm-pack build --target web --out-dir ../lib/wasm/pkg",
     "start": "node server.js",
     "start:next": "next start",
