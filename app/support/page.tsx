@@ -7,425 +7,29 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { gsap } from 'gsap';
 import { MESSAGE_MAX_LENGTH, TICKET_SUBJECT_MAX_LENGTH, MAX_TICKETS_PER_USER, MESSAGE_TIMEOUT, AUTH_FETCH_TIMEOUT, GSAP_DEFAULT_DURATION, GSAP_DEFAULT_EASE, MARK_AS_READ_DEBOUNCE } from '@/lib/utils/constants';
-import { getLastMessageLabelForAttachments, messageTextForBubble, normalizeLastMessageDisplayText } from '@/lib/utils/support-messages';
+import { getLastMessageLabelForAttachments, normalizeLastMessageDisplayText } from '@/lib/utils/support-messages';
 import { translateError } from '@/lib/utils/error-translations';
 import { getGradientClasses, getAvatarUrl } from '@/lib/utils/avatar-gradients';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { debugPerformanceAsync, debugStart, debugEnd, debugError } from '@/lib/utils/debug';
 import TicketSkeleton from '@/components/ui/TicketSkeleton';
 import FileUploadModal from '@/components/support/FileUploadModal';
-import { Paperclip, X, Image as ImageIcon, FileText, AlertCircle, PanelLeftClose, PanelLeft, Plus } from 'lucide-react';
+import MessageInput from '@/components/support/MessageInput';
+import ChatHeader from '@/components/support/ChatHeader';
+import MessageItem from '@/components/support/MessageItem';
+import TicketListItem from '@/components/support/TicketListItem';
+import CreateTicketForm from '@/components/support/CreateTicketForm';
+import { X, AlertCircle, PanelLeftClose, PanelLeft, Plus } from 'lucide-react';
 import ImageViewer from '@/components/support/ImageViewer';
 import { UserMenu } from '@/components/navigation/UserMenu';
 import { UserData } from '@/types';
+import type { Message, Ticket, MessageAttachment, UploadedFile } from '@/components/support/types';
 
 // Lazy load RateLimitCaptcha для оптимизации bundle size
 // Убираем loading state, чтобы избежать показа модального окна при загрузке страницы
 const RateLimitCaptcha = dynamic(() => import('@/components/auth/RateLimitCaptcha'), {
   ssr: false
 });
-
-interface MessageAttachment {
-  id: string;
-  file_name: string;
-  file_type: string;
-  file_size: number;
-  storage_url: string;
-  storage_path?: string; // Опционально, для формирования URL из пути
-  blur_hash?: string;
-  width?: number;
-  height?: number;
-}
-
-interface Message {
-  id: string;
-  text: string;
-  sender: 'user' | 'support';
-  timestamp: Date;
-  isRead?: boolean;
-  // Локальный флаг для оптимистичных сообщений, которые еще отправляются
-  // Используется для показа оверлея-лоадера поверх изображения
-  isPending?: boolean;
-  senderData?: {
-    id: string;
-    username: string;
-    user_id: string;
-    avatar?: string | null;
-  };
-  attachments?: MessageAttachment[];
-}
-
-interface Ticket {
-  id: string;
-  subject: string;
-  status: 'open' | 'closed' | 'pending';
-  createdAt: Date;
-  messages: Message[];
-  user_id?: string; // ID пользователя, которому принадлежит тикет
-  last_message?: {
-    id: string;
-    message_text: string;
-    sender_type: 'user' | 'support' | 'system';
-    created_at: string;
-    is_read: boolean;
-    attachments?: Array<{
-      id: string;
-      file_name: string;
-      file_type: string;
-      file_size: number;
-      storage_path: string;
-    }>;
-  } | null;
-  unread_count?: number;
-  updated_at?: string; // Для обновления через WebSocket
-}
-
-// Компонент для изображения с обработкой ошибок и skeleton-loader с shimmer эффектом
-function ImageWithError({
-  src,
-  alt,
-  className,
-  loading = 'lazy',
-  isRead = false,
-  blurHash,
-  width,
-  height,
-  isPending = false
-}: {
-  src: string;
-  alt: string;
-  className?: string;
-  loading?: 'lazy' | 'eager';
-  isRead?: boolean;
-  blurHash?: string;
-  width?: number;
-  height?: number;
-  // Флаг "сообщение отправляется" – показываем поверх изображения отдельный оверлей-лоадер
-  isPending?: boolean;
-}) {
-  const [hasError, setHasError] = useState(false);
-  // Если это blob URL (локальное превью), считаем что загрузка не нужна или уже выполнена
-  const isBlobUrl = src.startsWith('blob:');
-  const [isLoading, setIsLoading] = useState(!isBlobUrl);
-  const [isInView, setIsInView] = useState(false);
-  const imgRef = useRef<HTMLDivElement>(null);
-
-  // Intersection Observer для lazy loading
-  useEffect(() => {
-    if (!imgRef.current || loading !== 'lazy') {
-      setIsInView(true);
-      return;
-    }
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            setIsInView(true);
-            observer.disconnect();
-          }
-        });
-      },
-      { rootMargin: '50px' } // Начинаем загрузку за 50px до появления в viewport
-    );
-
-    observer.observe(imgRef.current);
-
-    return () => observer.disconnect();
-  }, [loading]);
-
-  // Сбрасываем isLoading при смене src, если это не blob
-  useEffect(() => {
-    if (!src.startsWith('blob:')) {
-      setIsLoading(true);
-    } else {
-      setIsLoading(false);
-    }
-  }, [src]);
-
-  // Определяем палитру skeleton-loader на основе статуса прочтения
-  const skeletonGradient = isRead
-    ? 'linear-gradient(90deg, rgba(59,130,246,0.3) 0%, rgba(96,165,250,0.5) 50%, rgba(59,130,246,0.3) 100%)' // Синяя палитра
-    : 'linear-gradient(90deg, rgba(64,64,64,0.3) 0%, rgba(115,115,115,0.5) 50%, rgba(64,64,64,0.3) 100%)'; // Стандартная палитра
-
-  // Генерируем URL для блюра, если есть хэш
-  const [blurUrl, setBlurUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (blurHash) {
-      // Здесь можно декодировать ThumbHash в DataURL
-      // Пока просто используем цвет заглушку или можно подключить WASM декодер
-      // Для простоты и скорости, если WASM на клиенте тяжелый, можно использовать CSS background
-    }
-  }, [blurHash]);
-
-  // Вычисляем aspect ratio style
-  const aspectRatioStyle = width && height 
-    ? { aspectRatio: `${width}/${height}` } 
-    : {};
-
-  return (
-    <div
-      className={`relative w-full rounded-lg overflow-hidden bg-neutral-800 ${!width || !height ? (isLoading ? 'aspect-[4/3] min-w-[12rem]' : '') : ''} ${className || ''}`}
-      ref={imgRef}
-      style={aspectRatioStyle}
-    >
-      {hasError ? (
-        <div className="min-h-[160px] flex items-center justify-center p-4">
-          <div className="text-center">
-            <AlertCircle className="w-8 h-8 text-red-400 mx-auto mb-2" />
-            <p className="text-xs text-red-300">Изображение недоступно</p>
-          </div>
-        </div>
-      ) : (
-        <>
-          {isLoading && !isBlobUrl && (
-            <div
-              className="absolute inset-0 rounded-lg"
-              style={{
-                backgroundImage: skeletonGradient,
-                backgroundSize: '200% 100%',
-                backgroundRepeat: 'no-repeat',
-                backgroundPosition: '0% 0%',
-                animation: 'shimmer 1.5s ease-in-out infinite'
-              }}
-            >
-               {/* Если есть blurHash, можно наложить canvas с размытием поверх скелетона */}
-               {blurHash && (
-                 <div className="absolute inset-0 backdrop-blur-xl bg-white/5" />
-               )}
-            </div>
-          )}
-          {isInView && (
-            <img
-              src={src}
-              alt={alt}
-              loading={loading}
-              className={`w-full h-auto max-h-[63vh] object-contain rounded-lg transition-opacity duration-300 ${isLoading ? 'absolute inset-0 opacity-0 pointer-events-none' : 'opacity-100 block'}`}
-              onLoad={() => setIsLoading(false)}
-              onError={() => {
-                setHasError(true);
-                setIsLoading(false);
-              }}
-            />
-          )}
-          {isPending && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/30">
-              <div className="w-8 h-8 border-2 border-white/40 border-t-transparent rounded-full animate-spin" />
-            </div>
-          )}
-        </>
-      )}
-    </div>
-  );
-}
-
-// Компонент для сообщения
-function MessageItem({
-  message,
-  showDate,
-  userData,
-  formatDate,
-  formatTime,
-  isInitialLoad = false,
-  onImageClick
-}: {
-  message: Message;
-  showDate: boolean;
-  userData: UserData | null;
-  formatDate: (date: Date) => string;
-  formatTime: (date: Date) => string;
-  isInitialLoad?: boolean;
-  onImageClick?: (url: string, alt: string) => void;
-}) {
-  const formatFileSize = (bytes: number): string => {
-    if (bytes < 1024) return `${bytes} Б`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} КБ`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} МБ`;
-  };
-
-  // Функция для форматирования размера файла (используется в MessageItem)
-  const formatFileSizeForMessage = (bytes: number): string => {
-    if (bytes < 1024) return `${bytes} Б`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} КБ`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} МБ`;
-  };
-  const messageRef = useRef<HTMLDivElement>(null);
-  const hasAnimatedRef = useRef(false);
-
-  useEffect(() => {
-    // При первой загрузке не анимируем, чтобы избежать дергания
-    if (isInitialLoad) {
-      if (messageRef.current) {
-        gsap.set(messageRef.current, { opacity: 1, y: 0, scale: 1 });
-      }
-      return;
-    }
-
-    // Анимируем только новые сообщения (не при первой загрузке)
-    if (messageRef.current && typeof window !== 'undefined' && !hasAnimatedRef.current) {
-      hasAnimatedRef.current = true;
-      gsap.fromTo(messageRef.current,
-        { opacity: 0, y: 10, scale: 0.95 },
-        { opacity: 1, y: 0, scale: 1, duration: 0.3, ease: "power2.out" }
-      );
-    }
-  }, [message.id, isInitialLoad]);
-
-  const bubbleText = messageTextForBubble(message.text || '', !!(message.attachments && message.attachments.length));
-  // Определяем, является ли сообщение системным
-  const SYSTEM_MESSAGE_TEXT = 'Спасибо за ваше обращение. Мы получили ваш запрос и ответим в ближайшее время.';
-  const messageText = message.text || '';
-  const isStatusChangeMessage = messageText.includes('Статус тикета изменен') ||
-    messageText.includes('Ваше обращение приняли в обработку') ||
-    messageText.includes('Ваше обращение было закрыто');
-  // Системное сообщение определяется по тексту, независимо от sender_type
-  // Используем trim() для надежного сравнения
-  const isSystemMessage = messageText.trim() === SYSTEM_MESSAGE_TEXT.trim() || isStatusChangeMessage;
-
-  return (
-    <div ref={messageRef}>
-      {showDate && (
-        <div className="text-center text-xs text-neutral-500 my-4">
-          {formatDate(message.timestamp)}
-        </div>
-      )}
-      {isSystemMessage ? (
-        <div className="flex flex-col items-start w-full">
-          {/* Заголовок с именем "Система" */}
-          <div className="mb-1 px-1 flex items-baseline gap-1">
-            <span className="text-xs sm:text-sm font-medium text-yellow-400 bg-white/10 px-1.5 sm:px-2 py-0.5 rounded">Система</span>
-          </div>
-
-          {/* Сообщение */}
-          <div className="max-w-[85%] sm:max-w-[70%] min-w-0 flex-shrink-0 rounded-2xl px-3 py-2 sm:px-4 bg-neutral-700/50 text-neutral-300" style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>
-            {bubbleText && (
-              <p className="text-xs sm:text-sm whitespace-pre-wrap break-words">
-                {bubbleText}
-              </p>
-            )}
-            <div className="flex items-center gap-2 text-[10px] sm:text-xs mt-1 text-neutral-400">
-              <span>{formatTime(message.timestamp)}</span>
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div className={`flex flex-col ${message.sender === 'user' ? 'items-end' : 'items-start'}`}>
-          {message.sender === 'user' && userData && (
-            <div className="mb-1 px-1 flex items-baseline gap-1">
-              <span className="text-xs sm:text-sm font-medium text-white bg-white/10 px-1.5 sm:px-2 py-0.5 rounded">{userData.username}</span>
-              <span className="text-[10px] sm:text-xs text-neutral-400">#{userData.user_id}</span>
-            </div>
-          )}
-          {message.sender === 'support' && message.senderData && (
-            <div className="mb-1 px-1 flex items-baseline gap-1">
-              <span className="text-xs sm:text-sm font-medium text-white bg-white/10 px-1.5 sm:px-2 py-0.5 rounded">{message.senderData.username}</span>
-              <span className="text-[10px] sm:text-xs text-white">Поддержка</span>
-            </div>
-          )}
-          <div className={`flex items-end gap-2 ${message.sender === 'user' ? 'flex-row-reverse' : 'flex-row'} w-full`}>
-            {message.sender === 'support' && (
-              <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-full overflow-hidden flex-shrink-0 mb-1 flex items-center justify-center">
-                {message.senderData?.avatar ? (
-                  <Image
-                    src={getAvatarUrl(message.senderData.avatar) || ''}
-                    alt={message.senderData.username || 'Support'}
-                    width={48}
-                    height={48}
-                    className="w-full h-full object-cover"
-                    unoptimized
-                  />
-                ) : (
-                  <div className={`w-full h-full ${getGradientClasses(message.senderData?.avatar)} flex items-center justify-center text-white font-semibold text-xs sm:text-sm`}>
-                    {message.senderData?.username ? message.senderData.username.charAt(0).toUpperCase() : 'S'}
-                  </div>
-                )}
-              </div>
-            )}
-            <div className={`max-w-[85%] sm:max-w-[70%] min-w-0 flex-shrink-0 rounded-2xl px-3 py-2 sm:px-4 ${message.sender === 'user'
-                ? message.isRead !== false
-                  ? 'bg-primary-500 text-white rounded-br-sm'
-                  : 'bg-neutral-600 text-white rounded-br-sm'
-                : 'bg-neutral-800 text-neutral-100 rounded-bl-sm'
-              }`} style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>
-              {bubbleText && (
-                <p className="text-xs sm:text-sm whitespace-pre-wrap break-words">
-                  {bubbleText}
-                </p>
-              )}
-
-              {/* Вложения */}
-              {message.attachments && message.attachments.length > 0 && (() => {
-                const images = message.attachments.filter(a => a.file_type.startsWith('image/'));
-                const documents = message.attachments.filter(a => !a.file_type.startsWith('image/'));
-
-                return (
-                  <div className={`mt-2 space-y-2 ${bubbleText ? 'mt-2' : ''}`}>
-                    {/* Группировка изображений */}
-                    {images.length > 0 && (
-                      <div className={`grid gap-1.5 w-full ${images.length === 1 ? 'max-w-[29rem]' : 'max-w-[37.5rem] grid-cols-2'}`}>
-                        {images.map((attachment) => (
-                          <button
-                            key={attachment.id}
-                            onClick={() => onImageClick?.(attachment.storage_url, attachment.file_name)}
-                            className="block w-full min-w-0 rounded-lg overflow-hidden cursor-pointer hover:opacity-90 transition-opacity"
-                          >
-                            <ImageWithError
-                              src={attachment.storage_url}
-                              alt={attachment.file_name}
-                              className="rounded-lg"
-                              isRead={message.isRead !== false}
-                              blurHash={attachment.blur_hash}
-                              width={attachment.width}
-                              height={attachment.height}
-                              isPending={message.isPending === true}
-                            />
-                          </button>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Документы */}
-                    {documents.length > 0 && (
-                      <div className="space-y-1.5">
-                        {documents.map((attachment) => (
-                          <a
-                            key={attachment.id}
-                            href={attachment.storage_url}
-                            download={attachment.file_name}
-                            className={`flex items-center gap-2 p-2 hover:bg-white/5 transition-colors rounded-lg cursor-pointer ${message.sender === 'user'
-                                ? 'bg-white/10'
-                                : 'bg-neutral-700/50'
-                              }`}
-                          >
-                            <FileText className="w-4 h-4 flex-shrink-0 text-neutral-300" />
-                            <div className="flex-1 min-w-0">
-                              <p className="text-xs font-medium truncate">{attachment.file_name}</p>
-                              <p className="text-[10px] text-neutral-400">{formatFileSize(attachment.file_size)}</p>
-                            </div>
-                          </a>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
-
-              <div className={`text-[10px] sm:text-xs mt-1 ${message.sender === 'user'
-                  ? message.isRead !== false
-                    ? 'text-primary-100'
-                    : 'text-neutral-300'
-                  : 'text-neutral-400'
-                }`}>
-                <span>{formatTime(message.timestamp)}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
 
 export default function SupportPage() {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -503,17 +107,7 @@ export default function SupportPage() {
   const [showFileUploadModal, setShowFileUploadModal] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   // Убрали лишнее состояние uploadingFiles, так как оно больше не нужно для оптимистичного UI в чате
-  const [uploadedFiles, setUploadedFiles] = useState<Array<{
-    fileName: string;
-    fileType: string;
-    fileSize: number;
-    storagePath: string;
-    storageUrl: string;
-    blur_hash?: string;
-    width?: number;
-    height?: number;
-    previewUrl?: string; // Для локального превью
-  }>>([]);
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [filePreviews, setFilePreviews] = useState<Map<string, string>>(new Map());
   const [fileErrors, setFileErrors] = useState<Set<string>>(new Set());
   const [viewingImage, setViewingImage] = useState<{ url: string; alt: string } | null>(null);
@@ -914,9 +508,49 @@ export default function SupportPage() {
     }) => {
       if (data.ticketId !== activeTicketRef.current?.id) return;
 
-      // Проверяем, что сообщение еще не добавлено (используем ref для актуальных данных)
-      const messageExists = activeTicketMessagesRef.current.some(m => m.id === data.message.id);
-      if (messageExists) return;
+      // Проверяем, что сообщение уже существует (optimistic UI)
+      const existingMessage = activeTicketMessagesRef.current.find(m => m.id === data.message.id);
+      
+      // Если сообщение уже существует (optimistic), обновляем его (убираем isPending)
+      if (existingMessage) {
+        startTransition(() => {
+          setActiveTicket(prev => {
+            if (!prev || prev.id !== data.ticketId) return prev;
+            
+            const updatedMessages = prev.messages.map(m => 
+              m.id === data.message.id 
+                ? { 
+                    ...m, 
+                    isPending: false, 
+                    isRead: data.message.is_read,
+                    // Обновляем вложения с серверными данными (включая blur_hash, width, height)
+                    attachments: data.message.attachments && data.message.attachments.length > 0
+                      ? data.message.attachments.map((att: any) => ({
+                          id: att.id,
+                          file_name: att.file_name,
+                          file_type: att.file_type,
+                          file_size: att.file_size,
+                          storage_path: att.storage_path,
+                          storage_url: att.storage_url || (att.storage_path
+                            ? `/support/files/${encodeURIComponent(att.storage_path)}`
+                            : ''),
+                          blur_hash: att.blur_hash,
+                          width: att.width,
+                          height: att.height
+                        }))
+                      : m.attachments
+                  } 
+                : m
+            );
+            
+            activeTicketMessagesRef.current = updatedMessages;
+            saveMessagesToCache(data.ticketId, updatedMessages);
+            
+            return { ...prev, messages: updatedMessages };
+          });
+        });
+        return;
+      }
 
       // Оптимизация: объединяем обновления состояния в один переход
       const newMessage: Message = {
@@ -926,7 +560,7 @@ export default function SupportPage() {
         timestamp: new Date(data.message.created_at),
         isRead: data.message.is_read,
         senderData: data.message.sender,
-        // Вложения уже правильно сформированы на сервере при broadcast, используем как есть
+        // Вложения с полными метаданными (включая blur_hash, width, height)
         attachments: data.message.attachments && Array.isArray(data.message.attachments) && data.message.attachments.length > 0
           ? data.message.attachments.map((att: any) => ({
             id: att.id,
@@ -936,7 +570,10 @@ export default function SupportPage() {
             storage_path: att.storage_path,
             storage_url: att.storage_url || (att.storage_path
               ? `/support/files/${encodeURIComponent(att.storage_path)}`
-              : '')
+              : ''),
+            blur_hash: att.blur_hash,
+            width: att.width,
+            height: att.height
           }))
           : undefined,
       };
@@ -1923,6 +1560,41 @@ export default function SupportPage() {
         // Отмечаем сообщение как загруженное
         loadedMessagesRef.current.add(optimisticMessage.id);
 
+        // Сразу после успешного ответа сервера обновляем сообщение:
+        // - Убираем isPending (сообщение доставлено)
+        // - Обновляем attachments с серверными данными (blur_hash, width, height, правильные id)
+        setTimeout(() => {
+          setActiveTicket(prev => {
+            if (!prev) return prev;
+            
+            const serverAttachments = data.message.attachments || [];
+            const updatedMessages = prev.messages.map(m => {
+              if (m.id !== data.message.id) return m;
+              
+              return {
+                ...m,
+                isPending: false,
+                attachments: serverAttachments.length > 0 
+                  ? serverAttachments.map((att: any) => ({
+                      id: att.id,
+                      file_name: att.file_name,
+                      file_type: att.file_type,
+                      file_size: att.file_size,
+                      storage_path: att.storage_path,
+                      storage_url: att.storage_url || `/support/files/${encodeURIComponent(att.storage_path)}`,
+                      blur_hash: att.blur_hash,
+                      width: att.width,
+                      height: att.height
+                    }))
+                  : m.attachments
+              };
+            });
+            
+            activeTicketMessagesRef.current = updatedMessages;
+            return { ...prev, messages: updatedMessages };
+          });
+        }, 100); // Небольшая задержка чтобы optimistic сообщение успело отрендериться
+
         // Отмечаем сообщения как прочитанные
         markMessagesAsRead(activeTicket.id);
 
@@ -2104,6 +1776,9 @@ export default function SupportPage() {
               file_size: number;
               storage_url: string;
               storage_path?: string;
+              blur_hash?: string;
+              width?: number;
+              height?: number;
             }>;
           }) => ({
             id: m.id,
@@ -2523,83 +2198,28 @@ export default function SupportPage() {
                 </div>
 
                 {!isSupport && (
-                  <div
-                    ref={newTicketFormRef}
-                    className={`mb-4 p-3 bg-neutral-800/50 rounded-xl flex-shrink-0 space-y-3 ${!showNewTicketForm ? 'hidden' : ''}`}
-                    style={!showNewTicketForm ? { height: 0, marginBottom: 0, opacity: 0, overflow: 'hidden' } : {}}
-                  >
-                    <div>
-                      <input
-                        ref={subjectInputRef}
-                        type="text"
-                        value={newTicketSubject}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          if (value.length <= TICKET_SUBJECT_MAX_LENGTH) {
-                            setNewTicketSubject(value);
-                          } else {
-                            showNotification(`Максимальная длина темы: ${TICKET_SUBJECT_MAX_LENGTH} символов`);
-                            triggerShake('subject');
-                          }
-                        }}
-                        placeholder="Тема обращения.."
-                        className="w-full px-3 py-2 bg-neutral-900 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-primary-500"
-                        onKeyPress={(e) => {
-                          if (e.key === 'Enter' && !e.shiftKey) {
-                            e.preventDefault();
-                            // Не создаем тикет по Enter, только переходим к полю сообщения
-                          }
-                        }}
-                        autoFocus
-                      />
-                      <div className="text-xs text-neutral-500 mt-1 text-right">
-                        {newTicketSubject.length}/{TICKET_SUBJECT_MAX_LENGTH}
-                      </div>
-                    </div>
-                    <div>
-                      <textarea
-                        value={newTicketMessage}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          if (value.length <= MESSAGE_MAX_LENGTH) {
-                            setNewTicketMessage(value);
-                          } else {
-                            showNotification(`Максимальная длина сообщения: ${MESSAGE_MAX_LENGTH} символов`);
-                            triggerShake('message');
-                          }
-                        }}
-                        placeholder="Опишите свою проблему.."
-                        rows={3}
-                        className="w-full px-3 py-2 bg-neutral-900 border border-white/10 rounded-lg text-white text-sm placeholder-neutral-500 focus:outline-none focus:border-primary-500 resize-none"
-                        onKeyPress={(e) => {
-                          if (e.key === 'Enter' && e.ctrlKey) {
-                            e.preventDefault();
-                            handleCreateTicket();
-                          }
-                        }}
-                      />
-                      <div className="text-xs text-neutral-500 mt-1 text-right">
-                        {newTicketMessage.length}/{MESSAGE_MAX_LENGTH}
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={handleCreateTicket}
-                        disabled={!newTicketSubject.trim() || !newTicketMessage.trim() || isCreatingTicket}
-                        className="flex-1 px-3 py-1.5 bg-primary-500 hover:bg-primary-400 disabled:bg-neutral-700 disabled:text-neutral-500 text-white text-sm rounded-lg transition-colors"
-                      >
-                        {isCreatingTicket ? 'Создание...' : 'Создать'}
-                      </button>
-                      <button
-                        onClick={() => {
-                          setShowNewTicketForm(false);
-                          // Поля очистятся автоматически после анимации
-                        }}
-                        className="px-3 py-1.5 bg-neutral-700 hover:bg-neutral-600 text-white text-sm rounded-lg transition-colors"
-                      >
-                        Отмена
-                      </button>
-                    </div>
+                  <div ref={newTicketFormRef}>
+                    <CreateTicketForm
+                      subject={newTicketSubject}
+                      message={newTicketMessage}
+                      onSubjectChange={setNewTicketSubject}
+                      onMessageChange={setNewTicketMessage}
+                      onSubmit={handleCreateTicket}
+                      onCancel={() => setShowNewTicketForm(false)}
+                      isCreating={isCreatingTicket}
+                      maxSubjectLength={TICKET_SUBJECT_MAX_LENGTH}
+                      maxMessageLength={MESSAGE_MAX_LENGTH}
+                      onMaxSubjectLengthExceeded={() => {
+                        showNotification(`Максимальная длина темы: ${TICKET_SUBJECT_MAX_LENGTH} символов`);
+                        triggerShake('subject');
+                      }}
+                      onMaxMessageLengthExceeded={() => {
+                        showNotification(`Максимальная длина сообщения: ${MESSAGE_MAX_LENGTH} символов`);
+                        triggerShake('message');
+                      }}
+                      variant="inline"
+                      isVisible={showNewTicketForm}
+                    />
                   </div>
                 )}
 
@@ -2622,91 +2242,34 @@ export default function SupportPage() {
                   ) : (
                     <div className="flex flex-col gap-2">
                       {tickets.map((ticket) => (
-                        <button
+                        <TicketListItem
                           key={ticket.id}
+                          ticket={ticket}
+                          isActive={activeTicket?.id === ticket.id}
                           onClick={async () => {
-                            // Предотвращаем клик на уже выбранный тикет
-                            if (activeTicket?.id === ticket.id) {
-                              return;
-                            }
-
-                            // Сразу загружаем сообщения при выборе тикета (даже если закрыт)
+                            if (activeTicket?.id === ticket.id) return;
+                            
                             const ticketData = {
                               id: ticket.id,
                               subject: ticket.subject,
                               status: ticket.status,
                               createdAt: ticket.createdAt,
-                              user_id: ticket.user_id, // Сохраняем user_id для проверки прав
+                              user_id: ticket.user_id,
                               messages: []
                             };
                             setActiveTicket(ticketData);
-                            // Сохраняем ID последнего открытого тикета
                             if (typeof window !== 'undefined') {
                               localStorage.setItem('support_last_ticket_id', ticket.id);
                             }
-                            // Сбрасываем счетчик сообщений при смене тикета
                             setMessagesSentCount(0);
                             setLastMessageTime(null);
                             setTimeoutSeconds(0);
-                            // Загружаем сообщения асинхронно с восстановлением позиции скролла
                             await fetchTicketMessages(ticket.id, 25, 0, true);
                           }}
-                          disabled={activeTicket?.id === ticket.id}
-                          className={`w-full text-left p-3 rounded-xl transition-colors ${activeTicket?.id === ticket.id
-                              ? ticket.status === 'open'
-                                ? 'bg-green-500/20 border border-green-500/50 cursor-default'
-                                : ticket.status === 'pending'
-                                  ? 'bg-yellow-500/20 border border-yellow-500/50 cursor-default'
-                                  : 'bg-red-500/20 border border-red-500/50 cursor-default'
-                              : 'bg-neutral-800/50 hover:bg-neutral-800 border border-transparent'
-                            }`}
-                        >
-                          <div className="flex items-start justify-between mb-1">
-                            <span className="text-sm font-medium text-white truncate flex-1">
-                              {ticket.subject}
-                            </span>
-                            <span className={`ml-2 px-2 py-0.5 text-xs rounded ${ticket.status === 'open'
-                                ? 'bg-green-500/20 text-green-400'
-                                : ticket.status === 'pending'
-                                  ? 'bg-yellow-500/20 text-yellow-400'
-                                  : 'bg-neutral-700 text-neutral-400'
-                              }`}>
-                              {ticket.status === 'open' ? 'Открыт' : ticket.status === 'pending' ? 'В работе' : 'Закрыт'}
-                            </span>
-                          </div>
-                          <div className="flex items-center justify-between mt-1">
-                            <div className="text-xs text-neutral-400 flex-1 min-w-0">
-                              {formatDate(ticket.createdAt)}, {formatTime(ticket.createdAt)}
-                            </div>
-                          </div>
-                          {ticket.last_message && ticket.status !== 'closed' && (() => {
-                            const SYSTEM_MESSAGE_TEXT = 'Спасибо за ваше обращение. Мы получили ваш запрос и ответим в ближайшее время.';
-                            const lastMessageText = ticket.last_message.message_text || '';
-                            const isStatusChangeMessage = lastMessageText.includes('Статус тикета изменен') ||
-                              lastMessageText.includes('Ваше обращение приняли в обработку') ||
-                              lastMessageText.includes('Ваше обращение было закрыто');
-                            // Используем trim() для надежного сравнения
-                            const isSystemMessage = lastMessageText.trim() === SYSTEM_MESSAGE_TEXT.trim() || isStatusChangeMessage;
-
-                            return (
-                              <div className="text-xs text-neutral-500 mt-1.5">
-                                <div className="truncate flex items-center gap-2">
-                                  <span className="flex-shrink-0 text-neutral-600">
-                                    {isSystemMessage ? 'Система:' : ticket.last_message.sender_type === 'user' ? 'Вы:' : 'Поддержка:'}
-                                  </span>
-                                  <span className="truncate flex-1 min-w-0">
-                                    {normalizeLastMessageDisplayText(ticket.last_message.message_text || '') || '—'}
-                                  </span>
-                                  {ticket.last_message.is_read === false && ticket.last_message.sender_type === 'support' && !isSystemMessage && (
-                                    <span className="flex-shrink-0 w-2 h-2 bg-blue-500 rounded-full"></span>
-                                  )}
-                                </div>
-                              </div>
-                            );
-                          })()}
-                        </button>
-                      ))
-                      }
+                          formatDate={formatDate}
+                          formatTime={formatTime}
+                        />
+                      ))}
                     </div>
                   )}
                 </div>
@@ -2719,34 +2282,13 @@ export default function SupportPage() {
                 {activeTicket ? (
                   <>
                     <div ref={chatAreaRef} className="flex-1 flex flex-col min-h-0 overflow-hidden transition-opacity duration-200">
-                      <div className="p-3 sm:p-4 border-b border-white/10 flex-shrink-0">
-                        <div className="flex items-center justify-between gap-2">
-                          {/* Кнопка возврата к списку на мобильных; на ПК при свёрнутой панели — развернуть список */}
-                          <button
-                            onClick={() => sidebarCollapsed ? toggleSidebarCollapsed() : setActiveTicket(null)}
-                            className={`${sidebarCollapsed ? 'lg:flex' : 'lg:hidden'} mr-2 p-1.5 text-neutral-400 hover:text-white transition-colors rounded-lg hover:bg-white/5`}
-                            aria-label={sidebarCollapsed ? 'Показать список тикетов' : 'Вернуться к списку тикетов'}
-                          >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                            </svg>
-                          </button>
-                          <div className="min-w-0 flex-1">
-                            <h3 className="text-sm sm:text-lg font-semibold truncate">{activeTicket.subject}</h3>
-                            <p className="text-xs sm:text-sm text-neutral-400">
-                              Создан {formatDateShort(activeTicket.createdAt)}
-                            </p>
-                          </div>
-                          <span className={`px-3 py-1 text-xs rounded-full ${activeTicket.status === 'open'
-                              ? 'bg-green-500/20 text-green-400'
-                              : activeTicket.status === 'pending'
-                                ? 'bg-yellow-500/20 text-yellow-400'
-                                : 'bg-neutral-700 text-neutral-400'
-                            }`}>
-                            {activeTicket.status === 'open' ? 'Открыт' : activeTicket.status === 'pending' ? 'В работе' : 'Закрыт'}
-                          </span>
-                        </div>
-                      </div>
+                      <ChatHeader
+                        ticket={activeTicket}
+                        sidebarCollapsed={sidebarCollapsed}
+                        onToggleSidebar={toggleSidebarCollapsed}
+                        onBack={() => setActiveTicket(null)}
+                        formatDateShort={formatDateShort}
+                      />
 
                       <div
                         ref={messagesContainerRef}
@@ -2807,116 +2349,38 @@ export default function SupportPage() {
                         </div>
                       </div>
 
-                      <div className="p-2 sm:p-4 border-t border-white/10 flex-shrink-0">
-                        {activeTicket.status === 'closed' ? (
-                          <div className="text-center py-4 px-4 bg-neutral-800/50 border border-neutral-700 rounded-xl">
-                            <p className="text-neutral-400 text-sm">Этот тикет закрыт. Вы не можете отправлять сообщения в закрытые тикеты.</p>
-                          </div>
-                        ) : isSupport && activeTicket.user_id && userData?.id && (activeTicket.user_id === userData.id || activeTicket.user_id === userData.user_id) ? (
-                          <div className="text-center py-4 px-4 bg-neutral-800/50 border border-neutral-700 rounded-xl">
-                            <p className="text-neutral-400 text-sm">Вы не можете отправлять сообщения в свои старые тикеты.</p>
-                          </div>
-                        ) : (
-                          <>
-                            {/* Список загруженных файлов */}
-                            {uploadedFiles.length > 0 && (
-                              <div className="mb-2 flex flex-wrap gap-2">
-                                {uploadedFiles.map((file, index) => {
-                                  const isImage = file.fileType.startsWith('image/');
-
-                                  return (
-                                    <div
-                                      key={index}
-                                      className="flex items-center gap-2 px-3 py-1.5 bg-neutral-800/50 rounded-lg border border-white/10 text-sm"
-                                    >
-                                      {isImage ? (
-                                        <ImageIcon className="w-4 h-4 text-blue-400 flex-shrink-0" />
-                                      ) : (
-                                        <FileText className="w-4 h-4 text-neutral-400 flex-shrink-0" />
-                                      )}
-                                      <span className="text-neutral-300 truncate max-w-[150px]">{file.fileName}</span>
-                                      <button
-                                        onClick={() => {
-                                          setUploadedFiles(prev => prev.filter((_, i) => i !== index));
-                                          setFilePreviews(prev => {
-                                            const newMap = new Map(prev);
-                                            newMap.delete(file.storageUrl);
-                                            return newMap;
-                                          });
-                                          setFileErrors(prev => {
-                                            const newSet = new Set(prev);
-                                            newSet.delete(file.storageUrl);
-                                            return newSet;
-                                          });
-                                        }}
-                                        className="p-1 hover:bg-red-500/20 rounded transition-colors"
-                                        aria-label="Удалить файл"
-                                      >
-                                        <X className="w-3 h-3 text-red-400" />
-                                      </button>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            )}
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => setShowFileUploadModal(true)}
-                                disabled={timeoutSeconds > 0 || isSendingMessage || uploadedFiles.length >= 2}
-                                className="px-3 py-2 bg-neutral-700 hover:bg-neutral-600 disabled:bg-neutral-800 disabled:text-neutral-500 text-white rounded-xl transition-colors text-sm sm:text-base flex-shrink-0"
-                                title="Прикрепить файл"
-                                aria-label="Прикрепить файл"
-                              >
-                                <Paperclip className="w-5 h-5" />
-                              </button>
-                              <div className="flex-1 relative">
-                                <input
-                                  ref={messageInputRef}
-                                  type="text"
-                                  value={messageText}
-                                  onChange={(e) => {
-                                    const value = e.target.value;
-                                    if (value.length <= MESSAGE_MAX_LENGTH) {
-                                      setMessageText(value);
-                                    } else {
-                                      showNotification(`Максимальная длина сообщения: ${MESSAGE_MAX_LENGTH} символов`);
-                                      triggerShake('message');
-                                    }
-                                  }}
-                                  onKeyPress={(e) => {
-                                    if (e.key === 'Enter' && !e.shiftKey && !isSendingMessage) {
-                                      handleSendMessage();
-                                    }
-                                  }}
-                                  placeholder={timeoutSeconds > 0 ? "Ожидание.." : "Напишите сообщение..."}
-                                  disabled={timeoutSeconds > 0}
-                                  className="w-full min-w-0 px-3 py-2 sm:px-4 text-sm sm:text-base bg-neutral-800 border border-white/10 rounded-xl text-white focus:outline-none focus:border-primary-500 disabled:opacity-50 pr-10"
-                                />
-                                {timeoutSeconds === 0 && (
-                                  <div className="absolute bottom-1 right-3 text-[10px] text-neutral-500">
-                                    {messageText.length}/{MESSAGE_MAX_LENGTH}
-                                  </div>
-                                )}
-                                {timeoutSeconds > 0 && (
-                                  <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 text-neutral-400">
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
-                                    <span className="text-xs font-medium">{timeoutSeconds}с</span>
-                                  </div>
-                                )}
-                              </div>
-                              <button
-                                onClick={handleSendMessage}
-                                disabled={(!messageText.trim() && uploadedFiles.length === 0) || timeoutSeconds > 0 || isSendingMessage}
-                                className="px-4 sm:px-6 py-2 bg-primary-500 hover:bg-primary-400 disabled:bg-neutral-700 text-white rounded-xl transition-colors text-sm sm:text-base"
-                              >
-                                {isSendingMessage ? 'Отправка...' : 'Отправить'}
-                              </button>
-                            </div>
-                          </>
-                        )}
-                      </div>
+                      <MessageInput
+                        messageText={messageText}
+                        onMessageChange={setMessageText}
+                        onSend={handleSendMessage}
+                        onAttachClick={() => setShowFileUploadModal(true)}
+                        uploadedFiles={uploadedFiles}
+                        onRemoveFile={(index) => {
+                          const file = uploadedFiles[index];
+                          setUploadedFiles(prev => prev.filter((_, i) => i !== index));
+                          if (file) {
+                            setFilePreviews(prev => {
+                              const newMap = new Map(prev);
+                              newMap.delete(file.storageUrl);
+                              return newMap;
+                            });
+                            setFileErrors(prev => {
+                              const newSet = new Set(prev);
+                              newSet.delete(file.storageUrl);
+                              return newSet;
+                            });
+                          }
+                        }}
+                        isSending={isSendingMessage}
+                        timeoutSeconds={timeoutSeconds}
+                        isTicketClosed={activeTicket.status === 'closed'}
+                        isSupportOwnTicket={isSupport && activeTicket.user_id !== undefined && userData?.id !== undefined && (activeTicket.user_id === userData.id || activeTicket.user_id === userData.user_id)}
+                        maxLength={MESSAGE_MAX_LENGTH}
+                        onMaxLengthExceeded={() => {
+                          showNotification(`Максимальная длина сообщения: ${MESSAGE_MAX_LENGTH} символов`);
+                          triggerShake('message');
+                        }}
+                      />
                     </div>
                   </>
                 ) : (

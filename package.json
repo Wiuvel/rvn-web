@@ -5,8 +5,8 @@
   "scripts": {
     "dev": "node server.js",
     "dev:next": "next dev --turbopack",
-    "build": "npm run build:wasm || echo 'WASM build failed, skipping...' && next build",
-    "build:wasm": "cd wasm && wasm-pack build --target web --out-dir ../lib/wasm/pkg",
+    "build": "next build",
+    "build:wasm": "cd wasm && wasm-pack build --target nodejs --out-dir ../lib/wasm/pkg",
     "start": "node server.js",
     "start:next": "next start",
     "lint": "eslint"
@@ -34,6 +34,7 @@
     "socket.io": "^4.8.3",
     "socket.io-client": "^4.8.3",
     "tailwind-merge": "^3.4.0",
+    "thumbhash": "^0.1.1",
     "zod": "^4.3.6"
   },
   "devDependencies": {

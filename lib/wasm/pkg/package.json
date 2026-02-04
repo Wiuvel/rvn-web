@@ -1,6 +1,5 @@
 {
   "name": "image-processor-wasm",
-  "type": "module",
   "description": "WASM image processor (resize) for Next.js media cache",
   "version": "0.1.0",
   "license": "MIT",
@@ -10,8 +9,5 @@
     "image_processor_wasm.d.ts"
   ],
   "main": "image_processor_wasm.js",
-  "types": "image_processor_wasm.d.ts",
-  "sideEffects": [
-    "./snippets/*"
-  ]
+  "types": "image_processor_wasm.d.ts"
 }

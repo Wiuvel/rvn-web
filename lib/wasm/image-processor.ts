@@ -15,6 +15,11 @@ export interface ProcessImageOptions {
 // Type definition for the WASM module exports
 interface WasmModule {
   resize_image: (input: Uint8Array, width: number, height: number) => Uint8Array;
+  generate_thumbhash: (input: Uint8Array) => {
+    width?: number;
+    height?: number;
+    thumbhash?: string;
+  };
 }
 
 let wasmModule: WasmModule | null = null;
@@ -27,34 +32,26 @@ async function loadWasmPkg(): Promise<WasmModule> {
   if (wasmModule) return wasmModule;
 
   try {
-    // 1. Try standard dynamic import (works in most bundled environments if configured correctly)
-    // @ts-ignore - The pkg directory is generated at build time
-    const pkg = await import('./pkg/image_processor_wasm.js');
+    const cwd = process.cwd();
+    const pkgPath = path.join(cwd, 'lib', 'wasm', 'pkg', 'image_processor_wasm.js');
+    const require = createRequire(path.join(cwd, 'package.json'));
+    const pkg = require(pkgPath);
     if (pkg && typeof pkg.resize_image === 'function') {
       wasmModule = pkg;
       return pkg;
     }
-    throw new Error('Invalid WASM module structure via import');
-  } catch (importError) {
-    // 2. Fallback: Load from filesystem (reliable in Next.js Server Actions / API routes)
-    // This handles cases where the bundler doesn't resolve the relative import correctly at runtime
+    throw new Error('Invalid WASM module structure via require');
+  } catch (fsError) {
     try {
-      const cwd = process.cwd();
-      // Construct path: [project_root]/lib/wasm/pkg/image_processor_wasm.js
-      // Ensure this path matches your build output structure
-      const pkgPath = path.join(cwd, 'lib', 'wasm', 'pkg', 'image_processor_wasm.js');
-      
-      const require = createRequire(path.join(cwd, 'package.json'));
-      const pkg = require(pkgPath);
-      
+      // @ts-ignore - The pkg directory is generated at build time
+      const pkg = await import('./pkg/image_processor_wasm.js');
       if (pkg && typeof pkg.resize_image === 'function') {
         wasmModule = pkg;
         return pkg;
       }
-      throw new Error('Invalid WASM module structure via require');
-    } catch (fsError) {
-      // Combine errors for better debugging
-      throw new Error(`Failed to load WASM module. Import error: ${importError}. FS error: ${fsError}`);
+      throw new Error('Invalid WASM module structure via import');
+    } catch (importError) {
+      throw new Error(`Failed to load WASM module. FS error: ${fsError}. Import error: ${importError}`);
     }
   }
 }
@@ -110,5 +107,24 @@ export async function processImage(
     // Log the error but don't crash the request
     console.error('[WASM] Image processing failed (returning original):', error);
     return buffer;
+  }
+}
+
+export async function generateThumbhash(buffer: Buffer): Promise<{
+  thumbhash: string | null;
+  width: number | null;
+  height: number | null;
+}> {
+  try {
+    const mod = await loadWasmPkg();
+    const result = mod.generate_thumbhash(new Uint8Array(buffer));
+    return {
+      thumbhash: result?.thumbhash ?? null,
+      width: result?.width ?? null,
+      height: result?.height ?? null,
+    };
+  } catch (error) {
+    console.error('[WASM] Thumbhash generation failed:', error);
+    return { thumbhash: null, width: null, height: null };
   }
 }

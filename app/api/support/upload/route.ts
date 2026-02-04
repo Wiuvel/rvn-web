@@ -5,6 +5,7 @@ import { getUserByToken } from '@/lib/auth/index';
 import { setCorsHeaders, handleCorsPreflight } from '@/lib/security/cors';
 import { generalRateLimit } from '@/lib/security/rate-limit';
 import { supabaseAdmin } from '@/lib/database/supabase';
+import { generateThumbhash } from '@/lib/wasm/image-processor';
 
 const MAX_FILES_PER_REQUEST = 2; // Максимум 2 файла за раз
 
@@ -116,16 +117,6 @@ export async function POST(request: NextRequest) {
     // Получаем FormData
     const formData = await request.formData();
     const files = formData.getAll('files') as File[];
-    const metadataRaw = formData.get('metadata') as string;
-    let metadata: Record<string, any> = {};
-
-    try {
-      if (metadataRaw) {
-        metadata = JSON.parse(metadataRaw);
-      }
-    } catch (e) {
-      console.warn('Failed to parse metadata', e);
-    }
 
     if (!files || files.length === 0) {
       return setCorsHeaders(
@@ -169,13 +160,28 @@ export async function POST(request: NextRequest) {
       const arrayBuffer = await file.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
 
+      // Генерируем ThumbHash и размер изображения на сервере (Node/WASM),
+      // чтобы не зависеть от клиентского WASM и не тянуть `fs` в браузерный бандл.
+      let blurHash: string | null = null;
+      let width: number | null = null;
+      let height: number | null = null;
+
+      if (file.type.startsWith('image/')) {
+        try {
+          const result = await generateThumbhash(buffer);
+          blurHash = result.thumbhash;
+          width = result.width;
+          height = result.height;
+        } catch (e) {
+          console.warn('Failed to generate thumbhash on server for', file.name, e);
+        }
+      }
+
       // Генерируем путь для хранения
       const storagePath = generateStoragePath(ticketId, file.name);
 
       // Загружаем в S3
       const fileUrl = await uploadFileToS3(buffer, storagePath, file.type);
-
-      const fileMetadata = metadata[file.name] || {};
 
       uploadResults.push({
         fileName: file.name,
@@ -183,9 +189,9 @@ export async function POST(request: NextRequest) {
         fileSize: file.size,
         storagePath,
         storageUrl: `/support/files/${encodeURIComponent(storagePath)}`, // Используем endpoint для авторизованного доступа
-        blur_hash: fileMetadata.blur_hash || null,
-        width: fileMetadata.width || null,
-        height: fileMetadata.height || null,
+        blur_hash: blurHash,
+        width,
+        height,
       });
     }
 

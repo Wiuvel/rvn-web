@@ -61,19 +61,8 @@ export default function FileUploadModal({
   const isCaptchaOpenRef = useRef(false);
   const isProcessingCaptchaRef = useRef(false);
   const pendingUploadRef = useRef<{ files: File[] } | null>(null);
-  const [isWasmLoaded, setIsWasmLoaded] = useState(false);
-  const wasmRef = useRef<any>(null);
-
-  useEffect(() => {
-    // Предзагрузка WASM модуля
-    import('@/lib/wasm/pkg/image_processor_wasm')
-      .then(async (module) => {
-        await module.default(); // Инициализация WASM для target web
-        wasmRef.current = module;
-        setIsWasmLoaded(true);
-      })
-      .catch(console.error);
-  }, []);
+  // Убрали предзагрузку WASM на клиенте, чтобы избежать проблем с Turbopack и node-модулем `fs` в браузерном бандле.
+  // thumbhash/blur теперь не генерируется на клиенте (можно реализовать серверную генерацию при необходимости).
 
   useEffect(() => {
     if (typeof window === 'undefined' || !modalRef.current || !backdropRef.current) return;
@@ -125,21 +114,44 @@ export default function FileUploadModal({
     }
   }, [isOpen]);
 
+  // Храним метаданные изображений (width, height, previewUrl)
+  const [imageMeta, setImageMeta] = useState<Map<string, { width: number; height: number; previewUrl: string }>>(new Map());
+
   useEffect(() => {
     const newPreviews = new Map<string, string>();
     
     selectedFiles.forEach((file) => {
       if (file.type.startsWith('image/')) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          if (e.target?.result) {
-            newPreviews.set(file.name, e.target.result as string);
-            setPreviews(new Map(newPreviews));
-          }
+        // Создаём blob URL для превью
+        const blobUrl = URL.createObjectURL(file);
+        newPreviews.set(file.name, blobUrl);
+        setPreviews(new Map(newPreviews));
+        
+        // Получаем width/height изображения
+        const img = new Image();
+        img.onload = () => {
+          setImageMeta(prev => {
+            const updated = new Map(prev);
+            updated.set(file.name, {
+              width: img.naturalWidth,
+              height: img.naturalHeight,
+              previewUrl: blobUrl
+            });
+            return updated;
+          });
         };
-        reader.readAsDataURL(file);
+        img.src = blobUrl;
       }
     });
+    
+    // Cleanup old blob URLs
+    return () => {
+      newPreviews.forEach((url) => {
+        if (url.startsWith('blob:')) {
+          URL.revokeObjectURL(url);
+        }
+      });
+    };
   }, [selectedFiles]);
 
   const processFiles = (files: FileList | File[]) => {
@@ -274,43 +286,28 @@ export default function FileUploadModal({
 
   const performUpload = async (filesToUpload: File[]) => {
     const formData = new FormData();
-    const metadata: Record<string, any> = {};
-    const localPreviews: Record<string, string> = {};
-
-    // Загружаем WASM модуль, если еще не загружен
-    let wasm = wasmRef.current;
-    if (!wasm) {
-      const module = await import('@/lib/wasm/pkg/image_processor_wasm');
-      await module.default();
-      wasm = module;
-      wasmRef.current = module;
-    }
+    const localFileData: Record<string, { previewUrl: string; width?: number; height?: number }> = {};
 
     for (const file of filesToUpload) {
       formData.append('files', file);
 
-      // Генерируем ThumbHash для изображений
+      // Собираем локальные данные изображения (превью + размеры)
       if (file.type.startsWith('image/')) {
-        try {
-          const buffer = await file.arrayBuffer();
-          const result = wasm.generate_thumbhash(new Uint8Array(buffer));
-          
-          metadata[file.name] = {
-            blur_hash: result.thumbhash,
-            width: result.width,
-            height: result.height
+        const meta = imageMeta.get(file.name);
+        if (meta) {
+          localFileData[file.name] = {
+            previewUrl: meta.previewUrl,
+            width: meta.width,
+            height: meta.height
           };
-
-          // Создаем blob URL для локального превью
-          localPreviews[file.name] = URL.createObjectURL(file);
-        } catch (err) {
-          console.warn('Failed to generate thumbhash for', file.name, err);
+        } else {
+          // Fallback если meta еще не загружена
+          localFileData[file.name] = {
+            previewUrl: URL.createObjectURL(file)
+          };
         }
       }
     }
-
-    // Добавляем метаданные в FormData
-    formData.append('metadata', JSON.stringify(metadata));
 
     const response = await fetch(`/api/support/upload?ticketId=${ticketId}`, {
       method: 'POST',
@@ -338,12 +335,18 @@ export default function FileUploadModal({
       throw new Error(data.error || 'Ошибка загрузки файлов');
     }
 
-    // Обогащаем ответ локальными превью (для мгновенного отображения)
+    // Обогащаем ответ локальными данными (превью + размеры для мгновенного отображения)
     if (data.success && data.files) {
-      data.files = data.files.map((f: any) => ({
-        ...f,
-        previewUrl: localPreviews[f.fileName]
-      }));
+      data.files = data.files.map((f: any) => {
+        const localData = localFileData[f.fileName];
+        return {
+          ...f,
+          previewUrl: localData?.previewUrl,
+          // Используем локальные размеры если сервер не вернул
+          width: f.width || localData?.width,
+          height: f.height || localData?.height
+        };
+      });
     }
 
     return data;

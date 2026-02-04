@@ -127,7 +127,7 @@ export async function GET(
       .select(`
         *,
         sender:users!support_messages_sender_id_fkey(id, username, user_id, avatar),
-        attachments:support_message_attachments(id, file_name, file_type, file_size, storage_path)
+        attachments:support_message_attachments(id, file_name, file_type, file_size, storage_path, blur_hash, width, height)
       `)
       .eq('ticket_id', ticketId)
       .order('created_at', { ascending: true })
@@ -189,7 +189,11 @@ export async function GET(
             // Формируем URL только из storage_path (единственный источник истины)
             storage_url: att.storage_path 
               ? `/support/files/${encodeURIComponent(att.storage_path)}` 
-              : ''
+              : '',
+            // Metadata для blur preview и правильного размера
+            blur_hash: att.blur_hash,
+            width: att.width,
+            height: att.height
           }));
         }
       }
