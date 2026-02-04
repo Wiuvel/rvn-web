@@ -116,6 +116,16 @@ export async function POST(request: NextRequest) {
     // Получаем FormData
     const formData = await request.formData();
     const files = formData.getAll('files') as File[];
+    const metadataRaw = formData.get('metadata') as string;
+    let metadata: Record<string, any> = {};
+
+    try {
+      if (metadataRaw) {
+        metadata = JSON.parse(metadataRaw);
+      }
+    } catch (e) {
+      console.warn('Failed to parse metadata', e);
+    }
 
     if (!files || files.length === 0) {
       return setCorsHeaders(
@@ -165,12 +175,17 @@ export async function POST(request: NextRequest) {
       // Загружаем в S3
       const fileUrl = await uploadFileToS3(buffer, storagePath, file.type);
 
+      const fileMetadata = metadata[file.name] || {};
+
       uploadResults.push({
         fileName: file.name,
         fileType: file.type,
         fileSize: file.size,
         storagePath,
         storageUrl: `/support/files/${encodeURIComponent(storagePath)}`, // Используем endpoint для авторизованного доступа
+        blur_hash: fileMetadata.blur_hash || null,
+        width: fileMetadata.width || null,
+        height: fileMetadata.height || null,
       });
     }
 

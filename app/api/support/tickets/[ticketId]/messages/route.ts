@@ -293,6 +293,9 @@ export async function POST(
         fileName: string;
         fileType: string;
         fileSize: number;
+        blur_hash?: string;
+        width?: number;
+        height?: number;
       }) => ({
         message_id: newMessage.id,
         file_name: att.fileName,
@@ -300,6 +303,9 @@ export async function POST(
         file_size: att.fileSize,
         storage_path: att.storagePath,
         storage_url: `/support/files/${encodeURIComponent(att.storagePath)}`, // Используем endpoint для авторизованного доступа
+        blur_hash: att.blur_hash || null,
+        width: att.width || null,
+        height: att.height || null,
       }));
 
       const { error: attachmentsError } = await supabaseAdmin
@@ -337,13 +343,16 @@ export async function POST(
         file_type: string;
         file_size: number;
         storage_path: string;
+        blur_hash?: string;
+        width?: number;
+        height?: number;
       }> = [];
       
       if (attachments && Array.isArray(attachments) && attachments.length > 0) {
         // Получаем вложения из базы данных
         const { data: dbAttachments } = await supabaseAdmin
           .from('support_message_attachments')
-          .select('id, file_name, file_type, file_size, storage_path')
+          .select('id, file_name, file_type, file_size, storage_path, blur_hash, width, height')
           .eq('message_id', newMessage.id);
         
         if (dbAttachments && dbAttachments.length > 0) {
@@ -353,6 +362,9 @@ export async function POST(
             file_type: att.file_type,
             file_size: att.file_size,
             storage_path: att.storage_path,
+            blur_hash: att.blur_hash,
+            width: att.width,
+            height: att.height,
           }));
         }
       }
@@ -365,7 +377,10 @@ export async function POST(
             file_type: att.file_type,
             file_size: att.file_size,
             storage_path: att.storage_path,
-            storage_url: `/support/files/${encodeURIComponent(att.storage_path)}`
+            storage_url: `/support/files/${encodeURIComponent(att.storage_path)}`,
+            blur_hash: att.blur_hash,
+            width: att.width,
+            height: att.height,
           }))
         : undefined;
 

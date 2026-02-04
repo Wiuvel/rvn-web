@@ -10,7 +10,11 @@ crate-type = ["cdylib"]
 
 [dependencies]
 wasm-bindgen = "0.2"
+serde = { version = "1.0", features = ["derive"] }
+serde-wasm-bindgen = "0.4"
 image = { version = "0.24", default-features = false, features = ["png", "jpeg", "gif"] }
+thumbhash = "0.1.0"
+base64 = "0.21"
 
 # Optimization for size and speed
 [profile.release]

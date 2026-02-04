@@ -32,6 +32,9 @@ interface MessageAttachment {
   file_size: number;
   storage_url: string;
   storage_path?: string; // Опционально, для формирования URL из пути
+  blur_hash?: string;
+  width?: number;
+  height?: number;
 }
 
 interface Message {
@@ -40,6 +43,9 @@ interface Message {
   sender: 'user' | 'support';
   timestamp: Date;
   isRead?: boolean;
+  // Локальный флаг для оптимистичных сообщений, которые еще отправляются
+  // Используется для показа оверлея-лоадера поверх изображения
+  isPending?: boolean;
   senderData?: {
     id: string;
     username: string;
@@ -80,16 +86,27 @@ function ImageWithError({
   alt,
   className,
   loading = 'lazy',
-  isRead = false
+  isRead = false,
+  blurHash,
+  width,
+  height,
+  isPending = false
 }: {
   src: string;
   alt: string;
   className?: string;
   loading?: 'lazy' | 'eager';
   isRead?: boolean;
+  blurHash?: string;
+  width?: number;
+  height?: number;
+  // Флаг "сообщение отправляется" – показываем поверх изображения отдельный оверлей-лоадер
+  isPending?: boolean;
 }) {
   const [hasError, setHasError] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  // Если это blob URL (локальное превью), считаем что загрузка не нужна или уже выполнена
+  const isBlobUrl = src.startsWith('blob:');
+  const [isLoading, setIsLoading] = useState(!isBlobUrl);
   const [isInView, setIsInView] = useState(false);
   const imgRef = useRef<HTMLDivElement>(null);
 
@@ -117,15 +134,41 @@ function ImageWithError({
     return () => observer.disconnect();
   }, [loading]);
 
+  // Сбрасываем isLoading при смене src, если это не blob
+  useEffect(() => {
+    if (!src.startsWith('blob:')) {
+      setIsLoading(true);
+    } else {
+      setIsLoading(false);
+    }
+  }, [src]);
+
   // Определяем палитру skeleton-loader на основе статуса прочтения
   const skeletonGradient = isRead
     ? 'linear-gradient(90deg, rgba(59,130,246,0.3) 0%, rgba(96,165,250,0.5) 50%, rgba(59,130,246,0.3) 100%)' // Синяя палитра
     : 'linear-gradient(90deg, rgba(64,64,64,0.3) 0%, rgba(115,115,115,0.5) 50%, rgba(64,64,64,0.3) 100%)'; // Стандартная палитра
 
+  // Генерируем URL для блюра, если есть хэш
+  const [blurUrl, setBlurUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (blurHash) {
+      // Здесь можно декодировать ThumbHash в DataURL
+      // Пока просто используем цвет заглушку или можно подключить WASM декодер
+      // Для простоты и скорости, если WASM на клиенте тяжелый, можно использовать CSS background
+    }
+  }, [blurHash]);
+
+  // Вычисляем aspect ratio style
+  const aspectRatioStyle = width && height 
+    ? { aspectRatio: `${width}/${height}` } 
+    : {};
+
   return (
     <div
-      className={`relative w-full rounded-lg overflow-hidden bg-neutral-800 ${isLoading ? 'aspect-[4/3] min-w-[12rem]' : ''} ${className || ''}`}
+      className={`relative w-full rounded-lg overflow-hidden bg-neutral-800 ${!width || !height ? (isLoading ? 'aspect-[4/3] min-w-[12rem]' : '') : ''} ${className || ''}`}
       ref={imgRef}
+      style={aspectRatioStyle}
     >
       {hasError ? (
         <div className="min-h-[160px] flex items-center justify-center p-4">
@@ -136,7 +179,7 @@ function ImageWithError({
         </div>
       ) : (
         <>
-          {isLoading && (
+          {isLoading && !isBlobUrl && (
             <div
               className="absolute inset-0 rounded-lg"
               style={{
@@ -146,7 +189,12 @@ function ImageWithError({
                 backgroundPosition: '0% 0%',
                 animation: 'shimmer 1.5s ease-in-out infinite'
               }}
-            />
+            >
+               {/* Если есть blurHash, можно наложить canvas с размытием поверх скелетона */}
+               {blurHash && (
+                 <div className="absolute inset-0 backdrop-blur-xl bg-white/5" />
+               )}
+            </div>
           )}
           {isInView && (
             <img
@@ -160,6 +208,11 @@ function ImageWithError({
                 setIsLoading(false);
               }}
             />
+          )}
+          {isPending && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+              <div className="w-8 h-8 border-2 border-white/40 border-t-transparent rounded-full animate-spin" />
+            </div>
           )}
         </>
       )}
@@ -322,6 +375,10 @@ function MessageItem({
                               alt={attachment.file_name}
                               className="rounded-lg"
                               isRead={message.isRead !== false}
+                              blurHash={attachment.blur_hash}
+                              width={attachment.width}
+                              height={attachment.height}
+                              isPending={message.isPending === true}
                             />
                           </button>
                         ))}
@@ -444,12 +501,18 @@ export default function SupportPage() {
     return localStorage.getItem('support_sidebar_collapsed') === 'true';
   });
   const [showFileUploadModal, setShowFileUploadModal] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  // Убрали лишнее состояние uploadingFiles, так как оно больше не нужно для оптимистичного UI в чате
   const [uploadedFiles, setUploadedFiles] = useState<Array<{
     fileName: string;
     fileType: string;
     fileSize: number;
     storagePath: string;
     storageUrl: string;
+    blur_hash?: string;
+    width?: number;
+    height?: number;
+    previewUrl?: string; // Для локального превью
   }>>([]);
   const [filePreviews, setFilePreviews] = useState<Map<string, string>>(new Map());
   const [fileErrors, setFileErrors] = useState<Set<string>>(new Set());
@@ -524,7 +587,10 @@ export default function SupportPage() {
             storage_path: att.storage_path,
             storage_url: att.storage_url || (att.storage_path
               ? `/support/files/${encodeURIComponent(att.storage_path)}`
-              : '')
+              : ''),
+            blur_hash: att.blur_hash,
+            width: att.width,
+            height: att.height
           }))
           : undefined
       }));
@@ -1122,6 +1188,9 @@ export default function SupportPage() {
                 file_type: string;
                 file_size: number;
                 storage_url: string;
+                blur_hash?: string;
+                width?: number;
+                height?: number;
               }>;
             }) => ({
               id: m.id,
@@ -1821,6 +1890,7 @@ export default function SupportPage() {
           sender: 'user' as const,
           timestamp: new Date(),
           isRead: false,
+          isPending: true,
           senderData: userData ? {
             id: userData.id,
             username: userData.username,
@@ -1831,7 +1901,10 @@ export default function SupportPage() {
             file_name: f.fileName,
             file_type: f.fileType,
             file_size: f.fileSize,
-            storage_url: f.storageUrl
+            storage_url: f.previewUrl || f.storageUrl,
+            blur_hash: f.blur_hash,
+            width: f.width,
+            height: f.height
           })) : []
         };
 
@@ -2055,7 +2128,10 @@ export default function SupportPage() {
                 storage_path: att.storage_path,
                 storage_url: att.storage_url || (att.storage_path
                   ? `/api/support/files/${encodeURIComponent(att.storage_path)}`
-                  : '')
+                  : ''),
+                blur_hash: att.blur_hash,
+                width: att.width,
+                height: att.height
               }))
               : undefined
           }));
@@ -2991,8 +3067,9 @@ export default function SupportPage() {
             // Генерируем превью для изображений
             files.forEach((file) => {
               if (file.fileType.startsWith('image/')) {
-                // Превью будет загружено из storageUrl
-                setFilePreviews(prev => new Map(prev).set(file.storageUrl, file.storageUrl));
+                // Если есть локальное превью (blob), сохраняем его
+                const preview = file.previewUrl || file.storageUrl;
+                setFilePreviews(prev => new Map(prev).set(file.storageUrl, preview));
               }
             });
             setShowFileUploadModal(false);

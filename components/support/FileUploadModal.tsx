@@ -27,6 +27,10 @@ interface UploadedFile {
   fileSize: number;
   storagePath: string;
   storageUrl: string;
+  blur_hash?: string;
+  width?: number;
+  height?: number;
+  previewUrl?: string; // Для локального отображения
 }
 
 interface FileUploadModalProps {
@@ -57,6 +61,19 @@ export default function FileUploadModal({
   const isCaptchaOpenRef = useRef(false);
   const isProcessingCaptchaRef = useRef(false);
   const pendingUploadRef = useRef<{ files: File[] } | null>(null);
+  const [isWasmLoaded, setIsWasmLoaded] = useState(false);
+  const wasmRef = useRef<any>(null);
+
+  useEffect(() => {
+    // Предзагрузка WASM модуля
+    import('@/lib/wasm/pkg/image_processor_wasm')
+      .then(async (module) => {
+        await module.default(); // Инициализация WASM для target web
+        wasmRef.current = module;
+        setIsWasmLoaded(true);
+      })
+      .catch(console.error);
+  }, []);
 
   useEffect(() => {
     if (typeof window === 'undefined' || !modalRef.current || !backdropRef.current) return;
@@ -257,9 +274,43 @@ export default function FileUploadModal({
 
   const performUpload = async (filesToUpload: File[]) => {
     const formData = new FormData();
-    filesToUpload.forEach((file) => {
+    const metadata: Record<string, any> = {};
+    const localPreviews: Record<string, string> = {};
+
+    // Загружаем WASM модуль, если еще не загружен
+    let wasm = wasmRef.current;
+    if (!wasm) {
+      const module = await import('@/lib/wasm/pkg/image_processor_wasm');
+      await module.default();
+      wasm = module;
+      wasmRef.current = module;
+    }
+
+    for (const file of filesToUpload) {
       formData.append('files', file);
-    });
+
+      // Генерируем ThumbHash для изображений
+      if (file.type.startsWith('image/')) {
+        try {
+          const buffer = await file.arrayBuffer();
+          const result = wasm.generate_thumbhash(new Uint8Array(buffer));
+          
+          metadata[file.name] = {
+            blur_hash: result.thumbhash,
+            width: result.width,
+            height: result.height
+          };
+
+          // Создаем blob URL для локального превью
+          localPreviews[file.name] = URL.createObjectURL(file);
+        } catch (err) {
+          console.warn('Failed to generate thumbhash for', file.name, err);
+        }
+      }
+    }
+
+    // Добавляем метаданные в FormData
+    formData.append('metadata', JSON.stringify(metadata));
 
     const response = await fetch(`/api/support/upload?ticketId=${ticketId}`, {
       method: 'POST',
@@ -285,6 +336,14 @@ export default function FileUploadModal({
 
     if (!response.ok) {
       throw new Error(data.error || 'Ошибка загрузки файлов');
+    }
+
+    // Обогащаем ответ локальными превью (для мгновенного отображения)
+    if (data.success && data.files) {
+      data.files = data.files.map((f: any) => ({
+        ...f,
+        previewUrl: localPreviews[f.fileName]
+      }));
     }
 
     return data;
