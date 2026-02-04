@@ -10,6 +10,9 @@ import { domains, getStaticUrl } from "@/lib/utils";
 import MaintenanceGuard from "@/components/layout/MaintenanceGuard";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
 
+// Force dynamic rendering to support maintenance mode checks via headers/cookies
+export const dynamic = 'force-dynamic';
+
 // Генерируем URL для favicon
 const getFaviconUrl = (path: string) => getStaticUrl(path);
 
