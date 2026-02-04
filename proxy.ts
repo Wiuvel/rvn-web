@@ -384,9 +384,10 @@ async function handleProtection(request: NextRequest, pathname: string): Promise
  * Auth Proxy - handles authentication and authorization
  * @param request - The Next.js request object
  * @param pathname - The request pathname
+ * @param requestHeaders - Headers to pass to the response
  * @returns NextResponse with redirect or null to allow/deny access
  */
-function handleAuth(request: NextRequest, pathname: string): NextResponse | null {
+function handleAuth(request: NextRequest, pathname: string, requestHeaders: Headers): NextResponse | null {
   const isAuthenticated = request.cookies.get('user_authenticated')?.value === 'true';
   const dashboardToken = request.cookies.get('dashboard_token')?.value;
 
@@ -399,7 +400,7 @@ function handleAuth(request: NextRequest, pathname: string): NextResponse | null
       pathname === '/auth/oauth-callback' ||
       pathname.startsWith('/auth/oauth-callback/')
     ) {
-      const response = NextResponse.next();
+      const response = NextResponse.next({ request: { headers: requestHeaders } });
       applySecurityHeaders(response, false);
       return response;
     }
@@ -417,7 +418,7 @@ function handleAuth(request: NextRequest, pathname: string): NextResponse | null
       return response;
     }
 
-    const response = NextResponse.next();
+    const response = NextResponse.next({ request: { headers: requestHeaders } });
     applySecurityHeaders(response, false);
     return response;
   }
@@ -446,7 +447,7 @@ function handleAuth(request: NextRequest, pathname: string): NextResponse | null
       return response;
     }
 
-    const response = NextResponse.next();
+    const response = NextResponse.next({ request: { headers: requestHeaders } });
     applySecurityHeaders(response, false);
     return response;
   }
@@ -459,21 +460,21 @@ function handleAuth(request: NextRequest, pathname: string): NextResponse | null
       applySecurityHeaders(response, false);
       return response;
     }
-    const response = NextResponse.next();
+    const response = NextResponse.next({ request: { headers: requestHeaders } });
     applySecurityHeaders(response, false);
     return response;
   }
 
   /** Admin panel - requires admin authentication */
   if (pathname.startsWith('/ui/panel/admin')) {
-    const response = NextResponse.next();
+    const response = NextResponse.next({ request: { headers: requestHeaders } });
     applySecurityHeaders(response, false);
     return response;
   }
 
   /** Public support page - no auth required */
   if (pathname === '/support' || pathname.startsWith('/support/')) {
-    const response = NextResponse.next();
+    const response = NextResponse.next({ request: { headers: requestHeaders } });
     applySecurityHeaders(response, false);
     return response;
   }
@@ -498,12 +499,17 @@ export async function proxy(request: NextRequest) {
   const userAgent = request.headers.get('user-agent') || '';
   const isStatic = isStaticFile(pathname);
 
+  // Create headers with x-url and x-pathname
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set('x-url', request.url);
+  requestHeaders.set('x-pathname', pathname);
+
   /** 
    * Ранний выход для статических файлов, API маршрутов и разрешенных ботов
    * Это оптимизирует производительность, избегая ненужных проверок
    */
   if (shouldBypassProxy(pathname, userAgent, hostname)) {
-    const response = NextResponse.next();
+    const response = NextResponse.next({ request: { headers: requestHeaders } });
     // Применяем CORS заголовки для статических файлов
     if (isStatic) {
       applySecurityHeaders(response, true, request);
@@ -524,7 +530,7 @@ export async function proxy(request: NextRequest) {
    * 2. Auth Proxy - проверка аутентификации и авторизации
    * Защищает приватные маршруты (dashboard, панели управления)
    */
-  const authResponse = handleAuth(request, pathname);
+  const authResponse = handleAuth(request, pathname, requestHeaders);
   if (authResponse) {
     return authResponse;
   }
@@ -533,7 +539,7 @@ export async function proxy(request: NextRequest) {
    * Дефолтный ответ для публичных страниц
    * Применяем security headers для всех ответов
    */
-  const response = NextResponse.next();
+  const response = NextResponse.next({ request: { headers: requestHeaders } });
   applySecurityHeaders(response, false);
   return response;
 }

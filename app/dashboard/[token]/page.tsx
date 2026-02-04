@@ -150,17 +150,15 @@ function QuickAction({
   return <button onClick={onClick} className={className}>{content}</button>;
 }
 
+import { NotificationsWidget } from '@/components/navigation/Notifications';
+
 export default function DashboardPage() {
   const [open, setOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [shouldRenderMenu, setShouldRenderMenu] = useState(false);
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const [shouldRenderNotificationsMenu, setShouldRenderNotificationsMenu] = useState(false);
   const [userData, setUserData] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
   const [currentYear] = useState(new Date().getFullYear());
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [readNotifications, setReadNotifications] = useState<Set<string>>(new Set());
   const [showAvatarModal, setShowAvatarModal] = useState(false);
   const [showBannerModal, setShowBannerModal] = useState(false);
   const [avatarLoading, setAvatarLoading] = useState(true);
@@ -169,8 +167,6 @@ export default function DashboardPage() {
   const token = params?.token as string;
   const userMenuRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-  const notificationsMenuRef = useRef<HTMLDivElement>(null);
-  const notificationsMenuContainerRef = useRef<HTMLDivElement>(null);
   
   const heroRef = useFadeIn(0.1) as React.RefObject<HTMLDivElement>;
   const statsRef = useStaggeredFadeIn(0.2, 0.08) as React.RefObject<HTMLDivElement>;
@@ -320,15 +316,6 @@ export default function DashboardPage() {
     return { label: 'Пользователь', color: 'text-neutral-400' };
   };
 
-  // Инициализация уведомлений
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const storedRead = localStorage.getItem('readNotifications');
-    const readSet = storedRead ? new Set<string>(JSON.parse(storedRead)) : new Set<string>();
-    setReadNotifications(readSet);
-    setNotifications([]);
-  }, []);
-
   // Обработка меню пользователя
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -363,70 +350,6 @@ export default function DashboardPage() {
     };
   }, [userMenuOpen]);
 
-  // Блокировка скролла
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    
-    if (notificationsOpen) {
-      document.body.style.overflow = 'hidden';
-    } else if (!userMenuOpen) {
-      document.body.style.overflow = '';
-    }
-
-    return () => {
-      if (!userMenuOpen) {
-        document.body.style.overflow = '';
-      }
-    };
-  }, [notificationsOpen, userMenuOpen]);
-
-  // Взаимное закрытие меню
-  useEffect(() => {
-    if (notificationsOpen && userMenuOpen) {
-      setUserMenuOpen(false);
-    }
-  }, [notificationsOpen, userMenuOpen]);
-
-  useEffect(() => {
-    if (userMenuOpen && notificationsOpen) {
-      setNotificationsOpen(false);
-    }
-  }, [userMenuOpen, notificationsOpen]);
-
-  // Анимация меню уведомлений
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    
-    if (notificationsOpen) {
-      setShouldRenderNotificationsMenu(true);
-      requestAnimationFrame(() => {
-        if (notificationsMenuContainerRef.current) {
-          gsap.set(notificationsMenuContainerRef.current, {
-            opacity: 0,
-            y: -10,
-            scale: 0.95
-          });
-          gsap.to(notificationsMenuContainerRef.current, {
-            opacity: 1,
-            y: 0,
-            scale: 1,
-            duration: 0.2,
-            ease: "power2.out"
-          });
-        }
-      });
-    } else if (shouldRenderNotificationsMenu && notificationsMenuContainerRef.current) {
-      gsap.to(notificationsMenuContainerRef.current, {
-        opacity: 0,
-        y: -10,
-        scale: 0.95,
-        duration: 0.15,
-        ease: "power2.in",
-        onComplete: () => setShouldRenderNotificationsMenu(false)
-      });
-    }
-  }, [notificationsOpen, shouldRenderNotificationsMenu]);
-
   // Клики вне меню
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -437,12 +360,9 @@ export default function DashboardPage() {
       if (userMenuOpen && userMenuRef.current && !userMenuRef.current.contains(target)) {
         setUserMenuOpen(false);
       }
-      if (notificationsOpen && notificationsMenuRef.current && !notificationsMenuRef.current.contains(target)) {
-        setNotificationsOpen(false);
-      }
     };
 
-    if (userMenuOpen || notificationsOpen) {
+    if (userMenuOpen) {
       const timeoutId = setTimeout(() => {
         document.addEventListener('mousedown', handleClickOutside);
       }, 0);
@@ -452,19 +372,7 @@ export default function DashboardPage() {
         document.removeEventListener('mousedown', handleClickOutside);
       };
     }
-  }, [userMenuOpen, notificationsOpen]);
-
-  const markNotificationAsRead = (notificationId: string) => {
-    const newReadSet = new Set(readNotifications);
-    newReadSet.add(notificationId);
-    setReadNotifications(newReadSet);
-    
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('readNotifications', JSON.stringify(Array.from(newReadSet)));
-    }
-  };
-
-  const hasUnreadNotifications = notifications.some(n => !readNotifications.has(n.id));
+  }, [userMenuOpen]);
 
   if (loading) {
     return <LoadingSpinner />;
@@ -489,79 +397,7 @@ export default function DashboardPage() {
             </nav>
             {userData && (
               <div className="hidden lg:flex items-center gap-2 relative" ref={userMenuRef}>
-                <div className="relative" ref={notificationsMenuRef}>
-                  <button
-                    onClick={() => setNotificationsOpen(!notificationsOpen)}
-                    className="w-10 h-10 rounded-full bg-neutral-800/60 hover:bg-neutral-700/60 flex items-center justify-center text-white/80 hover:text-white transition-all duration-200 hover:scale-110 cursor-pointer mr-2"
-                    title="Уведомления"
-                    aria-label="Уведомления"
-                    aria-expanded={notificationsOpen}
-                  >
-                    <Image 
-                      src={hasUnreadNotifications ? "/static/icons/accounts/bell-dot.svg" : "/static/icons/accounts/bell.svg"} 
-                      alt="Уведомления" 
-                      width={18} 
-                      height={18} 
-                      className="w-[18px] h-[18px]"
-                    />
-                  </button>
-                  {shouldRenderNotificationsMenu && (
-                    <div 
-                      ref={notificationsMenuContainerRef}
-                      className="absolute -right-3 top-full mt-4 w-80 bg-neutral-900/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-xl overflow-hidden z-50"
-                    >
-                      <div className="p-4 border-b border-white/10 mx-2">
-                        <h3 className="text-white font-semibold text-sm">Уведомления</h3>
-                      </div>
-                      <div className="max-h-96 overflow-y-auto">
-                        {notifications.length === 0 ? (
-                          <div className="p-4 text-center text-neutral-400 text-sm">
-                            Нет уведомлений
-                          </div>
-                        ) : (
-                          <div className="py-2">
-                            {notifications.map((notification) => {
-                              const isRead = readNotifications.has(notification.id);
-                              return (
-                                <div
-                                  key={notification.id}
-                                  onClick={() => markNotificationAsRead(notification.id)}
-                                  className={`px-4 py-3 mx-2 my-1 rounded-xl cursor-pointer transition-colors duration-200 ${
-                                    !isRead 
-                                      ? 'bg-blue-500/10 hover:bg-blue-500/20 border-l-2 border-blue-500' 
-                                      : 'hover:bg-white/5'
-                                  }`}
-                                >
-                                  <div className="flex items-start gap-3">
-                                    {!isRead && (
-                                      <div className="w-2 h-2 rounded-full bg-blue-500 mt-2 flex-shrink-0"></div>
-                                    )}
-                                    <div className="flex-1 min-w-0">
-                                      <div className="text-white font-medium text-sm mb-1">
-                                        {notification.title}
-                                      </div>
-                                      <div className="text-neutral-400 text-xs">
-                                        {notification.message}
-                                      </div>
-                                      <div className="text-neutral-500 text-xs mt-1">
-                                        {new Date(notification.created_at).toLocaleDateString('ru-RU', {
-                                          day: 'numeric',
-                                          month: 'short',
-                                          hour: '2-digit',
-                                          minute: '2-digit'
-                                        })}
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
+                <NotificationsWidget />
                 {(() => {
                   const avatarUrl = getAvatarUrl(userData?.avatar);
                   const gradientClasses = getGradientClasses(userData?.avatar);

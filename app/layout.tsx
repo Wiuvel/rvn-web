@@ -7,6 +7,8 @@ import { pageMetadata } from "@/lib/utils/seo";
 import { exo2 } from "./fonts";
 import HomeStructuredData from "@/components/seo/HomeStructuredData";
 import { domains, getStaticUrl } from "@/lib/utils";
+import MaintenanceGuard from "@/components/layout/MaintenanceGuard";
+import LoadingSpinner from "@/components/ui/LoadingSpinner";
 
 // Генерируем URL для favicon
 const getFaviconUrl = (path: string) => getStaticUrl(path);
@@ -37,12 +39,16 @@ export default function RootLayout({
   return (
     <html lang="ru" className={`h-full scroll-smooth dark ${exo2.variable}`} data-scroll-behavior="smooth">
       <body className={`h-full bg-neutral-950 text-neutral-100 antialiased relative ${exo2.className}`}>
-        <HomeStructuredData />
-        <SmoothScroll />
-        <Suspense fallback={<main className="min-h-screen" />}>
-          <ConditionalLayout>
-            {children}
-          </ConditionalLayout>
+        <Suspense fallback={<LoadingSpinner fullScreen />}>
+          <MaintenanceGuard>
+            <HomeStructuredData />
+            <SmoothScroll />
+            <Suspense fallback={<main className="min-h-screen" />}>
+              <ConditionalLayout>
+                {children}
+              </ConditionalLayout>
+            </Suspense>
+          </MaintenanceGuard>
         </Suspense>
       </body>
     </html>

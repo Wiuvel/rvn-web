@@ -8,7 +8,7 @@ import { gsap } from 'gsap';
 import { Notification } from '@/types';
 import { useAuth } from '@/hooks/useAuth';
 import { UserMenu } from '@/components/navigation/UserMenu';
-import { NotificationsMenu } from '@/components/navigation/Notifications';
+import { NotificationsWidget } from '@/components/navigation/Notifications';
 import { GSAP_DEFAULT_DURATION, GSAP_DEFAULT_EASE } from '@/lib/utils/constants';
 import { getGradientClasses, getAvatarUrl } from '@/lib/utils/avatar-gradients';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
@@ -26,15 +26,10 @@ interface HeaderProps {
 export default function Header({ variant = 'main' }: HeaderProps = {}) {
   const [open, setOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [readNotifications, setReadNotifications] = useState<Set<string>>(new Set());
   const [avatarLoading, setAvatarLoading] = useState(true);
   const [mobileAvatarLoading, setMobileAvatarLoading] = useState(true);
   const userMenuRef = useRef<HTMLDivElement | null>(null);
-  const notificationsMenuRef = useRef<HTMLDivElement | null>(null);
   const userMenuButtonRef = useRef<HTMLButtonElement | null>(null);
-  const notificationsButtonRef = useRef<HTMLButtonElement | null>(null);
   const spinnerRef = useRef<HTMLDivElement>(null);
   const mobileSpinnerRef = useRef<HTMLDivElement>(null);
   const avatarLoadFallbackRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -134,11 +129,6 @@ export default function Header({ variant = 'main' }: HeaderProps = {}) {
 
     // Загружаем прочитанные уведомления из localStorage
     const storedRead = localStorage.getItem('readNotifications');
-    const readSet = storedRead ? new Set<string>(JSON.parse(storedRead)) : new Set<string>();
-    setReadNotifications(readSet);
-
-    // Пока уведомления пустые, в будущем можно загружать с сервера
-    setNotifications([]);
   }, []);
 
   // Убрали GSAP анимации для спиннера, чтобы избежать прыжков layout
@@ -147,7 +137,7 @@ export default function Header({ variant = 'main' }: HeaderProps = {}) {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
-    if (userMenuOpen || notificationsOpen) {
+    if (userMenuOpen) {
       // Блокируем скролл
       document.body.style.overflow = 'hidden';
     } else {
@@ -161,38 +151,7 @@ export default function Header({ variant = 'main' }: HeaderProps = {}) {
         document.body.style.overflow = '';
       }
     };
-  }, [userMenuOpen, notificationsOpen]);
-
-  // Взаимное закрытие меню - закрываем другое меню при открытии нового
-  useEffect(() => {
-    // Если открывается меню уведомлений, закрываем меню пользователя
-    if (notificationsOpen && userMenuOpen) {
-      setUserMenuOpen(false);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [notificationsOpen]); // Срабатывает только при изменении notificationsOpen
-
-  useEffect(() => {
-    // Если открывается меню пользователя, закрываем меню уведомлений
-    if (userMenuOpen && notificationsOpen) {
-      setNotificationsOpen(false);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userMenuOpen]); // Срабатывает только при изменении userMenuOpen
-  
-  // Функция для отметки уведомления как прочитанного
-  const markNotificationAsRead = (notificationId: string) => {
-    const newReadSet = new Set(readNotifications);
-    newReadSet.add(notificationId);
-    setReadNotifications(newReadSet);
-    
-    // Сохраняем в localStorage
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('readNotifications', JSON.stringify(Array.from(newReadSet)));
-    }
-  };
-
-  // Анимации меню теперь обрабатываются в компонентах UserMenu и NotificationsMenu
+  }, [userMenuOpen]);
 
   // Закрытие меню при клике вне его
   useEffect(() => {
@@ -205,21 +164,15 @@ export default function Header({ variant = 'main' }: HeaderProps = {}) {
       if (userMenuButtonRef.current && userMenuButtonRef.current.contains(target)) {
         return; // Клик на кнопке пользователя - не закрываем, onClick обработает
       }
-      if (notificationsButtonRef.current && notificationsButtonRef.current.contains(target)) {
-        return; // Клик на кнопке уведомлений - не закрываем, onClick обработает
-      }
       
       // Проверяем, что клик был вне контейнера меню
       // Закрываем только то меню, которое действительно открыто
       if (userMenuOpen && userMenuRef.current && !userMenuRef.current.contains(target)) {
         setUserMenuOpen(false);
       }
-      if (notificationsOpen && notificationsMenuRef.current && !notificationsMenuRef.current.contains(target)) {
-        setNotificationsOpen(false);
-      }
     };
 
-    if (userMenuOpen || notificationsOpen) {
+    if (userMenuOpen) {
       // Используем небольшую задержку, чтобы onClick кнопки успел сработать первым
       const timeoutId = setTimeout(() => {
         document.addEventListener('click', handleClickOutside, true);
@@ -230,10 +183,7 @@ export default function Header({ variant = 'main' }: HeaderProps = {}) {
         document.removeEventListener('click', handleClickOutside, true);
       };
     }
-  }, [userMenuOpen, notificationsOpen]);
-
-  // Проверка наличия непрочитанных уведомлений
-  const hasUnreadNotifications = notifications.some(n => !readNotifications.has(n.id));
+  }, [userMenuOpen]);
 
   const getInitial = (username: string) => {
     return username.charAt(0).toUpperCase();
@@ -325,36 +275,7 @@ export default function Header({ variant = 'main' }: HeaderProps = {}) {
                 ></div>
               ) : userData ? (
                 <div className="flex items-center gap-2">
-                  <div className="relative" ref={notificationsMenuRef}>
-                    <button
-                      ref={notificationsButtonRef}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setNotificationsOpen(!notificationsOpen);
-                      }}
-                      className="w-10 h-10 rounded-full bg-neutral-800/60 hover:bg-neutral-700/60 flex items-center justify-center text-white/80 hover:text-white transition-all duration-200 hover:scale-110 cursor-pointer flex-shrink-0"
-                      title="Уведомления"
-                      aria-label="Уведомления"
-                      aria-expanded={notificationsOpen}
-                    >
-                      <Image 
-                        src={hasUnreadNotifications ? getStaticUrl("/static/icons/accounts/bell-dot.svg") : getStaticUrl("/static/icons/accounts/bell.svg")} 
-                        alt="Уведомления" 
-                        width={18} 
-                        height={18} 
-                        className="w-[18px] h-[18px]"
-                      />
-                    </button>
-                    <NotificationsMenu
-                      notifications={notifications}
-                      readNotifications={readNotifications}
-                      isOpen={notificationsOpen}
-                      onClose={() => setNotificationsOpen(false)}
-                      onMarkAsRead={markNotificationAsRead}
-                      menuRef={notificationsMenuRef}
-                      isMobile={false}
-                    />
-                  </div>
+                  <NotificationsWidget />
                   {(() => {
                     const avatarUrl = getAvatarUrl(userData.avatar);
                     const gradientClasses = getGradientClasses(userData.avatar);
@@ -449,36 +370,10 @@ export default function Header({ variant = 'main' }: HeaderProps = {}) {
           <div className="lg:hidden flex items-center gap-2">
             {/* Кнопка уведомлений для мобильных - только для авторизированных пользователей */}
             {!loading && userData && (
-              <button
-                ref={notificationsButtonRef}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  // Закрываем мобильное меню при открытии уведомлений
-                  if (open) {
-                    setOpen(false);
-                  }
-                  setNotificationsOpen(!notificationsOpen);
-                }}
-                className="w-10 h-10 rounded-full bg-neutral-800/60 hover:bg-neutral-700/60 flex items-center justify-center text-white/80 hover:text-white transition-all duration-200 hover:scale-110 cursor-pointer flex-shrink-0"
-                title="Уведомления"
-                aria-label="Уведомления"
-                aria-expanded={notificationsOpen}
-              >
-                <Image 
-                  src={hasUnreadNotifications ? getStaticUrl("/static/icons/accounts/bell-dot.svg") : getStaticUrl("/static/icons/accounts/bell.svg")} 
-                  alt="Уведомления" 
-                  width={18} 
-                  height={18} 
-                  className="w-[18px] h-[18px]"
-                />
-              </button>
+              <NotificationsWidget isMobile={true} />
             )}
             <button 
               onClick={() => {
-                // Закрываем меню уведомлений при открытии мобильного меню
-                if (notificationsOpen) {
-                  setNotificationsOpen(false);
-                }
                 setOpen(!open);
               }} 
               className="p-2 text-white/80 hover:text-white transition-colors duration-300" 
@@ -496,20 +391,8 @@ export default function Header({ variant = 'main' }: HeaderProps = {}) {
             </button>
           </div>
         </div>
-        {/* Мобильное меню уведомлений */}
-        {notificationsOpen && (
-          <NotificationsMenu
-            notifications={notifications}
-            readNotifications={readNotifications}
-            isOpen={notificationsOpen}
-            onClose={() => setNotificationsOpen(false)}
-            onMarkAsRead={markNotificationAsRead}
-            menuRef={notificationsMenuRef}
-            isMobile={true}
-          />
-        )}
         {/* Мобильное меню профиля */}
-        {open && !notificationsOpen && (
+        {open && (
           <div className="lg:hidden mt-4 py-4 bg-black/50 backdrop-blur-xl rounded-2xl border border-white/10">
             <div className="px-4 space-y-2">
               {loading ? (

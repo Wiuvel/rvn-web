@@ -1,87 +1,114 @@
 /**
- * Обёртка над WASM-модулем обработки изображений (docs/IMAGE_CACHE_IMPLEMENTATION_PLAN.md, Фаза 2).
- * При отсутствии или ошибке WASM возвращает исходный буфер (fallback).
- * Только относительный импорт — без process.cwd(), иначе Turbopack резолвит ./ROOT/... и падает.
+ * Wrapper around the WASM image processing module.
+ * Provides resizing capabilities with graceful fallback to the original buffer.
  */
+
+import { console } from 'inspector';
+import path from 'path';
+import { createRequire } from 'module';
 
 export interface ProcessImageOptions {
   width?: number;
   height?: number;
 }
 
-let wasmModule: {
+// Type definition for the WASM module exports
+interface WasmModule {
   resize_image: (input: Uint8Array, width: number, height: number) => Uint8Array;
-} | null = null;
-let initPromise: Promise<boolean> | null = null;
+}
 
-/** Загрузка WASM-пакета: сначала относительный импорт, при ошибке — по cwd (dev: бандл не в lib/wasm). */
-async function loadWasmPkg(): Promise<{
-  default?: unknown;
-  resize_image: (input: Uint8Array, width: number, height: number) => Uint8Array;
-}> {
+let wasmModule: WasmModule | null = null;
+
+/**
+ * Loads the WASM package.
+ * Tries dynamic import first (standard), falls back to filesystem load (Next.js server/dev context).
+ */
+async function loadWasmPkg(): Promise<WasmModule> {
+  if (wasmModule) return wasmModule;
+
   try {
-    return await import('./pkg/image_processor_wasm.js');
-  } catch {
-    // Fallback: путь из cwd в рантайме (строка собирается по частям, чтобы Turbopack не подставлял ROOT)
-    const path = await import('path');
-    const { createRequire } = await import('module');
-    const cwd = typeof process !== 'undefined' ? process.cwd() : '';
-    const sub = ['lib', 'wasm', 'pkg', 'image_processor_wasm.js'];
-    const pkgPath = path.join(cwd, ...sub);
-    const req = createRequire(path.join(cwd, 'package.json'));
-    return req(pkgPath);
+    // 1. Try standard dynamic import (works in most bundled environments if configured correctly)
+    // @ts-ignore - The pkg directory is generated at build time
+    const pkg = await import('./pkg/image_processor_wasm.js');
+    if (pkg && typeof pkg.resize_image === 'function') {
+      wasmModule = pkg;
+      return pkg;
+    }
+    throw new Error('Invalid WASM module structure via import');
+  } catch (importError) {
+    // 2. Fallback: Load from filesystem (reliable in Next.js Server Actions / API routes)
+    // This handles cases where the bundler doesn't resolve the relative import correctly at runtime
+    try {
+      const cwd = process.cwd();
+      // Construct path: [project_root]/lib/wasm/pkg/image_processor_wasm.js
+      // Ensure this path matches your build output structure
+      const pkgPath = path.join(cwd, 'lib', 'wasm', 'pkg', 'image_processor_wasm.js');
+      
+      const require = createRequire(path.join(cwd, 'package.json'));
+      const pkg = require(pkgPath);
+      
+      if (pkg && typeof pkg.resize_image === 'function') {
+        wasmModule = pkg;
+        return pkg;
+      }
+      throw new Error('Invalid WASM module structure via require');
+    } catch (fsError) {
+      // Combine errors for better debugging
+      throw new Error(`Failed to load WASM module. Import error: ${importError}. FS error: ${fsError}`);
+    }
   }
 }
 
-async function initWasm(): Promise<boolean> {
-  if (wasmModule) return true;
-  if (initPromise) return initPromise;
-  initPromise = (async () => {
-    try {
-      const pkg = await loadWasmPkg();
-      const init = pkg.default as unknown as (() => Promise<void>) | undefined;
-      if (typeof init === 'function') {
-        await init();
-      }
-      wasmModule = {
-        resize_image: pkg.resize_image,
-      };
-      return true;
-    } catch {
-      return false;
-    }
-  })();
-  return initPromise;
-}
-
 /**
- * Проверка готовности WASM при старте приложения (instrumentation).
- * Возвращает true, если модуль загружен и доступен.
+ * Checks if the WASM module is ready/loadable.
+ * Used for health checks or startup validation.
  */
 export async function checkWasmReady(): Promise<boolean> {
-  return initWasm();
+  try {
+    await loadWasmPkg();
+    return true;
+  } catch (error) {
+    console.error('[WASM] Health check failed:', error);
+    return false;
+  }
 }
 
 /**
- * Обработка изображения через WASM (ресайз).
- * Если WASM недоступен или произошла ошибка — возвращает исходный buffer.
+ * Processes an image buffer using WASM (resize).
+ * Returns the original buffer if WASM is unavailable or fails.
  */
 export async function processImage(
   buffer: Buffer,
   options: ProcessImageOptions = {}
 ): Promise<Buffer> {
-  const ok = await initWasm();
-  if (!ok || !wasmModule) {
+  // If no resizing is needed, return original immediately
+  if (!options.width && !options.height) {
     return buffer;
   }
+
   try {
+    const mod = await loadWasmPkg();
     const input = new Uint8Array(buffer);
-    if (options.width != null && options.height != null) {
-      const out = wasmModule.resize_image(input, options.width, options.height);
-      return Buffer.from(out);
+    
+    // Default to 0 if not provided (Rust side handles 0 as "keep original" or logic there)
+    // But our logic in Rust: if width==0 || height==0 returns original.
+    // So we need to ensure we pass valid dimensions if we want resize.
+    // If only one dimension is provided, we might want to maintain aspect ratio,
+    // but the current Rust implementation expects explicit width/height for resize_exact.
+    // If you need aspect ratio preservation with one dimension, you should calculate it here or update Rust.
+    // For now, we assume caller provides both or we pass 0 which results in no-op.
+    const w = options.width ?? 0;
+    const h = options.height ?? 0;
+
+    if (w > 0 && h > 0) {
+       const out = mod.resize_image(input, w, h);
+       return Buffer.from(out);
     }
+    
     return buffer;
-  } catch {
+  } catch (error) {
+    // Log the error but don't crash the request
+    console.error('[WASM] Image processing failed (returning original):', error);
     return buffer;
   }
 }

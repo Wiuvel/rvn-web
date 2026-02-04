@@ -14,7 +14,7 @@ import { useWebSocket } from '@/hooks/useWebSocket';
 import { debugPerformanceAsync, debugStart, debugEnd, debugError } from '@/lib/utils/debug';
 import TicketSkeleton from '@/components/ui/TicketSkeleton';
 import FileUploadModal from '@/components/support/FileUploadModal';
-import { Paperclip, X, Image as ImageIcon, FileText, AlertCircle, PanelLeftClose, PanelLeft } from 'lucide-react';
+import { Paperclip, X, Image as ImageIcon, FileText, AlertCircle, PanelLeftClose, PanelLeft, Plus } from 'lucide-react';
 import ImageViewer from '@/components/support/ImageViewer';
 import { UserMenu } from '@/components/navigation/UserMenu';
 import { UserData } from '@/types';
@@ -124,7 +124,7 @@ function ImageWithError({
 
   return (
     <div
-      className={`relative w-full rounded-lg overflow-hidden bg-neutral-800 ${isLoading ? 'min-h-[200px]' : ''} ${className || ''}`}
+      className={`relative w-full rounded-lg overflow-hidden bg-neutral-800 ${isLoading ? 'aspect-[4/3] min-w-[12rem]' : ''} ${className || ''}`}
       ref={imgRef}
     >
       {hasError ? (
@@ -310,7 +310,7 @@ function MessageItem({
                   <div className={`mt-2 space-y-2 ${bubbleText ? 'mt-2' : ''}`}>
                     {/* Группировка изображений */}
                     {images.length > 0 && (
-                      <div className={`grid gap-1.5 ${images.length === 1 ? 'max-w-[29rem]' : 'max-w-[37.5rem] grid-cols-2'}`}>
+                      <div className={`grid gap-1.5 w-full ${images.length === 1 ? 'max-w-[29rem]' : 'max-w-[37.5rem] grid-cols-2'}`}>
                         {images.map((attachment) => (
                           <button
                             key={attachment.id}
@@ -379,6 +379,7 @@ export default function SupportPage() {
   const [activeTicket, setActiveTicket] = useState<Ticket | null>(null);
   const [messageText, setMessageText] = useState('');
   const [showNewTicketForm, setShowNewTicketForm] = useState(false);
+  const [showCreateTicketModal, setShowCreateTicketModal] = useState(false);
   const [newTicketSubject, setNewTicketSubject] = useState('');
   const [newTicketMessage, setNewTicketMessage] = useState(''); // Отдельное состояние для сообщения нового тикета
   const [ticketsLoading, setTicketsLoading] = useState(false);
@@ -634,6 +635,16 @@ export default function SupportPage() {
       );
     }
   }, [notification.show]);
+
+  // Закрытие модального окна создания тикета по Escape
+  useEffect(() => {
+    if (!showCreateTicketModal) return;
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setShowCreateTicketModal(false);
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [showCreateTicketModal]);
 
   // Функция для анимации тряски с GSAP
   const triggerShake = (inputType: 'message' | 'subject') => {
@@ -1622,6 +1633,7 @@ export default function SupportPage() {
         setNewTicketSubject('');
         setNewTicketMessage('');
         setShowNewTicketForm(false);
+        setShowCreateTicketModal(false);
         showNotification('Обращение создано', 'info');
       } else {
         const errorMessage = data.error || 'Ошибка создания обращения';
@@ -2327,9 +2339,9 @@ export default function SupportPage() {
             <p className="text-xs sm:text-sm text-neutral-400">Обратитесь в службу поддержки. Создайте новое обращение или выберите существующее для продолжения диалога.</p>
           </div>
 
-          <div className={`grid grid-cols-1 gap-3 sm:gap-6 flex-1 min-h-0 ${sidebarCollapsed ? 'lg:grid-cols-[4rem_1fr]' : 'lg:grid-cols-3'}`}>
+          <div className="flex flex-col lg:flex-row gap-3 sm:gap-6 flex-1 min-h-0">
             {/* Левая панель: на ПК при свёрнутом виде — узкая панель с номерами; иначе — полный список (на мобильном всегда список) */}
-            <div className={`flex flex-col min-h-0 ${activeTicket ? 'hidden lg:flex' : 'flex'} ${sidebarCollapsed ? 'lg:w-16 lg:min-w-16' : 'lg:col-span-1'}`}>
+            <div className={`flex flex-col min-h-0 transition-all duration-300 ease-in-out overflow-hidden ${activeTicket ? 'hidden lg:flex' : 'flex'} ${sidebarCollapsed ? 'lg:w-16' : 'lg:w-1/3'}`}>
               {sidebarCollapsed && (
                 <div className="hidden lg:flex flex-col w-16 flex-shrink-0 bg-neutral-900 border border-white/10 rounded-2xl overflow-hidden">
                   <button
@@ -2341,7 +2353,7 @@ export default function SupportPage() {
                   >
                     <PanelLeft className="w-5 h-5 mx-auto" />
                   </button>
-                  <div className="flex-1 overflow-y-auto py-1 flex flex-col items-center gap-1">
+                  <div className="flex-1 overflow-y-auto overscroll-contain min-h-0 py-1 flex flex-col items-center gap-1">
                     {tickets.map((ticket, index) => (
                       <button
                         key={ticket.id}
@@ -2365,7 +2377,11 @@ export default function SupportPage() {
                         }}
                         className={`w-9 h-9 flex-shrink-0 rounded-lg flex items-center justify-center text-sm font-medium transition-colors ${
                           activeTicket?.id === ticket.id
-                            ? 'bg-primary-500 text-white'
+                            ? ticket.status === 'open'
+                              ? 'bg-green-500/90 text-white'
+                              : ticket.status === 'pending'
+                                ? 'bg-yellow-500/90 text-white'
+                                : 'bg-red-500/90 text-white'
                             : 'bg-neutral-800/80 text-neutral-300 hover:bg-neutral-700'
                         }`}
                         title={ticket.subject}
@@ -2374,15 +2390,33 @@ export default function SupportPage() {
                       </button>
                     ))}
                   </div>
+                  {!isSupport && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (activeTicketsCount >= MAX_TICKETS_PER_USER) {
+                          alert('Вы можете создать максимум 2 активных обращения');
+                          return;
+                        }
+                        setShowCreateTicketModal(true);
+                      }}
+                      disabled={activeTicketsCount >= MAX_TICKETS_PER_USER}
+                      className="flex-shrink-0 mt-2 mb-2 w-9 h-9 rounded-lg flex items-center justify-center bg-neutral-600 hover:bg-neutral-500 disabled:bg-neutral-700 disabled:text-neutral-500 text-white transition-colors mx-auto"
+                      title="Создать тикет"
+                      aria-label="Создать тикет"
+                    >
+                      <Plus className="w-5 h-5" />
+                    </button>
+                  )}
                 </div>
               )}
-              <div className={`bg-neutral-900 border border-white/10 rounded-2xl p-2 sm:p-4 flex-1 flex flex-col overflow-hidden ${sidebarCollapsed ? 'lg:hidden' : ''}`}>
+              <div className={`bg-neutral-900 border border-white/10 rounded-2xl p-2 sm:p-4 flex-1 flex flex-col overflow-hidden min-w-[300px] ${sidebarCollapsed ? 'lg:hidden' : ''}`}>
                 <div className="flex items-center justify-between gap-2 mb-2 sm:mb-4 flex-shrink-0">
                   <div className="flex items-center gap-2 min-w-0 flex-1">
                     <button
                       type="button"
                       onClick={toggleSidebarCollapsed}
-                      className="flex-shrink-0 p-1.5 rounded-lg text-neutral-400 hover:text-white hover:bg-white/5 transition-colors"
+                      className="hidden lg:flex flex-shrink-0 p-1.5 rounded-lg text-neutral-400 hover:text-white hover:bg-white/5 transition-colors"
                       title={sidebarCollapsed ? 'Показать список тикетов' : 'Свернуть в панель с номерами'}
                       aria-label={sidebarCollapsed ? 'Показать список тикетов' : 'Свернуть список тикетов'}
                     >
@@ -2415,7 +2449,7 @@ export default function SupportPage() {
                 {!isSupport && (
                   <div
                     ref={newTicketFormRef}
-                    className={`mb-4 p-3 bg-neutral-800/50 rounded-xl border border-white/10 flex-shrink-0 space-y-3 ${!showNewTicketForm ? 'hidden' : ''}`}
+                    className={`mb-4 p-3 bg-neutral-800/50 rounded-xl flex-shrink-0 space-y-3 ${!showNewTicketForm ? 'hidden' : ''}`}
                     style={!showNewTicketForm ? { height: 0, marginBottom: 0, opacity: 0, overflow: 'hidden' } : {}}
                   >
                     <div>
@@ -2432,7 +2466,7 @@ export default function SupportPage() {
                             triggerShake('subject');
                           }
                         }}
-                        placeholder="Тема обращения..."
+                        placeholder="Тема обращения.."
                         className="w-full px-3 py-2 bg-neutral-900 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-primary-500"
                         onKeyPress={(e) => {
                           if (e.key === 'Enter' && !e.shiftKey) {
@@ -2458,7 +2492,7 @@ export default function SupportPage() {
                             triggerShake('message');
                           }
                         }}
-                        placeholder="Опишите свою проблему..."
+                        placeholder="Опишите свою проблему.."
                         rows={3}
                         className="w-full px-3 py-2 bg-neutral-900 border border-white/10 rounded-lg text-white text-sm placeholder-neutral-500 focus:outline-none focus:border-primary-500 resize-none"
                         onKeyPress={(e) => {
@@ -2493,7 +2527,7 @@ export default function SupportPage() {
                   </div>
                 )}
 
-                <div className="support-tickets-list flex-1 overflow-y-auto min-h-0 flex-col flex lg:flex">
+                <div className="support-tickets-list flex-1 overflow-y-auto overscroll-contain min-h-0 flex-col flex lg:flex">
                   {ticketsLoading ? (
                     skeletonCount === null ? (
                       // Если последний раз тикетов не было, не показываем скелетоны
@@ -2543,7 +2577,11 @@ export default function SupportPage() {
                           }}
                           disabled={activeTicket?.id === ticket.id}
                           className={`w-full text-left p-3 rounded-xl transition-colors ${activeTicket?.id === ticket.id
-                              ? 'bg-primary-500/20 border border-primary-500/50 cursor-default'
+                              ? ticket.status === 'open'
+                                ? 'bg-green-500/20 border border-green-500/50 cursor-default'
+                                : ticket.status === 'pending'
+                                  ? 'bg-yellow-500/20 border border-yellow-500/50 cursor-default'
+                                  : 'bg-red-500/20 border border-red-500/50 cursor-default'
                               : 'bg-neutral-800/50 hover:bg-neutral-800 border border-transparent'
                             }`}
                         >
@@ -2600,7 +2638,7 @@ export default function SupportPage() {
             </div>
 
             {/* Чат — при свёрнутой панели занимает почти весь экран на ПК */}
-            <div className={`flex flex-col min-h-0 ${activeTicket ? 'flex' : 'hidden lg:flex'} ${sidebarCollapsed ? 'lg:col-span-1' : 'lg:col-span-2'}`}>
+            <div className={`flex flex-col min-h-0 flex-1 ${activeTicket ? 'flex' : 'hidden lg:flex'}`}>
               <div className="bg-neutral-900 border border-white/10 rounded-2xl flex-1 flex flex-col overflow-hidden">
                 {activeTicket ? (
                   <>
@@ -2841,6 +2879,92 @@ export default function SupportPage() {
                 </svg>
               )}
               <p className="text-xs sm:text-sm font-medium break-words">{notification.message}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Модальное окно создания тикета */}
+      {showCreateTicketModal && (
+        <div
+          className="fixed inset-0 z-[1100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          onClick={(e) => e.target === e.currentTarget && setShowCreateTicketModal(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="create-ticket-modal-title"
+        >
+          <div
+            className="bg-neutral-900 border border-white/10 rounded-2xl p-4 sm:p-6 w-full max-w-md max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 id="create-ticket-modal-title" className="text-lg font-semibold text-white mb-4">
+              Новое обращение
+            </h2>
+            <div className="space-y-3">
+              <div>
+                <input
+                  ref={subjectInputRef}
+                  type="text"
+                  value={newTicketSubject}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value.length <= TICKET_SUBJECT_MAX_LENGTH) {
+                      setNewTicketSubject(value);
+                    } else {
+                      showNotification(`Максимальная длина темы: ${TICKET_SUBJECT_MAX_LENGTH} символов`);
+                      triggerShake('subject');
+                    }
+                  }}
+                  placeholder="Тема обращения.."
+                  className="w-full px-3 py-2 bg-neutral-800 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-primary-500"
+                />
+                <div className="text-xs text-neutral-500 mt-1 text-right">
+                  {newTicketSubject.length}/{TICKET_SUBJECT_MAX_LENGTH}
+                </div>
+              </div>
+              <div>
+                <textarea
+                  value={newTicketMessage}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value.length <= MESSAGE_MAX_LENGTH) {
+                      setNewTicketMessage(value);
+                    } else {
+                      showNotification(`Максимальная длина сообщения: ${MESSAGE_MAX_LENGTH} символов`);
+                      triggerShake('message');
+                    }
+                  }}
+                  placeholder="Опишите свою проблему.."
+                  rows={4}
+                  className="w-full px-3 py-2 bg-neutral-800 border border-white/10 rounded-lg text-white text-sm placeholder-neutral-500 focus:outline-none focus:border-primary-500 resize-none"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && e.ctrlKey) {
+                      e.preventDefault();
+                      handleCreateTicket();
+                    }
+                  }}
+                />
+                <div className="text-xs text-neutral-500 mt-1 text-right">
+                  {newTicketMessage.length}/{MESSAGE_MAX_LENGTH}
+                </div>
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button
+                  onClick={handleCreateTicket}
+                  disabled={!newTicketSubject.trim() || !newTicketMessage.trim() || isCreatingTicket}
+                  className="flex-1 px-3 py-2 bg-primary-500 hover:bg-primary-400 disabled:bg-neutral-700 disabled:text-neutral-500 text-white text-sm rounded-lg transition-colors"
+                >
+                  {isCreatingTicket ? 'Создание...' : 'Создать'}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowCreateTicketModal(false);
+                  }}
+                  className="px-3 py-2 bg-neutral-700 hover:bg-neutral-600 text-white text-sm rounded-lg transition-colors"
+                >
+                  Отмена
+                </button>
+              </div>
             </div>
           </div>
         </div>

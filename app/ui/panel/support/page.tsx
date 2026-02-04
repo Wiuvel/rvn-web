@@ -2494,7 +2494,7 @@ export default function SupportPanel() {
               </div>
             ) : (
               <div className="space-y-2">
-                <TicketSkeleton count={skeletonCount} variant="panel" />
+                <TicketSkeleton count={skeletonCount} variant="user" />
               </div>
             )
           ) : filteredTickets.length === 0 ? (
