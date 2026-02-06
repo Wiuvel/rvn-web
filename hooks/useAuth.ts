@@ -1,16 +1,17 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useLayoutEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { UserData } from '@/types';
 import { AUTH_FETCH_TIMEOUT } from '@/lib/utils/constants';
+import { parseUserDataCookieClient } from '@/lib/auth/user-cookie.client';
 
 export interface UseAuthOptions {
   requireAuth?: boolean;
   redirectOnFail?: string;
   redirectOnTimeout?: string;
   silent?: boolean; // Не выводить ошибки в консоль
-  validateToken?: string; // Проверять совпадение токена
+  validateUserId?: string; // Проверять совпадение user_id (для страницы дашборда)
   onSuccess?: (data: UserData) => void;
   onError?: (error: Error) => void;
 }
@@ -27,7 +28,7 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
     redirectOnFail,
     redirectOnTimeout,
     silent = false,
-    validateToken,
+    validateUserId,
     onSuccess,
     onError
   } = options;
@@ -36,6 +37,14 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const router = useRouter();
+
+  // Мгновенное отображение аватара/username из user_data cookie до первого paint
+  useLayoutEffect(() => {
+    const payload = parseUserDataCookieClient();
+    if (payload) {
+      setUserData({ ...payload } as UserData);
+    }
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -64,7 +73,7 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
             const data = await response.json();
 
             // Проверяем, что пользователь авторизован
-            if (data.authenticated === false || !data.dashboard_token) {
+            if (data.authenticated === false || !data.user_id) {
               if (requireAuth && redirectOnFail) {
                 router.push(redirectOnFail);
                 return;
@@ -73,8 +82,8 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
               return;
             }
 
-            // Проверяем совпадение токена, если требуется
-            if (validateToken && data.dashboard_token !== validateToken) {
+            // Проверяем совпадение user_id, если требуется (для страницы дашборда)
+            if (validateUserId && data.user_id !== validateUserId) {
               if (redirectOnFail) {
                 router.push(redirectOnFail);
                 return;
@@ -173,7 +182,7 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
     };
     
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [requireAuth, redirectOnFail, redirectOnTimeout, silent, validateToken, router]);
+  }, [requireAuth, redirectOnFail, redirectOnTimeout, silent, validateUserId, router]);
 
   return { userData, loading, error };
 }

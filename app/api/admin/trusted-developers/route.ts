@@ -30,14 +30,14 @@ async function getCurrentAdminId(request: NextRequest): Promise<string | null> {
 
   const ipAddress = request.headers.get('x-forwarded-for') || 'unknown';
   const userAgent = request.headers.get('user-agent') || 'unknown';
-  const validation = SessionManager.validateSession(sessionId, ipAddress, userAgent);
+  const validation = await SessionManager.validateSession(sessionId, '', ipAddress, userAgent); // Admin: no token
   
   if (!validation.valid) {
     return null;
   }
 
   // Get session data after validation
-  const session = SessionManager.getSession(sessionId);
+  const session = await SessionManager.getSession(sessionId);
   if (!session) {
     return null;
   }

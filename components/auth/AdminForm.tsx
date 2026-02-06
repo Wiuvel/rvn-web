@@ -11,6 +11,7 @@ const AuroraBackground = dynamic(() => import('@/components/ui/AuroraBackground'
   loading: () => null
 });
 import { translateError } from '@/lib/utils/error-translations';
+import { ERROR_NETWORK, ERROR_POPUP_BLOCKED } from '@/lib/utils/constants';
 import { adminAuthSchema, adminRegisterSchema, type AdminAuthFormData, type AdminRegisterFormData } from '@/lib/validation/schemas';
 
 interface AuthState {
@@ -142,7 +143,7 @@ export default function AdminAuthForm({ onAuthSuccess }: AdminAuthFormProps) {
       }
     } catch (error) {
       console.error('Auth error:', error);
-      setError('Ошибка сети. Попробуйте позже.');
+      setError(translateError(ERROR_NETWORK));
       setLoginSuccess(false);
     } finally {
       setLoading(false);
@@ -282,7 +283,7 @@ export default function AdminAuthForm({ onAuthSuccess }: AdminAuthFormProps) {
                   );
                   
                   if (!popup) {
-                    setError('Всплывающие окна заблокированы. Разрешите всплывающие окна для этого сайта.');
+                    setError(translateError(ERROR_POPUP_BLOCKED));
                     return;
                   }
                   
@@ -488,9 +489,9 @@ export default function AdminAuthForm({ onAuthSuccess }: AdminAuthFormProps) {
                     );
                     
                     if (!popup) {
-                      setError('Всплывающие окна заблокированы. Разрешите всплывающие окна для этого сайта.');
-                      return;
-                    }
+                    setError(translateError(ERROR_POPUP_BLOCKED));
+                    return;
+                  }
                     
                     // Listen for OAuth success
                     const checkClosed = setInterval(() => {

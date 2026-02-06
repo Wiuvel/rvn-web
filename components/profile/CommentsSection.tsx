@@ -26,7 +26,7 @@ interface Comment {
 
 interface CommentsSectionProps {
     profileId: string; // The UUID of the profile owner
-    profileToken: string; // The dashboard_token from URL (used for API calls)
+    profileUserId: string; // The user_id from URL (used for API calls)
 }
 
 function formatTimeAgo(dateString: string): string {
@@ -47,9 +47,9 @@ function formatTimeAgo(dateString: string): string {
 
 import { getAvatarUrl, getGradientClasses } from '@/lib/utils/avatar-gradients';
 
-export default function CommentsSection({ profileId, profileToken }: CommentsSectionProps) {
+export default function CommentsSection({ profileId, profileUserId }: CommentsSectionProps) {
     const { userData: currentUser } = useAuth();
-    const authToken = currentUser?.dashboard_token;
+    const authToken = currentUser?.token;
 
     // Allow WS connection even without auth token request? 
     // Currently server enforces auth, so only logged in users get real-time updates.
@@ -101,7 +101,7 @@ export default function CommentsSection({ profileId, profileToken }: CommentsSec
         const fetchComments = async () => {
             try {
                 setLoading(true);
-                const res = await fetch(`/api/user/${profileToken}/comments`);
+                const res = await fetch(`/api/user/${profileUserId}/comments`);
                 if (!res.ok) throw new Error('Failed to load comments');
                 const data = await res.json();
                 setComments(data);
@@ -114,7 +114,7 @@ export default function CommentsSection({ profileId, profileToken }: CommentsSec
         };
 
         fetchComments();
-    }, [profileToken]);
+    }, [profileUserId]);
 
     // WebSocket Subscription
     useEffect(() => {
@@ -179,7 +179,7 @@ export default function CommentsSection({ profileId, profileToken }: CommentsSec
         setSubmitting(true);
 
         try {
-            const res = await fetch(`/api/user/${profileToken}/comments`, {
+            const res = await fetch(`/api/user/${profileUserId}/comments`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ content, parent_id: parentId })
@@ -254,7 +254,7 @@ export default function CommentsSection({ profileId, profileToken }: CommentsSec
             ) : (
                 <div className="mb-8 p-6 bg-neutral-900/40 border border-white/5 rounded-xl text-center">
                     <p className="text-neutral-400 text-base">
-                        <Link href="/login" className="text-white hover:underline font-medium">Войдите</Link>, чтобы присоединиться к обсуждению
+                        <Link href="/auth" className="text-white hover:underline font-medium">Войдите</Link>, чтобы присоединиться к обсуждению
                     </p>
                 </div>
             )}

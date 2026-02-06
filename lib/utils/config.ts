@@ -27,8 +27,19 @@ export const appConfig = {
 
   // Session
   session: {
-    timeout: 60 * 60 * 1000, // 1 час
+    timeout: 60 * 60 * 1000, // 1 час - session_id TTL
     cleanupInterval: 5 * 60 * 1000 // 5 минут
+  },
+
+  // Token (refresh) - httpOnly cookie
+  token: {
+    maxAge: 7 * 24 * 60 * 60, // 7 дней в секундах для cookie
+  },
+
+  // user_data cookie - non-httpOnly, для быстрого UI
+  userData: {
+    maxAge: 20 * 60, // 20 минут в секундах
+    ttlMs: 20 * 60 * 1000,
   },
 
   // CSRF
@@ -81,7 +92,7 @@ export const appConfig = {
   // Медиа: лимиты загрузки и отображения
   media: {
     avatarMaxBytes: 2 * 1024 * 1024, // 2 MB
-    bannerMaxBytes: 5 * 1024 * 1024, // 5 MB
+    bannerMaxBytes: 2 * 1024 * 1024, // 2 MB
     fileNameTruncateLen: 28, // макс. символов имени файла в UI (остальное «..»)
   },
 

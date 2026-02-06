@@ -17,16 +17,13 @@ export default function Home() {
   const [lightRaysLoaded, setLightRaysLoaded] = useState(false);
 
   useEffect(() => {
-    // Сбрасываем скролл в начало при загрузке
     if (typeof window !== 'undefined') {
       window.scrollTo(0, 0);
     }
   }, []);
 
-  // Ждем загрузки LightRays перед показом контента
   useEffect(() => {
     if (lightRaysLoaded) {
-      // Небольшая задержка для плавного появления
       const timer = setTimeout(() => {
         setIsLoading(false);
       }, 100);
@@ -36,11 +33,11 @@ export default function Home() {
 
   return (
     <>
-      {/* Лоадер - показывается пока не загружен LightRays */}
+      {/* Loader */}
       {isLoading && <LogoLoader />}
       
       <div ref={containerRef} className="relative">
-        {/* Контент страницы - всегда рендерится, но скрыт/прозрачен при загрузке */}
+        {/* Content */}
         <div className={isLoading ? 'opacity-0 pointer-events-none' : 'opacity-100 transition-opacity duration-300'}>
           <HeroSection onLightRaysLoad={() => setLightRaysLoaded(true)} />
           <FeaturesSection />

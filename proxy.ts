@@ -3,6 +3,7 @@ import { domains } from './lib/utils/config';
 import { shouldShowProtection, isAllowedBot, detectSuspiciousVisitor } from './lib/security/suspicious-detector';
 import { getRedisClient } from './lib/database/redis';
 import { logger } from './lib/utils/secure-logger';
+import { parseUserDataCookie } from './lib/auth/user-cookie.server';
 
 const MAIN_DOMAIN = domains.main;
 
@@ -269,11 +270,10 @@ async function handleProtection(request: NextRequest, pathname: string): Promise
    * Special case: OAuth users redirecting to dashboard
    * Protection cookies may not be set yet due to cookie timing
    */
-  const isAuthenticated = request.cookies.get('user_authenticated')?.value === 'true';
-  const hasDashboardToken = !!request.cookies.get('dashboard_token')?.value;
+  const hasToken = !!request.cookies.get('token')?.value;
   const hasSession = !!request.cookies.get('session_id')?.value;
 
-  if (isAuthenticated && hasDashboardToken && hasSession && pathname.startsWith('/dashboard')) {
+  if (hasToken && hasSession && pathname.startsWith('/dashboard')) {
     return null;
   }
 
@@ -388,12 +388,12 @@ async function handleProtection(request: NextRequest, pathname: string): Promise
  * @returns NextResponse with redirect or null to allow/deny access
  */
 function handleAuth(request: NextRequest, pathname: string, requestHeaders: Headers): NextResponse | null {
-  const isAuthenticated = request.cookies.get('user_authenticated')?.value === 'true';
-  const dashboardToken = request.cookies.get('dashboard_token')?.value;
+  const hasToken = !!request.cookies.get('token')?.value;
+  const userData = parseUserDataCookie(request.cookies.get('user_data')?.value);
+  const userId = userData?.user_id;
 
   /** Auth routes - redirect authenticated users to dashboard */
   if (pathname === '/auth' || pathname.startsWith('/auth/')) {
-    /** OAuth handler/callback pages should not be redirected */
     if (
       pathname === '/auth/oauth-handler' ||
       pathname.startsWith('/auth/oauth-handler/') ||
@@ -405,15 +405,15 @@ function handleAuth(request: NextRequest, pathname: string, requestHeaders: Head
       return response;
     }
 
-    /** Redirect authenticated users away from auth page */
-    if (isAuthenticated && dashboardToken) {
+    if (hasToken) {
       const retpatch = request.nextUrl.searchParams.get('retpatch');
       if (retpatch) {
         const response = NextResponse.redirect(new URL(retpatch, request.url));
         applySecurityHeaders(response, false);
         return response;
       }
-      const response = NextResponse.redirect(new URL(`/dashboard/${dashboardToken}`, request.url));
+      const redirectPath = userId ? `/dashboard/${userId}` : '/dashboard';
+      const response = NextResponse.redirect(new URL(redirectPath, request.url));
       applySecurityHeaders(response, false);
       return response;
     }
@@ -425,24 +425,23 @@ function handleAuth(request: NextRequest, pathname: string, requestHeaders: Head
 
   /** Dashboard routes - require authentication */
   if (pathname.startsWith('/dashboard')) {
-    if (!isAuthenticated || !dashboardToken) {
+    if (!hasToken) {
       const retpatch = encodeURIComponent(pathname);
       const response = NextResponse.redirect(new URL(`/auth?retpatch=${retpatch}`, request.url));
       applySecurityHeaders(response, false);
       return response;
     }
 
-    /** Normalize dashboard URL */
     if (pathname === '/dashboard' || pathname === '/dashboard/') {
-      const response = NextResponse.redirect(new URL(`/dashboard/${dashboardToken}`, request.url));
+      const redirectPath = userId ? `/dashboard/${userId}` : '/dashboard';
+      const response = NextResponse.redirect(new URL(redirectPath, request.url));
       applySecurityHeaders(response, false);
       return response;
     }
 
-    /** Ensure user accesses their own dashboard */
-    const urlToken = pathname.split('/dashboard/')[1]?.split('/')[0];
-    if (urlToken && urlToken !== dashboardToken) {
-      const response = NextResponse.redirect(new URL(`/dashboard/${dashboardToken}`, request.url));
+    const urlUserId = pathname.split('/dashboard/')[1]?.split('/')[0];
+    if (urlUserId && userId && urlUserId !== userId) {
+      const response = NextResponse.redirect(new URL(`/dashboard/${userId}`, request.url));
       applySecurityHeaders(response, false);
       return response;
     }
@@ -454,7 +453,7 @@ function handleAuth(request: NextRequest, pathname: string, requestHeaders: Head
 
   /** Support panel - requires authentication */
   if (pathname.startsWith('/ui/panel/support')) {
-    if (!isAuthenticated || !dashboardToken) {
+    if (!hasToken) {
       const retpatch = encodeURIComponent(pathname);
       const response = NextResponse.redirect(new URL(`/auth?retpatch=${retpatch}`, request.url));
       applySecurityHeaders(response, false);
@@ -483,7 +482,7 @@ function handleAuth(request: NextRequest, pathname: string, requestHeaders: Head
 }
 
 /**
- * Next.js 16 Proxy (ранее назывался middleware) - обрабатывает все запросы
+ * Next.js 16 Proxy
  * 
  * Порядок обработки запросов:
  * 1. Ранний выход для статических файлов, API маршрутов и разрешенных ботов

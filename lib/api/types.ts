@@ -39,8 +39,8 @@ export interface RegisterRequest {
 
 export interface AuthResponse {
   message?: string;
-  dashboard_token?: string;
-  access_token?: string;
+  user_id?: string;
+  token?: string;
   user?: UserData;
 }
 
@@ -48,17 +48,12 @@ export interface UserData {
   id: string;
   user_id: string;
   username: string;
-  dashboard_token: string;
+  token?: string;
   created_at: string;
   last_login?: string | null;
   avatar?: string | null;
   isSupport?: boolean;
   isAdmin?: boolean;
-}
-
-export interface AuthCheckResponse {
-  authenticated: boolean;
-  user?: UserData;
 }
 
 export interface RefreshTokenResponse {

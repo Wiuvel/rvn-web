@@ -30,7 +30,10 @@ export function UserMenu({
   menuRef: externalMenuRef
 }: UserMenuProps) {
   const router = useRouter();
-  const { shouldRender, menuRef: animatedMenuRef } = useMenuAnimation(isOpen);
+  const { shouldRender, menuRef: animatedMenuRef } = useMenuAnimation(isOpen, {
+    onClose,
+    persist: true // Keep mounted to avoid image reloading and layout shifts
+  });
   const [avatarLoading, setAvatarLoading] = useState(true);
   
   useEffect(() => {
@@ -76,7 +79,7 @@ export function UserMenu({
     >
       <div>
         <Link
-          href={`/dashboard/${userData.dashboard_token}`}
+          href={`/dashboard/${userData.user_id}`}
           onClick={onClose}
           className="block p-4 border-b border-white/10 hover:bg-white/5 transition-colors duration-200 cursor-pointer mx-2 my-1 rounded-xl"
         >
@@ -139,30 +142,30 @@ export function UserMenu({
         <div className="py-2">
           {showProfile && (
             <Link
-              href={`/dashboard/${userData.dashboard_token}`}
+              href={`/dashboard/${userData.user_id}`}
               onClick={onClose}
               className="flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-xl text-white/80 hover:text-white hover:bg-white/5 transition-colors duration-200"
             >
-              <Image 
-                src={getStaticUrl("/static/icons/accounts/users.svg")} 
+              <img 
+                src={getStaticUrl("/static/icons/accounts/7d971.profile.svg")} 
                 alt="Профиль" 
-                width={20} 
-                height={20} 
+                width={24} 
+                height={24} 
                 className="w-5 h-5"
               />
               <span>Профиль</span>
             </Link>
           )}
           <Link
-            href={`/dashboard/${userData.dashboard_token}#subscriptions`}
+            href={`/dashboard/${userData.user_id}#subscriptions`}
             onClick={onClose}
             className="flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-xl text-white/80 hover:text-white hover:bg-white/5 transition-colors duration-200"
           >
-            <Image 
-              src={getStaticUrl("/static/icons/accounts/wallet.svg")} 
+            <img 
+              src={getStaticUrl("/static/icons/accounts/7d972.wallet.svg")} 
               alt="Мои тарифы" 
-              width={20} 
-              height={20} 
+              width={24} 
+              height={24} 
               className="w-5 h-5"
             />
             <span>Мои тарифы</span>
@@ -172,11 +175,11 @@ export function UserMenu({
             onClick={onClose}
             className="flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-xl text-white/80 hover:text-white hover:bg-white/5 transition-colors duration-200"
           >
-            <Image 
-              src={getStaticUrl("/static/icons/accounts/support.svg")} 
+            <img 
+              src={getStaticUrl("/static/icons/accounts/7d973.support.svg")} 
               alt="Поддержка" 
-              width={20} 
-              height={20} 
+              width={24} 
+              height={24} 
               className="w-5 h-5"
             />
             <span>Поддержка</span>
@@ -186,8 +189,8 @@ export function UserMenu({
             onClick={handleLogout}
             className="w-full flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-xl text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors duration-200"
           >
-            <Image 
-              src={getStaticUrl("/static/icons/accounts/log-out.svg")} 
+            <img 
+              src={getStaticUrl("/static/icons/accounts/4d661-logout.svg")} 
               alt="Выйти" 
               width={20} 
               height={20} 

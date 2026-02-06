@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
     const { username, password, csrfToken } = validation.data;
 
     const currentSessionId = request.cookies.get(ADMIN_SESSION_COOKIE)?.value;
-    if (currentSessionId && csrfToken && !verifyCSRFToken(csrfToken, currentSessionId)) {
+    if (currentSessionId && csrfToken && !(await verifyCSRFToken(csrfToken, currentSessionId))) {
       // Невалидный CSRF токен - не логируем
       return setCorsHeaders(
         NextResponse.json({ error: 'Invalid request' }, { status: 403 }),
@@ -63,14 +63,14 @@ export async function POST(request: NextRequest) {
     const hostname = request.nextUrl.hostname;
     const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
 
-    const sessionId = SessionManager.createSession(
+    const sessionId = await SessionManager.createSession(
       result.admin.id,
       sanitizeInput(username),
       ipAddress,
       userAgent,
     );
 
-    revokeCSRFToken(sessionId);
+    await revokeCSRFToken(sessionId);
     await SessionManager.setSessionCookie(sessionId, isLocalhost, ADMIN_SESSION_COOKIE);
 
     const response = NextResponse.json(

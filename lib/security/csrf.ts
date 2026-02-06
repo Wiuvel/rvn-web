@@ -1,5 +1,11 @@
+/**
+ * CSRF protection with Redis backend and in-memory fallback.
+ * Enables horizontal scaling and CSRF persistence across restarts.
+ */
+
 import { createHmac, timingSafeEqual, randomBytes } from 'crypto';
 import { getEnv } from '../validation/env-validation';
+import { getCsrfStore, CSRF_TOKEN_LIFETIME } from './csrf-store';
 
 // Get CSRF secret from validated env (will throw if not set or invalid)
 function getCSRFSecret(): string {
@@ -14,73 +20,27 @@ function getCSRFSecret(): string {
   }
 }
 
-const CSRF_TOKEN_LIFETIME = 60 * 60 * 1000; // 1 hour
-
-interface CSRFStore {
-  [sessionId: string]: {
-    token: string;
-    createdAt: number;
-  };
-}
-
-const csrfStore: CSRFStore = {};
-
-// Оптимизированная структура для отслеживания времени истечения
-const csrfExpirationTimes = new Map<string, number>();
-
-// Cleanup expired tokens (оптимизированная версия)
-let csrfCleanupInterval: NodeJS.Timeout | null = null;
-
-function startCSRFCleanup() {
-  if (csrfCleanupInterval) return;
-  
-  csrfCleanupInterval = setInterval(() => {
-    const now = Date.now();
-    const keysToDelete: string[] = [];
-    
-    // Проходим только по ключам, которые точно истекли
-    csrfExpirationTimes.forEach((expirationTime, sessionId) => {
-      if (expirationTime < now) {
-        keysToDelete.push(sessionId);
-      }
-    });
-    
-    // Удаляем истекшие записи
-    keysToDelete.forEach(sessionId => {
-      delete csrfStore[sessionId];
-      csrfExpirationTimes.delete(sessionId);
-    });
-  }, 5 * 60 * 1000); // Cleanup every 5 minutes
-}
-
-// Запускаем очистку при первом импорте
-startCSRFCleanup();
-
-export function generateCSRFToken(sessionId: string): string {
+export async function generateCSRFToken(sessionId: string): Promise<string> {
   const timestamp = Date.now().toString();
   const nonce = randomBytes(16).toString('hex');
   const data = `${sessionId}-${timestamp}-${nonce}`;
   const signature = createHmac('sha256', getCSRFSecret())
     .update(data)
     .digest('hex');
-  
+
   const token = `${data}-${signature}`;
-  
-  // Store token for validation
-  // Если для этого sessionId уже есть токен, перезаписываем его
   const createdAt = Date.now();
-  csrfStore[sessionId] = {
-    token,
-    createdAt
-  };
-  csrfExpirationTimes.set(sessionId, createdAt + CSRF_TOKEN_LIFETIME);
-  
+
+  const store = getCsrfStore();
+  await store.set(sessionId, { token, createdAt }, CSRF_TOKEN_LIFETIME);
+
   return token;
 }
 
 // Функция для получения информации о токене (для отладки)
-export function getCSRFTokenInfo(sessionId: string): { exists: boolean; token?: string; createdAt?: number } {
-  const stored = csrfStore[sessionId];
+export async function getCSRFTokenInfo(sessionId: string): Promise<{ exists: boolean; token?: string; createdAt?: number }> {
+  const store = getCsrfStore();
+  const stored = await store.get(sessionId);
   if (!stored) {
     return { exists: false };
   }
@@ -91,85 +51,86 @@ export function getCSRFTokenInfo(sessionId: string): { exists: boolean; token?: 
   };
 }
 
-// Overload для обратной совместимости
-export function verifyCSRFToken(token: string, sessionId: string): boolean;
-export function verifyCSRFToken(token: string, sessionId: string, detailed: true): { valid: boolean; reason?: string };
-export function verifyCSRFToken(token: string, sessionId: string, detailed?: boolean): boolean | { valid: boolean; reason?: string } {
+// Async verify - используется для Redis-backed store
+export async function verifyCSRFToken(
+  token: string,
+  sessionId: string,
+  detailed?: false
+): Promise<boolean>;
+export async function verifyCSRFToken(
+  token: string,
+  sessionId: string,
+  detailed: true
+): Promise<{ valid: boolean; reason?: string }>;
+export async function verifyCSRFToken(
+  token: string,
+  sessionId: string,
+  detailed?: boolean
+): Promise<boolean | { valid: boolean; reason?: string }> {
   try {
     if (!token || !sessionId) {
       if (detailed) return { valid: false, reason: 'Missing token or sessionId' };
       return false;
     }
-    
+
     const parts = token.split('-');
     if (parts.length < 4) {
       if (detailed) return { valid: false, reason: 'Invalid token format' };
       return false;
     }
-    
+
     const signature = parts.pop();
     const nonce = parts.pop();
     const timestamp = parts.pop();
     const tokenSessionId = parts.join('-');
-    
-    // Check session ID matches
+
     if (tokenSessionId !== sessionId) {
       if (detailed) return { valid: false, reason: 'Session ID mismatch' };
       return false;
     }
-    
-    // Check token is not older than 1 hour (проверяем timestamp без использования хранилища)
+
     const tokenTime = parseInt(timestamp || '0');
     if (isNaN(tokenTime)) {
       if (detailed) return { valid: false, reason: 'Invalid timestamp' };
       return false;
     }
-    
+
     const now = Date.now();
     if (now - tokenTime > CSRF_TOKEN_LIFETIME) {
       if (detailed) return { valid: false, reason: 'Token expired' };
       return false;
     }
-    
-    // Verify signature (это основная проверка безопасности)
+
     const data = `${tokenSessionId}-${timestamp}-${nonce}`;
     const expectedSignature = createHmac('sha256', getCSRFSecret())
       .update(data)
       .digest('hex');
-    
-    // Use timing-safe comparison
+
     const signatureBuffer = Buffer.from(signature || '', 'hex');
     const expectedBuffer = Buffer.from(expectedSignature, 'hex');
-    
+
     if (signatureBuffer.length !== expectedBuffer.length) {
       if (detailed) return { valid: false, reason: 'Signature length mismatch' };
       return false;
     }
-    
+
     const isValid = timingSafeEqual(signatureBuffer, expectedBuffer);
-    
-    // Опционально: проверяем хранилище для дополнительной безопасности (но не блокируем если его нет)
-    // Это помогает предотвратить повторное использование токена, но не критично
+
     if (isValid) {
-      const storedToken = csrfStore[sessionId];
+      const store = getCsrfStore();
+      const storedToken = await store.get(sessionId);
       if (storedToken && storedToken.token !== token) {
-        // Токен был использован ранее - это подозрительно
         if (detailed) return { valid: false, reason: 'Token already used' };
         return false;
       }
       // Сохраняем токен в хранилище для предотвращения повторного использования
-      const createdAt = Date.now();
-      csrfStore[sessionId] = {
-        token,
-        createdAt
-      };
-      csrfExpirationTimes.set(sessionId, createdAt + CSRF_TOKEN_LIFETIME);
+      await store.set(sessionId, { token, createdAt: Date.now() }, CSRF_TOKEN_LIFETIME);
     }
-    
+
     if (detailed) {
       return { valid: isValid, reason: isValid ? undefined : 'Invalid signature' };
     }
-    
+
     return isValid;
   } catch (error) {
     if (detailed) {
@@ -185,23 +146,13 @@ export function verifyCSRFToken(token: string, sessionId: string, detailed?: boo
  */
 export { generateSessionId } from '../utils/index';
 
-export function revokeCSRFToken(sessionId: string): void {
-  delete csrfStore[sessionId];
-  csrfExpirationTimes.delete(sessionId);
-}
-
-/**
- * Очищает интервал очистки (для тестирования или graceful shutdown)
- */
-export function cleanupCSRF(): void {
-  if (csrfCleanupInterval) {
-    clearInterval(csrfCleanupInterval);
-    csrfCleanupInterval = null;
-  }
+export async function revokeCSRFToken(sessionId: string): Promise<void> {
+  const store = getCsrfStore();
+  await store.delete(sessionId);
 }
 
 // Экспортируем функцию для получения размера хранилища (для отладки)
 export function getCSRFStoreSize(): number {
-  return Object.keys(csrfStore).length;
+  // In-memory fallback не отслеживает размер; Redis - нужно бы SCAN
+  return 0;
 }
-

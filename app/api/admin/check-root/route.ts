@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
 
     const ipAddress = request.headers.get('x-forwarded-for') || 'unknown';
     const userAgent = request.headers.get('user-agent') || 'unknown';
-    const validation = SessionManager.validateSession(sessionId, ipAddress, userAgent);
+    const validation = await SessionManager.validateSession(sessionId, '', ipAddress, userAgent); // Admin: no token
 
     if (!validation.valid) {
       return setCorsHeaders(
@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const session = SessionManager.getSession(sessionId);
+    const session = await SessionManager.getSession(sessionId);
     if (!session) {
       return setCorsHeaders(
         NextResponse.json({ error: 'Invalid session' }, { status: 401 }),

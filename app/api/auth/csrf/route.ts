@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
       // Создана новая сессия - не логируем
     }
 
-    const csrfToken = generateCSRFToken(sessionId);
+    const csrfToken = await generateCSRFToken(sessionId);
     
     // Логируем для отладки
     // CSRF токен сгенерирован - не логируем

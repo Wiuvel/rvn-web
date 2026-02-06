@@ -115,7 +115,7 @@ export function withApiHandler(
         const sessionId = request.cookies.get('session_id')?.value;
         const csrfToken = data.csrfToken;
         
-        if (sessionId && csrfToken && !verifyCSRFToken(csrfToken, sessionId)) {
+        if (sessionId && csrfToken && !(await verifyCSRFToken(csrfToken, sessionId))) {
           logger.warn(`Invalid CSRF token for ${method} request`, {
             ip: request.headers.get('x-forwarded-for'),
             hasSessionId: !!sessionId,

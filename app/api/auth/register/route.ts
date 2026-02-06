@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
 
     // CSRF защита - упрощенная для регистрации
     const currentSessionId = request.cookies.get('session_id')?.value;
-    if (currentSessionId && csrfToken && !verifyCSRFToken(csrfToken, currentSessionId)) {
+    if (currentSessionId && csrfToken && !(await verifyCSRFToken(csrfToken, currentSessionId))) {
       // Невалидный CSRF токен - не логируем
       return setCorsHeaders(
         NextResponse.json(
@@ -59,31 +59,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create session for the new user
+    const user = result.user!;
     const ipAddress = request.headers.get('x-forwarded-for') || 'unknown';
     const userAgent = request.headers.get('user-agent') || 'unknown';
     const hostname = request.nextUrl.hostname;
     const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
-    
-    const sessionId = SessionManager.createSession(
-      result.user!.id,
+
+    const sessionId = await SessionManager.createSession(
+      user.id,
       sanitizeInput(username),
       ipAddress,
-      userAgent
+      userAgent,
+      user.token
     );
 
     await SessionManager.setSessionCookie(sessionId, isLocalhost);
 
-    // Set authentication cookies
     const response = NextResponse.json(
-      { 
-        message: 'User created successfully',
-        dashboard_token: result.user!.dashboard_token
-      },
+      { message: 'User created successfully', user_id: user.user_id },
       { status: 201 }
     );
 
-    response.cookies.set('user_authenticated', 'true', {
+    response.cookies.set('token', user.token, {
       maxAge: 60 * 60 * 24 * 7,
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production' && !isLocalhost,
@@ -91,23 +88,13 @@ export async function POST(request: NextRequest) {
       path: '/'
     });
 
-    response.cookies.set('user_id', result.user!.id, {
-      maxAge: 60 * 60 * 24 * 7,
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production' && !isLocalhost,
-      sameSite: 'strict',
-      path: '/'
-    });
-
-    response.cookies.set('dashboard_token', result.user!.dashboard_token, {
-      maxAge: 60 * 60 * 24 * 7,
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production' && !isLocalhost,
-      sameSite: 'strict',
-      path: '/'
-    });
-
-    // Successful registration
+    const { createUserDataCookie, USER_DATA_COOKIE_NAME, getUserDataCookieOptions } = await import('@/lib/auth/user-cookie.server');
+    response.cookies.set(USER_DATA_COOKIE_NAME, createUserDataCookie({
+      user_id: user.user_id,
+      username: user.username,
+      avatar: user.avatar ?? null,
+      banner: user.banner ?? null,
+    }), getUserDataCookieOptions(isLocalhost));
     // Успешная регистрация - не логируем
 
     return setCorsHeaders(response);

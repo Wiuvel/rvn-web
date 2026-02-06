@@ -7,7 +7,6 @@ import type {
   LoginRequest,
   RegisterRequest,
   AuthResponse,
-  AuthCheckResponse,
   RefreshTokenResponse,
   UserData,
   CreateTicketRequest,
@@ -214,11 +213,7 @@ class ApiClient {
       body: JSON.stringify(credentials),
     }, false); // Не повторяем запрос при 401 для login
     
-    // Сохраняем access token после успешного логина
-    if (result.success && result.data.access_token) {
-      this.setAccessToken(result.data.access_token);
-    }
-    
+    // Токен устанавливается как httpOnly cookie сервером, не сохраняем в клиенте
     return result;
   }
 
@@ -238,10 +233,6 @@ class ApiClient {
     this.clearTokens();
     
     return result;
-  }
-
-  async checkAuth(): Promise<ApiResult<AuthCheckResponse>> {
-    return this.request<AuthCheckResponse>('/api/auth/check');
   }
 
   async getMe(): Promise<ApiResult<UserData>> {

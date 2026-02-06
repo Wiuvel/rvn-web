@@ -1,5 +1,5 @@
 /**
- * Проверяет загрузку WASM image processor (Rust).
+ * Проверяет загрузку WASM Image Processor (Rust).
  */
 
 export async function register() {

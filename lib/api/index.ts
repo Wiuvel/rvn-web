@@ -1,6 +1,5 @@
-// Centralized export for all API utilities
-
-// Types
+// Centralized export for all API utilities;
+// Re-export all type definitions from the types module.
 export * from './types';
 
 // Validation schemas

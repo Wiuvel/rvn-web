@@ -18,8 +18,8 @@ export async function POST(request: NextRequest) {
     const username = cookieStore.get('admin_username')?.value;
 
     if (sessionId) {
-      SessionManager.destroySession(sessionId);
-      revokeCSRFToken(sessionId);
+      await SessionManager.destroySession(sessionId);
+      await revokeCSRFToken(sessionId);
     }
 
     await SessionManager.clearSessionCookie(ADMIN_SESSION_COOKIE);

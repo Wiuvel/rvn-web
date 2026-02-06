@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { getUserByToken } from '@/lib/auth/index';
+import { checkAuth } from '@/lib/auth/helper';
 import { getSupportAnalytics } from '@/lib/analytics/support-analytics';
 import { setCorsHeaders, handleCorsPreflight } from '@/lib/security/cors';
 import { ERROR_NOT_AUTHENTICATED, ERROR_INTERNAL_SERVER_ERROR } from '@/lib/utils/constants';
@@ -15,12 +14,8 @@ export async function OPTIONS() {
  */
 export async function GET(request: NextRequest) {
   try {
-    // Проверка авторизации
-    const cookieStore = await cookies();
-    const isAuthenticated = cookieStore.get('user_authenticated')?.value === 'true';
-    const dashboardToken = cookieStore.get('dashboard_token')?.value;
-
-    if (!isAuthenticated || !dashboardToken) {
+    const authResult = await checkAuth(request);
+    if (!authResult.isAuthenticated || !authResult.user) {
       return setCorsHeaders(
         NextResponse.json(
           { error: ERROR_NOT_AUTHENTICATED },
@@ -28,16 +23,7 @@ export async function GET(request: NextRequest) {
         )
       );
     }
-
-    const user = await getUserByToken(dashboardToken);
-    if (!user) {
-      return setCorsHeaders(
-        NextResponse.json(
-          { error: ERROR_NOT_AUTHENTICATED },
-          { status: 401 }
-        )
-      );
-    }
+    const user = authResult.user;
 
     // Проверка прав администратора убрана - доступ к админ-панели уже означает авторизацию администратора
     // Получаем параметр period из query string

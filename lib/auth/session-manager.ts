@@ -1,53 +1,30 @@
+/**
+ * Session manager with Redis backend and in-memory fallback.
+ * Session + Token binding: session_id и token взаимно связаны через tokenFingerprint.
+ */
+
+import { createHmac } from 'crypto';
 import { cookies } from 'next/headers';
-import { SESSION_TIMEOUT, SESSION_CLEANUP_INTERVAL } from '../utils/constants';
+import { SESSION_TIMEOUT } from '../utils/constants';
 import { generateSessionId as generateSessionIdUtil } from '../utils/index';
 import { logger } from '../utils/secure-logger';
+import { getSessionStore, type SessionData } from './session-store';
+import { getEnv } from '../validation/env-validation';
 
-interface SessionData {
-  id: string;
-  userId: string;
-  username: string;
-  createdAt: number;
-  lastActivity: number;
-  ipAddress: string;
-  userAgent: string;
+export type { SessionData };
+
+function getTokenBindingSecret(): string {
+  try {
+    return getEnv().CSRF_SECRET;
+  } catch {
+    return process.env.CSRF_SECRET || 'default-token-binding-secret';
+  }
 }
 
-interface SessionStore {
-  [sessionId: string]: SessionData;
+/** HMAC(token) — для привязки session к token (защита от подмены) */
+function computeTokenFingerprint(token: string): string {
+  return createHmac('sha256', getTokenBindingSecret()).update(token).digest('hex');
 }
-
-const sessions: SessionStore = {};
-
-// Оптимизированная структура для отслеживания времени истечения
-const sessionExpirationTimes = new Map<string, number>();
-
-let sessionCleanupInterval: NodeJS.Timeout | null = null;
-
-function startSessionCleanup() {
-  if (sessionCleanupInterval) return;
-  
-  sessionCleanupInterval = setInterval(() => {
-    const now = Date.now();
-    const keysToDelete: string[] = [];
-    
-    // Проходим только по ключам, которые точно истекли
-    sessionExpirationTimes.forEach((expirationTime, sessionId) => {
-      if (expirationTime < now) {
-        keysToDelete.push(sessionId);
-      }
-    });
-    
-    // Удаляем истекшие записи
-    keysToDelete.forEach(sessionId => {
-      delete sessions[sessionId];
-      sessionExpirationTimes.delete(sessionId);
-    });
-  }, SESSION_CLEANUP_INTERVAL);
-}
-
-// Запускаем очистку при первом импорте
-startSessionCleanup();
 
 export class SessionManager {
   /**
@@ -58,80 +35,54 @@ export class SessionManager {
     return generateSessionIdUtil();
   }
 
-  static createSession(
+  static async createSession(
     userId: string,
     username: string,
     ipAddress: string,
     userAgent: string,
-  ): string {
+    token?: string, // Optional for admin sessions (no token cookie)
+  ): Promise<string> {
     const sessionId = this.generateSessionId();
     const now = Date.now();
-
-    sessions[sessionId] = {
+    const data: SessionData = {
       id: sessionId,
       userId,
       username,
+      tokenFingerprint: token ? computeTokenFingerprint(token) : '',
       createdAt: now,
       lastActivity: now,
       ipAddress,
       userAgent,
     };
-    
-    sessionExpirationTimes.set(sessionId, now + SESSION_TIMEOUT);
 
+    const store = getSessionStore();
+    await store.set(sessionId, data, SESSION_TIMEOUT);
     return sessionId;
   }
 
-  static getSession(sessionId: string): SessionData | null {
-    const session = sessions[sessionId];
-    if (!session) return null;
-
-    const now = Date.now();
-    const expirationTime = sessionExpirationTimes.get(sessionId);
-    
-    if (!expirationTime || expirationTime < now) {
-      delete sessions[sessionId];
-      sessionExpirationTimes.delete(sessionId);
-      return null;
-    }
-
-    session.lastActivity = now;
-    // Обновляем время истечения при активности
-    sessionExpirationTimes.set(sessionId, now + SESSION_TIMEOUT);
-    return session;
+  static async getSession(sessionId: string): Promise<SessionData | null> {
+    const store = getSessionStore();
+    return store.get(sessionId);
   }
 
-  static updateSession(sessionId: string, updates: Partial<SessionData>): boolean {
-    const session = sessions[sessionId];
+  static async updateSession(sessionId: string, updates: Partial<SessionData>): Promise<boolean> {
+    const session = await this.getSession(sessionId);
     if (!session) return false;
 
-    Object.assign(session, updates);
-    const now = Date.now();
-    session.lastActivity = now;
-    // Обновляем время истечения при активности
-    sessionExpirationTimes.set(sessionId, now + SESSION_TIMEOUT);
+    const store = getSessionStore();
+    const updated: SessionData = { ...session, ...updates, lastActivity: Date.now() };
+    await store.set(sessionId, updated, SESSION_TIMEOUT);
     return true;
   }
 
-  static destroySession(sessionId: string): boolean {
-    if (sessions[sessionId]) {
-      delete sessions[sessionId];
-      sessionExpirationTimes.delete(sessionId);
-      return true;
-    }
-    return false;
+  static async destroySession(sessionId: string): Promise<boolean> {
+    const store = getSessionStore();
+    return store.delete(sessionId);
   }
 
-  static destroyAllUserSessions(userId: string): number {
-    let destroyed = 0;
-    Object.keys(sessions).forEach((sessionId) => {
-      if (sessions[sessionId].userId === userId) {
-        delete sessions[sessionId];
-        sessionExpirationTimes.delete(sessionId);
-        destroyed++;
-      }
-    });
-    return destroyed;
+  static async destroyAllUserSessions(userId: string): Promise<number> {
+    const store = getSessionStore();
+    return store.deleteByUserId(userId);
   }
 
   static async setSessionCookie(
@@ -154,21 +105,29 @@ export class SessionManager {
     cookieStore.delete(cookieName);
   }
 
-  static validateSession(
+  static async validateSession(
     sessionId: string,
+    token: string,
     ipAddress: string,
     userAgent: string,
     options: { strictIP?: boolean; updateCookie?: boolean } = {}
-  ): { valid: boolean; reason?: string } {
-    const session = this.getSession(sessionId);
+  ): Promise<{ valid: boolean; reason?: string }> {
+    const session = await this.getSession(sessionId);
     if (!session) {
       return { valid: false, reason: 'Session not found or expired' };
     }
 
+    // Token binding: если session имеет fingerprint, token должен совпадать (user sessions)
+    if (session.tokenFingerprint) {
+      if (!token) return { valid: false, reason: 'Token required' };
+      const expectedFingerprint = computeTokenFingerprint(token);
+      if (session.tokenFingerprint !== expectedFingerprint) {
+        return { valid: false, reason: 'Token mismatch' };
+      }
+    }
+
     // Смягченная валидация User-Agent - проверяем только основную часть
-    // Извлекаем основную информацию о браузере и ОС (игнорируем версии и детали)
     const normalizeUserAgent = (ua: string): string => {
-      // Извлекаем основную информацию: браузер и ОС
       const browserMatch = ua.match(/(Chrome|Firefox|Safari|Edge|Opera|Brave|Vivaldi|YandexBrowser|YaBrowser)/i);
       const osMatch = ua.match(/(Windows|Mac|Linux|Android|iOS|iPhone|iPad)/i);
       const browser = browserMatch ? browserMatch[1].toLowerCase() : 'unknown';
@@ -179,9 +138,7 @@ export class SessionManager {
     const sessionUANormalized = normalizeUserAgent(session.userAgent);
     const requestUANormalized = normalizeUserAgent(userAgent);
 
-    // Если основная часть User-Agent не совпадает - это подозрительно
     if (sessionUANormalized !== requestUANormalized) {
-      // Логируем, но не уничтожаем сессию сразу - может быть легитимное изменение
       logger.warn('User-Agent mismatch detected', {
         sessionId: sessionId.substring(0, 8) + '...',
         sessionUA: session.userAgent.substring(0, 50),
@@ -189,33 +146,24 @@ export class SessionManager {
         sessionNormalized: sessionUANormalized,
         requestNormalized: requestUANormalized
       });
-      // Обновляем User-Agent в сессии на новый (адаптируемся к изменениям)
-      session.userAgent = userAgent;
+      await this.updateSession(sessionId, { userAgent });
     }
 
     // IP validation - flexible by default, strict if requested
     if (options.strictIP) {
       if (session.ipAddress !== ipAddress) {
-        this.destroySession(sessionId);
+        await this.destroySession(sessionId);
         return { valid: false, reason: 'IP address mismatch' };
       }
     } else {
-      // Flexible IP validation - check first 3 octets (subnet)
-      // This allows for IP changes within the same network
       const normalizeIP = (ip: string): string => {
-        // Handle IPv4
         if (ip.includes('.')) {
           const parts = ip.split('.');
-          if (parts.length >= 3) {
-            return parts.slice(0, 3).join('.');
-          }
+          if (parts.length >= 3) return parts.slice(0, 3).join('.');
         }
-        // Handle IPv6 - use first 64 bits (first 4 groups)
         if (ip.includes(':')) {
           const parts = ip.split(':');
-          if (parts.length >= 4) {
-            return parts.slice(0, 4).join(':');
-          }
+          if (parts.length >= 4) return parts.slice(0, 4).join(':');
         }
         return ip;
       };
@@ -224,13 +172,8 @@ export class SessionManager {
       const requestIPPrefix = normalizeIP(ipAddress);
 
       if (sessionIPPrefix !== requestIPPrefix) {
-        // Log warning but don't block - IP can change legitimately
-        // This is logged for monitoring suspicious activity
         return { valid: true, reason: 'IP prefix mismatch (logged)' };
       }
-    }
-
-    if (options.updateCookie) {
     }
 
     return { valid: true };
@@ -244,22 +187,8 @@ export class SessionManager {
     isLocalhost: boolean = false,
     cookieName = 'session_id'
   ): Promise<void> {
-    // Проверяем, что сессия существует и не истекла
-    const session = this.getSession(sessionId);
-    if (!session) {
-      return; // Сессия не существует или истекла
-    }
-
-    // Обновляем cookie с новым maxAge
+    const session = await this.getSession(sessionId);
+    if (!session) return;
     await this.setSessionCookie(sessionId, isLocalhost, cookieName);
   }
-
-  static cleanup(): void {
-    if (sessionCleanupInterval) {
-      clearInterval(sessionCleanupInterval);
-      sessionCleanupInterval = null;
-    }
-  }
 }
-
-

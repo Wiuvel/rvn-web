@@ -3,7 +3,7 @@ import { cookies } from 'next/headers';
 import { generalRateLimit, messageRateLimit } from '@/lib/security/rate-limit';
 import { logger } from '@/lib/utils/secure-logger';
 import { setCorsHeaders, handleCorsPreflight } from '@/lib/security/cors';
-import { getUserByToken } from '@/lib/auth/index';
+import { checkAuth } from '@/lib/auth/helper';
 import { hasUserRole, batchHasUserRole } from '@/lib/auth/user-roles';
 import { supabaseAdmin } from '@/lib/database/supabase';
 import { ERROR_INTERNAL_SERVER_ERROR, ERROR_NOT_AUTHENTICATED, ERROR_INVALID_REQUEST_DATA, MESSAGE_MAX_LENGTH, ERROR_TICKET_NOT_FOUND, ERROR_ACCESS_DENIED, ERROR_CANNOT_SEND_TO_CLOSED_TICKET, ERROR_MESSAGE_TOO_LONG, ERROR_TOO_MANY_REQUESTS } from '@/lib/utils/constants';
@@ -35,12 +35,8 @@ export async function POST(
       );
     }
 
-    // Проверка авторизации
-    const cookieStore = await cookies();
-    const isAuthenticated = cookieStore.get('user_authenticated')?.value === 'true';
-    const dashboardToken = cookieStore.get('dashboard_token')?.value;
-
-    if (!isAuthenticated || !dashboardToken) {
+    const authResult = await checkAuth(request);
+    if (!authResult.isAuthenticated || !authResult.user) {
       return setCorsHeaders(
         NextResponse.json(
           { error: ERROR_NOT_AUTHENTICATED },
@@ -48,16 +44,7 @@ export async function POST(
         )
       );
     }
-
-    const user = await getUserByToken(dashboardToken);
-    if (!user) {
-      return setCorsHeaders(
-        NextResponse.json(
-          { error: ERROR_NOT_AUTHENTICATED },
-          { status: 401 }
-        )
-      );
-    }
+    const user = authResult.user;
 
     // Специфичный rate limit для сообщений по user_id (50 сообщений за 5 минут)
     const messageRateLimitResult = await messageRateLimit.checkWithKey(`message:${user.id}`);
@@ -71,12 +58,13 @@ export async function POST(
     }
 
     // Проверка CSRF токена
+    const cookieStore = await cookies();
     const sessionId = cookieStore.get('session_id')?.value;
     const requestData = await request.json();
     const csrfToken = requestData.csrfToken;
     
     if (sessionId && csrfToken) {
-      const csrfValidation = verifyCSRFToken(csrfToken, sessionId, true);
+      const csrfValidation = await verifyCSRFToken(csrfToken, sessionId, true);
       if (!csrfValidation.valid) {
         return setCorsHeaders(
           NextResponse.json(

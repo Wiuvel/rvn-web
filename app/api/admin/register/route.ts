@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
     const { username, password, csrfToken } = validation.data;
 
     const currentSessionId = request.cookies.get(ADMIN_SESSION_COOKIE)?.value;
-    if (currentSessionId && csrfToken && !verifyCSRFToken(csrfToken, currentSessionId)) {
+    if (currentSessionId && csrfToken && !(await verifyCSRFToken(csrfToken, currentSessionId))) {
       // Невалидный CSRF токен - не логируем
       return setCorsHeaders(
         NextResponse.json({ error: 'Invalid request' }, { status: 403 }),

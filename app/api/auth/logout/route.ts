@@ -14,12 +14,11 @@ export async function POST(request: NextRequest) {
   try {
     const cookieStore = await cookies();
     const sessionId = cookieStore.get('session_id')?.value;
-    const userId = cookieStore.get('user_id')?.value;
-    
+
     // Destroy session if exists
     if (sessionId) {
-      SessionManager.destroySession(sessionId);
-      revokeCSRFToken(sessionId);
+      await SessionManager.destroySession(sessionId);
+      await revokeCSRFToken(sessionId);
     }
     
     // Get hostname for cookie domain handling
@@ -33,11 +32,9 @@ export async function POST(request: NextRequest) {
     );
 
     // Delete all authentication cookies
-    // Use response.cookies.delete() to ensure proper deletion, including cookies with domains
     response.cookies.delete('session_id');
-    response.cookies.delete('user_authenticated');
-    response.cookies.delete('user_id');
-    response.cookies.delete('dashboard_token');
+    response.cookies.delete('token');
+    response.cookies.delete('user_data');
     
     // Delete OAuth state cookie if exists
     response.cookies.delete('oauth_state');
@@ -46,18 +43,11 @@ export async function POST(request: NextRequest) {
     // Эти куки дают иммунитет на 2 часа от Bot Challenge и не связаны с авторизацией пользователя
     // Они должны сохраняться при выходе из аккаунта для удобства пользователя
 
-    // Also delete from cookieStore for immediate effect
     await SessionManager.clearSessionCookie();
-    cookieStore.delete('user_authenticated');
-    cookieStore.delete('user_id');
-    cookieStore.delete('dashboard_token');
+    cookieStore.delete('token');
+    cookieStore.delete('user_data');
     cookieStore.delete('oauth_state');
     // НЕ удаляем protection cookies из cookieStore
-
-    // Log successful logout
-    if (userId) {
-      // Выход пользователя - не логируем
-    }
 
     return setCorsHeaders(response);
   } catch (error) {

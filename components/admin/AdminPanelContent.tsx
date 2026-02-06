@@ -24,7 +24,7 @@ interface PanelUser {
     created_at: string;
     last_login?: string | null;
     is_active: boolean;
-    dashboard_token?: string;
+    token?: string;
     roles?: string[];
 }
 

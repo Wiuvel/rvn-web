@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
 
     let supabaseQuery = supabaseAdmin
       .from('users')
-      .select('id,user_id,username,is_active,last_login,created_at,dashboard_token')
+      .select('id,user_id,username,is_active,last_login,created_at,token')
       .order('created_at', { ascending: order === 'asc' })
       .limit(limit);
 

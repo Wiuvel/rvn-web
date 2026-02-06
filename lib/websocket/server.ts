@@ -10,7 +10,22 @@ import type { SupportWebSocketEvents } from './events';
 import { supabaseAdmin } from '@/lib/database/supabase';
 import { getUserByToken } from '@/lib/auth/index';
 import { hasUserRole } from '@/lib/auth/user-roles';
+import { SessionManager } from '@/lib/auth/session-manager';
 import { isValidUUID } from '@/lib/utils/uuid-validation';
+
+/** Parse cookies from Cookie header string */
+function parseCookies(cookieHeader: string | undefined): Record<string, string> {
+  if (!cookieHeader) return {};
+  const result: Record<string, string> = {};
+  for (const part of cookieHeader.split(';')) {
+    const eq = part.indexOf('=');
+    if (eq === -1) continue;
+    const key = part.slice(0, eq).trim();
+    const value = part.slice(eq + 1).trim();
+    if (key) result[key] = decodeURIComponent(value);
+  }
+  return result;
+}
 
 // Вспомогательные типы для извлечения типов данных из событий
 type MessageNewData = Parameters<SupportWebSocketEvents['support:message:new']>[0];
@@ -259,6 +274,29 @@ export function initWebSocketServer(httpServer: HTTPServer): SocketIOServer<Supp
         }
 
         return next(new Error('Invalid token'));
+      }
+
+      // Session binding: require valid session + token from cookie
+      const cookieHeader = socket.handshake.headers.cookie;
+      const parsedCookies = parseCookies(typeof cookieHeader === 'string' ? cookieHeader : cookieHeader?.[0]);
+      const sessionId = parsedCookies['session_id'];
+      const tokenFromCookie = parsedCookies['token'];
+
+      if (!sessionId || !tokenFromCookie) {
+        return next(new Error('Session and token required'));
+      }
+
+      const userAgent = socket.handshake.headers['user-agent'] || 'unknown';
+      const ipForValidation = socket.handshake.headers['x-forwarded-for']?.toString().split(',')[0]?.trim() || clientIP;
+      const validation = await SessionManager.validateSession(sessionId, tokenFromCookie, ipForValidation, userAgent);
+
+      if (!validation.valid) {
+        return next(new Error('Invalid session'));
+      }
+
+      const session = await SessionManager.getSession(sessionId);
+      if (!session || session.userId !== user.id) {
+        return next(new Error('Session mismatch'));
       }
 
       // Успешная аутентификация - очищаем счетчики для этого IP
@@ -797,27 +835,6 @@ export function broadcastNewComment(
   comment: CommentNewData['comment']
 ): void {
   if (!io) {
-    // Временно используем queueMessage с типом 'comment'. 
-    // Т.к. queueMessage принимает ticketId, мы передаем profileId вместо ticketId
-    // и data с правильной структурой.
-    // Нам нужно расширить QueuedMessage type, но пока хак:
-    // Мы добавили case 'comment' в processMessageQueue, но нужно подправить queueMessage сигнатуру или обмануть ее
-    // Лучшим решением будет расширить логику queueMessage, но чтобы не ломать типы....
-    // В processMessageQueue мы добавили обработку.
-    // В queueMessage просто пушим.
-
-    // Приводим тип к any, чтобы обойти ограничение типов в queueMessage если оно строгое
-    // В данном файле queueMessage типизирован через type: QueuedMessage['type'].
-    // 'comment' не был добавлен в QueuedMessage['type'] явно в union выше...
-    // Стоп, я забыл добавить 'comment' в union QueuedMessage['type'] (Line 33).
-    // Исправим это в следующем шаге или добавим сейчас если возможно.
-    // Для надежности я добавлю 'comment' в definitions выше.
-
-    // Но здесь мы уже вызываем push...
-    // Сделаем broadcast напрямую если io есть, иначе...
-    // Если io нет, мы теряем коммент? Нет, лучше обновить типы.
-
-    // Пытаемся инициализировать
     const httpServer = global.__httpServer;
     if (httpServer) {
       try { initWebSocketServer(httpServer); } catch (e) { }
@@ -832,5 +849,3 @@ export function broadcastNewComment(
     });
   }
 }
-
-

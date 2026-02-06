@@ -181,22 +181,22 @@ export async function GET(request: NextRequest) {
     // Destroy old session if exists
     const oldSessionId = request.cookies.get('session_id')?.value;
     if (oldSessionId) {
-      SessionManager.destroySession(oldSessionId);
+      await SessionManager.destroySession(oldSessionId);
     }
     
-    const sessionId = SessionManager.createSession(
+    const sessionId = await SessionManager.createSession(
       user.id,
       sanitizeInput(user.username),
       ipAddress,
-      userAgent
+      userAgent,
+      user.token
     );
 
     await SessionManager.setSessionCookie(sessionId, isLocalhost);
 
-    // Build redirect URL
     const redirectUrl = isPopup 
-      ? new URL(`/auth/oauth-handler?provider=twitch&success=true&dashboard_token=${user.dashboard_token}&popup=true`, origin)
-      : new URL(`/dashboard/${user.dashboard_token}`, origin);
+      ? new URL(`/auth/oauth-handler?provider=twitch&success=true&user_id=${user.user_id}&popup=true`, origin)
+      : new URL(`/dashboard/${user.user_id}`, origin);
     const response = NextResponse.redirect(redirectUrl);
 
     // Copy protection cookies from request if they exist, or set temporary ones
@@ -269,32 +269,24 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Set authentication cookies
-    response.cookies.set('user_authenticated', 'true', {
-      maxAge: 60 * 60 * 24 * 7,
+    const { appConfig } = await import('@/lib/utils/config');
+    const { createUserDataCookie, USER_DATA_COOKIE_NAME, getUserDataCookieOptions } = await import('@/lib/auth/user-cookie.server');
+
+    response.cookies.set('token', user.token, {
+      maxAge: appConfig.token.maxAge,
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production' && !isLocalhost,
       sameSite: 'lax',
       path: '/'
     });
 
-    response.cookies.set('user_id', user.id, {
-      maxAge: 60 * 60 * 24 * 7,
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production' && !isLocalhost,
-      sameSite: 'lax',
-      path: '/'
-    });
+    response.cookies.set(USER_DATA_COOKIE_NAME, createUserDataCookie({
+      user_id: user.user_id,
+      username: user.username,
+      avatar: user.avatar ?? null,
+      banner: user.banner ?? null,
+    }), getUserDataCookieOptions(isLocalhost));
 
-    response.cookies.set('dashboard_token', user.dashboard_token, {
-      maxAge: 60 * 60 * 24 * 7,
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production' && !isLocalhost,
-      sameSite: 'lax',
-      path: '/'
-    });
-
-    // Clear OAuth state cookie
     response.cookies.delete('oauth_state');
 
     return setCorsHeaders(response);

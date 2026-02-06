@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { generalRateLimit } from '@/lib/security/rate-limit';
 import { logger } from '@/lib/utils/secure-logger';
 import { setCorsHeaders, handleCorsPreflight } from '@/lib/security/cors';
-import { getUserByToken } from '@/lib/auth/index';
+import { checkAuth } from '@/lib/auth/helper';
 import { hasUserRole } from '@/lib/auth/user-roles';
 import { ERROR_INTERNAL_SERVER_ERROR, ERROR_TOO_MANY_REQUESTS } from '@/lib/utils/constants';
 
@@ -30,12 +29,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Проверка авторизации пользователя
-    const cookieStore = await cookies();
-    const isAuthenticated = cookieStore.get('user_authenticated')?.value === 'true';
-    const dashboardToken = cookieStore.get('dashboard_token')?.value;
-
-    if (!isAuthenticated || !dashboardToken) {
+    const authResult = await checkAuth(request);
+    if (!authResult.isAuthenticated || !authResult.user) {
       return setCorsHeaders(
         NextResponse.json({
           isAuthenticated: false,
@@ -43,17 +38,7 @@ export async function GET(request: NextRequest) {
         })
       );
     }
-
-    // Получаем пользователя по токену
-    const user = await getUserByToken(dashboardToken);
-    if (!user) {
-      return setCorsHeaders(
-        NextResponse.json({
-          isAuthenticated: false,
-          hasSupportAccess: false
-        })
-      );
-    }
+    const user = authResult.user;
 
     // Проверяем роль поддержки (может выбросить ошибку если БД не настроена)
     let hasSupportAccess = false;
@@ -72,7 +57,7 @@ export async function GET(request: NextRequest) {
             username: user.username,
             userId: user.id,
             user_id: user.user_id,
-          dashboard_token: dashboardToken, // Возвращаем токен для WebSocket
+          token: user.token, // для WebSocket
             error: 'Database not configured'
           })
         );
@@ -85,10 +70,7 @@ export async function GET(request: NextRequest) {
         username: user.username,
         userId: user.id,
         user_id: user.user_id, // Добавляем user_id для отображения
-        // ВАЖНО: Возвращаем токен только для WebSocket аутентификации
-        // Токен должен использоваться только в памяти компонента, не сохраняться в localStorage/sessionStorage
-        // Это обходит защиту httpOnly cookie, но необходимо для WebSocket подключения
-        dashboard_token: dashboardToken
+        token: user.token // для WebSocket
       })
     );
   } catch (error) {
@@ -96,29 +78,23 @@ export async function GET(request: NextRequest) {
       error: error instanceof Error ? error.message : 'Unknown error',
       ip: request.headers.get('x-forwarded-for')
     });
-    
-    // При ошибке БД возвращаем 200 с информацией об ошибке, а не 500
-    const cookieStore = await cookies();
-    const isAuthenticated = cookieStore.get('user_authenticated')?.value === 'true';
-    const dashboardToken = cookieStore.get('dashboard_token')?.value;
-    
-    if (isAuthenticated && dashboardToken) {
-      const user = await getUserByToken(dashboardToken);
-      if (user) {
-        return setCorsHeaders(
-          NextResponse.json({
-            isAuthenticated: true,
-            hasSupportAccess: false,
-            username: user.username,
-            userId: user.id,
-            user_id: user.user_id,
-          dashboard_token: dashboardToken, // Возвращаем токен для WebSocket
-            error: 'Database not configured'
-          })
-        );
-      }
+
+    const authResult = await checkAuth(request);
+    if (authResult.isAuthenticated && authResult.user) {
+      const user = authResult.user;
+      return setCorsHeaders(
+        NextResponse.json({
+          isAuthenticated: true,
+          hasSupportAccess: false,
+          username: user.username,
+          userId: user.id,
+          user_id: user.user_id,
+          token: user.token,
+          error: 'Database not configured'
+        })
+      );
     }
-    
+
     return setCorsHeaders(
       NextResponse.json(
         { 

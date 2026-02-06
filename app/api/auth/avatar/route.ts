@@ -4,8 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { getUserByToken } from '@/lib/auth';
+import { checkAuth } from '@/lib/auth/helper';
 import { setCorsHeaders, handleCorsPreflight } from '@/lib/security/cors';
 import { generalRateLimit } from '@/lib/security/rate-limit';
 import { logger } from '@/lib/utils/secure-logger';
@@ -36,12 +35,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Проверка авторизации
-    const cookieStore = await cookies();
-    const isAuthenticated = cookieStore.get('user_authenticated')?.value === 'true';
-    const dashboardToken = cookieStore.get('dashboard_token')?.value;
-
-    if (!isAuthenticated || !dashboardToken) {
+    const authResult = await checkAuth(request);
+    if (!authResult.isAuthenticated || !authResult.user) {
       return setCorsHeaders(
         NextResponse.json(
           { error: ERROR_NOT_AUTHENTICATED },
@@ -49,16 +44,7 @@ export async function POST(request: NextRequest) {
         )
       );
     }
-
-    const user = await getUserByToken(dashboardToken);
-    if (!user) {
-      return setCorsHeaders(
-        NextResponse.json(
-          { error: ERROR_NOT_AUTHENTICATED },
-          { status: 401 }
-        )
-      );
-    }
+    const user = authResult.user;
 
     // Валидация userId (защита от уязвимостей)
     if (!isValidUUID(user.id)) {
@@ -270,14 +256,24 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Возвращаем успешный ответ с новым путем к аватару
-    return setCorsHeaders(
-      NextResponse.json({
-        success: true,
-        avatar: newAvatarPath,
-        avatarUrl: `/images/users/${user.id}/${timestamp}.${extension}`
-      })
-    );
+    // Обновляем user_data cookie с новым аватаром
+    const hostname = request.nextUrl?.hostname ?? request.headers.get('host') ?? '';
+    const isLocalhost = hostname.includes('localhost') || hostname.includes('127.0.0.1');
+    const { createUserDataCookie, USER_DATA_COOKIE_NAME, getUserDataCookieOptions } = await import('@/lib/auth/user-cookie.server');
+    const userDataValue = createUserDataCookie({
+      user_id: user.user_id,
+      username: user.username,
+      avatar: newAvatarPath,
+      banner: user.banner ?? null,
+    });
+    const response = NextResponse.json({
+      success: true,
+      avatar: newAvatarPath,
+      avatarUrl: `/images/users/${user.id}/${timestamp}.${extension}`
+    });
+    response.cookies.set(USER_DATA_COOKIE_NAME, userDataValue, getUserDataCookieOptions(isLocalhost));
+
+    return setCorsHeaders(response);
   } catch (error) {
     logger.error('Error uploading avatar', {
       error: error instanceof Error ? error.message : 'Unknown error'

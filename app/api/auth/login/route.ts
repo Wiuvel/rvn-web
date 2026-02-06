@@ -8,6 +8,7 @@ import { sanitizeInput } from '@/lib/security/sanitize';
 import { logger } from '@/lib/utils/secure-logger';
 import { setCorsHeaders, handleCorsPreflight } from '@/lib/security/cors';
 import { SessionManager } from '@/lib/auth/session-manager';
+import { appConfig } from '@/lib/utils/config';
 
 export async function OPTIONS() {
   return handleCorsPreflight();
@@ -51,7 +52,7 @@ export async function POST(request: NextRequest) {
       
       // Проверка CSRF токена - не логируем
       
-      const csrfValidation = verifyCSRFToken(csrfToken, currentSessionId, true);
+      const csrfValidation = await verifyCSRFToken(csrfToken, currentSessionId, true);
       if (!csrfValidation.valid) {
         // Невалидный CSRF токен - не логируем (нормальная валидация)
         return setCorsHeaders(
@@ -88,55 +89,44 @@ export async function POST(request: NextRequest) {
     // Session rotation: destroy old session if exists (prevents session fixation)
     const oldSessionId = currentSessionId;
     if (oldSessionId) {
-      SessionManager.destroySession(oldSessionId);
-      revokeCSRFToken(oldSessionId);
+      await SessionManager.destroySession(oldSessionId);
+      await revokeCSRFToken(oldSessionId);
     }
     
-    const sessionId = SessionManager.createSession(
-      result.user!.id,
+    const user = result.user!;
+    const token = user.token;
+    const sessionId = await SessionManager.createSession(
+      user.id,
       sanitizeInput(username),
       ipAddress,
-      userAgent
+      userAgent,
+      token
     );
 
-    // Revoke old CSRF token and set new session
-    revokeCSRFToken(sessionId);
+    await revokeCSRFToken(sessionId);
     await SessionManager.setSessionCookie(sessionId, isLocalhost);
 
-    // Успешный вход - не логируем
-
-    // Set authentication cookies
     const response = NextResponse.json(
-      { 
-        message: 'Login successful',
-        dashboard_token: result.user!.dashboard_token
-      },
+      { message: 'Login successful', user_id: user.user_id },
       { status: 200 }
     );
 
-    response.cookies.set('user_authenticated', 'true', {
-      maxAge: 60 * 60 * 24 * 7,
+    response.cookies.set('token', token, {
+      maxAge: appConfig.token.maxAge,
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production' && !isLocalhost,
       sameSite: 'strict',
       path: '/'
     });
 
-    response.cookies.set('user_id', result.user!.id, {
-      maxAge: 60 * 60 * 24 * 7,
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production' && !isLocalhost,
-      sameSite: 'strict',
-      path: '/'
+    const { createUserDataCookie, USER_DATA_COOKIE_NAME, getUserDataCookieOptions } = await import('@/lib/auth/user-cookie.server');
+    const userDataValue = createUserDataCookie({
+      user_id: user.user_id,
+      username: user.username,
+      avatar: user.avatar ?? null,
+      banner: user.banner ?? null,
     });
-
-    response.cookies.set('dashboard_token', result.user!.dashboard_token, {
-      maxAge: 60 * 60 * 24 * 7,
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production' && !isLocalhost,
-      sameSite: 'strict',
-      path: '/'
-    });
+    response.cookies.set(USER_DATA_COOKIE_NAME, userDataValue, getUserDataCookieOptions(isLocalhost));
 
     return setCorsHeaders(response);
   } catch (error) {

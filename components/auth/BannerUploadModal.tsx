@@ -109,7 +109,7 @@ export default function BannerUploadModal({
 
     // Валидация размера (лимит из конфига)
     if (file.size > BANNER_MAX_BYTES) {
-      setError('Размер файла не должен превышать 5MB');
+      setError('Размер файла не должен превышать 2MB');
       return false;
     }
 
@@ -597,7 +597,7 @@ export default function BannerUploadModal({
                         : 'Перетащите изображение или выберите файл'}
                     </span>
                     <span className="text-xs text-neutral-500 text-center">
-                      PNG, JPG, WEBP (макс. 5MB)
+                      PNG, JPG, WEBP (макс. 2MB)
                     </span>
                   </div>
                 </div>

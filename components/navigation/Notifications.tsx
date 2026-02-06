@@ -88,11 +88,11 @@ export function NotificationsWidget({ isMobile = false }: NotificationsWidgetPro
         aria-expanded={isOpen}
       >
         <Image 
-          src={hasUnread ? getStaticUrl("/static/icons/accounts/bell-dot.svg") : getStaticUrl("/static/icons/accounts/bell.svg")} 
+          src={hasUnread ? getStaticUrl("/static/icons/accounts/bell-dot.svg") : getStaticUrl("/static/icons/accounts/4d662.bell.svg")} 
           alt="Уведомления" 
-          width={18} 
-          height={18} 
-          className="w-[18px] h-[18px]"
+          width={24} 
+          height={24} 
+          className="w-[20px] h-[20px]"
         />
       </button>
 

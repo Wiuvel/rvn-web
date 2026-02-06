@@ -46,7 +46,7 @@ function isPopupWindow(): boolean {
 // Helper function to send message to parent and close popup
 function sendMessageAndClose(
   type: 'OAUTH_SUCCESS' | 'OAUTH_ERROR', 
-  data: { dashboard_token?: string; redirect?: string; error?: string },
+  data: { user_id?: string; redirect?: string; error?: string },
   setError?: (message: string | null) => void,
   setStatus?: (status: 'loading' | 'redirecting' | 'processing' | 'error') => void
 ): boolean {
@@ -151,16 +151,16 @@ function OAuthHandlerContent() {
     if (handled) return;
     
     const success = searchParams.get('success');
-    const dashboardToken = searchParams.get('dashboard_token');
+    const userId = searchParams.get('user_id');
     
-    if (success && dashboardToken) {
+    if (success && userId) {
       setHandled(true);
       setStatus('processing');
       
       // CRITICAL: If in popup, send message and close - NEVER redirect
       const wasHandled = sendMessageAndClose('OAUTH_SUCCESS', {
-        dashboard_token: dashboardToken,
-        redirect: `/dashboard/${dashboardToken}`
+        user_id: userId,
+        redirect: `/dashboard/${userId}`
       }, setErrorMessage, setStatus);
       
       if (!wasHandled) {
@@ -172,7 +172,7 @@ function OAuthHandlerContent() {
         } catch {
           // sessionStorage may be unavailable
         }
-        window.location.href = `/dashboard/${dashboardToken}`;
+        window.location.href = `/dashboard/${userId}`;
       }
       
       return;

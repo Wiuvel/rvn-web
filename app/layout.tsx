@@ -13,7 +13,7 @@ import LoadingSpinner from "@/components/ui/LoadingSpinner";
 // Force dynamic rendering to support maintenance mode checks via headers/cookies
 export const dynamic = 'force-dynamic';
 
-// Генерируем URL для favicon
+// Generate favicon URLs
 const getFaviconUrl = (path: string) => getStaticUrl(path);
 
 export const metadata: Metadata = {

@@ -74,6 +74,26 @@ export default function Header({ variant = 'main' }: HeaderProps = {}) {
     };
   }, [userData?.avatar]);
 
+  // Prefetch critical icons for dashboard to prevent loading glitches
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    // Only prefetch if on dashboard or if user is logged in (likely to open menu)
+    if (pathname?.startsWith('/dashboard') || userData) {
+      const iconsToPrefetch = [
+        "/static/icons/accounts/7d971.profile.svg",
+        "/static/icons/accounts/7d972.wallet.svg",
+        "/static/icons/accounts/7d973.support.svg",
+        "/static/icons/accounts/4d661-logout.svg",
+      ];
+      
+      iconsToPrefetch.forEach(src => {
+        const img = document.createElement('img');
+        img.src = getStaticUrl(src);
+      });
+    }
+  }, [pathname, userData]);
+
   useEffect(() => {
     if (typeof window === 'undefined' || !headerRef.current) return;
     
@@ -266,9 +286,9 @@ export default function Header({ variant = 'main' }: HeaderProps = {}) {
             <div 
               ref={authContainerRef}
               className="h-10 min-w-[100px] flex items-center justify-end transition-opacity duration-300"
-              style={{ opacity: loading ? 0.7 : 1 }}
+              style={{ opacity: loading && !userData ? 0.7 : 1 }}
             >
-              {loading ? (
+              {loading && !userData ? (
                 <div 
                   ref={spinnerRef}
                   className="w-10 h-10 rounded-full bg-gradient-to-r from-neutral-700 via-neutral-600 to-neutral-700 bg-[length:200%_100%] animate-[shimmer_1.5s_ease-in-out_infinite] flex-shrink-0"
@@ -326,12 +346,12 @@ export default function Header({ variant = 'main' }: HeaderProps = {}) {
                           </>
                         ) : (
                           <>
-                            {loading && (
+                            {loading && !userData?.id && (
                               <div 
                                 className="absolute inset-0 rounded-full bg-gradient-to-r from-neutral-700 via-neutral-600 to-neutral-700 bg-[length:200%_100%] animate-[shimmer_1.5s_ease-in-out_infinite]"
                               />
                             )}
-                            <div className={`${loading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300`}>
+                            <div className={`${loading && !userData?.id ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300`}>
                     {getInitial(userData.username)}
                             </div>
                           </>
@@ -356,7 +376,7 @@ export default function Header({ variant = 'main' }: HeaderProps = {}) {
                   className="rounded-xl bg-primary-500 hover:bg-primary-400 px-4 py-2 text-sm font-medium text-white shadow-glow transition flex items-center gap-2 h-10 flex-shrink-0 min-w-[110px] justify-center"
                 >
                   <Image 
-                    src={getStaticUrl("/static/icons/accounts/log-in.svg")} 
+                    src={getStaticUrl("/static/icons/accounts/4d660.login.svg")} 
                     alt="Войти" 
                     width={24} 
                     height={24} 
@@ -369,7 +389,7 @@ export default function Header({ variant = 'main' }: HeaderProps = {}) {
           </div>
           <div className="lg:hidden flex items-center gap-2">
             {/* Кнопка уведомлений для мобильных - только для авторизированных пользователей */}
-            {!loading && userData && (
+            {userData && (
               <NotificationsWidget isMobile={true} />
             )}
             <button 
@@ -395,7 +415,7 @@ export default function Header({ variant = 'main' }: HeaderProps = {}) {
         {open && (
           <div className="lg:hidden mt-4 py-4 bg-black/50 backdrop-blur-xl rounded-2xl border border-white/10">
             <div className="px-4 space-y-2">
-              {loading ? (
+              {loading && !userData ? (
                 <div className="h-12 flex items-center">
                   <div 
                     ref={mobileSpinnerRef}
@@ -405,7 +425,7 @@ export default function Header({ variant = 'main' }: HeaderProps = {}) {
               ) : userData ? (
                 <>
                   <Link
-                    href={`/dashboard/${userData.dashboard_token}`}
+                    href={`/dashboard/${userData.user_id}`}
                     onClick={() => setOpen(false)}
                     className="block p-4 border-b border-white/10 hover:bg-white/5 transition-colors duration-200 cursor-pointer mx-2 my-1 rounded-xl"
                   >
@@ -450,12 +470,12 @@ export default function Header({ variant = 'main' }: HeaderProps = {}) {
                               </>
                             ) : (
                               <>
-                                {loading && (
+                                {loading && !userData?.id && (
                                   <div 
                                     className="absolute inset-0 rounded-full bg-gradient-to-r from-neutral-700 via-neutral-600 to-neutral-700 bg-[length:200%_100%] animate-[shimmer_1.5s_ease-in-out_infinite]"
                                   />
                                 )}
-                                <div className={`${loading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300`}>
+                                <div className={`${loading && !userData?.id ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300`}>
                         {getInitial(userData.username)}
                       </div>
                               </>
@@ -486,12 +506,12 @@ export default function Header({ variant = 'main' }: HeaderProps = {}) {
                   </Link>
                   <div className="py-2">
                     <Link
-                      href={`/dashboard/${userData.dashboard_token}`}
+                      href={`/dashboard/${userData.user_id}`}
                       onClick={() => setOpen(false)}
                       className="flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-xl text-white/80 hover:text-white hover:bg-white/5 transition-colors duration-200"
                     >
                       <Image 
-                        src={getStaticUrl("/static/icons/accounts/users.svg")} 
+                        src={getStaticUrl("/static/icons/accounts/7d971.profile.svg")} 
                         alt="Профиль" 
                         width={24} 
                         height={24} 
@@ -500,12 +520,12 @@ export default function Header({ variant = 'main' }: HeaderProps = {}) {
                       <span>Профиль</span>
                     </Link>
                     <Link
-                      href={`/dashboard/${userData.dashboard_token}#subscriptions`}
+                      href={`/dashboard/${userData.user_id}#subscriptions`}
                       onClick={() => setOpen(false)}
                       className="flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-xl text-white/80 hover:text-white hover:bg-white/5 transition-colors duration-200"
                     >
                       <Image 
-                        src={getStaticUrl("/static/icons/accounts/wallet.svg")} 
+                        src={getStaticUrl("/static/icons/accounts/7d972.wallet.svg")} 
                         alt="Мои тарифы" 
                         width={24} 
                         height={24} 
@@ -519,7 +539,7 @@ export default function Header({ variant = 'main' }: HeaderProps = {}) {
                       className="flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-xl text-white/80 hover:text-white hover:bg-white/5 transition-colors duration-200"
                     >
                       <Image 
-                        src={getStaticUrl("/static/icons/accounts/support.svg")} 
+                        src={getStaticUrl("/static/icons/accounts/7d973.support.svg")} 
                         alt="Поддержка" 
                         width={24} 
                         height={24} 
@@ -545,7 +565,7 @@ export default function Header({ variant = 'main' }: HeaderProps = {}) {
                       className="w-full flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-xl text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors duration-200"
                     >
                       <Image 
-                        src={getStaticUrl("/static/icons/accounts/log-out.svg")} 
+                        src={getStaticUrl("/static/icons/accounts/4d661-logout.svg")} 
                         alt="Выйти" 
                         width={24} 
                         height={24} 
@@ -575,4 +595,3 @@ export default function Header({ variant = 'main' }: HeaderProps = {}) {
     </header>
   );
 }
-

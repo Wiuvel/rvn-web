@@ -7,9 +7,12 @@ import dynamic from 'next/dynamic';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { translateError } from '@/lib/utils/error-translations';
+import { ERROR_NETWORK } from '@/lib/utils/constants';
 import { getOAuthErrorMessage } from '@/lib/utils/oauth-errors';
 import { loginSchema, registerSchema, type LoginFormData, type RegisterFormData } from '@/lib/validation/schemas';
 import { getStaticUrl } from '@/lib/utils';
+import { calculatePasswordStrength } from '@/lib/utils/password';
+import { useRateLimitedFetch } from '@/hooks/useRateLimitedFetch';
 
 interface WindowWithPopup extends Window {
   __lastPopup?: Window & {
@@ -44,11 +47,15 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
   const [isLoading, setIsLoading] = useState(false);
   const [isPopupOpen, setIsPopupOpen] = useState(false);
   const [activeProvider, setActiveProvider] = useState<string | null>(null);
-  const [showRateLimitCaptcha, setShowRateLimitCaptcha] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
-  const isCaptchaOpenRef = useRef(false);
-  const pendingRequestsQueueRef = useRef<Array<() => Promise<void>>>([]);
-  const isProcessingCaptchaRef = useRef(false);
+  
+  const { 
+    showRateLimitCaptcha, 
+    setShowRateLimitCaptcha, 
+    fetchWithRateLimit, 
+    handleRateLimitSuccess,
+    handleRateLimitClose
+  } = useRateLimitedFetch();
   
   // React Hook Form setup for login
   const loginForm = useForm<LoginFormData>({
@@ -81,84 +88,6 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
     register: false,
     login: false
   });
-  
-  // Функция для расчета силы пароля
-  const calculatePasswordStrength = (password: string): {
-    score: number; // 0-4
-    label: string;
-    color: string;
-    requirements: {
-      minLength: boolean;
-      hasUpperCase: boolean;
-      hasLowerCase: boolean;
-      hasNumber: boolean;
-      hasSpecialChar: boolean;
-    };
-  } => {
-    if (!password) {
-      return {
-        score: 0,
-        label: '',
-        color: '',
-        requirements: {
-          minLength: false,
-          hasUpperCase: false,
-          hasLowerCase: false,
-          hasNumber: false,
-          hasSpecialChar: false
-        }
-      };
-    }
-
-    const requirements = {
-      minLength: password.length >= 6,
-      hasUpperCase: /[A-Z]/.test(password),
-      hasLowerCase: /[a-z]/.test(password),
-      hasNumber: /[0-9]/.test(password),
-      hasSpecialChar: /[!@#$%^&*()_+.\-=\[\]{};':"\\|,<>\/?]/.test(password)
-    };
-
-    let score = 0;
-    if (requirements.minLength) score++;
-    if (requirements.hasUpperCase) score++;
-    if (requirements.hasLowerCase) score++;
-    if (requirements.hasNumber) score++;
-    if (requirements.hasSpecialChar) score++;
-
-    // Нормализуем score до 0-4 для визуализации
-    let normalizedScore = 0;
-    let label = '';
-    let color = '';
-
-    if (score === 0) {
-      normalizedScore = 0;
-      label = '';
-      color = '';
-    } else if (score <= 2) {
-      normalizedScore = 1;
-      label = 'Слабый';
-      color = 'bg-red-500';
-    } else if (score === 3) {
-      normalizedScore = 2;
-      label = 'Средний';
-      color = 'bg-yellow-500';
-    } else if (score === 4) {
-      normalizedScore = 3;
-      label = 'Хороший';
-      color = 'bg-blue-500';
-    } else {
-      normalizedScore = 4;
-      label = 'Отличный';
-      color = 'bg-green-500';
-    }
-
-    return {
-      score: normalizedScore,
-      label,
-      color,
-      requirements
-    };
-  };
   
   const [showPassword, setShowPassword] = useState({
     register: false,
@@ -193,67 +122,6 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
       setShowPasswordStrength(prev => ({ ...prev, login: false }));
     }
   }, [loginPassword]);
-
-  // Обертка для fetch с обработкой rate limit
-  const fetchWithRateLimit = async (
-    url: string,
-    options: RequestInit = {},
-    retryCallback?: () => Promise<void>
-  ): Promise<Response> => {
-    const response = await fetch(url, options);
-    
-    if (response.status === 429) {
-      // Добавляем callback в очередь вместо перезаписи - исправляет race condition
-      if (retryCallback) {
-        pendingRequestsQueueRef.current.push(retryCallback);
-      }
-      
-      // Открываем модальное окно только если:
-      // 1. Оно еще не открыто
-      // 2. Капча не обрабатывается (предотвращает повторные открытия)
-      if (!isCaptchaOpenRef.current && !isProcessingCaptchaRef.current) {
-        isCaptchaOpenRef.current = true;
-        setShowRateLimitCaptcha(true);
-      }
-      throw new Error('RATE_LIMIT_EXCEEDED');
-    }
-    
-    return response;
-  };
-
-  const handleRateLimitSuccess = async () => {
-    // Устанавливаем флаг обработки капчи - предотвращает повторные открытия
-    isProcessingCaptchaRef.current = true;
-    
-    // Закрываем модальное окно
-    isCaptchaOpenRef.current = false;
-    setShowRateLimitCaptcha(false);
-    
-    // Увеличиваем задержку для гарантированного применения иммунитета на сервере
-    // Cookie устанавливается сразу, но store может обновиться с небольшой задержкой
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // Обрабатываем ВСЕ запросы из очереди последовательно
-    const queue = [...pendingRequestsQueueRef.current];
-    pendingRequestsQueueRef.current = []; // Очищаем очередь сразу
-    
-    for (const requestCallback of queue) {
-      try {
-        await requestCallback();
-      } catch (error) {
-        // Если запрос снова получил rate limit после иммунитета - это критическая ошибка
-        // НЕ добавляем обратно в очередь и НЕ показываем капчу снова
-        if (error instanceof Error && error.message === 'RATE_LIMIT_EXCEEDED') {
-          // Rate limit все еще активен - не логируем
-        } else {
-          // Ошибка при повторном запросе - не логируем
-        }
-      }
-    }
-    
-    // Сбрасываем флаг обработки только после обработки всех запросов
-    isProcessingCaptchaRef.current = false;
-  };
 
   const fetchCsrfToken = async (): Promise<string | null> => {
     try {
@@ -300,7 +168,7 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
         
         const responseData = await response.json();
         if (response.ok) {
-          window.location.href = `/dashboard/${responseData.dashboard_token}`;
+          window.location.href = `/dashboard/${responseData.user_id}`;
         } else {
           const translatedError = translateError(responseData.error || 'Ошибка регистрации');
           setGlobalError(escapeHtml(translatedError));
@@ -314,7 +182,7 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
           // Rate limit обработан, запрос добавлен в очередь
           setIsLoading(false);
         } else {
-          setGlobalError('API ERROR: 405.');
+          setGlobalError(translateError(ERROR_NETWORK));
           fetchCsrfToken();
           setIsLoading(false);
         }
@@ -350,7 +218,7 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
           if (retpatch && retpatch !== '/dashboard/') {
             window.location.href = retpatch;
           } else {
-            window.location.href = `/dashboard/${responseData.dashboard_token}`;
+            window.location.href = `/dashboard/${responseData.user_id}`;
           }
         } else {
           setLoginAttemptState('error');
@@ -367,7 +235,7 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
           setIsLoading(false);
         } else {
           setLoginAttemptState('error');
-          setGlobalError('Ошибка сети. Попробуйте позже.');
+          setGlobalError(translateError(ERROR_NETWORK));
           fetchCsrfToken();
           setIsLoading(false);
         }
@@ -417,8 +285,8 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
         // Redirect to dashboard
         if (event.data.redirect) {
           window.location.href = event.data.redirect;
-        } else if (event.data.dashboard_token) {
-          window.location.href = `/dashboard/${event.data.dashboard_token}`;
+        } else if (event.data.user_id) {
+          window.location.href = `/dashboard/${event.data.user_id}`;
         }
       } else if (event.data.type === 'OAUTH_ERROR') {
         // Clear any intervals
@@ -1041,13 +909,7 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
       <RateLimitCaptcha
         isOpen={showRateLimitCaptcha}
         onSuccess={handleRateLimitSuccess}
-        onClose={() => {
-          // При закрытии очищаем очередь и сбрасываем все флаги
-          isCaptchaOpenRef.current = false;
-          isProcessingCaptchaRef.current = false;
-          setShowRateLimitCaptcha(false);
-          pendingRequestsQueueRef.current = [];
-        }}
+        onClose={handleRateLimitClose}
       />
     </>
   );

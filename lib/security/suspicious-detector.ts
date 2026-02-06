@@ -33,6 +33,46 @@ interface RequestInfo {
   acceptLanguage: string | null;
 }
 
+// Regex Constants for better performance
+const SUSPICIOUS_UA_PATTERNS = [
+  /^$/, // Empty
+  /^[a-z]{1,3}$/i, // Too short
+  /curl|wget|python|java|go-http|scrapy|httpie|postman|insomnia|rest-client/i, // Dev tools/scrapers
+  /bot.*bot/i, // Double bot mention
+  /^Mozilla\/4\.0$/, // Old Mozilla
+  /^Mozilla\/5\.0$/, // Only version
+  /^Mozilla\/5\.0\s*$/, // Only version with spaces
+  /^python-requests|^go-http-client|^okhttp/i, // Known HTTP clients
+  /^$|^undefined$|^null$/i, // Invalid values
+];
+
+const BROWSER_MARKERS = /mozilla|chrome|safari|firefox|edge|opera/i;
+
+const ALLOWED_BOTS = [
+  /googlebot/i,
+  /yandex/i,
+  /bingbot/i,
+  /slurp/i, // Yahoo
+  /twitterbot/i,
+  /facebookexternalhit/i,
+  /telegrambot/i,
+  /discordbot/i,
+  /whatsapp/i,
+];
+
+const SUSPICIOUS_BOT_PATTERNS = [
+  /bot|crawler|spider|scraper|fetcher|parser/i,
+  /headless|phantom|selenium|webdriver|puppeteer|playwright/i,
+  /http|curl|wget|python|java|go-http/i,
+];
+
+const IPV4_REGEX = /^(\d{1,3}\.){3}\d{1,3}$/;
+const IPV6_REGEX = /^([0-9a-fA-F]{0,4}:){7}[0-9a-fA-F]{0,4}$/;
+
+const BROWSER_ACCEPT_TYPES = /text\/html|application\/xhtml|image|text\/css|application\/javascript|application\/json|text\/plain/i;
+const VALID_ACCEPT_LANGUAGE = /^[a-z]{2}(-[a-z]{2})?(\s*,\s*[a-z]{2}(-[a-z]{2})?(\s*;\s*q\s*=\s*0\.\d+)?)*$/i;
+const VALID_ACCEPT_ENCODING = /gzip|deflate|br|compress|identity/i;
+
 /**
  * Проверяет, является ли User-Agent подозрительным
  * Анализирует длину, структуру и известные паттерны автоматизированных инструментов
@@ -47,27 +87,18 @@ function isSuspiciousUserAgent(userAgent: string): boolean {
     return true;
   }
 
-  // Подозрительные паттерны автоматизированных инструментов
-  const suspiciousPatterns = [
-    /^$/, // Пустой
-    /^[a-z]{1,3}$/i, // Слишком короткий
-    /curl|wget|python|java|go-http|scrapy|httpie|postman|insomnia|rest-client/i, // Инструменты разработчика/скраперы
-    /bot.*bot/i, // Двойное упоминание bot
-    /^Mozilla\/4\.0$/, // Старый Mozilla без деталей
-    /^Mozilla\/5\.0$/, // Только версия без деталей
-    /^Mozilla\/5\.0\s*$/, // Только версия с пробелами
-    /^python-requests|^go-http-client|^okhttp/i, // Известные HTTP клиенты
-    /^$|^undefined$|^null$/i, // Невалидные значения
-  ];
-
   // Проверка на отсутствие типичных браузерных маркеров
-  const hasBrowserMarkers = /mozilla|chrome|safari|firefox|edge|opera/i.test(userAgent);
+  const hasBrowserMarkers = BROWSER_MARKERS.test(userAgent);
   if (!hasBrowserMarkers && userAgent.length > 0) {
     // Если нет браузерных маркеров, но есть UA - подозрительно
+    // Но сначала проверим, не бот ли это
+    if (isAllowedBot(userAgent)) {
+      return false;
+    }
     return true;
   }
 
-  return suspiciousPatterns.some(pattern => pattern.test(userAgent));
+  return SUSPICIOUS_UA_PATTERNS.some(pattern => pattern.test(userAgent));
 }
 
 /**
@@ -81,7 +112,6 @@ function hasMissingHeaders(headers: Record<string, string | null>): boolean {
   // Если отсутствуют 2 или более важных заголовка - подозрительно
   const missingCount = importantHeaders.filter(header => !headers[header] || headers[header]?.trim() === '').length;
   
-  // Также проверяем качество заголовков
   const hasAccept = !!headers['accept'] && headers['accept']!.length > 0;
   const hasAcceptLanguage = !!headers['accept-language'] && headers['accept-language']!.length > 0;
   const hasAcceptEncoding = !!headers['accept-encoding'] && headers['accept-encoding']!.length > 0;
@@ -99,14 +129,15 @@ function hasMissingHeaders(headers: Record<string, string | null>): boolean {
  */
 function isSuspiciousIP(ip: string): boolean {
   if (!ip) return true;
+  return !IPV4_REGEX.test(ip) && !IPV6_REGEX.test(ip);
+}
 
-  // Проверяем на известные прокси/VPN паттерны (можно расширить)
-  // Здесь можно добавить проверку через API или базу данных
-  // Пока проверяем только формат
-  const ipv4Regex = /^(\d{1,3}\.){3}\d{1,3}$/;
-  const ipv6Regex = /^([0-9a-fA-F]{0,4}:){7}[0-9a-fA-F]{0,4}$/;
-  
-  return !ipv4Regex.test(ip) && !ipv6Regex.test(ip);
+/**
+ * Проверяет, является ли посетитель разрешенным ботом (Google, Yandex и др.)
+ */
+export function isAllowedBot(userAgent: string): boolean {
+  if (!userAgent) return false;
+  return ALLOWED_BOTS.some(pattern => pattern.test(userAgent));
 }
 
 /**
@@ -115,27 +146,12 @@ function isSuspiciousIP(ip: string): boolean {
 function isBotPattern(userAgent: string): boolean {
   if (!userAgent) return true;
 
-  // Разрешенные боты (Google, Yandex) - НЕ подозрительны
-  const allowedBots = [
-    /googlebot/i,
-    /yandex/i,
-    /bingbot/i,
-    /slurp/i, // Yahoo
-  ];
-
   // Если это разрешенный бот - не подозрительно
-  if (allowedBots.some(pattern => pattern.test(userAgent))) {
+  if (isAllowedBot(userAgent)) {
     return false;
   }
 
-  // Подозрительные паттерны ботов
-  const botPatterns = [
-    /bot|crawler|spider|scraper|fetcher|parser/i,
-    /headless|phantom|selenium|webdriver|puppeteer|playwright/i,
-    /http|curl|wget|python|java|go-http/i,
-  ];
-
-  return botPatterns.some(pattern => pattern.test(userAgent));
+  return SUSPICIOUS_BOT_PATTERNS.some(pattern => pattern.test(userAgent));
 }
 
 /**
@@ -147,16 +163,14 @@ function hasSuspiciousBehavior(headers: Record<string, string | null>, referer: 
   const hasAcceptEncoding = !!headers['accept-encoding'] && headers['accept-encoding']!.length > 0;
 
   // Если есть accept, но нет accept-language и accept-encoding - подозрительно
-  // Реальные браузеры всегда отправляют все три заголовка вместе
   if (hasAccept && !hasAcceptLanguage && !hasAcceptEncoding) {
     return true;
   }
 
   // Подозрительный Accept header (не браузерный)
-  // Браузеры обычно запрашивают HTML, CSS, JS, изображения
   if (headers['accept']) {
     const acceptValue = headers['accept'].toLowerCase();
-    const hasBrowserAccept = /text\/html|application\/xhtml|image|text\/css|application\/javascript|application\/json|text\/plain/i.test(acceptValue);
+    const hasBrowserAccept = BROWSER_ACCEPT_TYPES.test(acceptValue);
     
     // Если accept не содержит типичных браузерных типов - подозрительно
     if (!hasBrowserAccept) {
@@ -165,7 +179,6 @@ function hasSuspiciousBehavior(headers: Record<string, string | null>, referer: 
     
     // Проверка на подозрительные паттерны в Accept
     if (/^\*\/\*$/.test(acceptValue.trim())) {
-      // Accept: */* без специфики - подозрительно
       return true;
     }
   }
@@ -173,9 +186,7 @@ function hasSuspiciousBehavior(headers: Record<string, string | null>, referer: 
   // Проверка Accept-Language на валидность
   if (headers['accept-language']) {
     const langValue = headers['accept-language'].toLowerCase();
-    // Валидный формат: en-US,en;q=0.9 или просто en
-    if (!/^[a-z]{2}(-[a-z]{2})?(\s*,\s*[a-z]{2}(-[a-z]{2})?(\s*;\s*q\s*=\s*0\.\d+)?)*$/i.test(langValue)) {
-      // Невалидный формат - подозрительно
+    if (!VALID_ACCEPT_LANGUAGE.test(langValue)) {
       return true;
     }
   }
@@ -183,9 +194,7 @@ function hasSuspiciousBehavior(headers: Record<string, string | null>, referer: 
   // Проверка Accept-Encoding
   if (headers['accept-encoding']) {
     const encodingValue = headers['accept-encoding'].toLowerCase();
-    // Браузеры обычно поддерживают gzip, deflate, br
-    if (!/gzip|deflate|br|compress|identity/i.test(encodingValue)) {
-      // Необычное кодирование - подозрительно
+    if (!VALID_ACCEPT_ENCODING.test(encodingValue)) {
       return true;
     }
   }
@@ -214,34 +223,17 @@ export function detectSuspiciousVisitor(requestInfo: RequestInfo): SuspicionFact
   };
 
   // Вычисляем общий счет подозрительности (0-100)
-  // Веса факторов основаны на их важности для определения ботов
   let score = 0;
 
-  if (factors.suspiciousUserAgent) score += 30; // Высокий вес - UA основной индикатор
-  if (factors.missingHeaders) score += 20; // Средний вес - отсутствие заголовков подозрительно
-  if (factors.suspiciousIP) score += 15; // Низкий вес - формат IP может быть валидным, но необычным
-  if (factors.botPattern) score += 25; // Высокий вес - явные паттерны ботов
-  if (factors.suspiciousBehavior) score += 10; // Низкий вес - поведенческие сигналы менее надежны
+  if (factors.suspiciousUserAgent) score += 30;
+  if (factors.missingHeaders) score += 20;
+  if (factors.suspiciousIP) score += 15;
+  if (factors.botPattern) score += 25;
+  if (factors.suspiciousBehavior) score += 10;
 
   factors.score = Math.min(score, 100);
 
   return factors;
-}
-
-/**
- * Проверяет, является ли посетитель разрешенным ботом (Google, Yandex)
- */
-export function isAllowedBot(userAgent: string): boolean {
-  if (!userAgent) return false;
-
-  const allowedBots = [
-    /googlebot/i,
-    /yandex/i,
-    /bingbot/i,
-    /slurp/i, // Yahoo
-  ];
-
-  return allowedBots.some(pattern => pattern.test(userAgent));
 }
 
 /**
@@ -267,8 +259,7 @@ export function shouldShowProtection(
   // Определяем подозрительность
   const factors = detectSuspiciousVisitor(requestInfo);
 
-  // Если счет подозрительности выше порога - показываем защиту
-  // Порог можно настроить (например, 30 = показывать только явно подозрительным)
+  // Порог подозрительности
   const SUSPICION_THRESHOLD = 30;
 
   return factors.score >= SUSPICION_THRESHOLD;

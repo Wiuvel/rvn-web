@@ -31,7 +31,9 @@ import {
   ERROR_SUBJECT_TOO_LONG,
   ERROR_MAXIMUM_TICKET_LIMIT_REACHED,
   ERROR_INVALID_STATUS_TRANSITION,
-  ERROR_TICKET_NOT_ASSIGNED
+  ERROR_TICKET_NOT_ASSIGNED,
+  ERROR_NETWORK,
+  ERROR_POPUP_BLOCKED
 } from './constants';
 
 const errorTranslations: Record<string, string> = {
@@ -56,6 +58,8 @@ const errorTranslations: Record<string, string> = {
   [ERROR_DATABASE_NOT_CONFIGURED]: 'База данных не настроена',
   [ERROR_DATABASE_ERROR]: 'Ошибка базы данных',
   [ERROR_UNEXPECTED]: 'Неожиданная ошибка',
+  [ERROR_NETWORK]: 'Ошибка сети. Попробуйте позже.',
+  [ERROR_POPUP_BLOCKED]: 'Всплывающие окна заблокированы. Разрешите их.',
   
   // Support API Errors
   [ERROR_TICKET_NOT_FOUND]: 'Тикет не найден',
@@ -86,6 +90,10 @@ const errorTranslations: Record<string, string> = {
   'Пользователь с таким именем уже существует': 'Пользователь с таким именем уже существует',
   'Не удалось создать аккаунт': 'Не удалось создать аккаунт',
   'Непредвиденная ошибка': 'Непредвиденная ошибка',
+  
+  // English errors from lib/auth/index.ts
+  'User with this username already exists': 'Пользователь с таким именем уже существует',
+  'This account uses OAuth authentication. Please sign in with your OAuth provider.': 'Этот аккаунт использует вход через OAuth. Пожалуйста, войдите через социальную сеть.',
   
   // OAuth errors
   'rate_limit': 'Слишком много попыток. Попробуйте позже.',

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { uploadFileToS3, generateStoragePath, validateFile } from '@/lib/storage/s3-client';
-import { getUserByToken } from '@/lib/auth/index';
+import { checkAuth } from '@/lib/auth/helper';
 import { setCorsHeaders, handleCorsPreflight } from '@/lib/security/cors';
 import { generalRateLimit } from '@/lib/security/rate-limit';
 import { supabaseAdmin } from '@/lib/database/supabase';
@@ -32,12 +31,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Проверка авторизации
-    const cookieStore = await cookies();
-    const isAuthenticated = cookieStore.get('user_authenticated')?.value === 'true';
-    const dashboardToken = cookieStore.get('dashboard_token')?.value;
-
-    if (!isAuthenticated || !dashboardToken) {
+    const authResult = await checkAuth(request);
+    if (!authResult.isAuthenticated || !authResult.user) {
       return setCorsHeaders(
         NextResponse.json(
           { error: 'NOT_AUTHENTICATED' },
@@ -45,16 +40,7 @@ export async function POST(request: NextRequest) {
         )
       );
     }
-
-    const user = await getUserByToken(dashboardToken);
-    if (!user) {
-      return setCorsHeaders(
-        NextResponse.json(
-          { error: 'NOT_AUTHENTICATED' },
-          { status: 401 }
-        )
-      );
-    }
+    const user = authResult.user;
 
     // Получаем ticketId из query параметров
     const { searchParams } = new URL(request.url);

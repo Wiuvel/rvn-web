@@ -1,3 +1,4 @@
+import { randomBytes } from 'crypto';
 import bcrypt from 'bcryptjs';
 import { supabaseAdmin, Admin } from '../database/supabase';
 import { logger } from '../utils/secure-logger';
@@ -170,37 +171,34 @@ export interface User {
   password_hash: string | null;
   avatar?: string | null;
   banner?: string | null;
-  dashboard_token: string;
+  token: string;
   is_active: boolean;
   last_login?: string;
   created_at: string;
   updated_at: string;
 }
 
-// Generate 8-digit dashboard token
-export function generateDashboardToken(): string {
-  const digits = '0123456789';
-  let token = '';
-  for (let i = 0; i < 8; i++) {
-    token += digits[Math.floor(Math.random() * digits.length)];
+/** Base64url alphabet (без +, /, =) */
+const BASE64URL_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+
+/** Генерирует auth token: 15 символов base64url (crypto random) */
+export function generateAuthToken(): string {
+  const bytes = randomBytes(15);
+  let result = '';
+  for (let i = 0; i < 15; i++) {
+    result += BASE64URL_ALPHABET[bytes[i]! % 64];
   }
-  return token;
+  return result;
 }
 
-// Generate unique user ID (2 letters + 4 digits)
+/** @deprecated Use generateAuthToken */
+export const generateDashboardToken = generateAuthToken;
+
+/** Генерирует user_id: 6 цифр (000000–999999) */
 export function generateUserId(): string {
-  const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-  const digits = '0123456789';
-  
-  let id = '';
-  for (let i = 0; i < 2; i++) {
-    id += letters[Math.floor(Math.random() * letters.length)];
-  }
-  for (let i = 0; i < 4; i++) {
-    id += digits[Math.floor(Math.random() * digits.length)];
-  }
-  
-  return id;
+  const bytes = randomBytes(4);
+  const num = bytes.readUInt32BE(0) % 1000000;
+  return num.toString().padStart(6, '0');
 }
 
 // Create new user account
@@ -241,7 +239,7 @@ export async function createUser(username: string, password: string): Promise<{ 
     }
 
     const passwordHash = await hashPassword(password);
-    const dashboardToken = generateDashboardToken();
+    const authToken = generateAuthToken();
     let userId = generateUserId();
     
     let retryCount = 0;
@@ -270,7 +268,7 @@ export async function createUser(username: string, password: string): Promise<{ 
         user_id: userId,
         username: username,
         password_hash: passwordHash,
-        dashboard_token: dashboardToken,
+        token: authToken,
         avatar: avatar
       })
       .select()
@@ -361,26 +359,42 @@ export async function authenticateUser(username: string, password: string): Prom
   }
 }
 
-export async function getUserByToken(dashboardToken: string): Promise<User | null> {
+export async function getUserByToken(authToken: string): Promise<User | null> {
   try {
-    if (!supabaseAdmin) {
-      return null;
-    }
+    if (!supabaseAdmin) return null;
 
     const { data: user, error } = await supabaseAdmin
       .from('users')
       .select('*')
-      .eq('dashboard_token', dashboardToken)
+      .eq('token', authToken)
       .eq('is_active', true)
       .single();
 
-    if (error || !user) {
-      return null;
-    }
-
+    if (error || !user) return null;
     return user as User;
   } catch (error) {
     logger.error('Error getting user by token', {
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+    return null;
+  }
+}
+
+export async function getUserById(userId: string): Promise<User | null> {
+  try {
+    if (!supabaseAdmin) return null;
+
+    const { data: user, error } = await supabaseAdmin
+      .from('users')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('is_active', true)
+      .single();
+
+    if (error || !user) return null;
+    return user as User;
+  } catch (error) {
+    logger.error('Error getting user by id', {
       error: error instanceof Error ? error.message : 'Unknown error'
     });
     return null;
@@ -523,8 +537,8 @@ export async function createUserFromOAuth(email: string, preferredUsername?: str
       retryCount++;
     }
 
-    // Generate dashboard token and avatar
-    const dashboardToken = generateDashboardToken();
+    // Generate auth token and avatar
+    const authToken = generateAuthToken();
     
     // Попытка загрузить аватар из OAuth провайдера
     let avatar: string = generateRandomAvatar(); // Fallback на случайный градиент
@@ -555,7 +569,7 @@ export async function createUserFromOAuth(email: string, preferredUsername?: str
         user_id: userId,
         username: username,
         password_hash: null, // OAuth users don't have passwords
-        dashboard_token: dashboardToken,
+        token: authToken,
         avatar: avatar,
         is_active: true
       })

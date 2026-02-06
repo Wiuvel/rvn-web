@@ -1,7 +1,7 @@
 'use client';
 
 import { Renderer, Program, Mesh, Color, Triangle } from 'ogl';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useMemo } from 'react';
 
 const VERT = `#version 300 es
 in vec2 position;
@@ -118,11 +118,33 @@ interface AuroraBackgroundProps {
 }
 
 export default function AuroraBackground(props: AuroraBackgroundProps) {
-  const { colorStops = ['#5227FF', '#7cff67', '#5227FF'], amplitude = 1.0, blend = 0.5 } = props;
-  const propsRef = useRef(props);
-  propsRef.current = props;
-
+  const { colorStops = ['#5227FF', '#7cff67', '#5227FF'], amplitude = 1.0, blend = 0.5, time, speed = 1.0 } = props;
+  
   const ctnDom = useRef<HTMLDivElement>(null);
+  
+  // Memoize converted colors to avoid recalculation on every frame
+  const colorStopsArray = useMemo(() => {
+    return colorStops.map((hex: string) => {
+      const c = new Color(hex);
+      return [c.r, c.g, c.b];
+    });
+  }, [colorStops]);
+
+  // Refs for values used in animation loop
+  const timeRef = useRef(time);
+  const speedRef = useRef(speed);
+  const amplitudeRef = useRef(amplitude);
+  const blendRef = useRef(blend);
+  const colorStopsRef = useRef(colorStopsArray);
+
+  // Update refs when props change
+  useEffect(() => {
+    timeRef.current = time;
+    speedRef.current = speed;
+    amplitudeRef.current = amplitude;
+    blendRef.current = blend;
+    colorStopsRef.current = colorStopsArray;
+  }, [time, speed, amplitude, blend, colorStopsArray]);
 
   useEffect(() => {
     const ctn = ctnDom.current;
@@ -158,20 +180,15 @@ export default function AuroraBackground(props: AuroraBackgroundProps) {
       delete geometry.attributes.uv;
     }
 
-    const colorStopsArray = colorStops.map((hex: string) => {
-      const c = new Color(hex);
-      return [c.r, c.g, c.b];
-    });
-
     program = new Program(gl, {
       vertex: VERT,
       fragment: FRAG,
       uniforms: {
         uTime: { value: 0 },
-        uAmplitude: { value: amplitude },
-        uColorStops: { value: colorStopsArray },
+        uAmplitude: { value: amplitudeRef.current },
+        uColorStops: { value: colorStopsRef.current },
         uResolution: { value: [ctn.offsetWidth, ctn.offsetHeight] },
-        uBlend: { value: blend }
+        uBlend: { value: blendRef.current }
       }
     });
 
@@ -181,15 +198,15 @@ export default function AuroraBackground(props: AuroraBackgroundProps) {
     let animateId = 0;
     const update = (t: number) => {
       animateId = requestAnimationFrame(update);
-      const { time = t * 0.01, speed = 1.0 } = propsRef.current;
-      program.uniforms.uTime.value = time * speed * 0.1;
-      program.uniforms.uAmplitude.value = propsRef.current.amplitude ?? 1.0;
-      program.uniforms.uBlend.value = propsRef.current.blend ?? blend;
-      const stops = propsRef.current.colorStops ?? colorStops;
-      program.uniforms.uColorStops.value = stops.map((hex: string) => {
-        const c = new Color(hex);
-        return [c.r, c.g, c.b];
-      });
+      
+      const currentTime = timeRef.current !== undefined ? timeRef.current : t * 0.01;
+      const currentSpeed = speedRef.current;
+      
+      program.uniforms.uTime.value = currentTime * currentSpeed * 0.1;
+      program.uniforms.uAmplitude.value = amplitudeRef.current;
+      program.uniforms.uBlend.value = blendRef.current;
+      program.uniforms.uColorStops.value = colorStopsRef.current;
+      
       renderer.render({ scene: mesh });
     };
     animateId = requestAnimationFrame(update);
@@ -205,7 +222,7 @@ export default function AuroraBackground(props: AuroraBackgroundProps) {
       gl.getExtension('WEBGL_lose_context')?.loseContext();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [amplitude]);
+  }, []); // Run once on mount
 
   return (
     <div className="fixed inset-0 overflow-hidden pointer-events-none">

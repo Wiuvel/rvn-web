@@ -1,14 +1,14 @@
 /**
- * WebSocket события для системы поддержки
+ * WebSocket events for support system
  */
 
 export interface SupportWebSocketEvents {
-  // Клиент -> Сервер
+  // Client -> Server
   'support:join': (data: { ticketId: string; userId: string; isSupport: boolean }) => void;
   'support:leave': (data: { ticketId: string }) => void;
   'support:typing': (data: { ticketId: string; userId: string; isTyping: boolean }) => void;
 
-  // Сервер -> Клиент
+  // Server -> Client
   'support:message:new': (data: {
     ticketId: string;
     message: {

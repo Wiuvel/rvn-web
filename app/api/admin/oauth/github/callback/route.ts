@@ -289,10 +289,10 @@ export async function GET(request: NextRequest) {
     // Destroy old session if exists
     const oldSessionId = request.cookies.get(ADMIN_SESSION_COOKIE)?.value;
     if (oldSessionId) {
-      SessionManager.destroySession(oldSessionId);
+      await SessionManager.destroySession(oldSessionId);
     }
     
-    const sessionId = SessionManager.createSession(
+    const sessionId = await SessionManager.createSession(
       admin.id,
       sanitizeInput(githubUsername),
       ipAddress,

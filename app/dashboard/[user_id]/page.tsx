@@ -29,12 +29,13 @@ import {
   Smartphone,
   ShoppingBag
 } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
+import { NotificationsWidget } from '@/components/navigation/Notifications';
 
 interface UserData {
   id: string;
   user_id: string;
   username: string;
-  dashboard_token: string;
   created_at: string;
   last_login?: string;
   avatar?: string | null;
@@ -42,13 +43,6 @@ interface UserData {
   isSupport?: boolean;
   isAdmin?: boolean;
   balance?: number;
-}
-
-interface Notification {
-  id: string;
-  title: string;
-  message: string;
-  created_at: string;
 }
 
 // Компонент карточки статистики
@@ -84,30 +78,6 @@ function StatCard({
         </div>
         <div className="text-xl sm:text-2xl font-bold text-white">{value}</div>
         {subtext && <div className="mt-1 text-xs text-neutral-500">{subtext}</div>}
-      </div>
-    </div>
-  );
-}
-
-// Компонент статуса сервера
-function ServerStatus({ name, status, ping }: { name: string; status: 'ok' | 'load' | 'down'; ping?: number }) {
-  const statusConfig = {
-    ok: { color: 'bg-green-500', text: 'text-green-400', label: 'Online', glow: 'shadow-green-500/50' },
-    load: { color: 'bg-yellow-500', text: 'text-yellow-400', label: 'Load', glow: 'shadow-yellow-500/50' },
-    down: { color: 'bg-red-500', text: 'text-red-400', label: 'Offline', glow: 'shadow-red-500/50' }
-  };
-  
-  const config = statusConfig[status];
-  
-  return (
-    <div className="group flex items-center justify-between rounded-xl border border-neutral-800/50 bg-neutral-950/60 p-3 sm:p-4 hover:bg-neutral-900/60 hover:border-neutral-700/50 transition-all duration-200">
-      <div className="flex items-center gap-3">
-        <div className={`h-2.5 w-2.5 rounded-full ${config.color} ${config.glow} shadow-lg`} />
-        <span className="text-sm font-medium text-neutral-200">{name}</span>
-      </div>
-      <div className="flex items-center gap-3">
-        {ping && <span className="text-xs text-neutral-500">{ping}ms</span>}
-        <span className={`text-xs font-medium ${config.text}`}>{config.label}</span>
       </div>
     </div>
   );
@@ -150,8 +120,6 @@ function QuickAction({
   return <button onClick={onClick} className={className}>{content}</button>;
 }
 
-import { NotificationsWidget } from '@/components/navigation/Notifications';
-
 export default function DashboardPage() {
   const [open, setOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -164,7 +132,7 @@ export default function DashboardPage() {
   const [avatarLoading, setAvatarLoading] = useState(true);
   const router = useRouter();
   const params = useParams();
-  const token = params?.token as string;
+  const userId = params?.user_id as string;
   const userMenuRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   
@@ -174,7 +142,7 @@ export default function DashboardPage() {
   const serversRef = useFadeIn(0.4) as React.RefObject<HTMLDivElement>;
 
   useEffect(() => {
-    if (!token) {
+    if (!userId) {
       router.push('/auth');
       return;
     }
@@ -202,7 +170,7 @@ export default function DashboardPage() {
 
           if (response.ok) {
             const data = await response.json();
-            if (data.authenticated === false || !data.dashboard_token) {
+            if (data.authenticated === false || !data.user_id) {
               try {
                 await fetch('/api/auth/logout', {
                   method: 'POST',
@@ -214,8 +182,8 @@ export default function DashboardPage() {
               router.push('/auth');
               return;
             }
-            if (data.dashboard_token !== token) {
-              router.push(`/dashboard/${data.dashboard_token}`);
+            if (data.user_id !== userId) {
+              router.push(`/dashboard/${data.user_id}`);
               return;
             }
             setUserData(data);
@@ -274,7 +242,7 @@ export default function DashboardPage() {
         controller.abort();
       }
     };
-  }, [token, router]);
+  }, [userId, router]);
 
   const handleLogout = async () => {
     try {
@@ -297,15 +265,8 @@ export default function DashboardPage() {
     return `${day}.${month}.${year}`;
   };
 
-  const getShortId = (userId: string) => {
-    return userId;
-  };
+  const getShortId = (id: string) => id;
 
-  const getInitial = (username: string) => {
-    return username.charAt(0).toUpperCase();
-  };
-
-  // Получение информации о роли
   const getRoleInfo = () => {
     if (userData?.isAdmin) {
       return { label: 'Администратор', color: 'text-orange-500' };
@@ -316,7 +277,6 @@ export default function DashboardPage() {
     return { label: 'Пользователь', color: 'text-neutral-400' };
   };
 
-  // Обработка меню пользователя
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
@@ -350,7 +310,6 @@ export default function DashboardPage() {
     };
   }, [userMenuOpen]);
 
-  // Клики вне меню
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
@@ -382,7 +341,6 @@ export default function DashboardPage() {
 
   return (
     <div className="dashboard-page">
-      {/* Header - старый стиль */}
       <header className="fixed top-0 left-0 right-0 pt-4 z-[999]">
         <div className="mx-auto max-w-6xl px-4">
           <div className="backdrop-blur-lg bg-neutral-900/40 border border-white/10 rounded-full px-6 py-3 flex items-center justify-between shadow-lg">
@@ -392,7 +350,7 @@ export default function DashboardPage() {
             </Link>
             <nav className="hidden lg:flex items-center gap-8 text-sm text-neutral-300">
               <Link href="/" className="hover:text-white transition">Главная</Link>
-              <Link href={`/dashboard/${userData?.dashboard_token}`} className="hover:text-white transition">Профиль</Link>
+              <Link href={`/dashboard/${userData?.user_id}`} className="hover:text-white transition">Профиль</Link>
               <Link href="/support" className="hover:text-white transition">Поддержка</Link>
             </nav>
             {userData && (
@@ -420,7 +378,7 @@ export default function DashboardPage() {
                           unoptimized
                         />
                       ) : (
-                        getInitial(userData.username)
+                        userData.username.charAt(0).toUpperCase()
                       )}
                 </button>
                   );
@@ -431,7 +389,7 @@ export default function DashboardPage() {
                     className="absolute -right-3 top-full mt-4 w-64 bg-neutral-900/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-xl overflow-hidden z-50"
                   >
                     <Link
-                      href={`/dashboard/${userData.dashboard_token}`}
+                      href={`/dashboard/${userData.user_id}`}
                       onClick={() => setUserMenuOpen(false)}
                       className="block p-4 border-b border-white/10 hover:bg-white/5 transition-colors duration-200 cursor-pointer mx-2 my-1 rounded-xl"
                     >
@@ -452,7 +410,7 @@ export default function DashboardPage() {
                                   unoptimized
                                 />
                               ) : (
-                                getInitial(userData.username)
+                                userData.username.charAt(0).toUpperCase()
                               )}
                         </div>
                           );
@@ -465,15 +423,15 @@ export default function DashboardPage() {
                     </Link>
                     <div className="py-2">
                       <Link
-                        href={`/dashboard/${userData.dashboard_token}#subscriptions`}
+                        href={`/dashboard/${userData.user_id}#subscriptions`}
                         onClick={() => setUserMenuOpen(false)}
                         className="flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-xl text-white/80 hover:text-white hover:bg-white/5 transition-colors duration-200"
                       >
                         <Image 
-                          src="/static/icons/accounts/wallet.svg" 
+                          src="/static/icons/accounts/7d972.wallet.svg" 
                           alt="Мои тарифы" 
-                          width={20} 
-                          height={20} 
+                          width={24} 
+                          height={24} 
                           className="w-5 h-5"
                         />
                         <span>Мои тарифы</span>
@@ -484,10 +442,10 @@ export default function DashboardPage() {
                         className="flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-xl text-white/80 hover:text-white hover:bg-white/5 transition-colors duration-200"
                       >
                         <Image 
-                          src="/static/icons/accounts/support.svg" 
+                          src="/static/icons/accounts/7d973.support.svg" 
                           alt="Поддержка" 
-                          width={20} 
-                          height={20} 
+                          width={24} 
+                          height={24} 
                           className="w-5 h-5"
                         />
                         <span>Поддержка</span>
@@ -501,7 +459,7 @@ export default function DashboardPage() {
                         className="w-full flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-xl text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors duration-200"
                       >
                         <Image 
-                          src="/static/icons/accounts/log-out.svg" 
+                          src="/static/icons/accounts/4d661-logout.svg" 
                           alt="Выйти" 
                           width={20} 
                           height={20} 
@@ -527,12 +485,11 @@ export default function DashboardPage() {
               )}
             </button>
           </div>
-          {/* Mobile menu */}
           {open && userData && (
             <div className="lg:hidden mt-4 py-4 bg-black/50 backdrop-blur-lg rounded-2xl border border-white/10"style={{animation: 'fadeIn 0.2s ease-out'}}>
               <div className="px-4 space-y-2">
                 <Link
-                  href={`/dashboard/${userData.dashboard_token}`}
+                  href={`/dashboard/${userData.user_id}`}
                   onClick={() => setOpen(false)}
                   className="block p-4 border-b border-white/10 hover:bg-white/5 transition-colors duration-200 cursor-pointer mx-2 my-1 rounded-xl"
                 >
@@ -553,7 +510,7 @@ export default function DashboardPage() {
                               unoptimized
                             />
                           ) : (
-                            getInitial(userData.username)
+                            userData.username.charAt(0).toUpperCase()
                           )}
                     </div>
                       );
@@ -566,15 +523,15 @@ export default function DashboardPage() {
                 </Link>
                 <div className="py-2">
                   <Link
-                    href={`/dashboard/${userData.dashboard_token}#subscriptions`}
+                    href={`/dashboard/${userData.user_id}#subscriptions`}
                     onClick={() => setOpen(false)}
                     className="flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-xl text-white/80 hover:text-white hover:bg-white/5 transition-colors duration-200"
                   >
                     <Image 
-                      src="/static/icons/accounts/wallet.svg" 
+                      src="/static/icons/accounts/7d972.wallet.svg" 
                       alt="Мои тарифы" 
-                      width={20} 
-                      height={20} 
+                      width={24} 
+                      height={24} 
                       className="w-5 h-5"
                     />
                     <span>Мои тарифы</span>
@@ -585,10 +542,10 @@ export default function DashboardPage() {
                     className="flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-xl text-white/80 hover:text-white hover:bg-white/5 transition-colors duration-200"
                   >
                     <Image 
-                      src="/static/icons/accounts/support.svg" 
+                      src="/static/icons/accounts/7d973.support.svg" 
                       alt="Поддержка" 
-                      width={20} 
-                      height={20} 
+                      width={24} 
+                      height={24} 
                       className="w-5 h-5"
                     />
                     <span>Поддержка</span>
@@ -602,7 +559,7 @@ export default function DashboardPage() {
                     className="w-full flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-xl text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors duration-200"
                   >
                     <Image 
-                      src="/static/icons/accounts/log-out.svg" 
+                      src="/static/icons/accounts/4d661-logout.svg" 
                       alt="Выйти" 
                       width={20} 
                       height={20} 
@@ -617,9 +574,7 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      {/* Main content */}
       <main className="pt-32 pb-16 relative overflow-hidden">
-        {/* Background Decoration */}
         <svg className="absolute inset-0 w-full h-full opacity-20 -z-10" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none" aria-hidden="true">
           <defs>
             <radialGradient id="dash-grad" cx="50%" cy="50%" r="75%" fx="50%" fy="50%">
@@ -638,9 +593,7 @@ export default function DashboardPage() {
         <div className="pointer-events-none absolute -bottom-24 -left-24 w-72 h-72 bg-white/5 blur-[100px] rounded-full -z-10"></div>
         
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          {/* Hero Section with Banner */}
           <div ref={heroRef} className="relative mb-8">
-            {/* Banner */}
             <div className="relative h-40 sm:h-48 md:h-56 lg:h-64 rounded-xl overflow-hidden border border-neutral-800">
               {(() => {
                 const bannerUrl = userData ? getBannerUrl(userData.banner) : null;
@@ -658,7 +611,6 @@ export default function DashboardPage() {
                 );
               })()}
               
-              {/* Edit Banner Button */}
               <button
                 onClick={() => setShowBannerModal(true)}
                 className="absolute top-4 right-4 px-3 py-1.5 text-xs font-medium text-white/80 bg-black/30 hover:bg-black/50 backdrop-blur-md rounded-lg transition-all duration-200 flex items-center gap-1.5 border-0"
@@ -668,10 +620,8 @@ export default function DashboardPage() {
               </button>
             </div>
 
-            {/* Profile Info - под баннером */}
             <div className="relative mt-[-40px] sm:mt-[-50px] px-4 sm:px-6">
               <div className="flex items-end gap-4 sm:gap-6">
-                {/* Avatar - выступает над нижним краем баннера */}
                 {(() => {
                   const avatarUrl = getAvatarUrl(userData?.avatar);
                   const gradientClasses = getGradientClasses(userData?.avatar);
@@ -700,7 +650,6 @@ export default function DashboardPage() {
                         ) : (
                           userData?.username ? userData.username.charAt(0).toUpperCase() : '—'
                         )}
-                        {/* Dark overlay on hover — ring вместо border, чтобы закругление совпадало с аватаркой */}
                         <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center rounded-xl">
                           <Pencil className="w-5 h-5 text-white" />
                         </div>
@@ -709,7 +658,6 @@ export default function DashboardPage() {
                   );
                 })()}
 
-                {/* User Info - справа от аватарки */}
                 <div className="flex-1 min-w-0 pb-2">
                   <h1 className={`text-xl sm:text-2xl lg:text-3xl font-bold truncate mb-1 ${
                     userData?.isAdmin 
@@ -738,7 +686,6 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Stats Grid */}
           <div ref={statsRef} className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
             <StatCard
               icon={CreditCard}
@@ -776,11 +723,8 @@ export default function DashboardPage() {
             />
           </div>
 
-          {/* Two Column Layout */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
-            {/* Left Column - Quick Actions */}
             <div ref={actionsRef} className="lg:col-span-2 space-y-6">
-              {/* Quick Actions */}
               <div className="rounded-2xl border border-neutral-800 bg-neutral-900/50 p-4 sm:p-6 backdrop-blur-sm">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-lg font-semibold text-white">Быстрые действия</h2>
@@ -795,7 +739,7 @@ export default function DashboardPage() {
                   <QuickAction
                     icon={Smartphone}
                     label="Мои устройства"
-                    href={`/dashboard/${userData?.dashboard_token}#keys`}
+                    href={`/dashboard/${userData?.user_id}#keys`}
                   />
                   <QuickAction
                     icon={HeadphonesIcon}
@@ -805,12 +749,11 @@ export default function DashboardPage() {
                   <QuickAction
                     icon={Settings}
                     label="Настройки аккаунта"
-                    href={`/dashboard/${userData?.dashboard_token}#settings`}
+                    href={`/dashboard/${userData?.user_id}#settings`}
                   />
                 </div>
               </div>
 
-              {/* Subscription Info */}
               <div className="rounded-2xl border border-neutral-800 bg-neutral-900/50 p-4 sm:p-6 backdrop-blur-sm">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-lg font-semibold text-white">Мои покупки</h2>
@@ -825,9 +768,7 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* Right Column - Server Status */}
             <div ref={serversRef} className="space-y-6">
-              {/* Server Status */}
               <div className="rounded-2xl border border-neutral-800 bg-neutral-900/50 p-4 sm:p-6 backdrop-blur-sm">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
@@ -843,7 +784,6 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {/* Recent Activity */}
               <div className="rounded-2xl border border-neutral-800 bg-neutral-900/50 p-4 sm:p-6 backdrop-blur-sm">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
@@ -863,7 +803,6 @@ export default function DashboardPage() {
         </div>
       </main>
 
-      {/* Footer - старый стиль */}
       <footer className="mt-20 border-t border-neutral-800/50">
         <div className="mx-auto max-w-6xl px-4 py-8">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
@@ -877,7 +816,6 @@ export default function DashboardPage() {
         </div>
       </footer>
 
-      {/* Modals */}
       <AvatarUploadModal
         isOpen={showAvatarModal}
         onClose={() => setShowAvatarModal(false)}

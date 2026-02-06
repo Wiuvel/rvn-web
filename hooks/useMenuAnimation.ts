@@ -7,6 +7,7 @@ import { GSAP_DEFAULT_DURATION, GSAP_DEFAULT_EASE } from '@/lib/utils/constants'
 export interface UseMenuAnimationOptions {
   blockScroll?: boolean;
   onClose?: () => void;
+  persist?: boolean;
 }
 
 export function useMenuAnimation(
@@ -16,8 +17,8 @@ export function useMenuAnimation(
   shouldRender: boolean;
   menuRef: React.RefObject<HTMLDivElement | null>;
 } {
-  const { blockScroll = false, onClose } = options;
-  const [shouldRender, setShouldRender] = useState(false);
+  const { blockScroll = false, onClose, persist = false } = options;
+  const [shouldRender, setShouldRender] = useState(persist);
   const menuRef = useRef<HTMLDivElement>(null);
   const animationRef = useRef<gsap.core.Tween | null>(null);
 
@@ -42,7 +43,9 @@ export function useMenuAnimation(
           gsap.set(menuRef.current, {
             opacity: 0,
             y: -10,
-            scale: 0.95
+            scale: 0.95,
+            pointerEvents: 'auto',
+            display: 'block'
           });
           animationRef.current = gsap.to(menuRef.current, {
             opacity: 1,
@@ -58,7 +61,7 @@ export function useMenuAnimation(
       });
     } else {
 
-      if (shouldRender) {
+      if (shouldRender || (persist && menuRef.current)) {
         if (menuRef.current) {
 
           gsap.killTweensOf(menuRef.current);
@@ -70,18 +73,22 @@ export function useMenuAnimation(
             duration: 0.15,
             ease: "power2.in",
             onComplete: () => {
-              setShouldRender(false);
+              if (!persist) {
+                setShouldRender(false);
+              } else {
+                gsap.set(menuRef.current, { pointerEvents: 'none', display: 'none' });
+              }
               animationRef.current = null;
               if (onClose) onClose();
             }
           });
-        } else {
+        } else if (!persist) {
           setShouldRender(false);
           if (onClose) onClose();
         }
       }
     }
-  }, [isOpen, shouldRender, onClose]);
+  }, [isOpen, shouldRender, onClose, persist]);
 
   useEffect(() => {
     return () => {

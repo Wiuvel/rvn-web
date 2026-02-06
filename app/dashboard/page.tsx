@@ -11,9 +11,9 @@ export default function DashboardPage() {
     redirectOnFail: '/auth',
     redirectOnTimeout: '/error/500',
     onSuccess: (data) => {
-      // Редиректим на правильный URL с токеном
-      if (data.dashboard_token) {
-        router.push(`/dashboard/${data.dashboard_token}`);
+      // Redirect to the dashboard with the user_id
+      if (data.user_id) {
+        router.push(`/dashboard/${data.user_id}`);
       }
     }
   });
@@ -22,5 +22,5 @@ export default function DashboardPage() {
     return <LoadingSpinner />;
   }
 
-  return null; // Компонент редиректит, поэтому ничего не рендерим
+  return null;
 }

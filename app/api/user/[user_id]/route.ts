@@ -3,19 +3,18 @@ import { supabaseAdmin } from '@/lib/database/supabase';
 import { hasUserRole } from '@/lib/auth/user-roles';
 
 /**
- * GET /api/user/[token] - Получение публичного профиля пользователя
- * Доступно всем без авторизации
+ * GET /api/user/[user_id] - Публичный профиль пользователя по user_id
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ token: string }> }
+  { params }: { params: Promise<{ user_id: string }> }
 ) {
   try {
-    const { token } = await params;
+    const { user_id } = await params;
 
-    if (!token) {
+    if (!user_id) {
       return NextResponse.json(
-        { error: 'Token is required' },
+        { error: 'User ID is required' },
         { status: 400 }
       );
     }
@@ -27,11 +26,10 @@ export async function GET(
       );
     }
 
-    // Получаем публичные данные пользователя по токену
     const { data: user, error } = await supabaseAdmin
       .from('users')
       .select('id, user_id, username, created_at, avatar, banner')
-      .eq('dashboard_token', token)
+      .eq('user_id', user_id)
       .single();
 
     if (error || !user) {
@@ -41,13 +39,11 @@ export async function GET(
       );
     }
 
-    // Проверяем роли пользователя
     const [isSupport, isAdmin] = await Promise.all([
       hasUserRole(user.id, 'support'),
       hasUserRole(user.id, 'admin')
     ]);
 
-    // Возвращаем только публичные данные
     return NextResponse.json({
       id: user.id,
       user_id: user.user_id,

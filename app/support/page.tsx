@@ -351,7 +351,7 @@ export default function SupportPage() {
           if (response.ok) {
             const data = await response.json();
             // Проверяем, что пользователь авторизован
-            if (data.authenticated === false || !data.dashboard_token) {
+            if (data.authenticated === false || !data.user_id) {
               setUserData(null);
               setIsSupport(false);
             } else {
@@ -415,11 +415,11 @@ export default function SupportPage() {
   // ВАЖНО: Токен передается только после загрузки userData для предотвращения преждевременных подключений
   // Токен хранится только в памяти компонента, не в localStorage/sessionStorage для безопасности
   const { socket, isConnected: isWebSocketConnected, joinTicket, leaveTicket } = useWebSocket({
-    enabled: !!userData && !!userData.dashboard_token,
+    enabled: !!userData && !!userData.token,
     userId: userData?.id,
     ticketId: activeTicket?.id,
     isSupport: false,
-    token: userData?.dashboard_token, // Передаем токен для аутентификации WebSocket
+    token: userData?.token, // Передаем токен для аутентификации WebSocket
   });
 
   // Отметка сообщений как прочитанных с улучшенным debounce

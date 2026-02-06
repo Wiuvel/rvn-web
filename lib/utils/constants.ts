@@ -52,6 +52,8 @@ export const ERROR_USER_NOT_FOUND = 'User not found';
 export const ERROR_DATABASE_NOT_CONFIGURED = 'Database not configured';
 export const ERROR_DATABASE_ERROR = 'Database ERROR';
 export const ERROR_UNEXPECTED = 'Unexpected error';
+export const ERROR_NETWORK = 'Network error';
+export const ERROR_POPUP_BLOCKED = 'Popup blocked';
 
 // Support API Error Messages
 export const ERROR_TICKET_NOT_FOUND = 'Ticket not found';

@@ -840,19 +840,19 @@ export default function SupportPanel() {
   };
 
   // Получаем токен из ответа API для WebSocket
-  // ВАЖНО: dashboard_token установлен как httpOnly cookie, поэтому JavaScript не может его прочитать из cookies
+  // ВАЖНО: token установлен как httpOnly cookie, поэтому JavaScript не может его прочитать из cookies
   // Токен получается из API ответа и хранится только в памяти компонента (React state)
   // НЕ сохраняем токен в localStorage/sessionStorage для безопасности
-  const [dashboardToken, setDashboardToken] = useState<string | undefined>(undefined);
-  const dashboardTokenRef = useRef<string | undefined>(undefined); // Ref для предотвращения лишних обновлений
+  const [wsToken, setWsToken] = useState<string | undefined>(undefined);
+  const wsTokenRef = useRef<string | undefined>(undefined); // Ref для предотвращения лишних обновлений
 
   // Инициализация WebSocket
   const { socket, isConnected, joinTicket, leaveTicket } = useWebSocket({
-    enabled: authState.hasSupportAccess && !!dashboardToken,
+    enabled: authState.hasSupportAccess && !!wsToken,
     userId: authState.userId || undefined,
     ticketId: activeTicket?.id,
     isSupport: true,
-    token: dashboardToken,
+    token: wsToken,
   });
 
   useEffect(() => {
@@ -1336,10 +1336,10 @@ export default function SupportPanel() {
         // Сохраняем токен для WebSocket (если он есть в ответе)
         // ВАЖНО: Токен хранится только в памяти компонента, не в localStorage/sessionStorage
         // ОПТИМИЗАЦИЯ: Обновляем токен только если он изменился, чтобы избежать лишних переподключений WebSocket
-        const newToken = data.dashboard_token || undefined;
-        if (dashboardTokenRef.current !== newToken) {
-          dashboardTokenRef.current = newToken;
-          setDashboardToken(newToken);
+        const newToken = data.token || undefined;
+        if (wsTokenRef.current !== newToken) {
+          wsTokenRef.current = newToken;
+          setWsToken(newToken);
         }
         setLoading(false);
         return; // Не редиректим, показываем сообщение на странице
@@ -1356,10 +1356,10 @@ export default function SupportPanel() {
         // Сохраняем токен для WebSocket (если он есть в ответе)
         // ВАЖНО: Токен хранится только в памяти компонента, не в localStorage/sessionStorage
         // ОПТИМИЗАЦИЯ: Обновляем токен только если он изменился, чтобы избежать лишних переподключений WebSocket
-        const newToken = data.dashboard_token || undefined;
-        if (dashboardTokenRef.current !== newToken) {
-          dashboardTokenRef.current = newToken;
-          setDashboardToken(newToken);
+        const newToken = data.token || undefined;
+        if (wsTokenRef.current !== newToken) {
+          wsTokenRef.current = newToken;
+          setWsToken(newToken);
         }
         setLoading(false);
         return; // Не редиректим, показываем сообщение на странице
@@ -1376,10 +1376,10 @@ export default function SupportPanel() {
       // Сохраняем токен для WebSocket (если он есть в ответе)
       // ВАЖНО: Токен хранится только в памяти компонента, не в localStorage/sessionStorage
       // ОПТИМИЗАЦИЯ: Обновляем токен только если он изменился, чтобы избежать лишних переподключений WebSocket
-      const newToken = data.dashboard_token || undefined;
-      if (dashboardTokenRef.current !== newToken) {
-        dashboardTokenRef.current = newToken;
-        setDashboardToken(newToken);
+      const newToken = data.token || undefined;
+      if (wsTokenRef.current !== newToken) {
+        wsTokenRef.current = newToken;
+        setWsToken(newToken);
       }
 
       setLoading(false);

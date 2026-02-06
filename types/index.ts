@@ -2,7 +2,7 @@ export interface UserData {
   id: string;
   user_id: string;
   username: string;
-  dashboard_token: string;
+  token?: string;
   created_at: string;
   last_login?: string;
   avatar?: string | null;
@@ -20,7 +20,7 @@ export interface Notification {
 }
 
 /**
- * Базовый тип для API ответов
+ * Base type for API responses
  */
 export interface ApiResponse<T = unknown> {
   success?: boolean;
@@ -29,7 +29,7 @@ export interface ApiResponse<T = unknown> {
 }
 
 /**
- * Типы для Support API
+ * Types for Support API
  */
 export interface Ticket {
   id: string;
@@ -79,15 +79,16 @@ export interface TicketResponse extends ApiResponse {
 }
 
 /**
- * Типы для Auth API
+ * Types for Auth API
  */
 export interface AuthResponse extends ApiResponse {
   user?: UserData;
-  dashboardToken?: string;
+  user_id?: string;
+  token?: string;
 }
 
 /**
- * Типы для Admin API
+ * Types for Admin API
  */
 export interface AdminUsersResponse extends ApiResponse {
   users?: UserData[];

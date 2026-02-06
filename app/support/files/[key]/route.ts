@@ -6,8 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { getUserByToken } from '@/lib/auth';
+import { checkAuth } from '@/lib/auth/helper';
 import { hasUserRole } from '@/lib/auth/user-roles';
 import { setCorsHeaders, handleCorsPreflight } from '@/lib/security/cors';
 import { generalRateLimit } from '@/lib/security/rate-limit';
@@ -33,12 +32,8 @@ export async function GET(
   { params }: { params: Promise<{ key: string }> }
 ) {
   try {
-    // Проверка авторизации
-    const cookieStore = await cookies();
-    const isAuthenticated = cookieStore.get('user_authenticated')?.value === 'true';
-    const dashboardToken = cookieStore.get('dashboard_token')?.value;
-
-    if (!isAuthenticated || !dashboardToken) {
+    const authResult = await checkAuth(request);
+    if (!authResult.isAuthenticated || !authResult.user) {
       return setCorsHeaders(
         NextResponse.json(
           { error: ERROR_NOT_AUTHENTICATED },
@@ -46,16 +41,7 @@ export async function GET(
         )
       );
     }
-
-    const user = await getUserByToken(dashboardToken);
-    if (!user) {
-      return setCorsHeaders(
-        NextResponse.json(
-          { error: ERROR_NOT_AUTHENTICATED },
-          { status: 401 }
-        )
-      );
-    }
+    const user = authResult.user;
 
     const isSupport = await hasUserRole(user.id, 'support');
     const { key } = await params;
