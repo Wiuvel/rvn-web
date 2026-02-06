@@ -3,6 +3,7 @@ export interface UserDataPayload {
   username: string;
   avatar?: string | null;
   banner?: string | null;
+  pex?: 'u' | 's' | 'a';
 }
 
 export interface SessionData {

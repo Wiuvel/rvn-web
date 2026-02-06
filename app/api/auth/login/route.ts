@@ -119,12 +119,17 @@ export async function POST(request: NextRequest) {
       path: '/'
     });
 
+    const { hasUserRole } = await import('@/lib/auth/user-roles');
+    const isAdmin = await hasUserRole(user.id, 'admin');
+    const isSupport = await hasUserRole(user.id, 'support');
+
     const { createUserDataCookie, USER_DATA_COOKIE_NAME, getUserDataCookieOptions } = await import('@/lib/auth/user-cookie.server');
     const userDataValue = createUserDataCookie({
       user_id: user.user_id,
       username: user.username,
       avatar: user.avatar ?? null,
       banner: user.banner ?? null,
+      pex: isAdmin ? 'a' : isSupport ? 's' : 'u',
     });
     response.cookies.set(USER_DATA_COOKIE_NAME, userDataValue, getUserDataCookieOptions(isLocalhost));
 

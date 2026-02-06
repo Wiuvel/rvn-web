@@ -94,6 +94,7 @@ export async function POST(request: NextRequest) {
       username: user.username,
       avatar: user.avatar ?? null,
       banner: user.banner ?? null,
+      pex: 'u',
     }), getUserDataCookieOptions(isLocalhost));
     // Успешная регистрация - не логируем
 

@@ -32,7 +32,7 @@ export default function PublicProfilePage() {
   const [error, setError] = useState(false);
   const [avatarLoading, setAvatarLoading] = useState(true);
   const [currentYear] = useState(new Date().getFullYear());
-  const { userData: authUserData } = useAuth({ silent: true });
+  const { userData: authUserData } = useAuth({ silent: true, lightweight: true });
 
   useEffect(() => {
     if (!userId) {
@@ -80,7 +80,7 @@ export default function PublicProfilePage() {
       <ErrorState 
         code="404"
         title="Пользователь не найден"
-        description="Профиль, который вы ищете, не существует или был удален."
+        description="Профиль, который вы ищете, не существует."
         showButton={false}
         showImage={false}
       />

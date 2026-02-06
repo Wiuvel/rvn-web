@@ -30,6 +30,7 @@ import {
   ShoppingBag
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { UserMenu } from '@/components/navigation/UserMenu';
 import { NotificationsWidget } from '@/components/navigation/Notifications';
 
 interface UserData {
@@ -43,6 +44,7 @@ interface UserData {
   isSupport?: boolean;
   isAdmin?: boolean;
   balance?: number;
+  pex?: 'u' | 's' | 'a';
 }
 
 // Компонент карточки статистики
@@ -121,9 +123,7 @@ function QuickAction({
 }
 
 export default function DashboardPage() {
-  const [open, setOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [shouldRenderMenu, setShouldRenderMenu] = useState(false);
   const [userData, setUserData] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
   const [currentYear] = useState(new Date().getFullYear());
@@ -134,7 +134,7 @@ export default function DashboardPage() {
   const params = useParams();
   const userId = params?.user_id as string;
   const userMenuRef = useRef<HTMLDivElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
+  const userMenuButtonRef = useRef<HTMLButtonElement>(null);
   
   const heroRef = useFadeIn(0.1) as React.RefObject<HTMLDivElement>;
   const statsRef = useStaggeredFadeIn(0.2, 0.08) as React.RefObject<HTMLDivElement>;
@@ -280,42 +280,14 @@ export default function DashboardPage() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    if (userMenuOpen) {
-      setShouldRenderMenu(true);
-      if (menuRef.current) {
-        gsap.fromTo(menuRef.current,
-          { opacity: 0, y: -10, scale: 0.95 },
-          { opacity: 1, y: 0, scale: 1, duration: 0.2, ease: "power2.out" }
-        );
-      }
-      document.body.style.overflow = 'hidden';
-    } else {
-      if (menuRef.current) {
-        gsap.to(menuRef.current, {
-          opacity: 0,
-          y: -10,
-          scale: 0.95,
-          duration: 0.15,
-          ease: "power2.in",
-          onComplete: () => setShouldRenderMenu(false)
-        });
-      } else {
-        setShouldRenderMenu(false);
-      }
-      document.body.style.overflow = '';
-    }
-
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, [userMenuOpen]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Node;
       
+      // Проверяем, был ли клик на кнопке меню - если да, не закрываем (onClick обработает)
+      if (userMenuButtonRef.current && userMenuButtonRef.current.contains(target)) {
+        return;
+      }
+
       if (userMenuOpen && userMenuRef.current && !userMenuRef.current.contains(target)) {
         setUserMenuOpen(false);
       }
@@ -342,235 +314,60 @@ export default function DashboardPage() {
   return (
     <div className="dashboard-page">
       <header className="fixed top-0 left-0 right-0 pt-4 z-[999]">
-        <div className="mx-auto max-w-6xl px-4">
-          <div className="backdrop-blur-lg bg-neutral-900/40 border border-white/10 rounded-full px-6 py-3 flex items-center justify-between shadow-lg">
-            <Link href="/" className="flex items-center gap-2">
-              <Image src="/static/logo.svg" alt="Raven Logo" width={256} height={256} className="w-6 h-6" priority/>
-              <span className="font-semibold text-white">RVN</span>
+        <div className="mx-auto max-w-7xl px-5">
+          <div className="backdrop-blur-lg bg-neutral-900/40 border border-white/10 rounded-full px-6 py-4 flex items-center justify-between shadow-lg">
+            <Link href="/" className="flex items-center gap-3">
+              <Image src="/static/logo.svg" alt="Raven Logo" width={256} height={256} className="w-8 h-8" priority/>
+              <span className="font-semibold text-lg text-white">RVN</span>
             </Link>
-            <nav className="hidden lg:flex items-center gap-8 text-sm text-neutral-300">
+            <nav className="hidden lg:flex items-center gap-8 text-base text-neutral-300">
               <Link href="/" className="hover:text-white transition">Главная</Link>
               <Link href={`/dashboard/${userData?.user_id}`} className="hover:text-white transition">Профиль</Link>
               <Link href="/support" className="hover:text-white transition">Поддержка</Link>
             </nav>
             {userData && (
-              <div className="hidden lg:flex items-center gap-2 relative" ref={userMenuRef}>
+              <div className="flex items-center gap-2 relative">
                 <NotificationsWidget />
                 {(() => {
                   const avatarUrl = getAvatarUrl(userData?.avatar);
                   const gradientClasses = getGradientClasses(userData?.avatar);
                   
                   return (
-                <button
-                  onClick={() => setUserMenuOpen(!userMenuOpen)}
-                      className={`w-10 h-10 rounded-full overflow-hidden ${avatarUrl ? '' : gradientClasses} flex items-center justify-center text-white font-semibold text-sm transition-transform duration-200 hover:scale-110 cursor-pointer`}
-                  title={userData.username}
-                  aria-label="Меню пользователя"
-                  aria-expanded={userMenuOpen}
-                >
+                    <button
+                      ref={userMenuButtonRef}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setUserMenuOpen(!userMenuOpen);
+                      }}
+                      className={`w-11 h-11 rounded-full overflow-hidden ${avatarUrl ? '' : gradientClasses} flex items-center justify-center text-white font-semibold text-base transition-transform duration-200 hover:scale-110 cursor-pointer`}
+                      title={userData.username}
+                      aria-label="Меню пользователя"
+                      aria-expanded={userMenuOpen}
+                    >
                       {avatarUrl ? (
                         <Image
                           src={avatarUrl}
                           alt={userData.username}
-                          width={40}
-                          height={40}
+                          width={44}
+                          height={44}
                           className="w-full h-full object-cover"
                           unoptimized
                         />
                       ) : (
                         userData.username.charAt(0).toUpperCase()
                       )}
-                </button>
+                    </button>
                   );
                 })()}
-                {shouldRenderMenu && (
-                  <div 
-                    ref={menuRef}
-                    className="absolute -right-3 top-full mt-4 w-64 bg-neutral-900/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-xl overflow-hidden z-50"
-                  >
-                    <Link
-                      href={`/dashboard/${userData.user_id}`}
-                      onClick={() => setUserMenuOpen(false)}
-                      className="block p-4 border-b border-white/10 hover:bg-white/5 transition-colors duration-200 cursor-pointer mx-2 my-1 rounded-xl"
-                    >
-                      <div className="flex items-center gap-3">
-                        {(() => {
-                          const avatarUrl = getAvatarUrl(userData?.avatar);
-                          const gradientClasses = getGradientClasses(userData?.avatar);
-                          
-                          return (
-                            <div className={`w-12 h-12 rounded-full overflow-hidden ${avatarUrl ? '' : gradientClasses} flex items-center justify-center text-white font-semibold text-base flex-shrink-0`}>
-                              {avatarUrl ? (
-                                <Image
-                                  src={avatarUrl}
-                                  alt={userData.username}
-                                  width={48}
-                                  height={48}
-                                  className="w-full h-full object-cover"
-                                  unoptimized
-                                />
-                              ) : (
-                                userData.username.charAt(0).toUpperCase()
-                              )}
-                        </div>
-                          );
-                        })()}
-                        <div className="min-w-0 flex-1">
-                          <div className="text-white font-medium truncate">{userData.username}</div>
-                          <div className={`text-sm truncate ${roleInfo.color}`}>{roleInfo.label}</div>
-                        </div>
-                      </div>
-                    </Link>
-                    <div className="py-2">
-                      <Link
-                        href={`/dashboard/${userData.user_id}#subscriptions`}
-                        onClick={() => setUserMenuOpen(false)}
-                        className="flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-xl text-white/80 hover:text-white hover:bg-white/5 transition-colors duration-200"
-                      >
-                        <Image 
-                          src="/static/icons/accounts/7d972.wallet.svg" 
-                          alt="Мои тарифы" 
-                          width={24} 
-                          height={24} 
-                          className="w-5 h-5"
-                        />
-                        <span>Мои тарифы</span>
-                      </Link>
-                      <Link
-                        href="/support"
-                        onClick={() => setUserMenuOpen(false)}
-                        className="flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-xl text-white/80 hover:text-white hover:bg-white/5 transition-colors duration-200"
-                      >
-                        <Image 
-                          src="/static/icons/accounts/7d973.support.svg" 
-                          alt="Поддержка" 
-                          width={24} 
-                          height={24} 
-                          className="w-5 h-5"
-                        />
-                        <span>Поддержка</span>
-                      </Link>
-                      <div className="border-t border-white/10 my-1 mx-2"></div>
-                      <button
-                        onClick={() => {
-                          setUserMenuOpen(false);
-                          handleLogout();
-                        }}
-                        className="w-full flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-xl text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors duration-200"
-                      >
-                        <Image 
-                          src="/static/icons/accounts/4d661-logout.svg" 
-                          alt="Выйти" 
-                          width={20} 
-                          height={20} 
-                          className="w-5 h-5"
-                        />
-                        <span>Выйти</span>
-                      </button>
-                    </div>
-                  </div>
-                )}
+                <UserMenu
+                  userData={userData}
+                  isOpen={userMenuOpen}
+                  onClose={() => setUserMenuOpen(false)}
+                  menuRef={userMenuRef}
+                />
               </div>
             )}
-            <button 
-              onClick={() => setOpen(!open)} className="lg:hidden p-2 text-white/80 hover:text-white transition-colors duration-300" aria-label="Открыть меню">
-              {!open ? (
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"/>
-                </svg>
-              ) : (
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/>
-                </svg>
-              )}
-            </button>
           </div>
-          {open && userData && (
-            <div className="lg:hidden mt-4 py-4 bg-black/50 backdrop-blur-lg rounded-2xl border border-white/10"style={{animation: 'fadeIn 0.2s ease-out'}}>
-              <div className="px-4 space-y-2">
-                <Link
-                  href={`/dashboard/${userData.user_id}`}
-                  onClick={() => setOpen(false)}
-                  className="block p-4 border-b border-white/10 hover:bg-white/5 transition-colors duration-200 cursor-pointer mx-2 my-1 rounded-xl"
-                >
-                  <div className="flex items-center gap-3">
-                    {(() => {
-                      const avatarUrl = getAvatarUrl(userData?.avatar);
-                      const gradientClasses = getGradientClasses(userData?.avatar);
-                      
-                      return (
-                        <div className={`w-12 h-12 rounded-full overflow-hidden ${avatarUrl ? '' : gradientClasses} flex items-center justify-center text-white font-semibold text-base flex-shrink-0`}>
-                          {avatarUrl ? (
-                            <Image
-                              src={avatarUrl}
-                              alt={userData.username}
-                              width={48}
-                              height={48}
-                              className="w-full h-full object-cover"
-                              unoptimized
-                            />
-                          ) : (
-                            userData.username.charAt(0).toUpperCase()
-                          )}
-                    </div>
-                      );
-                    })()}
-                    <div className="min-w-0 flex-1">
-                      <div className="text-white font-medium truncate">{userData.username}</div>
-                      <div className={`text-sm truncate ${roleInfo.color}`}>{roleInfo.label}</div>
-                    </div>
-                  </div>
-                </Link>
-                <div className="py-2">
-                  <Link
-                    href={`/dashboard/${userData.user_id}#subscriptions`}
-                    onClick={() => setOpen(false)}
-                    className="flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-xl text-white/80 hover:text-white hover:bg-white/5 transition-colors duration-200"
-                  >
-                    <Image 
-                      src="/static/icons/accounts/7d972.wallet.svg" 
-                      alt="Мои тарифы" 
-                      width={24} 
-                      height={24} 
-                      className="w-5 h-5"
-                    />
-                    <span>Мои тарифы</span>
-                  </Link>
-                  <Link
-                    href="/support"
-                    onClick={() => setOpen(false)}
-                    className="flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-xl text-white/80 hover:text-white hover:bg-white/5 transition-colors duration-200"
-                  >
-                    <Image 
-                      src="/static/icons/accounts/7d973.support.svg" 
-                      alt="Поддержка" 
-                      width={24} 
-                      height={24} 
-                      className="w-5 h-5"
-                    />
-                    <span>Поддержка</span>
-                  </Link>
-                  <div className="border-t border-white/10 my-1 mx-2"></div>
-                  <button
-                    onClick={() => {
-                      setOpen(false);
-                      handleLogout();
-                    }}
-                    className="w-full flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-xl text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors duration-200"
-                  >
-                    <Image 
-                      src="/static/icons/accounts/4d661-logout.svg" 
-                      alt="Выйти" 
-                      width={20} 
-                      height={20} 
-                      className="w-5 h-5"
-                    />
-                    <span>Выйти</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       </header>
 
@@ -631,7 +428,7 @@ export default function DashboardPage() {
                       className="relative group cursor-pointer shrink-0"
                       onClick={() => setShowAvatarModal(true)}
                     >
-                      <div className={`h-24 w-24 sm:h-28 sm:w-28 lg:h-32 lg:w-32 rounded-xl overflow-hidden ring-1 ring-neutral-800 ${avatarUrl ? '' : gradientClasses} flex items-center justify-center text-white font-bold text-3xl sm:text-4xl lg:text-5xl shadow-2xl transition-all duration-200 group-hover:scale-105 bg-neutral-900`}>
+                      <div className={`relative h-24 w-24 sm:h-28 sm:w-28 lg:h-32 lg:w-32 rounded-xl overflow-hidden ring-1 ring-neutral-800 ${avatarUrl ? '' : gradientClasses} flex items-center justify-center text-white font-bold text-3xl sm:text-4xl lg:text-5xl shadow-2xl transition-all duration-200 group-hover:scale-105 bg-neutral-900`}>
                         {avatarUrl ? (
                           <>
                             {avatarLoading && (
@@ -658,8 +455,8 @@ export default function DashboardPage() {
                   );
                 })()}
 
-                <div className="flex-1 min-w-0 pb-2">
-                  <h1 className={`text-xl sm:text-2xl lg:text-3xl font-bold truncate mb-1 ${
+                <div className="flex-1 min-w-0">
+                  <h1 className={`text-xl sm:text-2xl lg:text-3xl font-bold truncate mb-1.5 ${
                     userData?.isAdmin 
                       ? 'text-orange-500' 
                       : userData?.isSupport 
@@ -670,7 +467,7 @@ export default function DashboardPage() {
                   </h1>
                   <div className="flex flex-wrap items-center gap-3 sm:gap-5 text-sm sm:text-base text-neutral-400">
                     <div className="group/info relative" title="Ваш ID">
-                      <span className="cursor-help">ID: {userData ? getShortId(userData.user_id) : '—'}</span>
+                      <span className="bg-white/5 px-2 py-1 rounded-md text-neutral-400 text-sm font-mono cursor-help">ID: {userData ? getShortId(userData.user_id) : '—'}</span>
                     </div>
                     <div className="flex items-center gap-1.5 sm:gap-2 group/info relative" title="Дата регистрации">
                       <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-neutral-500" />

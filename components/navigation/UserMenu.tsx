@@ -7,14 +7,22 @@ import { useRouter } from 'next/navigation';
 import { UserData } from '@/types';
 import { useMenuAnimation } from '@/hooks/useMenuAnimation';
 import { getGradientClasses, getAvatarUrl } from '@/lib/utils/avatar-gradients';
-import { getStaticUrl } from '@/lib/utils';
-import { Wallet } from 'lucide-react';
+import { 
+  User, 
+  Settings, 
+  Receipt, 
+  LogOut, 
+  LifeBuoy, 
+  Wallet,
+  ChevronRight,
+  ShieldCheck,
+  CreditCard
+} from 'lucide-react';
 
 interface UserMenuProps {
   userData: UserData;
   isOpen: boolean;
   onClose: () => void;
-  showProfile?: boolean;
   showUserId?: boolean;
   hideBalance?: boolean;
   menuRef?: React.RefObject<HTMLDivElement | null>;
@@ -24,7 +32,6 @@ export function UserMenu({
   userData,
   isOpen,
   onClose,
-  showProfile = true,
   showUserId = true,
   hideBalance = false,
   menuRef: externalMenuRef
@@ -32,7 +39,7 @@ export function UserMenu({
   const router = useRouter();
   const { shouldRender, menuRef: animatedMenuRef } = useMenuAnimation(isOpen, {
     onClose,
-    persist: true // Keep mounted to avoid image reloading and layout shifts
+    persist: true
   });
   const [avatarLoading, setAvatarLoading] = useState(true);
   
@@ -42,25 +49,25 @@ export function UserMenu({
     }
   }, [shouldRender, animatedMenuRef, externalMenuRef]);
 
-  // Сбрасываем состояние загрузки аватара при смене аватара
   useEffect(() => {
     if (userData?.avatar) {
       const avatarUrl = getAvatarUrl(userData.avatar);
       if (avatarUrl) {
         setAvatarLoading(true);
+        // Preload image
+        const img = new window.Image();
+        img.src = avatarUrl;
+        img.onload = () => setAvatarLoading(false);
+        img.onerror = () => setAvatarLoading(false);
       }
     }
   }, [userData?.avatar]);
 
-  const getInitial = (username: string) => {
-    return username.charAt(0).toUpperCase();
-  };
+  const getInitial = (username: string) => username.charAt(0).toUpperCase();
 
   const handleLogout = async () => {
     try {
-      const response = await fetch('/api/auth/logout', {
-        method: 'POST'
-      });
+      const response = await fetch('/api/auth/logout', { method: 'POST' });
       if (response.ok) {
         onClose();
         router.push('/auth');
@@ -75,131 +82,168 @@ export function UserMenu({
   return (
     <div 
       ref={animatedMenuRef}
-      className="absolute -right-3 top-full mt-4 w-64 max-w-[calc(100vw-2rem)] bg-neutral-900/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-xl overflow-hidden z-50"
+      className="absolute -right-[25px] top-full mt-5 w-[340px] max-w-[calc(100vw-2rem)] bg-[#0A0A0A]/95 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50 ring-1 ring-black/5"
     >
-      <div>
+      {/* User Header Card */}
+      <div className="p-2">
         <Link
           href={`/dashboard/${userData.user_id}`}
           onClick={onClose}
-          className="block p-4 border-b border-white/10 hover:bg-white/5 transition-colors duration-200 cursor-pointer mx-2 my-1 rounded-xl"
+          className="relative group block p-4 rounded-xl bg-gradient-to-br from-white/5 to-white/[0.02] border border-white/5 hover:border-white/10 transition-all duration-300"
         >
-          <div className="flex items-center gap-3">
-            {(() => {
-              const avatarUrl = getAvatarUrl(userData.avatar);
-              const gradientClasses = getGradientClasses(userData.avatar);
-              
-              return (
-                <div className={`w-12 h-12 rounded-full overflow-hidden ${avatarUrl ? '' : gradientClasses} flex items-center justify-center text-white font-semibold text-base flex-shrink-0 relative`}>
-                  {avatarUrl ? (
-                    <>
-                      {avatarLoading && (
-                        <div 
-                          className="absolute inset-0 rounded-full bg-gradient-to-r from-neutral-700 via-neutral-600 to-neutral-700 bg-[length:200%_100%] animate-[shimmer_1.5s_ease-in-out_infinite]"
+          <div className="flex items-center gap-4">
+            {/* Avatar */}
+            <div className="relative shrink-0">
+              {(() => {
+                const avatarUrl = getAvatarUrl(userData.avatar);
+                const gradientClasses = getGradientClasses(userData.avatar);
+                
+                return (
+                  <div className={`w-14 h-14 rounded-full overflow-hidden ${avatarUrl ? '' : gradientClasses} flex items-center justify-center text-white font-bold text-xl ring-2 ring-white/10 group-hover:ring-white/20 transition-all duration-300 shadow-lg`}>
+                    {avatarUrl ? (
+                      <>
+                        {avatarLoading && (
+                          <div className="absolute inset-0 bg-neutral-800 animate-pulse rounded-full" />
+                        )}
+                        <Image
+                          src={avatarUrl}
+                          alt={userData.username}
+                          width={56}
+                          height={56}
+                          className={`w-full h-full object-cover transition-opacity duration-300 ${avatarLoading ? 'opacity-0' : 'opacity-100'}`}
+                          unoptimized
+                          onLoad={() => setAvatarLoading(false)}
+                          onError={() => setAvatarLoading(false)}
                         />
-                      )}
-                      <Image
-                        src={avatarUrl}
-                        alt={userData.username}
-                        width={48}
-                        height={48}
-                        className={`w-full h-full object-cover transition-opacity duration-300 ${avatarLoading ? 'opacity-0' : 'opacity-100'}`}
-                        unoptimized
-                        onLoad={() => setAvatarLoading(false)}
-                        onError={() => setAvatarLoading(false)}
-                      />
-                    </>
-                  ) : (
-                    getInitial(userData.username)
-                  )}
+                      </>
+                    ) : (
+                      getInitial(userData.username)
+                    )}
+                  </div>
+                );
+              })()}
+              {/* Role Badge */}
+              {(userData.pex === 'a' || userData.pex === 's' || userData.isAdmin || userData.isSupport) && (
+                <div className="absolute -bottom-1 -right-1 bg-neutral-900 rounded-full p-0.5 ring-2 ring-neutral-900">
+                  <div className={`p-1 rounded-full ${userData.pex === 'a' || userData.isAdmin ? 'bg-orange-500/20 text-orange-500' : 'bg-green-500/20 text-green-500'}`}>
+                    <ShieldCheck className="w-3 h-3" />
+                  </div>
+                </div>
+              )}
             </div>
-              );
-            })()}
+
+            {/* User Info */}
             <div className="min-w-0 flex-1">
-              <div className={`font-medium truncate ${
-                userData.isAdmin 
-                  ? 'text-orange-500' 
-                  : userData.isSupport 
-                  ? 'text-green-500' 
-                  : 'text-white'
-              }`}>
-                {userData.username}
+              <div className="flex items-center justify-between">
+                <div className={`font-semibold text-lg truncate pr-2 ${
+                  (userData.pex === 'a' || userData.isAdmin) 
+                    ? 'text-orange-400' 
+                    : (userData.pex === 's' || userData.isSupport) 
+                    ? 'text-green-400' 
+                    : 'text-white'
+                }`}>
+                  {userData.username}
+                </div>
               </div>
-              <div className="flex items-center gap-2 text-neutral-400 text-sm truncate">
-                <span>{showUserId ? `ID: ${userData.user_id}` : 'Пользователь'}</span>
-                {!hideBalance && (
-                  <>
-                    <span className="text-neutral-500">•</span>
-                    <span className="flex items-center gap-1">
-                      <Wallet className="w-4 h-4 text-neutral-500" />
-                      {userData.balance !== undefined ? `${userData.balance} ₽` : '0 ₽'}
-                    </span>
-                  </>
-                )}
+              
+              <div className="text-xs text-neutral-400 font-mono mt-0.5 flex items-center gap-2">
+                <span className="bg-white/5 px-1.5 py-0.5 rounded text-neutral-500">ID: {userData.user_id}</span>
               </div>
+
+              {!hideBalance && (
+                <div className="mt-2 flex items-center gap-1.5 text-sm">
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                    <Wallet className="w-3.5 h-3.5" />
+                    <span className="font-medium">{userData.balance || 0} ₽</span>
+                  </div>
+                </div>
+              )}
             </div>
+            
+            <ChevronRight className="w-5 h-5 text-neutral-600 group-hover:text-neutral-400 transition-colors" />
           </div>
         </Link>
-        <div className="py-2">
-          {showProfile && (
-            <Link
-              href={`/dashboard/${userData.user_id}`}
-              onClick={onClose}
-              className="flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-xl text-white/80 hover:text-white hover:bg-white/5 transition-colors duration-200"
-            >
-              <img 
-                src={getStaticUrl("/static/icons/accounts/7d971.profile.svg")} 
-                alt="Профиль" 
-                width={24} 
-                height={24} 
-                className="w-5 h-5"
-              />
-              <span>Профиль</span>
-            </Link>
-          )}
-          <Link
+      </div>
+
+      {/* Navigation */}
+      <div className="px-2 pb-2">
+        <div className="flex flex-col gap-0.5">
+          <MenuItem 
             href={`/dashboard/${userData.user_id}#subscriptions`}
             onClick={onClose}
-            className="flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-xl text-white/80 hover:text-white hover:bg-white/5 transition-colors duration-200"
-          >
-            <img 
-              src={getStaticUrl("/static/icons/accounts/7d972.wallet.svg")} 
-              alt="Мои тарифы" 
-              width={24} 
-              height={24} 
-              className="w-5 h-5"
-            />
-            <span>Мои тарифы</span>
-          </Link>
-          <Link
+            icon={CreditCard}
+            label="Мои тарифы"
+            highlight
+          />
+
+          <div className="h-px bg-white/5 mx-2 my-2" />
+
+          <MenuItem 
+            href={`/dashboard/${userData.user_id}/transactions`}
+            onClick={onClose}
+            icon={Receipt}
+            label="Транзакции"
+          />
+          
+          <MenuItem 
+            href={`/dashboard/${userData.user_id}/settings`}
+            onClick={onClose}
+            icon={Settings}
+            label="Настройки"
+          />
+
+          <div className="h-px bg-white/5 mx-2 my-2" />
+
+          <MenuItem 
             href="/support"
             onClick={onClose}
-            className="flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-xl text-white/80 hover:text-white hover:bg-white/5 transition-colors duration-200"
-          >
-            <img 
-              src={getStaticUrl("/static/icons/accounts/7d973.support.svg")} 
-              alt="Поддержка" 
-              width={24} 
-              height={24} 
-              className="w-5 h-5"
-            />
-            <span>Поддержка</span>
-          </Link>
-          <div className="border-t border-white/10 my-1 mx-2"></div>
+            icon={LifeBuoy}
+            label="Поддержка"
+          />
+
           <button
             onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-xl text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors duration-200"
+            className="group w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-all duration-200 mt-1"
           >
-            <img 
-              src={getStaticUrl("/static/icons/accounts/4d661-logout.svg")} 
-              alt="Выйти" 
-              width={20} 
-              height={20} 
-              className="w-5 h-5"
-            />
-            <span>Выйти</span>
+            <span className="flex items-center gap-3 font-medium">
+              <span className="p-1.5 rounded-lg bg-red-500/10 group-hover:bg-red-500/20 transition-colors">
+                <LogOut className="w-4 h-4" />
+              </span>
+              Выйти
+            </span>
           </button>
         </div>
       </div>
     </div>
+  );
+}
+
+interface MenuItemProps {
+  href: string;
+  onClick: () => void;
+  icon: React.ElementType;
+  label: string;
+  highlight?: boolean;
+}
+
+function MenuItem({ href, onClick, icon: Icon, label, highlight }: MenuItemProps) {
+  return (
+    <Link
+      href={href}
+      onClick={onClick}
+      className="group flex items-center justify-between px-3 py-2.5 rounded-xl text-neutral-300 hover:text-white hover:bg-white/5 transition-all duration-200"
+    >
+      <div className="flex items-center gap-3">
+        <span className={`p-1.5 rounded-lg transition-colors ${
+          highlight 
+            ? 'bg-purple-500/10 text-purple-400 group-hover:bg-purple-500/20' 
+            : 'bg-white/5 text-neutral-400 group-hover:bg-white/10 group-hover:text-white'
+        }`}>
+          <Icon className="w-4 h-4" />
+        </span>
+        <span className={`font-medium ${highlight ? 'text-purple-100' : ''}`}>{label}</span>
+      </div>
+      <ChevronRight className="w-4 h-4 text-neutral-700 group-hover:text-neutral-500 transition-colors -translate-x-1 opacity-0 group-hover:translate-x-0 group-hover:opacity-100" />
+    </Link>
   );
 }

@@ -70,7 +70,7 @@ export default function PricingSection() {
 
   return (
     <section id="pricing" className="relative bg-neutral-950 overflow-hidden fade-in">
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl px-6 sm:px-8 lg:px-12 xl:px-16 h-px z-10" style={{
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl px-4 sm:px-6 lg:px-8 h-px z-10" style={{
         backgroundImage: 'radial-gradient(circle, rgb(115 115 115 / 0.4) 1.5px, transparent 1.5px)',
         backgroundSize: '12px 1px',
         backgroundRepeat: 'repeat-x',
@@ -91,7 +91,7 @@ export default function PricingSection() {
           <line x1="0" y1="80%" x2="100%" y2="80%"/>
         </g>
       </svg>
-      <div className="relative mx-auto max-w-7xl px-6 sm:px-8 lg:px-12 xl:px-16 py-12 md:py-16">
+      <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12 md:py-16">
         <div ref={titleRef} className="text-center">
           <h2 className="text-3xl sm:text-4xl font-semibold">Простые тарифы</h2>
           <p className="mt-2 text-neutral-400">Разные уровни защиты — один сервис. Найдите свой идеальный тариф.</p>

@@ -13,14 +13,34 @@ export async function OPTIONS() {
 export async function GET(request: NextRequest) {
   try {
     const authResult = await checkAuth(request);
+    const hostname = request.nextUrl.hostname;
+    const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
 
     if (!authResult.isAuthenticated || !authResult.user) {
-      return setCorsHeaders(NextResponse.json({ authenticated: false }));
+      // Clear invalid cookies to prevent redirect loops
+      const response = NextResponse.json({ authenticated: false });
+      
+      // Clear user_data cookie
+      response.cookies.set('user_data', '', {
+        maxAge: 0,
+        path: '/',
+        secure: process.env.NODE_ENV === 'production' && !isLocalhost,
+        sameSite: 'strict'
+      });
+      
+      // Clear session cookies if they exist but are invalid
+      response.cookies.set('session_id', '', {
+        maxAge: 0,
+        path: '/',
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production' && !isLocalhost,
+        sameSite: 'strict'
+      });
+
+      return setCorsHeaders(response);
     }
 
     const user = authResult.user;
-    const hostname = request.nextUrl.hostname;
-    const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
     const cookieStore = await cookies();
     const currentSessionId = cookieStore.get('session_id')?.value;
 

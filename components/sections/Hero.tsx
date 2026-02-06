@@ -170,7 +170,7 @@ export default function HeroSection({ onLightRaysLoad }: HeroSectionProps = {}) 
         )}
       </div>
       <div className="absolute bottom-0 left-0 right-0 h-32 pointer-events-none z-10 bg-gradient-to-t from-neutral-950 to-transparent" />
-      <div className="mx-auto max-w-7xl px-6 sm:px-8 lg:px-12 xl:px-16 pt-24 pb-24 md:pt-32 md:pb-36 relative z-10">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-24 pb-24 md:pt-32 md:pb-36 relative z-10">
         <div className="flex flex-col lg:grid lg:grid-cols-2 gap-8 md:gap-12 items-center">
           <div className="order-2 lg:order-1 text-center lg:text-left">
             <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-semibold tracking-tight leading-tight">

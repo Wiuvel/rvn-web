@@ -82,7 +82,7 @@ export function NotificationsWidget({ isMobile = false }: NotificationsWidgetPro
           e.stopPropagation();
           setIsOpen(!isOpen);
         }}
-        className="w-10 h-10 rounded-full bg-neutral-800/60 hover:bg-neutral-700/60 flex items-center justify-center text-white/80 hover:text-white transition-all duration-200 hover:scale-110 cursor-pointer flex-shrink-0 relative"
+        className="w-11 h-11 rounded-full bg-neutral-800/60 hover:bg-neutral-700/60 flex items-center justify-center text-white/80 hover:text-white transition-all duration-200 hover:scale-110 cursor-pointer flex-shrink-0 relative"
         title="Уведомления"
         aria-label="Уведомления"
         aria-expanded={isOpen}
@@ -90,9 +90,9 @@ export function NotificationsWidget({ isMobile = false }: NotificationsWidgetPro
         <Image 
           src={hasUnread ? getStaticUrl("/static/icons/accounts/bell-dot.svg") : getStaticUrl("/static/icons/accounts/4d662.bell.svg")} 
           alt="Уведомления" 
-          width={24} 
-          height={24} 
-          className="w-[20px] h-[20px]"
+          width={28} 
+          height={28} 
+          className="w-[24px] h-[24px]"
         />
       </button>
 
@@ -104,7 +104,7 @@ export function NotificationsWidget({ isMobile = false }: NotificationsWidgetPro
             absolute z-50 bg-neutral-900/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-xl overflow-hidden
             ${isMobile 
               ? 'fixed left-4 right-4 top-[70px] mt-0 w-auto' // Мобильные стили (на весь экран по ширине)
-              : '-right-3 top-full mt-4 w-80' // Десктопные стили
+              : '-right-3 top-full mt-5 w-80' // Десктопные стили
             }
           `}
         >

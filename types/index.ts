@@ -10,6 +10,7 @@ export interface UserData {
   isSupport?: boolean;
   isAdmin?: boolean;
   balance?: number;
+  pex?: 'u' | 's' | 'a';
 }
 
 export interface Notification {

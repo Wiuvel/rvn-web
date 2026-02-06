@@ -1999,13 +1999,13 @@ export default function SupportPage() {
     <div className="h-screen bg-neutral-950 text-neutral-100 flex flex-col overflow-hidden">
       {/* Header */}
       <header className="fixed top-0 left-0 right-0 pt-4 z-[999]">
-        <div className="mx-auto max-w-6xl px-4">
-          <div className="backdrop-blur-lg bg-neutral-900/40 border border-white/10 rounded-full px-6 py-3 flex items-center justify-between shadow-lg">
-            <Link href="/" className="flex items-center gap-2">
-              <Image src="/static/logo.svg" alt="Raven Logo" width={256} height={256} className="w-6 h-6" priority />
-              <span className="font-semibold text-white">RVN</span>
+        <div className="mx-auto max-w-7xl px-5">
+          <div className="backdrop-blur-lg bg-neutral-900/40 border border-white/10 rounded-full px-6 py-4 flex items-center justify-between shadow-lg">
+            <Link href="/" className="flex items-center gap-3">
+              <Image src="/static/logo.svg" alt="Raven Logo" width={256} height={256} className="w-8 h-8" priority />
+              <span className="font-semibold text-lg text-white">RVN</span>
             </Link>
-            <nav className="hidden lg:flex items-center gap-8 text-sm text-neutral-300">
+            <nav className="hidden lg:flex items-center gap-8 text-base text-neutral-300">
               <Link href="/" className="hover:text-white transition">Главная</Link>
               <Link href="/auth" className="hover:text-white transition">Профиль</Link>
             </nav>
@@ -2018,7 +2018,7 @@ export default function SupportPage() {
                   return (
                     <button
                       onClick={() => setUserMenuOpen(!userMenuOpen)}
-                      className={`w-10 h-10 rounded-full overflow-hidden ${avatarUrl ? '' : gradientClasses} flex items-center justify-center text-white font-semibold text-sm transition-transform duration-200 hover:scale-110 cursor-pointer`}
+                      className={`w-11 h-11 rounded-full overflow-hidden ${avatarUrl ? '' : gradientClasses} flex items-center justify-center text-white font-semibold text-base transition-transform duration-200 hover:scale-110 cursor-pointer`}
                       title={userData.username}
                       aria-label="Меню пользователя"
                       aria-expanded={userMenuOpen}
@@ -2027,8 +2027,8 @@ export default function SupportPage() {
                         <Image
                           src={avatarUrl}
                           alt={userData.username}
-                          width={40}
-                          height={40}
+                          width={44}
+                          height={44}
                           className="w-full h-full object-cover"
                           unoptimized
                         />
@@ -2050,7 +2050,7 @@ export default function SupportPage() {
               <div className="lg:hidden flex items-center gap-2 relative">
                 <button
                   onClick={() => setUserMenuOpen(!userMenuOpen)}
-                  className={`w-10 h-10 rounded-full overflow-hidden ${getAvatarUrl(userData.avatar) ? '' : getGradientClasses(userData.avatar)} flex items-center justify-center text-white font-semibold text-sm transition-transform duration-200 hover:scale-110 cursor-pointer`}
+                  className={`w-11 h-11 rounded-full overflow-hidden ${getAvatarUrl(userData.avatar) ? '' : getGradientClasses(userData.avatar)} flex items-center justify-center text-white font-semibold text-base transition-transform duration-200 hover:scale-110 cursor-pointer`}
                   title={userData.username}
                   aria-label="Меню пользователя"
                   aria-expanded={userMenuOpen}
@@ -2061,8 +2061,8 @@ export default function SupportPage() {
                       <Image
                         src={avatarUrl}
                         alt={userData.username}
-                        width={40}
-                        height={40}
+                        width={44}
+                        height={44}
                         className="w-full h-full object-cover"
                         unoptimized
                       />
@@ -2075,7 +2075,6 @@ export default function SupportPage() {
                   userData={userData}
                   isOpen={userMenuOpen}
                   onClose={() => setUserMenuOpen(false)}
-                  showProfile={true}
                 />
               </div>
             )}

@@ -259,12 +259,19 @@ export async function POST(request: NextRequest) {
     // Обновляем user_data cookie с новым баннером
     const hostname = request.nextUrl?.hostname ?? request.headers.get('host') ?? '';
     const isLocalhost = hostname.includes('localhost') || hostname.includes('127.0.0.1');
-    const { createUserDataCookie, USER_DATA_COOKIE_NAME, getUserDataCookieOptions } = await import('@/lib/auth/user-cookie.server');
+    
+    // Получаем текущий pex из cookie или базы
+    const { parseUserDataCookie, createUserDataCookie, USER_DATA_COOKIE_NAME, getUserDataCookieOptions } = await import('@/lib/auth/user-cookie.server');
+    const currentCookie = request.cookies.get(USER_DATA_COOKIE_NAME)?.value;
+    const currentData = parseUserDataCookie(currentCookie);
+    const pex = currentData?.pex || 'u';
+
     const userDataValue = createUserDataCookie({
       user_id: user.user_id,
       username: user.username,
       avatar: user.avatar ?? null,
       banner: newBannerPath,
+      pex,
     });
     const response = NextResponse.json({
       success: true,

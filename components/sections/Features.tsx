@@ -33,13 +33,13 @@ export default function FeaturesSection() {
 
   return (
     <section id="features" className="overflow-hidden select-none relative hidden md:block">
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl px-6 sm:px-8 lg:px-12 xl:px-16 h-px" style={{
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl px-4 sm:px-6 lg:px-8 h-px" style={{
         backgroundImage: 'radial-gradient(circle, rgb(115 115 115 / 0.4) 1.5px, transparent 1.5px)',
         backgroundSize: '12px 1px',
         backgroundRepeat: 'repeat-x',
         backgroundPosition: '0 0'
       }}></div>
-      <div className="mx-auto max-w-7xl px-6 sm:px-8 lg:px-12 xl:px-16 py-12">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12">
         <div ref={cardsRef} className="relative" aria-label="Возможности сервиса" role="region">
           <div className="fade-mask">
             <div className="animate-marquee" role="list">

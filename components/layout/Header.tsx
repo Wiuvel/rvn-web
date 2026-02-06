@@ -13,7 +13,6 @@ import { GSAP_DEFAULT_DURATION, GSAP_DEFAULT_EASE } from '@/lib/utils/constants'
 import { getGradientClasses, getAvatarUrl } from '@/lib/utils/avatar-gradients';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { getStaticUrl } from "@/lib/utils";
-import { Wallet } from 'lucide-react';
 
 if (typeof window !== 'undefined') {
   gsap.registerPlugin(ScrollTrigger);
@@ -38,7 +37,7 @@ export default function Header({ variant = 'main' }: HeaderProps = {}) {
   const authContainerRef = useRef<HTMLDivElement>(null);
 
   // Используем новый хук useAuth
-  const { userData, loading } = useAuth({ silent: true });
+  const { userData, loading } = useAuth({ silent: true, lightweight: true });
 
   const headerRef = useRef<HTMLElement>(null);
 
@@ -73,26 +72,6 @@ export default function Header({ variant = 'main' }: HeaderProps = {}) {
       }
     };
   }, [userData?.avatar]);
-
-  // Prefetch critical icons for dashboard to prevent loading glitches
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    
-    // Only prefetch if on dashboard or if user is logged in (likely to open menu)
-    if (pathname?.startsWith('/dashboard') || userData) {
-      const iconsToPrefetch = [
-        "/static/icons/accounts/7d971.profile.svg",
-        "/static/icons/accounts/7d972.wallet.svg",
-        "/static/icons/accounts/7d973.support.svg",
-        "/static/icons/accounts/4d661-logout.svg",
-      ];
-      
-      iconsToPrefetch.forEach(src => {
-        const img = document.createElement('img');
-        img.src = getStaticUrl(src);
-      });
-    }
-  }, [pathname, userData]);
 
   useEffect(() => {
     if (typeof window === 'undefined' || !headerRef.current) return;
@@ -259,11 +238,11 @@ export default function Header({ variant = 'main' }: HeaderProps = {}) {
 
   return (
     <header ref={headerRef} className="fixed top-0 left-0 right-0 pt-4 z-50">
-      <div className="mx-auto max-w-6xl px-4">
-        <div className="header-container backdrop-blur-md bg-neutral-900/40 border border-white/10 rounded-full px-6 py-3 flex items-center justify-between shadow-lg">
+      <div className="mx-auto max-w-7xl px-8">
+        <div className="header-container backdrop-blur-md bg-neutral-900/40 border border-white/10 rounded-full px-6 py-4 flex items-center justify-between shadow-lg">
           <Link
             href="/"
-            className="flex items-center gap-2"
+            className="flex items-center gap-3"
             aria-current={pathname === '/' ? 'page' : undefined}
           >
             <Image 
@@ -271,13 +250,13 @@ export default function Header({ variant = 'main' }: HeaderProps = {}) {
               alt="RVNPrivate" 
               width={256} 
               height={256} 
-              className="w-6 h-6"
+              className="w-8 h-8"
               priority
             />
-            <span className="font-semibold text-white">RVN</span>
+            <span className="font-semibold text-lg text-white">RVN</span>
           </Link>
           {variant === 'main' && (
-            <nav className="hidden lg:flex items-center gap-8 text-sm text-neutral-300">
+            <nav className="hidden lg:flex items-center gap-8 text-base text-neutral-300">
               {getNavigation()}
             </nav>
           )}
@@ -307,7 +286,7 @@ export default function Header({ variant = 'main' }: HeaderProps = {}) {
                       e.stopPropagation();
                       setUserMenuOpen(!userMenuOpen);
                     }}
-                        className={`w-10 h-10 rounded-full overflow-hidden ${avatarUrl ? '' : gradientClasses} flex items-center justify-center text-white font-semibold text-sm transition-transform duration-200 hover:scale-110 cursor-pointer flex-shrink-0 relative`}
+                        className={`w-11 h-11 rounded-full overflow-hidden ${avatarUrl ? '' : gradientClasses} flex items-center justify-center text-white font-semibold text-base transition-transform duration-200 hover:scale-110 cursor-pointer flex-shrink-0 relative`}
                     title={userData.username}
                     aria-label="Меню пользователя"
                     aria-expanded={userMenuOpen}
@@ -322,8 +301,8 @@ export default function Header({ variant = 'main' }: HeaderProps = {}) {
                             <Image
                               src={avatarUrl}
                               alt={userData.username}
-                              width={40}
-                              height={40}
+                              width={44}
+                              height={44}
                               className={`w-full h-full object-cover transition-opacity duration-300 ${avatarLoading ? 'opacity-0' : 'opacity-100'}`}
                               unoptimized
                               onLoad={() => {
@@ -364,7 +343,6 @@ export default function Header({ variant = 'main' }: HeaderProps = {}) {
                       userData={userData}
                       isOpen={userMenuOpen}
                       onClose={() => setUserMenuOpen(false)}
-                      showProfile={true}
                       showUserId={true}
                       menuRef={userMenuRef}
                     />
@@ -387,10 +365,18 @@ export default function Header({ variant = 'main' }: HeaderProps = {}) {
               )}
             </div>
           </div>
-          <div className="lg:hidden flex items-center gap-2">
+          <div className="lg:hidden flex items-center gap-2 relative">
             {/* Кнопка уведомлений для мобильных - только для авторизированных пользователей */}
             {userData && (
               <NotificationsWidget isMobile={true} />
+            )}
+            {open && userData && (
+              <UserMenu
+                userData={userData}
+                isOpen={open}
+                onClose={() => setOpen(false)}
+                menuRef={userMenuRef}
+              />
             )}
             <button 
               onClick={() => {
@@ -412,169 +398,16 @@ export default function Header({ variant = 'main' }: HeaderProps = {}) {
           </div>
         </div>
         {/* Мобильное меню профиля */}
-        {open && (
+        {open && !userData && (
           <div className="lg:hidden mt-4 py-4 bg-black/50 backdrop-blur-xl rounded-2xl border border-white/10">
             <div className="px-4 space-y-2">
-              {loading && !userData ? (
+              {loading ? (
                 <div className="h-12 flex items-center">
                   <div 
                     ref={mobileSpinnerRef}
                     className="w-10 h-10 rounded-full bg-gradient-to-r from-neutral-700 via-neutral-600 to-neutral-700 bg-[length:200%_100%] animate-[shimmer_1.5s_ease-in-out_infinite] flex-shrink-0"
                   ></div>
                 </div>
-              ) : userData ? (
-                <>
-                  <Link
-                    href={`/dashboard/${userData.user_id}`}
-                    onClick={() => setOpen(false)}
-                    className="block p-4 border-b border-white/10 hover:bg-white/5 transition-colors duration-200 cursor-pointer mx-2 my-1 rounded-xl"
-                  >
-                    <div className="flex items-center gap-3">
-                      {(() => {
-                        const avatarUrl = getAvatarUrl(userData.avatar);
-                        const gradientClasses = getGradientClasses(userData.avatar);
-                        
-                        return (
-                          <div className={`w-12 h-12 rounded-full overflow-hidden ${avatarUrl ? '' : gradientClasses} flex items-center justify-center text-white font-semibold text-base flex-shrink-0 relative`}>
-                            {avatarUrl ? (
-                              <>
-                            {mobileAvatarLoading && (
-                              <div 
-                                className="absolute inset-0 rounded-full bg-gradient-to-r from-neutral-700 via-neutral-600 to-neutral-700 bg-[length:200%_100%] animate-[shimmer_1.5s_ease-in-out_infinite]"
-                              />
-                            )}
-                                <Image
-                                  src={avatarUrl}
-                                  alt={userData.username}
-                                  width={48}
-                                  height={48}
-                                  className={`w-full h-full object-cover transition-opacity duration-300 ${mobileAvatarLoading ? 'opacity-0' : 'opacity-100'}`}
-                                  unoptimized
-                                  onLoad={() => {
-                                    if (avatarLoadFallbackRef.current) {
-                                      clearTimeout(avatarLoadFallbackRef.current);
-                                      avatarLoadFallbackRef.current = null;
-                                    }
-                                    setAvatarLoading(false);
-                                    setMobileAvatarLoading(false);
-                                  }}
-                                  onError={() => {
-                                    if (avatarLoadFallbackRef.current) {
-                                      clearTimeout(avatarLoadFallbackRef.current);
-                                      avatarLoadFallbackRef.current = null;
-                                    }
-                                    setAvatarLoading(false);
-                                    setMobileAvatarLoading(false);
-                                  }}
-                                />
-                              </>
-                            ) : (
-                              <>
-                                {loading && !userData?.id && (
-                                  <div 
-                                    className="absolute inset-0 rounded-full bg-gradient-to-r from-neutral-700 via-neutral-600 to-neutral-700 bg-[length:200%_100%] animate-[shimmer_1.5s_ease-in-out_infinite]"
-                                  />
-                                )}
-                                <div className={`${loading && !userData?.id ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300`}>
-                        {getInitial(userData.username)}
-                      </div>
-                              </>
-                            )}
-                          </div>
-                        );
-                      })()}
-                      <div className="min-w-0 flex-1">
-                        <div className={`font-medium truncate ${
-                          userData.isAdmin 
-                            ? 'text-orange-500' 
-                            : userData.isSupport 
-                            ? 'text-green-500' 
-                            : 'text-white'
-                        }`}>
-                          {userData.username}
-                        </div>
-                        <div className="flex items-center gap-2 text-neutral-400 text-sm truncate">
-                          <span>ID: {userData.user_id}</span>
-                          <span className="text-neutral-500">•</span>
-                          <span className="flex items-center gap-1">
-                            <Wallet className="w-4 h-4 text-neutral-500" />
-                            {userData.balance !== undefined ? `${userData.balance} ₽` : '0 ₽'}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </Link>
-                  <div className="py-2">
-                    <Link
-                      href={`/dashboard/${userData.user_id}`}
-                      onClick={() => setOpen(false)}
-                      className="flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-xl text-white/80 hover:text-white hover:bg-white/5 transition-colors duration-200"
-                    >
-                      <Image 
-                        src={getStaticUrl("/static/icons/accounts/7d971.profile.svg")} 
-                        alt="Профиль" 
-                        width={24} 
-                        height={24} 
-                        className="w-5 h-5"
-                      />
-                      <span>Профиль</span>
-                    </Link>
-                    <Link
-                      href={`/dashboard/${userData.user_id}#subscriptions`}
-                      onClick={() => setOpen(false)}
-                      className="flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-xl text-white/80 hover:text-white hover:bg-white/5 transition-colors duration-200"
-                    >
-                      <Image 
-                        src={getStaticUrl("/static/icons/accounts/7d972.wallet.svg")} 
-                        alt="Мои тарифы" 
-                        width={24} 
-                        height={24} 
-                        className="w-5 h-5"
-                      />
-                      <span>Мои тарифы</span>
-                    </Link>
-                    <Link
-                      href="/support"
-                      onClick={() => setOpen(false)}
-                      className="flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-xl text-white/80 hover:text-white hover:bg-white/5 transition-colors duration-200"
-                    >
-                      <Image 
-                        src={getStaticUrl("/static/icons/accounts/7d973.support.svg")} 
-                        alt="Поддержка" 
-                        width={24} 
-                        height={24} 
-                        className="w-5 h-5"
-                      />
-                      <span>Поддержка</span>
-                    </Link>
-                    <div className="border-t border-white/10 my-1 mx-2"></div>
-                    <button
-                      onClick={async () => {
-                        setOpen(false);
-                        try {
-                          const response = await fetch('/api/auth/logout', {
-                            method: 'POST'
-                          });
-                          if (response.ok) {
-                            router.push('/auth');
-                          }
-                        } catch (error) {
-                          console.error('Logout error:', error);
-                        }
-                      }}
-                      className="w-full flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-xl text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors duration-200"
-                    >
-                      <Image 
-                        src={getStaticUrl("/static/icons/accounts/4d661-logout.svg")} 
-                        alt="Выйти" 
-                        width={24} 
-                        height={24} 
-                        className="w-5 h-5"
-                      />
-                      <span>Выйти</span>
-                    </button>
-                  </div>
-                </>
               ) : (
                 <>
                   {variant === 'main' && getMobileNavigation()}

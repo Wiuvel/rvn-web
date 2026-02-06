@@ -8,7 +8,7 @@ import { getStaticUrl } from "@/lib/utils";
 export interface ErrorStateProps {
   code?: string | number;
   title?: string;
-  description?: string;
+  description?: string | React.ReactNode;
   showButton?: boolean;
   showImage?: boolean;
   buttonText?: string;
@@ -38,7 +38,7 @@ export default function ErrorState({
       <div className={`w-full max-w-6xl grid grid-cols-1 ${showImage ? 'lg:grid-cols-12' : 'grid-cols-1'} gap-12 items-center`}>
         
         {/* Text Content - Centered if no image, otherwise Left Aligned */}
-        <div className={`${showImage ? 'lg:col-span-7 lg:items-start lg:text-left' : 'w-full flex flex-col items-center text-center'} flex flex-col items-center space-y-8 z-10`}>
+        <div className={`${showImage ? 'lg:col-span-7 lg:items-start lg:text-left items-center text-center' : 'w-full flex flex-col items-center text-center'} flex flex-col space-y-8 z-10`}>
           {/* Error Code Console Style */}
           <div className="relative">
             <h1 className="text-[6rem] sm:text-[9rem] lg:text-[10rem] font-bold leading-none tracking-tighter select-none font-mono">

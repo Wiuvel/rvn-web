@@ -285,6 +285,7 @@ export async function GET(request: NextRequest) {
       username: user.username,
       avatar: user.avatar ?? null,
       banner: user.banner ?? null,
+      pex: 'u', // Default to 'u'
     }), getUserDataCookieOptions(isLocalhost));
 
     response.cookies.delete('oauth_state');

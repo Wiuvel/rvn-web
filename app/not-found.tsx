@@ -7,7 +7,12 @@ export default function NotFound() {
     <ErrorState 
       code="404"
       title="Контент не найден"
-      description="Запрашиваемая страница не существует или была перемещена. Держите собаку, не расстраивайтесь."
+      description={
+        <>
+          Запрашиваемая страница не существует или была перемещена.{" "}
+          <span className="hidden md:inline">Держите собаку, не расстраивайтесь.</span>
+        </>
+      }
       showButton={true}
       showImage={true}
       imageSrc="/static/ErrorState_NotFound.png"

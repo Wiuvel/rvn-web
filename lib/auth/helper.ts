@@ -17,11 +17,15 @@ export interface AuthResult {
  * Устанавливает user_data cookie (HMAC-signed JSON для быстрого UI).
  */
 export async function setUserDataCookie(user: User, isLocalhost: boolean): Promise<void> {
+  const isAdmin = await hasUserRole(user.id, 'admin');
+  const isSupport = await hasUserRole(user.id, 'support');
+  
   const payload = {
     user_id: user.user_id,
     username: user.username,
     avatar: user.avatar ?? null,
     banner: user.banner ?? null,
+    pex: (isAdmin ? 'a' : isSupport ? 's' : 'u') as 'u' | 's' | 'a',
   };
   const value = createUserDataCookie(payload);
   const opts = getUserDataCookieOptions(isLocalhost);

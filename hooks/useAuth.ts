@@ -12,6 +12,7 @@ export interface UseAuthOptions {
   redirectOnTimeout?: string;
   silent?: boolean; // Не выводить ошибки в консоль
   validateUserId?: string; // Проверять совпадение user_id (для страницы дашборда)
+  lightweight?: boolean; // Использовать только данные из cookie, без запроса к API
   onSuccess?: (data: UserData) => void;
   onError?: (error: Error) => void;
 }
@@ -29,6 +30,7 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
     redirectOnTimeout,
     silent = false,
     validateUserId,
+    lightweight = false,
     onSuccess,
     onError
   } = options;
@@ -52,6 +54,17 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
     let timeoutId: NodeJS.Timeout | null = null;
 
     const fetchUserData = async () => {
+      // Если включен lightweight режим, используем данные из cookie (уже установлены в useLayoutEffect)
+      // и не делаем запрос к API
+      if (lightweight) {
+        setLoading(false);
+        // Если данные есть, вызываем onSuccess
+        if (userData && onSuccess) {
+          onSuccess(userData);
+        }
+        return;
+      }
+
       try {
         controller = new AbortController();
         timeoutId = setTimeout(() => controller!.abort(), AUTH_FETCH_TIMEOUT);
@@ -75,6 +88,8 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
             // Проверяем, что пользователь авторизован
             if (data.authenticated === false || !data.user_id) {
               if (requireAuth && redirectOnFail) {
+                // Clear potentially invalid cookies on client side before redirecting
+                document.cookie = 'user_data=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
                 router.push(redirectOnFail);
                 return;
               }

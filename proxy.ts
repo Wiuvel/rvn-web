@@ -433,8 +433,14 @@ function handleAuth(request: NextRequest, pathname: string, requestHeaders: Head
     }
 
     if (pathname === '/dashboard' || pathname === '/dashboard/') {
-      const redirectPath = userId ? `/dashboard/${userId}` : '/dashboard';
-      const response = NextResponse.redirect(new URL(redirectPath, request.url));
+      if (userId) {
+        const response = NextResponse.redirect(new URL(`/dashboard/${userId}`, request.url));
+        applySecurityHeaders(response, false);
+        return response;
+      }
+      // If no userId (e.g. corrupted user_data cookie), let the page load
+      // The client-side useAuth will handle the actual redirection or data fetching
+      const response = NextResponse.next({ request: { headers: requestHeaders } });
       applySecurityHeaders(response, false);
       return response;
     }

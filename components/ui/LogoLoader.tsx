@@ -11,8 +11,8 @@ export default function LogoLoader() {
         <Image
           src={getStaticUrl("/static/large-logo.svg")}
           alt="RVN"
-          width={200}
-          height={97}
+          width={800}
+          height={350}
           className="logo-pulse w-[200px] h-auto"
           priority
         />
