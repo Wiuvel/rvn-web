@@ -8,7 +8,7 @@ import { SessionManager } from '@/lib/auth/session-manager';
 import { validateRequestBody } from '@/lib/api/validation';
 import { z } from 'zod';
 
-const ADMIN_SESSION_COOKIE = 'admin_session_id';
+const ADMIN_SESSION_COOKIE = 'admin_sid';
 
 const trustedDeveloperSchema = z.object({
   email: z.string().email().optional().or(z.literal('')),
@@ -23,6 +23,7 @@ export async function OPTIONS() {
 async function getCurrentAdminId(request: NextRequest): Promise<string | null> {
   const cookieStore = await cookies();
   const sessionId = cookieStore.get(ADMIN_SESSION_COOKIE)?.value;
+  const token = cookieStore.get('admin_token')?.value;
   
   if (!sessionId) {
     return null;
@@ -30,7 +31,7 @@ async function getCurrentAdminId(request: NextRequest): Promise<string | null> {
 
   const ipAddress = request.headers.get('x-forwarded-for') || 'unknown';
   const userAgent = request.headers.get('user-agent') || 'unknown';
-  const validation = await SessionManager.validateSession(sessionId, '', ipAddress, userAgent); // Admin: no token
+  const validation = await SessionManager.validateSession(sessionId, token || '', ipAddress, userAgent);
   
   if (!validation.valid) {
     return null;
@@ -86,7 +87,16 @@ export async function GET(request: NextRequest) {
     }
 
     const cookieStore = await cookies();
-    const isAuthenticated = cookieStore.get('admin_authenticated')?.value === 'true';
+    const sessionId = cookieStore.get(ADMIN_SESSION_COOKIE)?.value;
+    const token = cookieStore.get('admin_token')?.value;
+
+    let isAuthenticated = false;
+    if (sessionId) {
+      const ipAddress = request.headers.get('x-forwarded-for') || 'unknown';
+      const userAgent = request.headers.get('user-agent') || 'unknown';
+      const validation = await SessionManager.validateSession(sessionId, token || '', ipAddress, userAgent);
+      isAuthenticated = validation.valid;
+    }
 
     if (!isAuthenticated) {
       return setCorsHeaders(
@@ -144,7 +154,16 @@ export async function POST(request: NextRequest) {
     }
 
     const cookieStore = await cookies();
-    const isAuthenticated = cookieStore.get('admin_authenticated')?.value === 'true';
+    const sessionId = cookieStore.get(ADMIN_SESSION_COOKIE)?.value;
+    const token = cookieStore.get('admin_token')?.value;
+
+    let isAuthenticated = false;
+    if (sessionId) {
+      const ipAddress = request.headers.get('x-forwarded-for') || 'unknown';
+      const userAgent = request.headers.get('user-agent') || 'unknown';
+      const validation = await SessionManager.validateSession(sessionId, token || '', ipAddress, userAgent);
+      isAuthenticated = validation.valid;
+    }
 
     if (!isAuthenticated) {
       return setCorsHeaders(
@@ -271,7 +290,16 @@ export async function DELETE(request: NextRequest) {
     }
 
     const cookieStore = await cookies();
-    const isAuthenticated = cookieStore.get('admin_authenticated')?.value === 'true';
+    const sessionId = cookieStore.get(ADMIN_SESSION_COOKIE)?.value;
+    const token = cookieStore.get('admin_token')?.value;
+
+    let isAuthenticated = false;
+    if (sessionId) {
+      const ipAddress = request.headers.get('x-forwarded-for') || 'unknown';
+      const userAgent = request.headers.get('user-agent') || 'unknown';
+      const validation = await SessionManager.validateSession(sessionId, token || '', ipAddress, userAgent);
+      isAuthenticated = validation.valid;
+    }
 
     if (!isAuthenticated) {
       return setCorsHeaders(

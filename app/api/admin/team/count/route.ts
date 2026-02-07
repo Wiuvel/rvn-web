@@ -4,6 +4,7 @@ import { supabaseAdmin } from '@/lib/database/supabase';
 import { generalRateLimit } from '@/lib/security/rate-limit';
 import { logger } from '@/lib/utils/secure-logger';
 import { setCorsHeaders, handleCorsPreflight } from '@/lib/security/cors';
+import { SessionManager } from '@/lib/auth/session-manager';
 
 export async function OPTIONS() {
   return handleCorsPreflight();
@@ -24,7 +25,16 @@ export async function GET(request: NextRequest) {
 
     // Проверяем аутентификацию админа
     const cookieStore = await cookies();
-    const isAuthenticated = cookieStore.get('admin_authenticated')?.value === 'true';
+    const sessionId = cookieStore.get('admin_sid')?.value;
+    const token = cookieStore.get('admin_token')?.value;
+
+    let isAuthenticated = false;
+    if (sessionId) {
+      const ipAddress = request.headers.get('x-forwarded-for') || 'unknown';
+      const userAgent = request.headers.get('user-agent') || 'unknown';
+      const validation = await SessionManager.validateSession(sessionId, token || '', ipAddress, userAgent);
+      isAuthenticated = validation.valid;
+    }
     
     if (!isAuthenticated) {
       return setCorsHeaders(

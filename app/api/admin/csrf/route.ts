@@ -6,7 +6,7 @@ import { generalRateLimit } from '@/lib/security/rate-limit';
 import { logger } from '@/lib/utils/secure-logger';
 import { setCorsHeaders, handleCorsPreflight } from '@/lib/security/cors';
 
-const ADMIN_SESSION_COOKIE = 'admin_session_id';
+const ADMIN_SESSION_COOKIE = 'admin_sid';
 
 export async function OPTIONS() {
   return handleCorsPreflight();

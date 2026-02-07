@@ -730,7 +730,6 @@ export default function AdminPanelContent({ teamCount }: AdminPanelContentProps)
                                         {!usersLoading && users.length === 0 && !usersError && (
                                             <div className="user-empty-state">
                                                 <p>Пользователи не найдены</p>
-                                                <span>Попробуйте изменить запрос или обновить список</span>
                                             </div>
                                         )}
 

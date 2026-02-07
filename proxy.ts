@@ -8,6 +8,34 @@ import { parseUserDataCookie } from './lib/auth/user-cookie.server';
 const MAIN_DOMAIN = domains.main;
 
 /**
+ * Cache for the HMAC key to avoid re-importing it on every request
+ * This optimization is crucial for high-traffic scenarios
+ */
+let cachedHmacKey: CryptoKey | null = null;
+
+/**
+ * Gets or imports the HMAC key for protection validation
+ */
+async function getHmacKey(secretKey: string): Promise<CryptoKey> {
+  if (cachedHmacKey) {
+    return cachedHmacKey;
+  }
+
+  const encoder = new TextEncoder();
+  const keyData = encoder.encode(secretKey);
+  
+  cachedHmacKey = await crypto.subtle.importKey(
+    'raw', 
+    keyData, 
+    { name: 'HMAC', hash: 'SHA-256' }, 
+    false, 
+    ['sign']
+  );
+  
+  return cachedHmacKey;
+}
+
+/**
  * Проверяет, является ли hostname поддоменом основного домена
  * @param hostname - Hostname для проверки
  * @returns True если это поддомен основного домена
@@ -214,20 +242,32 @@ async function checkRateLimit(ip: string): Promise<boolean> {
 }
 
 /**
- * Protection Proxy - проверяет прохождение пользователем страницы защиты
+ * Protection Proxy - validates user access and detects suspicious activity
  * 
- * Логика работы:
- * 1. Проверяет наличие валидных куки защиты (access_granted + access_hash)
- * 2. Если куки нет, анализирует посетителя через систему определения подозрительности
- * 3. При превышении rate limit или высоком счете подозрительности - редирект на /protection
- * 4. Разрешенные боты (Google, Yandex) всегда обходят защиту
- * 5. После прохождения Turnstile CAPTCHA выдаются куки на 12 часов
+ * Logic flow:
+ * 1. Validates protection cookies (access_granted + access_hash)
+ *    - Uses HMAC-SHA256 to verify cookie integrity
+ *    - Checks if cookies are bound to user's IP/UA
+ * 
+ * 2. If no valid cookies:
+ *    - Analyzes visitor behavior (UA, Headers, IP)
+ *    - Checks rate limits via Redis
+ * 
+ * 3. Actions:
+ *    - Redirects to /protection if suspicious or rate limited
+ *    - Allows access if clean
+ *    - Bypasses OAuth and specific system routes
  * 
  * @param request - The Next.js request object
  * @param pathname - The request pathname
  * @returns NextResponse with redirect to protection page, or null to allow access
  */
 async function handleProtection(request: NextRequest, pathname: string): Promise<NextResponse | null> {
+  // Next.js Server Components requests (internal navigation)
+  if (request.nextUrl.searchParams.has('_rsc')) {
+    return null;
+  }
+
   const accessGranted = request.cookies.get('access_granted')?.value === 'true';
   const accessHash = request.cookies.get('access_hash')?.value;
 
@@ -257,12 +297,39 @@ async function handleProtection(request: NextRequest, pathname: string): Promise
 
   /** User has protection cookies - validate and allow access */
   if (accessGranted && accessHash) {
-    // Валидация hash: должен быть 64 символа hex (SHA-256)
-    // Это защищает от подделки куки - hash генерируется на основе браузерного fingerprint
+    // Валидация hash: HMAC-SHA256(IP|UserAgent, Secret)
+    // Это гарантирует, что кука была выдана сервером и привязана к текущему пользователю
+    const secretKey = process.env.TURNSTILE_SECRET_KEY;
+    
+    // Если ключ не настроен или это старый формат хеша (64 символа, но не подпись) - требуем перепроверку
+    // Но для плавного перехода пока поддерживаем старый формат, если он валиден (TODO: удалить позже)
     if (accessHash.length === 64 && /^[a-f0-9]{64}$/i.test(accessHash)) {
-      return null; // Валидные куки - разрешаем доступ
+      if (!secretKey) return null; // Fallback если нет ключа
+
+      try {
+        const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || request.headers.get('x-real-ip') || 'unknown';
+        const userAgent = request.headers.get('user-agent') || '';
+        const data = `${ip}|${userAgent}`;
+        
+        // Web Crypto API для Edge Runtime
+        const encoder = new TextEncoder();
+        const msgData = encoder.encode(data);
+
+        // Use cached key for performance optimization
+        const key = await getHmacKey(secretKey);
+        
+        const signature = await crypto.subtle.sign('HMAC', key, msgData);
+        const signatureArray = Array.from(new Uint8Array(signature));
+        const signatureHex = signatureArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
+        if (signatureHex === accessHash) {
+          return null; // Подпись верна
+        }
+      } catch (e) {
+        // Ошибка проверки подписи - считаем невалидным
+      }
     }
-    // Невалидный hash - считаем что куки подделаны, требуем повторную проверку
+    // Невалидный hash - считаем что куки подделаны или устарели, требуем повторную проверку
     // Продолжаем выполнение для редиректа на страницу защиты
   }
 
@@ -382,6 +449,20 @@ async function handleProtection(request: NextRequest, pathname: string): Promise
 
 /**
  * Auth Proxy - handles authentication and authorization
+ * 
+ * Logic flow:
+ * 1. Auth routes (login/register):
+ *    - Redirect authenticated users to dashboard
+ *    - Handle OAuth callbacks
+ * 
+ * 2. Dashboard routes:
+ *    - Require authentication (token cookie)
+ *    - Redirect unauthenticated users to login
+ *    - Enforce correct user ID in URL
+ * 
+ * 3. Support panel:
+ *    - Require authentication
+ * 
  * @param request - The Next.js request object
  * @param pathname - The request pathname
  * @param requestHeaders - Headers to pass to the response
@@ -392,7 +473,10 @@ function handleAuth(request: NextRequest, pathname: string, requestHeaders: Head
   const userData = parseUserDataCookie(request.cookies.get('user_data')?.value);
   const userId = userData?.user_id;
 
-  /** Auth routes - redirect authenticated users to dashboard */
+  /**
+   * Auth routes - redirect authenticated users to dashboard
+   * Prevent logged-in users from accessing login/register pages
+   */
   if (pathname === '/auth' || pathname.startsWith('/auth/')) {
     if (
       pathname === '/auth/oauth-handler' ||
@@ -423,7 +507,10 @@ function handleAuth(request: NextRequest, pathname: string, requestHeaders: Head
     return response;
   }
 
-  /** Dashboard routes - require authentication */
+  /**
+   * Dashboard routes - require authentication
+   * Redirects unauthenticated users to login page with return URL
+   */
   if (pathname.startsWith('/dashboard')) {
     if (!hasToken) {
       const retpatch = encodeURIComponent(pathname);
@@ -457,7 +544,10 @@ function handleAuth(request: NextRequest, pathname: string, requestHeaders: Head
     return response;
   }
 
-  /** Support panel - requires authentication */
+  /**
+   * Support panel - requires authentication
+   * Redirects unauthenticated users to login page
+   */
   if (pathname.startsWith('/ui/panel/support')) {
     if (!hasToken) {
       const retpatch = encodeURIComponent(pathname);
@@ -470,14 +560,21 @@ function handleAuth(request: NextRequest, pathname: string, requestHeaders: Head
     return response;
   }
 
-  /** Admin panel - requires admin authentication */
+  /**
+   * Admin panel - requires admin authentication
+   * Currently, we allow all requests to pass through to the panel
+   * Authentication is handled client-side or in server components
+   */
   if (pathname.startsWith('/ui/panel/admin')) {
     const response = NextResponse.next({ request: { headers: requestHeaders } });
     applySecurityHeaders(response, false);
     return response;
   }
 
-  /** Public support page - no auth required */
+  /**
+   * Public support page - no auth required
+   * Applies security headers to the response
+   */
   if (pathname === '/support' || pathname.startsWith('/support/')) {
     const response = NextResponse.next({ request: { headers: requestHeaders } });
     applySecurityHeaders(response, false);

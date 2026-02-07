@@ -5,7 +5,8 @@ import { setCorsHeaders, handleCorsPreflight } from '@/lib/security/cors';
 import { SessionManager } from '@/lib/auth/session-manager';
 import { revokeCSRFToken } from '@/lib/security/csrf';
 
-const ADMIN_SESSION_COOKIE = 'admin_session_id';
+const ADMIN_SESSION_COOKIE = 'admin_sid';
+const ADMIN_TOKEN_COOKIE = 'admin_token';
 
 export async function OPTIONS() {
   return handleCorsPreflight();
@@ -23,7 +24,7 @@ export async function POST(request: NextRequest) {
     }
 
     await SessionManager.clearSessionCookie(ADMIN_SESSION_COOKIE);
-    cookieStore.delete('admin_authenticated');
+    cookieStore.delete(ADMIN_TOKEN_COOKIE);
     cookieStore.delete('admin_username');
 
     if (username) {

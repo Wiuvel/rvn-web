@@ -6,6 +6,7 @@ import { setCorsHeaders, handleCorsPreflight } from '@/lib/security/cors';
 import { supabaseAdmin } from '@/lib/database/supabase';
 import { grantUserRole, revokeUserRole, getUserRoles, getUsersByRole, UserRole } from '@/lib/auth/user-roles';
 import { ERROR_INTERNAL_SERVER_ERROR, ERROR_NOT_AUTHENTICATED, ERROR_INVALID_REQUEST_DATA } from '@/lib/utils/constants';
+import { SessionManager } from '@/lib/auth/session-manager';
 
 export async function OPTIONS() {
   return handleCorsPreflight();
@@ -31,7 +32,16 @@ export async function GET(request: NextRequest) {
     // Проверка авторизации админа
     const cookieStore = await cookies();
     const adminUsername = cookieStore.get('admin_username')?.value;
-    const isAuthenticated = cookieStore.get('admin_authenticated')?.value === 'true';
+    const sessionId = cookieStore.get('admin_sid')?.value;
+    const token = cookieStore.get('admin_token')?.value;
+
+    let isAuthenticated = false;
+    if (sessionId) {
+      const ipAddress = request.headers.get('x-forwarded-for') || 'unknown';
+      const userAgent = request.headers.get('user-agent') || 'unknown';
+      const validation = await SessionManager.validateSession(sessionId, token || '', ipAddress, userAgent);
+      isAuthenticated = validation.valid;
+    }
 
     if (!isAuthenticated || !adminUsername) {
       return setCorsHeaders(
@@ -102,7 +112,16 @@ export async function POST(request: NextRequest) {
     // Проверка авторизации админа
     const cookieStore = await cookies();
     const adminUsername = cookieStore.get('admin_username')?.value;
-    const isAuthenticated = cookieStore.get('admin_authenticated')?.value === 'true';
+    const sessionId = cookieStore.get('admin_sid')?.value;
+    const token = cookieStore.get('admin_token')?.value;
+
+    let isAuthenticated = false;
+    if (sessionId) {
+      const ipAddress = request.headers.get('x-forwarded-for') || 'unknown';
+      const userAgent = request.headers.get('user-agent') || 'unknown';
+      const validation = await SessionManager.validateSession(sessionId, token || '', ipAddress, userAgent);
+      isAuthenticated = validation.valid;
+    }
 
     if (!isAuthenticated || !adminUsername) {
       return setCorsHeaders(
@@ -206,7 +225,16 @@ export async function DELETE(request: NextRequest) {
     // Проверка авторизации админа
     const cookieStore = await cookies();
     const adminUsername = cookieStore.get('admin_username')?.value;
-    const isAuthenticated = cookieStore.get('admin_authenticated')?.value === 'true';
+    const sessionId = cookieStore.get('admin_sid')?.value;
+    const token = cookieStore.get('admin_token')?.value;
+
+    let isAuthenticated = false;
+    if (sessionId) {
+      const ipAddress = request.headers.get('x-forwarded-for') || 'unknown';
+      const userAgent = request.headers.get('user-agent') || 'unknown';
+      const validation = await SessionManager.validateSession(sessionId, token || '', ipAddress, userAgent);
+      isAuthenticated = validation.valid;
+    }
 
     if (!isAuthenticated || !adminUsername) {
       return setCorsHeaders(

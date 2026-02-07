@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { checkAuth } from '@/lib/auth/helper';
+import { cookies } from 'next/headers';
+import { SessionManager } from '@/lib/auth/session-manager';
 import { getSupportAnalytics } from '@/lib/analytics/support-analytics';
 import { setCorsHeaders, handleCorsPreflight } from '@/lib/security/cors';
-import { ERROR_NOT_AUTHENTICATED, ERROR_INTERNAL_SERVER_ERROR } from '@/lib/utils/constants';
+import { ERROR_INTERNAL_SERVER_ERROR } from '@/lib/utils/constants';
 import { logger } from '@/lib/utils/secure-logger';
 
 export async function OPTIONS() {
@@ -14,18 +15,27 @@ export async function OPTIONS() {
  */
 export async function GET(request: NextRequest) {
   try {
-    const authResult = await checkAuth(request);
-    if (!authResult.isAuthenticated || !authResult.user) {
+    const cookieStore = await cookies();
+    const sessionId = cookieStore.get('admin_sid')?.value;
+    const token = cookieStore.get('admin_token')?.value;
+
+    if (!sessionId) {
       return setCorsHeaders(
-        NextResponse.json(
-          { error: ERROR_NOT_AUTHENTICATED },
-          { status: 401 }
-        )
+        NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
       );
     }
-    const user = authResult.user;
 
-    // Проверка прав администратора убрана - доступ к админ-панели уже означает авторизацию администратора
+    const ipAddress = request.headers.get('x-forwarded-for') || 'unknown';
+    const userAgent = request.headers.get('user-agent') || 'unknown';
+
+    const validation = await SessionManager.validateSession(sessionId, token || '', ipAddress, userAgent);
+
+    if (!validation.valid) {
+      return setCorsHeaders(
+        NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      );
+    }
+
     // Получаем параметр period из query string
     const { searchParams } = new URL(request.url);
     const period = searchParams.get('period') || 'month';
