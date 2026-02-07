@@ -42,9 +42,7 @@ export const useGSAP = () => {
 
       const isMobile = window.innerWidth < 768;
       if (isMobile) {
-        // Отключаем все ScrollTrigger анимации на мобильных устройствах
         ScrollTrigger.getAll().forEach(trigger => trigger.disable());
-        gsap.globalTimeline.timeScale(0);
       }
 
     }, containerRef);
@@ -65,7 +63,6 @@ export const useFadeIn = (delay: number = 0) => {
     const isMobile = window.innerWidth < 768;
     
     if (isMobile) {
-      // На мобильных устройствах просто устанавливаем финальное состояние без анимации
       gsap.set(element, { opacity: 1, y: 0 });
       return;
     }
@@ -109,12 +106,10 @@ export const useStaggeredFadeIn = (delay: number = 0, stagger: number = 0.05) =>
     const elements = containerRef.current.children;
     
     if (isMobile) {
-      // На мобильных устройствах просто устанавливаем финальное состояние без анимации
       gsap.set(elements, { opacity: 1, y: 0, scale: 1 });
       return;
     }
 
-    // Проверяем видимость с небольшой задержкой (чтобы DOM успел отрендериться)
     const timeout = setTimeout(() => {
       if (!containerRef.current) return;
       
@@ -122,12 +117,10 @@ export const useStaggeredFadeIn = (delay: number = 0, stagger: number = 0.05) =>
       const isAlreadyVisible = rect.top < window.innerHeight * 0.92;
       
       if (isAlreadyVisible) {
-        // Если элемент уже виден, оставляем его видимым (не применяем анимацию)
         gsap.set(elements, { opacity: 1, y: 0, scale: 1 });
         return;
       }
 
-      // Если элемент не виден, устанавливаем начальное состояние и создаем анимацию
       gsap.set(elements, { opacity: 0, y: 10, scale: 0.98 });
       
       const animation = gsap.to(elements, {
@@ -146,7 +139,6 @@ export const useStaggeredFadeIn = (delay: number = 0, stagger: number = 0.05) =>
         }
       });
 
-      // Сохраняем ссылку на анимацию для очистки
       (containerRef.current as any).__gsapAnimation = animation;
     }, 150);
 

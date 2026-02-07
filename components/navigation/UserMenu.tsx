@@ -26,6 +26,7 @@ interface UserMenuProps {
   showUserId?: boolean;
   hideBalance?: boolean;
   menuRef?: React.RefObject<HTMLDivElement | null>;
+  persist?: boolean;
 }
 
 export function UserMenu({
@@ -34,12 +35,13 @@ export function UserMenu({
   onClose,
   showUserId = true,
   hideBalance = false,
-  menuRef: externalMenuRef
+  menuRef: externalMenuRef,
+  persist = true
 }: UserMenuProps) {
   const router = useRouter();
   const { shouldRender, menuRef: animatedMenuRef } = useMenuAnimation(isOpen, {
     onClose,
-    persist: true
+    persist
   });
   const [avatarLoading, setAvatarLoading] = useState(true);
   

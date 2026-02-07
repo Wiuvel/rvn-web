@@ -95,7 +95,7 @@ export default function PublicProfilePage() {
     <div className="min-h-screen bg-neutral-950 text-neutral-100">
       <Header variant="main" />
 
-      <main className="pt-32 pb-16 relative overflow-hidden">
+      <main className="pt-4 lg:pt-32 pb-16 relative overflow-hidden">
         <svg className="absolute inset-0 w-full h-full opacity-20 -z-10" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none" aria-hidden="true">
           <defs>
             <radialGradient id="user-grad" cx="50%" cy="50%" r="75%" fx="50%" fy="50%">

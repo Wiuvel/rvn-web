@@ -30,6 +30,7 @@ import {
   ShoppingBag
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import Header from '@/components/layout/Header';
 import { UserMenu } from '@/components/navigation/UserMenu';
 import { NotificationsWidget } from '@/components/navigation/Notifications';
 
@@ -277,6 +278,17 @@ export default function DashboardPage() {
     return { label: 'Пользователь', color: 'text-neutral-400' };
   };
 
+  // Закрытие десктоп-меню при переключении viewport (DevTools / resize)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const mq = window.matchMedia('(min-width: 1024px)');
+    const handler = (e: MediaQueryListEvent) => {
+      if (!e.matches) setUserMenuOpen(false);
+    };
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
@@ -313,65 +325,9 @@ export default function DashboardPage() {
 
   return (
     <div className="dashboard-page">
-      <header className="fixed top-0 left-0 right-0 pt-4 z-[999]">
-        <div className="mx-auto max-w-7xl px-5">
-          <div className="backdrop-blur-lg bg-neutral-900/40 border border-white/10 rounded-full px-6 py-4 flex items-center justify-between shadow-lg">
-            <Link href="/" className="flex items-center gap-3">
-              <Image src="/static/logo.svg" alt="Raven Logo" width={256} height={256} className="w-8 h-8" priority/>
-              <span className="font-semibold text-lg text-white">RVN</span>
-            </Link>
-            <nav className="hidden lg:flex items-center gap-8 text-base text-neutral-300">
-              <Link href="/" className="hover:text-white transition">Главная</Link>
-              <Link href={`/dashboard/${userData?.user_id}`} className="hover:text-white transition">Профиль</Link>
-              <Link href="/support" className="hover:text-white transition">Поддержка</Link>
-            </nav>
-            {userData && (
-              <div className="flex items-center gap-2 relative">
-                <NotificationsWidget />
-                {(() => {
-                  const avatarUrl = getAvatarUrl(userData?.avatar);
-                  const gradientClasses = getGradientClasses(userData?.avatar);
-                  
-                  return (
-                    <button
-                      ref={userMenuButtonRef}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setUserMenuOpen(!userMenuOpen);
-                      }}
-                      className={`w-11 h-11 rounded-full overflow-hidden ${avatarUrl ? '' : gradientClasses} flex items-center justify-center text-white font-semibold text-base transition-transform duration-200 hover:scale-110 cursor-pointer`}
-                      title={userData.username}
-                      aria-label="Меню пользователя"
-                      aria-expanded={userMenuOpen}
-                    >
-                      {avatarUrl ? (
-                        <Image
-                          src={avatarUrl}
-                          alt={userData.username}
-                          width={44}
-                          height={44}
-                          className="w-full h-full object-cover"
-                          unoptimized
-                        />
-                      ) : (
-                        userData.username.charAt(0).toUpperCase()
-                      )}
-                    </button>
-                  );
-                })()}
-                <UserMenu
-                  userData={userData}
-                  isOpen={userMenuOpen}
-                  onClose={() => setUserMenuOpen(false)}
-                  menuRef={userMenuRef}
-                />
-              </div>
-            )}
-          </div>
-        </div>
-      </header>
+      <Header />
 
-      <main className="pt-32 pb-16 relative overflow-hidden">
+      <main className="pt-4 lg:pt-32 pb-16 relative overflow-hidden">
         <svg className="absolute inset-0 w-full h-full opacity-20 -z-10" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none" aria-hidden="true">
           <defs>
             <radialGradient id="dash-grad" cx="50%" cy="50%" r="75%" fx="50%" fy="50%">
@@ -418,53 +374,70 @@ export default function DashboardPage() {
             </div>
 
             <div className="relative mt-[-40px] sm:mt-[-50px] px-4 sm:px-6">
-              <div className="flex items-end gap-4 sm:gap-6">
-                {(() => {
-                  const avatarUrl = getAvatarUrl(userData?.avatar);
-                  const gradientClasses = getGradientClasses(userData?.avatar);
-                  
-                  return (
-                    <div 
-                      className="relative group cursor-pointer shrink-0"
-                      onClick={() => setShowAvatarModal(true)}
-                    >
-                      <div className={`relative h-24 w-24 sm:h-28 sm:w-28 lg:h-32 lg:w-32 rounded-xl overflow-hidden ring-1 ring-neutral-800 ${avatarUrl ? '' : gradientClasses} flex items-center justify-center text-white font-bold text-3xl sm:text-4xl lg:text-5xl shadow-2xl transition-all duration-200 group-hover:scale-105 bg-neutral-900`}>
-                        {avatarUrl ? (
-                          <>
-                            {avatarLoading && (
-                              <div className="absolute inset-0 bg-neutral-800 animate-pulse rounded-xl" />
-                            )}
-                            <Image
-                              src={avatarUrl}
-                              alt={userData?.username || ''}
-                              fill
-                              className={`object-cover rounded-xl transition-opacity duration-300 ${avatarLoading ? 'opacity-0' : 'opacity-100'}`}
-                              unoptimized
-                              onLoad={() => setAvatarLoading(false)}
-                              onError={() => setAvatarLoading(false)}
-                            />
-                          </>
-                        ) : (
-                          userData?.username ? userData.username.charAt(0).toUpperCase() : '—'
-                        )}
-                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center rounded-xl">
-                          <Pencil className="w-5 h-5 text-white" />
+              <div className="flex flex-col sm:flex-row sm:items-end gap-4 sm:gap-6">
+                <div className="flex items-end gap-4 w-full sm:w-auto">
+                  {(() => {
+                    const avatarUrl = getAvatarUrl(userData?.avatar);
+                    const gradientClasses = getGradientClasses(userData?.avatar);
+                    
+                    return (
+                      <div 
+                        className="relative group cursor-pointer shrink-0"
+                        onClick={() => setShowAvatarModal(true)}
+                      >
+                        <div className={`relative h-24 w-24 sm:h-28 sm:w-28 lg:h-32 lg:w-32 rounded-xl overflow-hidden ring-1 ring-neutral-800 ${avatarUrl ? '' : gradientClasses} flex items-center justify-center text-white font-bold text-3xl sm:text-4xl lg:text-5xl shadow-2xl transition-all duration-200 group-hover:scale-105 bg-neutral-900`}>
+                          {avatarUrl ? (
+                            <>
+                              {avatarLoading && (
+                                <div className="absolute inset-0 bg-neutral-800 animate-pulse rounded-xl" />
+                              )}
+                              <Image
+                                src={avatarUrl}
+                                alt={userData?.username || ''}
+                                fill
+                                className={`object-cover rounded-xl transition-opacity duration-300 ${avatarLoading ? 'opacity-0' : 'opacity-100'}`}
+                                unoptimized
+                                onLoad={() => setAvatarLoading(false)}
+                                onError={() => setAvatarLoading(false)}
+                              />
+                            </>
+                          ) : (
+                            userData?.username ? userData.username.charAt(0).toUpperCase() : '—'
+                          )}
+                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center rounded-xl">
+                            <Pencil className="w-5 h-5 text-white" />
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  );
-                })()}
+                    );
+                  })()}
+                  
+                  <div className="flex-1 min-w-0 sm:hidden pb-1">
+                    <h1 className={`text-xl font-bold truncate ${
+                      userData?.isAdmin 
+                        ? 'text-orange-500' 
+                        : userData?.isSupport 
+                        ? 'text-green-500' 
+                        : 'text-white'
+                    }`}>
+                      {userData?.username || '—'}
+                    </h1>
+                  </div>
+                </div>
 
-                <div className="flex-1 min-w-0">
-                  <h1 className={`text-xl sm:text-2xl lg:text-3xl font-bold truncate mb-1.5 ${
-                    userData?.isAdmin 
-                      ? 'text-orange-500' 
-                      : userData?.isSupport 
-                      ? 'text-green-500' 
-                      : 'text-white'
-                  }`}>
-                    {userData?.username || '—'}
-                  </h1>
+                <div className="flex-1 min-w-0 w-full">
+                  <div className="hidden sm:block">
+                    <h1 className={`text-2xl lg:text-3xl font-bold truncate mb-1.5 ${
+                      userData?.isAdmin 
+                        ? 'text-orange-500' 
+                        : userData?.isSupport 
+                        ? 'text-green-500' 
+                        : 'text-white'
+                    }`}>
+                      {userData?.username || '—'}
+                    </h1>
+                  </div>
+                  
                   <div className="flex flex-wrap items-center gap-3 sm:gap-5 text-sm sm:text-base text-neutral-400">
                     <div className="group/info relative" title="Ваш ID">
                       <span className="bg-white/5 px-2 py-1 rounded-md text-neutral-400 text-sm font-mono cursor-help">ID: {userData ? getShortId(userData.user_id) : '—'}</span>

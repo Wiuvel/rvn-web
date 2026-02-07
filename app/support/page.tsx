@@ -21,6 +21,7 @@ import TicketListItem from '@/components/support/TicketListItem';
 import CreateTicketForm from '@/components/support/CreateTicketForm';
 import { X, AlertCircle, PanelLeftClose, PanelLeft, Plus } from 'lucide-react';
 import ImageViewer from '@/components/support/ImageViewer';
+import Header from '@/components/layout/Header';
 import { UserMenu } from '@/components/navigation/UserMenu';
 import { UserData } from '@/types';
 import type { Message, Ticket, MessageAttachment, UploadedFile } from '@/components/support/types';
@@ -73,6 +74,17 @@ export default function SupportPage() {
   const scrollPositionRef = useRef<number | null>(null);
   const isRestoringScrollRef = useRef(false);
   const router = useRouter();
+
+  // Закрытие десктоп-меню при переключении viewport (DevTools / resize)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const mq = window.matchMedia('(min-width: 1024px)');
+    const handler = (e: MediaQueryListEvent) => {
+      if (!e.matches) setUserMenuOpen(false);
+    };
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
 
   // Подсчет активных тикетов (только open и pending)
   const activeTicketsCount = tickets.filter(t => t.status === 'open' || t.status === 'pending').length;
@@ -1997,93 +2009,10 @@ export default function SupportPage() {
 
   return (
     <div className="h-screen bg-neutral-950 text-neutral-100 flex flex-col overflow-hidden">
-      {/* Header */}
-      <header className="fixed top-0 left-0 right-0 pt-4 z-[999]">
-        <div className="mx-auto max-w-7xl px-5">
-          <div className="backdrop-blur-lg bg-neutral-900/40 border border-white/10 rounded-full px-6 py-4 flex items-center justify-between shadow-lg">
-            <Link href="/" className="flex items-center gap-3">
-              <Image src="/static/logo.svg" alt="Raven Logo" width={256} height={256} className="w-8 h-8" priority />
-              <span className="font-semibold text-lg text-white">RVN</span>
-            </Link>
-            <nav className="hidden lg:flex items-center gap-8 text-base text-neutral-300">
-              <Link href="/" className="hover:text-white transition">Главная</Link>
-              <Link href="/auth" className="hover:text-white transition">Профиль</Link>
-            </nav>
-            {userData && (
-              <div className="hidden lg:flex items-center gap-2 relative" ref={userMenuRef}>
-                {(() => {
-                  const avatarUrl = getAvatarUrl(userData.avatar);
-                  const gradientClasses = getGradientClasses(userData.avatar);
-
-                  return (
-                    <button
-                      onClick={() => setUserMenuOpen(!userMenuOpen)}
-                      className={`w-11 h-11 rounded-full overflow-hidden ${avatarUrl ? '' : gradientClasses} flex items-center justify-center text-white font-semibold text-base transition-transform duration-200 hover:scale-110 cursor-pointer`}
-                      title={userData.username}
-                      aria-label="Меню пользователя"
-                      aria-expanded={userMenuOpen}
-                    >
-                      {avatarUrl ? (
-                        <Image
-                          src={avatarUrl}
-                          alt={userData.username}
-                          width={44}
-                          height={44}
-                          className="w-full h-full object-cover"
-                          unoptimized
-                        />
-                      ) : (
-                        userData.username.charAt(0).toUpperCase()
-                      )}
-                    </button>
-                  );
-                })()}
-                <UserMenu
-                  userData={userData}
-                  isOpen={userMenuOpen}
-                  onClose={() => setUserMenuOpen(false)}
-                  menuRef={userMenuRef}
-                />
-              </div>
-            )}
-            {userData && (
-              <div className="lg:hidden flex items-center gap-2 relative">
-                <button
-                  onClick={() => setUserMenuOpen(!userMenuOpen)}
-                  className={`w-11 h-11 rounded-full overflow-hidden ${getAvatarUrl(userData.avatar) ? '' : getGradientClasses(userData.avatar)} flex items-center justify-center text-white font-semibold text-base transition-transform duration-200 hover:scale-110 cursor-pointer`}
-                  title={userData.username}
-                  aria-label="Меню пользователя"
-                  aria-expanded={userMenuOpen}
-                >
-                  {(() => {
-                    const avatarUrl = getAvatarUrl(userData.avatar);
-                    return avatarUrl ? (
-                      <Image
-                        src={avatarUrl}
-                        alt={userData.username}
-                        width={44}
-                        height={44}
-                        className="w-full h-full object-cover"
-                        unoptimized
-                      />
-                    ) : (
-                      userData.username.charAt(0).toUpperCase()
-                    );
-                  })()}
-                </button>
-                <UserMenu
-                  userData={userData}
-                  isOpen={userMenuOpen}
-                  onClose={() => setUserMenuOpen(false)}
-                />
-              </div>
-            )}
-          </div>
-        </div>
-      </header>
+      <Header />
 
       {/* Main Content */}
-      <main className="flex-1 pt-32 pb-4 overflow-hidden min-h-0">
+      <main className="flex-1 pt-4 lg:pt-32 pb-4 overflow-hidden min-h-0">
         <div className="mx-auto max-w-7xl px-3 sm:px-4 lg:px-8 h-full flex flex-col overflow-hidden">
           <div className="mb-4 sm:mb-6 hidden sm:block">
             <p className="text-xs sm:text-sm text-neutral-400">Обратитесь в службу поддержки. Создайте новое обращение или выберите существующее для продолжения диалога.</p>

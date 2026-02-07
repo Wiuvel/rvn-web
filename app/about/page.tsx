@@ -56,7 +56,7 @@ export default function AboutPage() {
       </div>
       )}
 
-      <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-24 sm:py-32">
+      <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-8 pb-24 lg:pt-32 lg:pb-32">
         {/* Hero Section */}
         <div ref={titleRef} className="text-center mb-20">
           <h1 className="text-5xl sm:text-6xl md:text-7xl font-bold mb-6 bg-gradient-to-r from-white via-neutral-200 to-neutral-400 bg-clip-text text-transparent">
