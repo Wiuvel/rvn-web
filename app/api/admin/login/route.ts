@@ -94,7 +94,8 @@ export async function POST(request: NextRequest) {
       sanitizeInput(username),
       ipAddress,
       userAgent,
-      token // Pass token for fingerprinting
+      token,
+      'admin'
     );
 
     await revokeCSRFToken(sessionId);

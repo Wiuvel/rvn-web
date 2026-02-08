@@ -1,4 +1,4 @@
-import { randomBytes } from 'crypto';
+import { randomBytes, createHash } from 'crypto';
 import bcrypt from 'bcryptjs';
 import { supabaseAdmin, Admin } from '../database/supabase';
 import { logger } from '../utils/secure-logger';
@@ -361,21 +361,38 @@ export async function authenticateUser(username: string, password: string): Prom
 
 export async function getUserByToken(authToken: string): Promise<User | null> {
   try {
-    if (!supabaseAdmin) return null;
+    if (!supabaseAdmin) {
+      return null;
+    }
+
+    const tokenHash = createHash('sha256').update(authToken).digest('hex');
+
+    // Check user_devices first
+    const { data: device, error: deviceError } = await supabaseAdmin
+      .from('user_devices')
+      .select('user_id')
+      .eq('token_hash', tokenHash)
+      .single();
+
+    if (deviceError || !device) {
+      // Legacy support: check users table directly (optional, can be removed)
+      // For now, let's keep it STRICT as per "Update auth logic... to use 'user_devices' table"
+      return null;
+    }
 
     const { data: user, error } = await supabaseAdmin
       .from('users')
       .select('*')
-      .eq('token', authToken)
+      .eq('id', device.user_id)
       .eq('is_active', true)
       .single();
 
-    if (error || !user) return null;
+    if (error || !user) {
+      return null;
+    }
+
     return user as User;
   } catch (error) {
-    logger.error('Error getting user by token', {
-      error: error instanceof Error ? error.message : 'Unknown error'
-    });
     return null;
   }
 }

@@ -33,13 +33,13 @@ export const appConfig = {
 
   // Token (refresh) - httpOnly cookie
   token: {
-    maxAge: 7 * 24 * 60 * 60, // 7 дней в секундах для cookie
+    maxAge: 365 * 24 * 60 * 60, // 1 год в секундах для cookie
   },
 
   // user_data cookie - non-httpOnly, для быстрого UI
   userData: {
-    maxAge: 20 * 60, // 20 минут в секундах
-    ttlMs: 20 * 60 * 1000,
+    maxAge: 365 * 24 * 60 * 60, // 1 год в секундах
+    ttlMs: 365 * 24 * 60 * 60 * 1000,
   },
 
   // CSRF

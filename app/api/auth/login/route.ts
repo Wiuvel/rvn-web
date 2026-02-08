@@ -94,13 +94,17 @@ export async function POST(request: NextRequest) {
     }
     
     const user = result.user!;
-    const token = user.token;
+    
+    // Register device and get new token
+    const token = await SessionManager.registerDevice(user.id, userAgent, ipAddress);
+
     const sessionId = await SessionManager.createSession(
       user.id,
       sanitizeInput(username),
       ipAddress,
       userAgent,
-      token
+      token,
+      'user'
     );
 
     await revokeCSRFToken(sessionId);

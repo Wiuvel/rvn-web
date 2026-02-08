@@ -201,7 +201,7 @@ export default function Header({ variant = 'main' }: HeaderProps = {}) {
           >
             <Image 
               src={getStaticUrl("/static/logo.svg")} 
-              alt="RVNPrivate" 
+              alt="RVN Logo" 
               width={256} 
               height={256} 
               className="w-8 h-8"

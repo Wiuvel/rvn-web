@@ -184,12 +184,16 @@ export async function GET(request: NextRequest) {
       await SessionManager.destroySession(oldSessionId);
     }
     
+    // Register device and get new token
+    const token = await SessionManager.registerDevice(user.id, userAgent, ipAddress);
+
     const sessionId = await SessionManager.createSession(
       user.id,
       sanitizeInput(user.username),
       ipAddress,
       userAgent,
-      user.token
+      token,
+      'user'
     );
 
     await SessionManager.setSessionCookie(sessionId, isLocalhost);
@@ -272,7 +276,7 @@ export async function GET(request: NextRequest) {
     const { appConfig } = await import('@/lib/utils/config');
     const { createUserDataCookie, USER_DATA_COOKIE_NAME, getUserDataCookieOptions } = await import('@/lib/auth/user-cookie.server');
 
-    response.cookies.set('token', user.token, {
+    response.cookies.set('token', token, {
       maxAge: appConfig.token.maxAge,
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production' && !isLocalhost,

@@ -39,6 +39,8 @@ export async function GET(request: NextRequest) {
       );
     }
     const user = authResult.user;
+    const cookieStore = request.cookies;
+    const currentToken = cookieStore.get('token')?.value;
 
     // Проверяем роль поддержки (может выбросить ошибку если БД не настроена)
     let hasSupportAccess = false;
@@ -57,7 +59,7 @@ export async function GET(request: NextRequest) {
             username: user.username,
             userId: user.id,
             user_id: user.user_id,
-          token: user.token, // для WebSocket
+            token: currentToken, // Valid device token from cookie
             error: 'Database not configured'
           })
         );
@@ -70,7 +72,7 @@ export async function GET(request: NextRequest) {
         username: user.username,
         userId: user.id,
         user_id: user.user_id, // Добавляем user_id для отображения
-        token: user.token // для WebSocket
+        token: currentToken // Valid device token from cookie
       })
     );
   } catch (error) {

@@ -310,10 +310,10 @@ export default function MobileNavigation() {
               <>
                 <OverlayMenuItem href={`/dashboard/${userData.user_id}#subscriptions`} onClick={closeOverlay} icon={CreditCard} label="Мои тарифы" highlight />
                 <OverlayMenuItem href={`/dashboard/${userData.user_id}`} onClick={closeOverlay} icon={Receipt} label="Транзакции" />
-                <OverlayMenuItem href={`/dashboard/${userData.user_id}`} onClick={closeOverlay} icon={Settings} label="Настройки" />
+                <OverlayMenuItem href={`/dashboard/${userData.user_id}/settings`} onClick={closeOverlay} icon={Settings} label="Настройки" />
                 <div className="h-px bg-white/5 mx-2 my-2" />
               </> 
-            )} // -transactions -settings
+            )}
 
             <OverlayMenuItem href="/" onClick={closeOverlay} icon={Home} label="Главная" active={isActive('/')} />
             <OverlayMenuItem href="/about" onClick={closeOverlay} icon={Info} label="О проекте" active={isActive('/about')} />

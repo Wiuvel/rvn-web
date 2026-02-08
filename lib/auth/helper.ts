@@ -63,7 +63,8 @@ export async function checkAuth(request?: { headers: Headers }): Promise<AuthRes
       user.username,
       ipAddress,
       userAgent,
-      token
+      token,
+      'user'
     );
     const host = request.headers.get('host') || '';
     const isLocalhost = host.includes('localhost') || host.includes('127.0.0.1');

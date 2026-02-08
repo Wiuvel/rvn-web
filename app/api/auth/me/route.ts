@@ -43,6 +43,7 @@ export async function GET(request: NextRequest) {
     const user = authResult.user;
     const cookieStore = await cookies();
     const currentSessionId = cookieStore.get('session_id')?.value;
+    const currentToken = cookieStore.get('token')?.value;
 
     // Проверяем роли пользователя
     let isSupport = false;
@@ -65,7 +66,7 @@ export async function GET(request: NextRequest) {
       id: user.id,
       user_id: user.user_id,
       username: user.username,
-      token: user.token, // для WebSocket auth
+      token: currentToken, // Valid device token from cookie
       created_at: user.created_at,
       last_login: user.last_login,
       avatar: user.avatar,

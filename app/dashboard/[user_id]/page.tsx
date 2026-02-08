@@ -509,7 +509,7 @@ export default function DashboardPage() {
                   <QuickAction
                     icon={Smartphone}
                     label="Мои устройства"
-                    href={`/dashboard/${userData?.user_id}#keys`}
+                    href={`/dashboard/${userData?.user_id}/settings`}
                   />
                   <QuickAction
                     icon={HeadphonesIcon}
@@ -519,7 +519,7 @@ export default function DashboardPage() {
                   <QuickAction
                     icon={Settings}
                     label="Настройки аккаунта"
-                    href={`/dashboard/${userData?.user_id}#settings`}
+                    href={`/dashboard/${userData?.user_id}/settings`}
                   />
                 </div>
               </div>

@@ -181,14 +181,14 @@ export function UserMenu({
           <div className="h-px bg-white/5 mx-2 my-2" />
 
           <MenuItem 
-            href={`/dashboard/${userData.user_id}`} // -transactions
+            href={`/dashboard/${userData.user_id}`}
             onClick={onClose}
             icon={Receipt}
             label="Транзакции"
           />
           
           <MenuItem 
-            href={`/dashboard/${userData.user_id}`} // -settings
+            href={`/dashboard/${userData.user_id}/settings`}
             onClick={onClose}
             icon={Settings}
             label="Настройки"

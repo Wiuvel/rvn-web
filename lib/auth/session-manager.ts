@@ -3,13 +3,14 @@
  * Session + Token binding: session_id и token взаимно связаны через tokenFingerprint.
  */
 
-import { createHmac } from 'crypto';
+import { createHmac, createHash } from 'crypto';
 import { cookies } from 'next/headers';
 import { SESSION_TIMEOUT } from '../utils/constants';
 import { generateSessionId as generateSessionIdUtil } from '../utils/index';
 import { logger } from '../utils/secure-logger';
 import { getSessionStore, type SessionData } from './session-store';
 import { getEnv } from '../validation/env-validation';
+import { supabaseAdmin } from '../database/supabase';
 
 export type { SessionData };
 
@@ -26,6 +27,11 @@ function computeTokenFingerprint(token: string): string {
   return createHmac('sha256', getTokenBindingSecret()).update(token).digest('hex');
 }
 
+/** SHA256(token) — для хранения в БД */
+function computeTokenHash(token: string): string {
+  return createHash('sha256').update(token).digest('hex');
+}
+
 export class SessionManager {
   /**
    * Генерирует случайный session ID
@@ -35,12 +41,112 @@ export class SessionManager {
     return generateSessionIdUtil();
   }
 
+  /**
+   * Регистрирует новое устройство пользователя
+   * @returns Токен устройства (raw)
+   */
+  static async registerDevice(
+    userId: string,
+    userAgent: string,
+    ipAddress: string
+  ): Promise<string> {
+    const token = generateSessionIdUtil(); // Используем надежный генератор ID как токен
+    const tokenHash = computeTokenHash(token);
+    const deviceName = this.parseDeviceName(userAgent);
+
+    if (supabaseAdmin) {
+      const { error } = await supabaseAdmin.from('user_devices').insert({
+        user_id: userId,
+        token_hash: tokenHash,
+        device_name: deviceName,
+        ip_address: ipAddress,
+        last_active: new Date().toISOString()
+      });
+
+      if (error) {
+        logger.error('Failed to register device', { error: error.message, userId });
+      }
+    }
+
+    return token;
+  }
+
+  /**
+   * Удаляет устройство по токену
+   */
+  static async revokeDevice(token: string): Promise<void> {
+    if (!supabaseAdmin) return;
+    const tokenHash = computeTokenHash(token);
+    await supabaseAdmin.from('user_devices').delete().eq('token_hash', tokenHash);
+  }
+
+  /**
+   * Удаляет устройство по ID (для UI)
+   */
+  static async revokeDeviceById(deviceId: string, userId: string): Promise<void> {
+    if (!supabaseAdmin) return;
+    // RLS should handle permission check, but good to be explicit
+    await supabaseAdmin
+      .from('user_devices')
+      .delete()
+      .eq('id', deviceId)
+      .eq('user_id', userId);
+  }
+
+  /**
+   * Удаляет все устройства пользователя кроме текущего
+   */
+  static async revokeOtherDevices(userId: string, currentToken: string): Promise<void> {
+    if (!supabaseAdmin) return;
+    const currentTokenHash = computeTokenHash(currentToken);
+    
+    // Удаляем все устройства пользователя, кроме того, чей хеш совпадает с текущим
+    await supabaseAdmin
+      .from('user_devices')
+      .delete()
+      .eq('user_id', userId)
+      .neq('token_hash', currentTokenHash);
+  }
+
+  static parseDeviceName(userAgent: string): string {
+    let browser = 'Unknown Browser';
+    
+    // Order matters! Check specific browsers before generic ones (Chrome/Safari)
+    if (/Edg\//i.test(userAgent) || /Edge\//i.test(userAgent)) {
+      browser = 'Edge';
+    } else if (/OPR\//i.test(userAgent) || /Opera/i.test(userAgent)) {
+      browser = 'Opera';
+    } else if (/YaBrowser\//i.test(userAgent)) {
+      browser = 'Yandex Browser';
+    } else if (/Vivaldi\//i.test(userAgent)) {
+      browser = 'Vivaldi';
+    } else if (/Brave\//i.test(userAgent)) {
+        browser = 'Brave';
+    } else if (/Chrome\//i.test(userAgent)) {
+      browser = 'Chrome';
+    } else if (/Firefox\//i.test(userAgent)) {
+      browser = 'Firefox';
+    } else if (/Safari\//i.test(userAgent) && !/Chrome\//i.test(userAgent)) {
+      browser = 'Safari';
+    }
+
+    const osMatch = userAgent.match(/(Windows|Mac|Linux|Android|iOS|iPhone|iPad)/i);
+    let os = osMatch ? osMatch[1] : 'Unknown OS';
+    
+    // Normalize OS names
+    if (os.toLowerCase().startsWith('mac')) os = 'macOS';
+    if (os.toLowerCase() === 'iphone' || os.toLowerCase() === 'ipad') os = 'iOS';
+
+    return `${browser} (${os})`;
+  }
+
   static async createSession(
     userId: string,
     username: string,
     ipAddress: string,
     userAgent: string,
-    token?: string, // Optional for admin sessions (no token cookie)
+    token?: string, // Device token (required for users, optional for admins)
+    userType: 'user' | 'admin' = 'user'
   ): Promise<string> {
     const sessionId = this.generateSessionId();
     const now = Date.now();
@@ -57,6 +163,20 @@ export class SessionManager {
 
     const store = getSessionStore();
     await store.set(sessionId, data, SESSION_TIMEOUT);
+    
+    // Если это пользователь и есть токен, обновляем last_active в БД
+    if (userType === 'user' && token && supabaseAdmin) {
+        const tokenHash = computeTokenHash(token);
+        // Не блокируем создание сессии ожиданием БД
+        supabaseAdmin
+            .from('user_devices')
+            .update({ last_active: new Date().toISOString(), ip_address: ipAddress })
+            .eq('token_hash', tokenHash)
+            .then(({ error }) => {
+                if (error) logger.warn('Failed to update device last_active', { error: error.message });
+            });
+    }
+
     return sessionId;
   }
 

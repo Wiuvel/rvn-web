@@ -73,9 +73,22 @@ export const adminRegisterSchema = adminAuthSchema.extend({
   path: ['confirmPassword'],
 });
 
+// Password change schema
+export const passwordChangeSchema = z
+  .object({
+    oldPassword: passwordSchema,
+    newPassword: passwordSchema,
+    confirmNewPassword: z.string(),
+  })
+  .refine((data) => data.newPassword === data.confirmNewPassword, {
+    message: 'Пароли не совпадают',
+    path: ['confirmNewPassword'],
+  });
+
 // Type exports
 export type LoginFormData = z.infer<typeof loginSchema>;
 export type RegisterFormData = z.infer<typeof registerSchema>;
 export type AdminAuthFormData = z.infer<typeof adminAuthSchema>;
 export type AdminRegisterFormData = z.infer<typeof adminRegisterSchema>;
+export type PasswordChangeFormData = z.infer<typeof passwordChangeSchema>;
 

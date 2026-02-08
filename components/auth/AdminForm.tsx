@@ -372,7 +372,7 @@ export default function AdminAuthForm({ onAuthSuccess }: AdminAuthFormProps) {
           </div>
           
           <h2 className="text-2xl sm:text-3xl font-bold text-white">
-            {isLogin ? 'RVN' : 'Welcome!'}
+            {isLogin ? 'Raven Team' : 'Welcome!'}
           </h2>
           <p className="mt-2 text-sm sm:text-base text-neutral-400">
             {isLogin 

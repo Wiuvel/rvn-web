@@ -296,7 +296,9 @@ export async function GET(request: NextRequest) {
       admin.id,
       sanitizeInput(githubUsername),
       ipAddress,
-      userAgent
+      userAgent,
+      undefined,
+      'admin'
     );
 
     await SessionManager.setSessionCookie(sessionId, isLocalhost, ADMIN_SESSION_COOKIE);

@@ -14,11 +14,17 @@ export async function POST(request: NextRequest) {
   try {
     const cookieStore = await cookies();
     const sessionId = cookieStore.get('session_id')?.value;
+    const token = cookieStore.get('token')?.value;
 
     // Destroy session if exists
     if (sessionId) {
       await SessionManager.destroySession(sessionId);
       await revokeCSRFToken(sessionId);
+    }
+
+    // Revoke device if token exists
+    if (token) {
+      await SessionManager.revokeDevice(token);
     }
     
     // Get hostname for cookie domain handling

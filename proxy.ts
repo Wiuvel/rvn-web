@@ -174,18 +174,24 @@ function isStaticFile(pathname: string): boolean {
 
 /**
  * Early exit for static files, API routes, and bots
- * @param pathname - The request pathname
- * @param userAgent - The request user agent
- * @param hostname - The request hostname (for subdomain detection)
+ * @param request - The request object
  * @returns True if the request should bypass all proxy checks
  */
-function shouldBypassProxy(pathname: string, userAgent: string, hostname?: string): boolean {
+function shouldBypassProxy(request: NextRequest): boolean {
+  const { pathname, hostname } = request.nextUrl;
+  const userAgent = request.headers.get('user-agent') || '';
+
   if (isStaticFile(pathname)) {
     return true;
   }
 
   /** API routes bypass protection but may have auth checks */
   if (pathname.startsWith('/api/')) {
+    return true;
+  }
+
+  /** Next.js Server Components requests (internal navigation) */
+  if (request.nextUrl.searchParams.has('_rsc')) {
     return true;
   }
 
@@ -225,10 +231,9 @@ async function checkRateLimit(ip: string): Promise<boolean> {
     const count = await redis.zcard(key);
     
     if (count >= limit) {
-      return true; // Превышен лимит
+      return true;
     }
     
-    // Добавляем текущий запрос
     await redis.zadd(key, now, `${now}-${Math.random()}`);
     
     // Устанавливаем TTL для ключа (окно + 10 секунд запас)
@@ -236,7 +241,6 @@ async function checkRateLimit(ip: string): Promise<boolean> {
     
     return false;
   } catch (error) {
-    // При ошибке Redis не блокируем
     return false;
   }
 }
@@ -263,7 +267,6 @@ async function checkRateLimit(ip: string): Promise<boolean> {
  * @returns NextResponse with redirect to protection page, or null to allow access
  */
 async function handleProtection(request: NextRequest, pathname: string): Promise<NextResponse | null> {
-  // Next.js Server Components requests (internal navigation)
   if (request.nextUrl.searchParams.has('_rsc')) {
     return null;
   }
@@ -610,7 +613,7 @@ export async function proxy(request: NextRequest) {
    * Ранний выход для статических файлов, API маршрутов и разрешенных ботов
    * Это оптимизирует производительность, избегая ненужных проверок
    */
-  if (shouldBypassProxy(pathname, userAgent, hostname)) {
+  if (shouldBypassProxy(request)) {
     const response = NextResponse.next({ request: { headers: requestHeaders } });
     // Применяем CORS заголовки для статических файлов
     if (isStatic) {

@@ -84,7 +84,7 @@ export default function AuthIsolatedClient() {
             <Link href="/" className="flex items-center gap-2">
               <Image 
                 src="/static/logo.svg" 
-                alt="RVNPrivate" 
+                alt="RVN" 
                 width={256} 
                 height={256} 
                 className="w-6 h-6"

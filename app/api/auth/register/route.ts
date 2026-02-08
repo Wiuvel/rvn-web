@@ -65,12 +65,16 @@ export async function POST(request: NextRequest) {
     const hostname = request.nextUrl.hostname;
     const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
 
+    // Register device and get new token
+    const token = await SessionManager.registerDevice(user.id, userAgent, ipAddress);
+
     const sessionId = await SessionManager.createSession(
       user.id,
       sanitizeInput(username),
       ipAddress,
       userAgent,
-      user.token
+      token,
+      'user'
     );
 
     await SessionManager.setSessionCookie(sessionId, isLocalhost);
@@ -80,8 +84,10 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
 
-    response.cookies.set('token', user.token, {
-      maxAge: 60 * 60 * 24 * 7,
+    const { appConfig } = await import('@/lib/utils/config');
+
+    response.cookies.set('token', token, {
+      maxAge: appConfig.token.maxAge,
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production' && !isLocalhost,
       sameSite: 'strict',
