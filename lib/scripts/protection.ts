@@ -317,47 +317,6 @@ function isValidBrowser(): boolean {
 }
 
 /**
- * Sets secure cookies after successful verification
- */
-async function setSecureCookie(): Promise<boolean> {
-  try {
-    const expiration = new Date();
-    expiration.setTime(expiration.getTime() + 12 * 60 * 60 * 1000); // 12 hours
-    const secureHash = await generateSecureHash();
-    const hostname = window.location.hostname;
-    const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
-
-    let domain = '';
-    let secure = '';
-
-    if (isLocalhost) {
-      domain = '';
-      secure = '';
-    } else {
-      // Extract root domain from hostname (e.g., rvn.market from www.rvn.market)
-      const hostnameParts = hostname.split('.');
-      if (hostnameParts.length >= 2) {
-        // Get last two parts (e.g., ['rvn', 'market'])
-        const rootDomain = hostnameParts.slice(-2).join('.');
-        domain = `.${rootDomain}`;
-      }
-      secure = 'Secure';
-    }
-
-    const cookieOptions = `expires=${expiration.toUTCString()}; path=/; ${domain ? `domain=${domain}; ` : ''}${secure}; SameSite=Strict`;
-
-    document.cookie = `access_granted=true; ${cookieOptions}`;
-    document.cookie = `access_hash=${secureHash}; ${cookieOptions}`;
-    document.cookie = `access_time=${Date.now()}; ${cookieOptions}`;
-
-    return true;
-  } catch (error) {
-    console.error('%c[PROTECT] Critical: Cookie initialization failed', 'color: #a855f7; font-weight: bold;', error);
-    return false;
-  }
-}
-
-/**
  * Callback before captcha becomes interactive
  */
 function onBeforeInteractiveCallback(): void {
@@ -418,12 +377,8 @@ async function onSuccessCallback(token: string): Promise<void> {
       return;
     }
 
-    // Токен проверен успешно, устанавливаем cookie
-    if (!(await setSecureCookie())) {
-      currentState = captchaStates.ERROR;
-      updateStatusText();
-      return;
-    }
+    // Токен проверен успешно, куки установлены сервером
+    // if (!(await setSecureCookie())) { ... } - удалено, так как куки теперь HttpOnly
 
     currentState = captchaStates.SUCCESS;
     updateStatusText();

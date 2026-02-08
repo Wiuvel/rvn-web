@@ -124,13 +124,21 @@ export default function AdminAuthForm({ onAuthSuccess }: AdminAuthFormProps) {
       }
 
       if (isLogin) {
+        // Update auth state immediately after successful login
+        setAuthState({
+          isAuthenticated: true,
+          username: data.username,
+          adminExists: true
+        });
         setLoginSuccess(true);
         setError('');
-        setTimeout(() => {
-          if (onAuthSuccess) {
-            onAuthSuccess();
-          }
-        }, 2000);
+
+        if (onAuthSuccess) {
+          onAuthSuccess();
+        } else {
+          // Force hard navigation to ensure clean state
+          window.location.href = '/ui/panel/admin';
+        }
       } else {
         setError('');
         setIsTransitioning(true);
@@ -182,7 +190,7 @@ export default function AdminAuthForm({ onAuthSuccess }: AdminAuthFormProps) {
             </div>
 
             <h2 className="text-2xl sm:text-3xl font-bold text-white">
-              RVN
+              Raven Team
             </h2>
             <p className="mt-2 text-sm sm:text-base text-white/70">
               Войдите в систему для доступа к панели
@@ -198,6 +206,7 @@ export default function AdminAuthForm({ onAuthSuccess }: AdminAuthFormProps) {
               <input
                 id="username"
                 type="text"
+                autoComplete="username"
                 {...form.register('username')}
                 className="w-full px-4 py-3 rounded-xl bg-neutral-800/60 border border-neutral-700/60 text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all duration-200"
                 placeholder="Введите логин"
@@ -215,6 +224,7 @@ export default function AdminAuthForm({ onAuthSuccess }: AdminAuthFormProps) {
               <input
                 id="password"
                 type="password"
+                autoComplete="current-password"
                 {...form.register('password')}
                 className="w-full px-4 py-3 rounded-xl bg-neutral-800/60 border border-neutral-700/60 text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all duration-200"
                 placeholder="Введите пароль"
@@ -382,6 +392,7 @@ export default function AdminAuthForm({ onAuthSuccess }: AdminAuthFormProps) {
               <input
                 id="username"
                 type="text"
+                autoComplete="username"
                 {...form.register('username')}
                 className="block w-full px-4 py-3 border border-neutral-600 rounded-lg shadow-sm placeholder-neutral-500 bg-neutral-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:border-neutral-500"
                 placeholder="Введите логин"
@@ -399,6 +410,7 @@ export default function AdminAuthForm({ onAuthSuccess }: AdminAuthFormProps) {
               <input
                 id="password"
                 type="password"
+                autoComplete={isLogin ? "current-password" : "new-password"}
                 {...form.register('password')}
                 className="block w-full px-4 py-3 border border-neutral-600 rounded-lg shadow-sm placeholder-neutral-500 bg-neutral-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:border-neutral-500"
                 placeholder="Введите пароль"
@@ -417,6 +429,7 @@ export default function AdminAuthForm({ onAuthSuccess }: AdminAuthFormProps) {
                 <input
                   id="confirmPassword"
                   type="password"
+                  autoComplete="new-password"
                   {...form.register('confirmPassword')}
                   className="block w-full px-4 py-3 border border-neutral-600 rounded-lg shadow-sm placeholder-neutral-500 bg-neutral-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:border-neutral-500"
                   placeholder="Подтвердите пароль"

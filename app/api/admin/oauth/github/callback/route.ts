@@ -9,7 +9,7 @@ import { authRateLimit } from '@/lib/security/rate-limit';
 import { getErrorRedirectUrl, GOOGLE_ERROR_MAP } from '@/lib/utils/oauth-errors';
 import { domains, getCookieDomain } from '@/lib/utils';
 
-const ADMIN_SESSION_COOKIE = 'admin_session_id';
+const ADMIN_SESSION_COOKIE = 'admin_sid';
 
 export async function OPTIONS() {
   return handleCorsPreflight();
@@ -309,27 +309,19 @@ export async function GET(request: NextRequest) {
     const response = NextResponse.redirect(redirectUrl);
 
     // Set admin authentication cookies
-    response.cookies.set('admin_authenticated', 'true', {
-      maxAge: 60 * 60 * 6,
+    const cookieOptions = {
+      maxAge: 60 * 60 * 6, // 6 hours
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production' && !isLocalhost,
-      sameSite: 'lax',
-      path: '/'
-    });
+      sameSite: 'strict' as const,
+      path: '/',
+    };
 
-    response.cookies.set('admin_username', sanitizeInput(githubUsername), {
-      maxAge: 60 * 60 * 6,
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production' && !isLocalhost,
-      sameSite: 'lax',
-      path: '/'
-    });
+    response.cookies.set('admin_username', sanitizeInput(githubUsername), cookieOptions);
 
-    // Clear OAuth state cookie
-    response.cookies.delete('admin_oauth_state');
-
-    logger.info('OAuth: GitHub admin login successful.', {
-      username: githubUsername
+    logger.info('OAuth: Admin login successful', {
+      username: githubUsername,
+      ip: ipAddress
     });
 
     return setCorsHeaders(response);

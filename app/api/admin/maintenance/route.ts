@@ -1,15 +1,25 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { getMaintenanceConfig, setMaintenanceConfig, MaintenanceConfig } from '@/lib/utils/maintenance';
 import { logger } from '@/lib/utils/secure-logger';
+import { SessionManager } from '@/lib/auth/session-manager';
 
-async function isAdmin() {
+async function validateAdminSession(request: NextRequest) {
   const cookieStore = await cookies();
-  return cookieStore.get('admin_authenticated')?.value === 'true';
+  const sessionId = cookieStore.get('admin_sid')?.value;
+  const token = cookieStore.get('admin_token')?.value;
+  
+  if (!sessionId) return false;
+
+  const ipAddress = request.headers.get('x-forwarded-for') || 'unknown';
+  const userAgent = request.headers.get('user-agent') || 'unknown';
+  
+  const validation = await SessionManager.validateSession(sessionId, token || '', ipAddress, userAgent);
+  return validation.valid;
 }
 
-export async function GET() {
-  if (!(await isAdmin())) {
+export async function GET(request: NextRequest) {
+  if (!(await validateAdminSession(request))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   try {
@@ -21,8 +31,8 @@ export async function GET() {
   }
 }
 
-export async function POST(request: Request) {
-  if (!(await isAdmin())) {
+export async function POST(request: NextRequest) {
+  if (!(await validateAdminSession(request))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   try {

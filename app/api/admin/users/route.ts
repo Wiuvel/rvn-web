@@ -5,6 +5,7 @@ import { generalRateLimit } from '@/lib/security/rate-limit';
 import { logger } from '@/lib/utils/secure-logger';
 import { setCorsHeaders, handleCorsPreflight } from '@/lib/security/cors';
 import { getUserRoles, UserRole } from '@/lib/auth/user-roles';
+import { SessionManager } from '@/lib/auth/session-manager';
 
 export async function OPTIONS() {
   return handleCorsPreflight();
@@ -31,9 +32,21 @@ export async function GET(request: NextRequest) {
     }
 
     const cookieStore = await cookies();
-    const isAuthenticated = cookieStore.get('admin_authenticated')?.value === 'true';
+    const sessionId = cookieStore.get('admin_sid')?.value;
+    const token = cookieStore.get('admin_token')?.value;
 
-    if (!isAuthenticated) {
+    if (!sessionId) {
+      return setCorsHeaders(
+        NextResponse.json({ error: 'Unauthorized' }, { status: 401 }),
+      );
+    }
+
+    const ipAddress = request.headers.get('x-forwarded-for') || 'unknown';
+    const userAgent = request.headers.get('user-agent') || 'unknown';
+
+    const validation = await SessionManager.validateSession(sessionId, token || '', ipAddress, userAgent);
+
+    if (!validation.valid) {
       return setCorsHeaders(
         NextResponse.json({ error: 'Unauthorized' }, { status: 401 }),
       );

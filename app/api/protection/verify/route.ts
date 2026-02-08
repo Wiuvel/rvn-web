@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { logger } from '@/lib/utils/secure-logger';
 import { setCorsHeaders, handleCorsPreflight } from '@/lib/security/cors';
+import crypto from 'crypto';
 
 export async function OPTIONS() {
   return handleCorsPreflight();
@@ -69,14 +70,37 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Успешная верификация Turnstile - не логируем
+    // Успешная верификация Turnstile - генерируем защищенные куки
+    // Используем HMAC-SHA256 для подписи данных (IP + UserAgent)
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || request.headers.get('x-real-ip') || 'unknown';
+    const userAgent = request.headers.get('user-agent') || '';
+    
+    // Формируем подпись: HMAC(IP|UserAgent, Secret)
+    // Это связывает куку с конкретным IP и браузером, предотвращая кражу и подделку
+    const data = `${ip}|${userAgent}`;
+    const signature = crypto.createHmac('sha256', secretKey)
+      .update(data)
+      .digest('hex');
 
-    return setCorsHeaders(
-      NextResponse.json({
-        success: true,
-        verified: true
-      })
-    );
+    const response = NextResponse.json({
+      success: true,
+      verified: true
+    });
+
+    // Устанавливаем защищенные HttpOnly куки
+    const cookieOptions = {
+      maxAge: 12 * 60 * 60, // 12 часов
+      httpOnly: true, // Недоступно через JS (защита от XSS)
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict' as const,
+      path: '/'
+    };
+
+    response.cookies.set('access_granted', 'true', cookieOptions);
+    response.cookies.set('access_hash', signature, cookieOptions);
+    response.cookies.set('access_time', Date.now().toString(), cookieOptions);
+
+    return setCorsHeaders(response);
   } catch (error) {
     logger.error('Error verifying Turnstile token', {
       error: error instanceof Error ? error.message : 'Unknown error',

@@ -6,7 +6,7 @@ import { logger } from '@/lib/utils/secure-logger';
 import { setCorsHeaders, handleCorsPreflight } from '@/lib/security/cors';
 import { SessionManager } from '@/lib/auth/session-manager';
 
-const ADMIN_SESSION_COOKIE = 'admin_session_id';
+const ADMIN_SESSION_COOKIE = 'admin_sid';
 
 export async function OPTIONS() {
   return handleCorsPreflight();
@@ -33,35 +33,29 @@ export async function GET(request: NextRequest) {
     }
 
     const cookieStore = await cookies();
-    const isAuthenticated = cookieStore.get('admin_authenticated')?.value === 'true';
+    const sessionId = cookieStore.get(ADMIN_SESSION_COOKIE)?.value;
+    const token = cookieStore.get('admin_token')?.value;
 
-    if (!isAuthenticated) {
+    if (!sessionId) {
       return setCorsHeaders(
         NextResponse.json({ error: 'Unauthorized' }, { status: 401 }),
       );
     }
 
-    const sessionId = cookieStore.get(ADMIN_SESSION_COOKIE)?.value;
-    if (!sessionId) {
-      return setCorsHeaders(
-        NextResponse.json({ error: 'Invalid session' }, { status: 401 }),
-      );
-    }
-
     const ipAddress = request.headers.get('x-forwarded-for') || 'unknown';
     const userAgent = request.headers.get('user-agent') || 'unknown';
-    const validation = await SessionManager.validateSession(sessionId, '', ipAddress, userAgent); // Admin: no token
+    const validation = await SessionManager.validateSession(sessionId, token || '', ipAddress, userAgent);
 
     if (!validation.valid) {
       return setCorsHeaders(
-        NextResponse.json({ error: 'Invalid session' }, { status: 401 }),
+        NextResponse.json({ error: 'Unauthorized' }, { status: 401 }),
       );
     }
 
     const session = await SessionManager.getSession(sessionId);
     if (!session) {
       return setCorsHeaders(
-        NextResponse.json({ error: 'Invalid session' }, { status: 401 }),
+        NextResponse.json({ error: 'Unauthorized' }, { status: 401 }),
       );
     }
 
