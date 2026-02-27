@@ -13,11 +13,11 @@ import { logger } from '@/lib/utils/secure-logger';
 export async function GET() {
   try {
     const httpServer = global.__httpServer;
-    
+
     if (!httpServer) {
       return NextResponse.json(
         { error: 'HTTP server not available', initialized: false },
-        { status: 503 }
+        { status: 503 },
       );
     }
 
@@ -32,9 +32,9 @@ export async function GET() {
 
     // Инициализируем WebSocket сервер
     initWebSocketServer(httpServer);
-    
+
     // WebSocket сервер инициализирован - не логируем
-    
+
     return NextResponse.json({
       initialized: true,
       message: 'WebSocket server initialized successfully',
@@ -43,14 +43,13 @@ export async function GET() {
     logger.error('Failed to initialize WebSocket server', {
       error: error instanceof Error ? error.message : 'Unknown error',
     });
-    
+
     return NextResponse.json(
       {
         initialized: false,
         error: error instanceof Error ? error.message : 'Unknown error',
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
-

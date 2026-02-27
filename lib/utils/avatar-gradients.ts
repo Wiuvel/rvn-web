@@ -37,10 +37,10 @@ export function generateAvatarFromString(str: string): AvatarId {
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
     const char = str.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
+    hash = (hash << 5) - hash + char;
     hash = hash & hash; // Convert to 32bit integer
   }
-  
+
   // Используем абсолютное значение хеша для выбора аватара
   const index = Math.abs(hash) % AVATAR_GRADIENTS.length;
   return String(index) as AvatarId;
@@ -50,25 +50,28 @@ export function generateAvatarFromString(str: string): AvatarId {
  * Получает классы Tailwind для применения градиента по идентификатору аватарки
  * Если avatarId начинается с 's3:', возвращает пустую строку (для использования с изображением)
  */
-export function getGradientClasses(avatarId: string | null | undefined, fallback: AvatarId = '0'): string {
+export function getGradientClasses(
+  avatarId: string | null | undefined,
+  fallback: AvatarId = '0',
+): string {
   if (!avatarId) {
     const gradient = AVATAR_GRADIENTS[parseInt(fallback) || 0];
     return `bg-gradient-to-r ${gradient}`;
   }
-  
+
   // Проверяем, является ли аватар путем к S3 (формат: s3:avatars/userId/timestamp.ext)
   if (avatarId.startsWith('s3:')) {
     // Возвращаем пустую строку, чтобы компонент мог использовать изображение
     return '';
   }
-  
+
   // Валидируем идентификатор
   const id = parseInt(avatarId);
   if (isNaN(id) || id < 0 || id >= AVATAR_GRADIENTS.length) {
     const gradient = AVATAR_GRADIENTS[parseInt(fallback) || 0];
     return `bg-gradient-to-r ${gradient}`;
   }
-  
+
   const gradient = AVATAR_GRADIENTS[id];
   return `bg-gradient-to-r ${gradient}`;
 }
@@ -82,28 +85,28 @@ export function getAvatarUrl(avatarId: string | null | undefined): string | null
   if (!avatarId) {
     return null;
   }
-  
+
   // Проверяем, является ли аватар путем к S3
   if (avatarId.startsWith('s3:')) {
     // Извлекаем путь (убираем префикс 's3:')
     const storagePath = avatarId.substring(3);
-    
+
     // Проверяем, что путь начинается с 'avatars/'
     if (!storagePath.startsWith('avatars/')) {
       return null;
     }
-    
+
     // Убираем префикс 'avatars/' и формируем URL к публичному endpoint
     // Формат: avatars/userId/timestamp.ext -> /images/users/userId/timestamp.ext
     const relativePath = storagePath.substring('avatars/'.length);
-    
+
     // Кодируем каждую часть пути отдельно для правильной обработки специальных символов
     const pathParts = relativePath.split('/');
-    const encodedPath = pathParts.map(part => encodeURIComponent(part)).join('/');
-    
+    const encodedPath = pathParts.map((part) => encodeURIComponent(part)).join('/');
+
     return `/images/users/${encodedPath}`;
   }
-  
+
   return null;
 }
 
@@ -116,29 +119,29 @@ export function getBannerUrl(bannerId: string | null | undefined): string | null
   if (!bannerId) {
     return null;
   }
-  
+
   // Проверяем, является ли баннер путем к S3
   if (bannerId.startsWith('s3:')) {
     // Извлекаем путь (убираем префикс 's3:')
     const storagePath = bannerId.substring(3);
-    
+
     // Проверяем, что путь начинается с 'banners/'
     if (!storagePath.startsWith('banners/')) {
       return null;
     }
-    
+
     // Формируем URL к публичному endpoint
     // Формат в S3: banners/userId/timestamp.ext
     // Формат URL: /images/users/banners/userId/timestamp.ext
     const relativePath = storagePath.substring('banners/'.length);
-    
+
     // Кодируем каждую часть пути отдельно для правильной обработки специальных символов
     const pathParts = relativePath.split('/');
-    const encodedPath = pathParts.map(part => encodeURIComponent(part)).join('/');
-    
+    const encodedPath = pathParts.map((part) => encodeURIComponent(part)).join('/');
+
     return `/images/users/banners/${encodedPath}`;
   }
-  
+
   return null;
 }
 
@@ -165,4 +168,3 @@ export function generateRandomGradient(): string {
 export function generateGradientFromString(str: string): string {
   return generateAvatarFromString(str);
 }
-

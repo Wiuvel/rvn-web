@@ -45,19 +45,14 @@ export async function POST(request: NextRequest) {
     const currentSessionId = request.cookies.get(ADMIN_SESSION_COOKIE)?.value;
     if (currentSessionId && csrfToken && !(await verifyCSRFToken(csrfToken, currentSessionId))) {
       // Невалидный CSRF токен - не логируем
-      return setCorsHeaders(
-        NextResponse.json({ error: 'Invalid request' }, { status: 403 }),
-      );
+      return setCorsHeaders(NextResponse.json({ error: 'Invalid request' }, { status: 403 }));
     }
 
     const result = await authenticateAdmin(username, password);
 
     if (!result.success || !result.admin) {
       return setCorsHeaders(
-        NextResponse.json(
-          { error: result.error || 'Authentication failed' },
-          { status: 401 },
-        ),
+        NextResponse.json({ error: result.error || 'Authentication failed' }, { status: 401 }),
       );
     }
 
@@ -65,10 +60,8 @@ export async function POST(request: NextRequest) {
     const token = randomBytes(32).toString('hex');
 
     if (!supabaseAdmin) {
-        logger.error('Supabase admin client is not initialized');
-        return setCorsHeaders(
-            NextResponse.json({ error: 'Internal server error' }, { status: 500 }),
-        );
+      logger.error('Supabase admin client is not initialized');
+      return setCorsHeaders(NextResponse.json({ error: 'Internal server error' }, { status: 500 }));
     }
 
     // Update admin record with new token
@@ -79,9 +72,7 @@ export async function POST(request: NextRequest) {
 
     if (updateError) {
       logger.error('Failed to update admin token', { error: updateError.message });
-      return setCorsHeaders(
-        NextResponse.json({ error: 'Internal server error' }, { status: 500 }),
-      );
+      return setCorsHeaders(NextResponse.json({ error: 'Internal server error' }, { status: 500 }));
     }
 
     const ipAddress = request.headers.get('x-forwarded-for') || 'unknown';
@@ -95,11 +86,11 @@ export async function POST(request: NextRequest) {
       ipAddress,
       userAgent,
       token,
-      'admin'
+      'admin',
     );
 
     await revokeCSRFToken(sessionId);
-    
+
     // Set admin_sid cookie
     await SessionManager.setSessionCookie(sessionId, isLocalhost, ADMIN_SESSION_COOKIE);
 
@@ -136,10 +127,6 @@ export async function POST(request: NextRequest) {
       error: error instanceof Error ? error.message : 'Unknown error',
       ip: request.headers.get('x-forwarded-for'),
     });
-    return setCorsHeaders(
-      NextResponse.json({ error: 'Internal server error' }, { status: 500 }),
-    );
+    return setCorsHeaders(NextResponse.json({ error: 'Internal server error' }, { status: 500 }));
   }
 }
-
-

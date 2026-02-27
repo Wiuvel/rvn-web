@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual } from 'crypto';
+import { cookies } from 'next/headers';
 import { getEnv } from '@/lib/validation/env-validation';
 import { appConfig } from '@/lib/utils/config';
 import type { UserDataPayload } from './types';
@@ -22,9 +23,7 @@ function getUserDataSecret(): string {
 export function createUserDataCookie(payload: UserDataPayload): string {
   const json = JSON.stringify(payload);
   const dataB64 = Buffer.from(json, 'utf-8').toString('base64url');
-  const signature = createHmac('sha256', getUserDataSecret())
-    .update(dataB64)
-    .digest('base64url');
+  const signature = createHmac('sha256', getUserDataSecret()).update(dataB64).digest('base64url');
   return `${dataB64}.${signature}`;
 }
 
@@ -47,7 +46,7 @@ export function parseUserDataCookie(cookieValue: string | undefined): UserDataPa
 
     const sigBuffer = Buffer.from(signatureB64, 'base64url');
     const expectedBuffer = Buffer.from(expectedSignature, 'base64url');
-    
+
     if (sigBuffer.length !== expectedBuffer.length || !timingSafeEqual(sigBuffer, expectedBuffer)) {
       return null;
     }
@@ -62,6 +61,15 @@ export function parseUserDataCookie(cookieValue: string | undefined): UserDataPa
   } catch {
     return null;
   }
+}
+
+/**
+ * Helper to get user data in Server Components
+ */
+export async function getUserData(): Promise<UserDataPayload | null> {
+  const cookieStore = await cookies();
+  const cookieValue = cookieStore.get(USER_DATA_COOKIE_NAME)?.value;
+  return parseUserDataCookie(cookieValue);
 }
 
 /**

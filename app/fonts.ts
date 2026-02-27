@@ -17,7 +17,13 @@ export const exo2 = localFont({
   variable: '--font-exo2',
   display: 'swap',
   preload: true,
-  fallback: ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Helvetica Neue', 'Arial', 'sans-serif'],
+  fallback: [
+    '-apple-system',
+    'BlinkMacSystemFont',
+    'Segoe UI',
+    'Helvetica Neue',
+    'Arial',
+    'sans-serif',
+  ],
   adjustFontFallback: false,
 });
-

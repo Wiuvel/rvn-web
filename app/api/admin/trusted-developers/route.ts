@@ -24,15 +24,20 @@ async function getCurrentAdminId(request: NextRequest): Promise<string | null> {
   const cookieStore = await cookies();
   const sessionId = cookieStore.get(ADMIN_SESSION_COOKIE)?.value;
   const token = cookieStore.get('admin_token')?.value;
-  
+
   if (!sessionId) {
     return null;
   }
 
   const ipAddress = request.headers.get('x-forwarded-for') || 'unknown';
   const userAgent = request.headers.get('user-agent') || 'unknown';
-  const validation = await SessionManager.validateSession(sessionId, token || '', ipAddress, userAgent);
-  
+  const validation = await SessionManager.validateSession(
+    sessionId,
+    token || '',
+    ipAddress,
+    userAgent,
+  );
+
   if (!validation.valid) {
     return null;
   }
@@ -74,9 +79,7 @@ export async function GET(request: NextRequest) {
         ip: request.headers.get('x-forwarded-for'),
         userAgent: request.headers.get('user-agent'),
       });
-      return setCorsHeaders(
-        NextResponse.json({ error: 'Too many requests' }, { status: 429 }),
-      );
+      return setCorsHeaders(NextResponse.json({ error: 'Too many requests' }, { status: 429 }));
     }
 
     if (!supabaseAdmin) {
@@ -94,14 +97,17 @@ export async function GET(request: NextRequest) {
     if (sessionId) {
       const ipAddress = request.headers.get('x-forwarded-for') || 'unknown';
       const userAgent = request.headers.get('user-agent') || 'unknown';
-      const validation = await SessionManager.validateSession(sessionId, token || '', ipAddress, userAgent);
+      const validation = await SessionManager.validateSession(
+        sessionId,
+        token || '',
+        ipAddress,
+        userAgent,
+      );
       isAuthenticated = validation.valid;
     }
 
     if (!isAuthenticated) {
-      return setCorsHeaders(
-        NextResponse.json({ error: 'Unauthorized' }, { status: 401 }),
-      );
+      return setCorsHeaders(NextResponse.json({ error: 'Unauthorized' }, { status: 401 }));
     }
 
     const { data: developers, error } = await supabaseAdmin
@@ -119,16 +125,12 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    return setCorsHeaders(
-      NextResponse.json({ developers: developers || [] }),
-    );
+    return setCorsHeaders(NextResponse.json({ developers: developers || [] }));
   } catch (error) {
     logger.error('Error in GET trusted developers', {
       error: error instanceof Error ? error.message : 'Unknown error',
     });
-    return setCorsHeaders(
-      NextResponse.json({ error: 'Internal server error' }, { status: 500 }),
-    );
+    return setCorsHeaders(NextResponse.json({ error: 'Internal server error' }, { status: 500 }));
   }
 }
 
@@ -141,9 +143,7 @@ export async function POST(request: NextRequest) {
         ip: request.headers.get('x-forwarded-for'),
         userAgent: request.headers.get('user-agent'),
       });
-      return setCorsHeaders(
-        NextResponse.json({ error: 'Too many requests' }, { status: 429 }),
-      );
+      return setCorsHeaders(NextResponse.json({ error: 'Too many requests' }, { status: 429 }));
     }
 
     if (!supabaseAdmin) {
@@ -161,21 +161,22 @@ export async function POST(request: NextRequest) {
     if (sessionId) {
       const ipAddress = request.headers.get('x-forwarded-for') || 'unknown';
       const userAgent = request.headers.get('user-agent') || 'unknown';
-      const validation = await SessionManager.validateSession(sessionId, token || '', ipAddress, userAgent);
+      const validation = await SessionManager.validateSession(
+        sessionId,
+        token || '',
+        ipAddress,
+        userAgent,
+      );
       isAuthenticated = validation.valid;
     }
 
     if (!isAuthenticated) {
-      return setCorsHeaders(
-        NextResponse.json({ error: 'Unauthorized' }, { status: 401 }),
-      );
+      return setCorsHeaders(NextResponse.json({ error: 'Unauthorized' }, { status: 401 }));
     }
 
     const adminId = await getCurrentAdminId(request);
     if (!adminId) {
-      return setCorsHeaders(
-        NextResponse.json({ error: 'Invalid session' }, { status: 401 }),
-      );
+      return setCorsHeaders(NextResponse.json({ error: 'Invalid session' }, { status: 401 }));
     }
 
     // Check if admin is Root - only Root can add trusted developers
@@ -209,17 +210,14 @@ export async function POST(request: NextRequest) {
       .or(
         normalizedEmail
           ? `email.eq.${normalizedEmail},github_username.eq.${normalizedUsername}`
-          : `github_username.eq.${normalizedUsername}`
+          : `github_username.eq.${normalizedUsername}`,
       )
       .limit(1)
       .single();
 
     if (existing) {
       return setCorsHeaders(
-        NextResponse.json(
-          { error: 'Developer already exists' },
-          { status: 409 },
-        ),
+        NextResponse.json({ error: 'Developer already exists' }, { status: 409 }),
       );
     }
 
@@ -239,10 +237,7 @@ export async function POST(request: NextRequest) {
         code: insertError.code,
       });
       return setCorsHeaders(
-        NextResponse.json(
-          { error: 'Failed to add developer' },
-          { status: 500 },
-        ),
+        NextResponse.json({ error: 'Failed to add developer' }, { status: 500 }),
       );
     }
 
@@ -262,9 +257,7 @@ export async function POST(request: NextRequest) {
     logger.error('Error in POST trusted developer', {
       error: error instanceof Error ? error.message : 'Unknown error',
     });
-    return setCorsHeaders(
-      NextResponse.json({ error: 'Internal server error' }, { status: 500 }),
-    );
+    return setCorsHeaders(NextResponse.json({ error: 'Internal server error' }, { status: 500 }));
   }
 }
 
@@ -277,9 +270,7 @@ export async function DELETE(request: NextRequest) {
         ip: request.headers.get('x-forwarded-for'),
         userAgent: request.headers.get('user-agent'),
       });
-      return setCorsHeaders(
-        NextResponse.json({ error: 'Too many requests' }, { status: 429 }),
-      );
+      return setCorsHeaders(NextResponse.json({ error: 'Too many requests' }, { status: 429 }));
     }
 
     if (!supabaseAdmin) {
@@ -297,21 +288,22 @@ export async function DELETE(request: NextRequest) {
     if (sessionId) {
       const ipAddress = request.headers.get('x-forwarded-for') || 'unknown';
       const userAgent = request.headers.get('user-agent') || 'unknown';
-      const validation = await SessionManager.validateSession(sessionId, token || '', ipAddress, userAgent);
+      const validation = await SessionManager.validateSession(
+        sessionId,
+        token || '',
+        ipAddress,
+        userAgent,
+      );
       isAuthenticated = validation.valid;
     }
 
     if (!isAuthenticated) {
-      return setCorsHeaders(
-        NextResponse.json({ error: 'Unauthorized' }, { status: 401 }),
-      );
+      return setCorsHeaders(NextResponse.json({ error: 'Unauthorized' }, { status: 401 }));
     }
 
     const adminId = await getCurrentAdminId(request);
     if (!adminId) {
-      return setCorsHeaders(
-        NextResponse.json({ error: 'Invalid session' }, { status: 401 }),
-      );
+      return setCorsHeaders(NextResponse.json({ error: 'Invalid session' }, { status: 401 }));
     }
 
     // Check if admin is Root - only Root can delete trusted developers
@@ -350,25 +342,17 @@ export async function DELETE(request: NextRequest) {
         id,
       });
       return setCorsHeaders(
-        NextResponse.json(
-          { error: 'Failed to delete developer' },
-          { status: 500 },
-        ),
+        NextResponse.json({ error: 'Failed to delete developer' }, { status: 500 }),
       );
     }
 
     logger.info('Trusted developer deleted', { id });
 
-    return setCorsHeaders(
-      NextResponse.json({ message: 'Developer deleted successfully' }),
-    );
+    return setCorsHeaders(NextResponse.json({ message: 'Developer deleted successfully' }));
   } catch (error) {
     logger.error('Error in DELETE trusted developer', {
       error: error instanceof Error ? error.message : 'Unknown error',
     });
-    return setCorsHeaders(
-      NextResponse.json({ error: 'Internal server error' }, { status: 500 }),
-    );
+    return setCorsHeaders(NextResponse.json({ error: 'Internal server error' }, { status: 500 }));
   }
 }
-

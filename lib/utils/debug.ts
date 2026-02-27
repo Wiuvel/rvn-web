@@ -14,12 +14,12 @@ interface DebugOptions {
 const DEBUG_ENABLED = process.env.NODE_ENV === 'development';
 
 const COLORS = {
-  info: '#a78bfa',      // Фиолетовый 400
-  warn: '#c084fc',      // Фиолетовый 500
-  error: '#9333ea',     // Фиолетовый 600
-  success: '#7c3aed',   // Фиолетовый 700
-  group: '#8b5cf6',     // Фиолетовый 500
-  reset: '#ffffff'
+  info: '#a78bfa', // Фиолетовый 400
+  warn: '#c084fc', // Фиолетовый 500
+  error: '#9333ea', // Фиолетовый 600
+  success: '#7c3aed', // Фиолетовый 700
+  group: '#8b5cf6', // Фиолетовый 500
+  reset: '#ffffff',
 };
 
 const STYLES = {
@@ -27,17 +27,13 @@ const STYLES = {
   warn: `color: ${COLORS.warn}; font-weight: 600;`,
   error: `color: ${COLORS.error}; font-weight: 700;`,
   success: `color: ${COLORS.success}; font-weight: 600;`,
-  group: `color: ${COLORS.group}; font-weight: 600; font-size: 12px;`
+  group: `color: ${COLORS.group}; font-weight: 600; font-size: 12px;`,
 };
 
 /**
  * Отладочное логирование с фиолетовой палитрой
  */
-export function debug(
-  message: string,
-  data?: unknown,
-  options: DebugOptions = {}
-): void {
+export function debug(message: string, data?: unknown, options: DebugOptions = {}): void {
   if (!DEBUG_ENABLED) return;
 
   const { level = 'info', group, collapsed = false } = options;
@@ -88,26 +84,28 @@ export function debugWarn(functionName: string, message: string, data?: unknown)
 
 function getIcon(level: DebugLevel): string {
   switch (level) {
-    case 'info': return 'ℹ';
-    case 'warn': return '⚠';
-    case 'error': return '✗';
-    case 'success': return '✓';
-    default: return '•';
+    case 'info':
+      return 'ℹ';
+    case 'warn':
+      return '⚠';
+    case 'error':
+      return '✗';
+    case 'success':
+      return '✓';
+    default:
+      return '•';
   }
 }
 
 /**
  * Измерение производительности функции
  */
-export function debugPerformance<T>(
-  functionName: string,
-  fn: () => T
-): T {
+export function debugPerformance<T>(functionName: string, fn: () => T): T {
   if (!DEBUG_ENABLED) return fn();
 
   const start = performance.now();
   debugStart(functionName);
-  
+
   try {
     const result = fn();
     const duration = performance.now() - start;
@@ -125,13 +123,13 @@ export function debugPerformance<T>(
  */
 export async function debugPerformanceAsync<T>(
   functionName: string,
-  fn: () => Promise<T>
+  fn: () => Promise<T>,
 ): Promise<T> {
   if (!DEBUG_ENABLED) return fn();
 
   const start = performance.now();
   debugStart(functionName);
-  
+
   try {
     const result = await fn();
     const duration = performance.now() - start;

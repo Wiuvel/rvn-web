@@ -1,5 +1,5 @@
 /**
- * Проверяет загрузку WASM Image Processor (Rust).
+ * Check if WASM Image Processor (Rust) is ready.
  */
 
 export async function register() {
@@ -10,7 +10,7 @@ export async function register() {
       console.log(
         ok
           ? '[startup] WASM image processor: ready'
-          : '[startup] WASM image processor: unavailable (fallback to passthrough)'
+          : '[startup] WASM image processor: unavailable (fallback to passthrough)',
       );
     } catch {
       console.log('[startup] WASM image processor: failed to load (fallback to passthrough)');

@@ -112,7 +112,11 @@ function safeRedirect(url: string): boolean {
     window.location.replace('/');
     return true;
   } catch (error) {
-    console.error('%c[PROTECT] Critical: Redirect error', 'color: #a855f7; font-weight: bold;', error);
+    console.error(
+      '%c[PROTECT] Critical: Redirect error',
+      'color: #a855f7; font-weight: bold;',
+      error,
+    );
     window.location.replace('/');
     return true;
   }
@@ -271,12 +275,20 @@ function updateStatusText(): void {
 
   switch (currentState) {
     case captchaStates.LOADING:
-      animateTextChange(desc, 'Проверяем, человек ли вы. Это может занять несколько секунд.', '#b0b0b0');
+      animateTextChange(
+        desc,
+        'Проверяем, человек ли вы. Это может занять несколько секунд.',
+        '#b0b0b0',
+      );
       if (footer) animateTextChange(footer, '', '#888');
       resetTitleFill();
       break;
     case captchaStates.INTERACTIVE:
-      animateTextChange(desc, 'Подтвердите, что вы человек, выполнив указанное действие ниже:', '#b0b0b0');
+      animateTextChange(
+        desc,
+        'Подтвердите, что вы человек, выполнив указанное действие ниже:',
+        '#b0b0b0',
+      );
       if (footer) animateTextChange(footer, 'Выполните проверку безопасности', '#888');
       setTitleFill();
       break;
@@ -290,7 +302,11 @@ function updateStatusText(): void {
       setTitleFill();
       break;
     case captchaStates.ERROR:
-      animateTextChange(desc, 'Ошибка проверки безопасности. Обновите страницу или попробуйте позже.', '#ff6b6b');
+      animateTextChange(
+        desc,
+        'Ошибка проверки безопасности. Обновите страницу или попробуйте позже.',
+        '#ff6b6b',
+      );
       if (footer) animateTextChange(footer, '', '#888');
       resetTitleFill();
       break;
@@ -371,7 +387,11 @@ async function onSuccessCallback(token: string): Promise<void> {
     const verifyData: VerifyResponse = await verifyResponse.json();
 
     if (!verifyResponse.ok || !verifyData.success) {
-      console.error('%c[PROTECT] Critical: Token verification failed', 'color: #a855f7; font-weight: bold;', verifyData.error || 'Unknown error');
+      console.error(
+        '%c[PROTECT] Critical: Token verification failed',
+        'color: #a855f7; font-weight: bold;',
+        verifyData.error || 'Unknown error',
+      );
       currentState = captchaStates.ERROR;
       updateStatusText();
       return;
@@ -405,7 +425,11 @@ async function onSuccessCallback(token: string): Promise<void> {
       safeRedirect(redirectUrl);
     }, 1000);
   } catch (error) {
-    console.error('%c[PROTECT] Critical: Token verification error', 'color: #a855f7; font-weight: bold;', error);
+    console.error(
+      '%c[PROTECT] Critical: Token verification error',
+      'color: #a855f7; font-weight: bold;',
+      error,
+    );
     currentState = captchaStates.ERROR;
     updateStatusText();
   }

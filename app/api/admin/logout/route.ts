@@ -43,10 +43,6 @@ export async function POST(request: NextRequest) {
       error: error instanceof Error ? error.message : 'Unknown error',
       ip: request.headers.get('x-forwarded-for'),
     });
-    return setCorsHeaders(
-      NextResponse.json({ error: 'Internal server error' }, { status: 500 }),
-    );
+    return setCorsHeaders(NextResponse.json({ error: 'Internal server error' }, { status: 500 }));
   }
 }
-
-

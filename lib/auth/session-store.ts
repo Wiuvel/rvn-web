@@ -65,7 +65,7 @@ class RedisSessionStore implements ISessionStore {
     } catch (error) {
       logger.error('Redis session get error', {
         error: error instanceof Error ? error.message : 'Unknown error',
-        sessionId: sessionId.substring(0, 8) + '...'
+        sessionId: sessionId.substring(0, 8) + '...',
       });
       return null;
     }
@@ -87,7 +87,7 @@ class RedisSessionStore implements ISessionStore {
     } catch (error) {
       logger.error('Redis session set error', {
         error: error instanceof Error ? error.message : 'Unknown error',
-        sessionId: sessionId.substring(0, 8) + '...'
+        sessionId: sessionId.substring(0, 8) + '...',
       });
     }
   }
@@ -109,7 +109,7 @@ class RedisSessionStore implements ISessionStore {
     } catch (error) {
       logger.error('Redis session delete error', {
         error: error instanceof Error ? error.message : 'Unknown error',
-        sessionId: sessionId.substring(0, 8) + '...'
+        sessionId: sessionId.substring(0, 8) + '...',
       });
       return false;
     }
@@ -135,7 +135,7 @@ class RedisSessionStore implements ISessionStore {
     } catch (error) {
       logger.error('Redis session deleteByUserId error', {
         error: error instanceof Error ? error.message : 'Unknown error',
-        userId
+        userId,
       });
       return 0;
     }

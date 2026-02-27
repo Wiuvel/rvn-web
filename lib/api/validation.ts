@@ -11,7 +11,7 @@ import { ERROR_INVALID_REQUEST_DATA } from '@/lib/utils/constants';
  */
 export async function validateRequestBody<T>(
   request: NextRequest,
-  schema: ZodSchema<T>
+  schema: ZodSchema<T>,
 ): Promise<{ success: true; data: T } | { success: false; response: NextResponse }> {
   try {
     const body = await request.json();
@@ -22,25 +22,22 @@ export async function validateRequestBody<T>(
       const errorMessage = error.issues
         .map((err) => `${err.path.join('.')}: ${err.message}`)
         .join(', ');
-      
+
       return {
         success: false,
         response: setCorsHeaders(
           NextResponse.json(
             { error: ERROR_INVALID_REQUEST_DATA, details: errorMessage },
-            { status: 400 }
-          )
+            { status: 400 },
+          ),
         ),
       };
     }
-    
+
     return {
       success: false,
       response: setCorsHeaders(
-        NextResponse.json(
-          { error: ERROR_INVALID_REQUEST_DATA },
-          { status: 400 }
-        )
+        NextResponse.json({ error: ERROR_INVALID_REQUEST_DATA }, { status: 400 }),
       ),
     };
   }
@@ -51,16 +48,16 @@ export async function validateRequestBody<T>(
  */
 export function validateQueryParams<T>(
   request: NextRequest,
-  schema: ZodSchema<T>
+  schema: ZodSchema<T>,
 ): { success: true; data: T } | { success: false; response: NextResponse } {
   try {
     const { searchParams } = new URL(request.url);
     const params: Record<string, string> = {};
-    
+
     searchParams.forEach((value, key) => {
       params[key] = value;
     });
-    
+
     const validatedData = schema.parse(params);
     return { success: true, data: validatedData };
   } catch (error) {
@@ -68,25 +65,22 @@ export function validateQueryParams<T>(
       const errorMessage = error.issues
         .map((err) => `${err.path.join('.')}: ${err.message}`)
         .join(', ');
-      
+
       return {
         success: false,
         response: setCorsHeaders(
           NextResponse.json(
             { error: ERROR_INVALID_REQUEST_DATA, details: errorMessage },
-            { status: 400 }
-          )
+            { status: 400 },
+          ),
         ),
       };
     }
-    
+
     return {
       success: false,
       response: setCorsHeaders(
-        NextResponse.json(
-          { error: ERROR_INVALID_REQUEST_DATA },
-          { status: 400 }
-        )
+        NextResponse.json({ error: ERROR_INVALID_REQUEST_DATA }, { status: 400 }),
       ),
     };
   }
@@ -97,7 +91,7 @@ export function validateQueryParams<T>(
  */
 export function validateRouteParams<T>(
   params: unknown,
-  schema: ZodSchema<T>
+  schema: ZodSchema<T>,
 ): { success: true; data: T } | { success: false; response: NextResponse } {
   try {
     const validatedData = schema.parse(params);
@@ -107,27 +101,23 @@ export function validateRouteParams<T>(
       const errorMessage = error.issues
         .map((err) => `${err.path.join('.')}: ${err.message}`)
         .join(', ');
-      
+
       return {
         success: false,
         response: setCorsHeaders(
           NextResponse.json(
             { error: ERROR_INVALID_REQUEST_DATA, details: errorMessage },
-            { status: 400 }
-          )
+            { status: 400 },
+          ),
         ),
       };
     }
-    
+
     return {
       success: false,
       response: setCorsHeaders(
-        NextResponse.json(
-          { error: ERROR_INVALID_REQUEST_DATA },
-          { status: 400 }
-        )
+        NextResponse.json({ error: ERROR_INVALID_REQUEST_DATA }, { status: 400 }),
       ),
     };
   }
 }
-

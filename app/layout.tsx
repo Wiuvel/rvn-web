@@ -1,14 +1,16 @@
-import type { Metadata, Viewport } from "next";
-import { Suspense } from "react";
-import "./globals.css";
-import SmoothScroll from "@/components/utils/SmoothScroll";
-import ConditionalLayout from "@/components/layout/Conditional";
-import { pageMetadata } from "@/lib/utils/seo";
-import { exo2 } from "./fonts";
-import HomeStructuredData from "@/components/seo/HomeStructuredData";
-import { domains, getStaticUrl } from "@/lib/utils";
-import MaintenanceGuard from "@/components/layout/MaintenanceGuard";
-import LoadingSpinner from "@/components/ui/LoadingSpinner";
+import type { Metadata, Viewport } from 'next';
+import { Suspense } from 'react';
+import './globals.css';
+import SmoothScroll from '@/components/utils/SmoothScroll';
+import ConditionalLayout from '@/components/layout/Conditional';
+import { pageMetadata } from '@/lib/utils/seo';
+import { exo2 } from './fonts';
+import HomeStructuredData from '@/components/seo/HomeStructuredData';
+import { domains, getStaticUrl } from '@/lib/utils';
+import MaintenanceGuard from '@/components/layout/MaintenanceGuard';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
+
+import SessionExpiredModal from '@/components/auth/SessionExpiredModal';
 
 // Force dynamic rendering to support maintenance mode checks via headers/cookies
 export const dynamic = 'force-dynamic';
@@ -31,7 +33,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0f7fdb",
+  themeColor: '#0f7fdb',
 };
 
 export default function RootLayout({
@@ -40,16 +42,21 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ru" className={`h-full scroll-smooth dark ${exo2.variable}`} data-scroll-behavior="smooth">
-      <body className={`h-full bg-neutral-950 text-neutral-100 antialiased relative ${exo2.className}`}>
+    <html
+      lang="ru"
+      className={`dark h-full scroll-smooth ${exo2.variable}`}
+      data-scroll-behavior="smooth"
+    >
+      <body
+        className={`relative h-full bg-neutral-950 text-neutral-100 antialiased ${exo2.className}`}
+      >
         <Suspense fallback={<LoadingSpinner fullScreen />}>
           <MaintenanceGuard>
             <HomeStructuredData />
             <SmoothScroll />
+            <SessionExpiredModal />
             <Suspense fallback={<main className="min-h-screen" />}>
-              <ConditionalLayout>
-                {children}
-              </ConditionalLayout>
+              <ConditionalLayout>{children}</ConditionalLayout>
             </Suspense>
           </MaintenanceGuard>
         </Suspense>

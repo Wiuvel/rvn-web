@@ -6,10 +6,7 @@ export async function GET(request: NextRequest) {
   const cfConnectingIp = request.headers.get('cf-connecting-ip');
 
   const ip =
-    forwardedFor?.split(',')[0]?.trim() ||
-    realIp ||
-    cfConnectingIp ||
-    'Не удалось определить';
+    forwardedFor?.split(',')[0]?.trim() || realIp || cfConnectingIp || 'Не удалось определить';
 
   return NextResponse.json(
     { ip },
@@ -17,7 +14,6 @@ export async function GET(request: NextRequest) {
       headers: {
         'Cache-Control': 'no-store',
       },
-    }
+    },
   );
 }
-

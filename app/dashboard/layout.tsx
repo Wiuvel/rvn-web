@@ -1,6 +1,6 @@
-import type { Metadata, Viewport } from "next";
-import "../globals.css";
-import { pageMetadata } from "@/lib/utils/seo";
+import type { Metadata, Viewport } from 'next';
+import '../globals.css';
+import { pageMetadata } from '@/lib/utils/seo';
 
 export const metadata: Metadata = {
   ...pageMetadata.dashboard,
@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0f7fdb",
+  themeColor: '#0f7fdb',
 };
 
 export default function DashboardLayout({
@@ -21,10 +21,7 @@ export default function DashboardLayout({
 }>) {
   return (
     <>
-      <div className="dashboard-layout">
-        {children}
-      </div>
+      <div className="dashboard-layout">{children}</div>
     </>
   );
 }
-

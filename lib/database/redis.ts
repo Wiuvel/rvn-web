@@ -12,7 +12,7 @@ let redis: Redis | null = null;
  */
 export function getRedisClient(): Redis | null {
   const redisUrl = process.env.REDIS_URL;
-  
+
   if (!redisUrl) {
     // Не логируем отсутствие Redis - это опциональная функция
     return null;
@@ -80,7 +80,7 @@ export function getRedisClient(): Redis | null {
     return redis;
   } catch (error) {
     logger.error('Failed to initialize Redis', {
-      error: error instanceof Error ? error.message : 'Unknown error'
+      error: error instanceof Error ? error.message : 'Unknown error',
     });
     redis = null;
     return null;
@@ -96,4 +96,3 @@ export async function closeRedis(): Promise<void> {
     redis = null;
   }
 }
-

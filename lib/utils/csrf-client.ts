@@ -44,7 +44,7 @@ class CSRFTokenManager {
     try {
       const response = await fetch('/api/auth/csrf', {
         method: 'GET',
-        credentials: 'include'
+        credentials: 'include',
       });
 
       if (!response.ok) {
@@ -61,7 +61,7 @@ class CSRFTokenManager {
       // Сохраняем токен с временем истечения
       this.tokenData = {
         token,
-        expiresAt: Date.now() + this.TOKEN_LIFETIME
+        expiresAt: Date.now() + this.TOKEN_LIFETIME,
       };
 
       // Планируем автоматическое обновление за 10 минут до истечения
@@ -96,11 +96,13 @@ class CSRFTokenManager {
       this.refreshTimer = setTimeout(() => {
         // Обновляем токен в фоне
         this.refreshPromise = this.fetchToken();
-        this.refreshPromise.then(() => {
-          this.refreshPromise = null;
-        }).catch(() => {
-          this.refreshPromise = null;
-        });
+        this.refreshPromise
+          .then(() => {
+            this.refreshPromise = null;
+          })
+          .catch(() => {
+            this.refreshPromise = null;
+          });
       }, timeUntilRefresh);
     }
   }
@@ -139,4 +141,3 @@ export const csrfTokenManager = new CSRFTokenManager();
 export async function getCSRFToken(): Promise<string> {
   return csrfTokenManager.getToken();
 }
-

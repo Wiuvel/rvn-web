@@ -48,7 +48,7 @@ export class SessionManager {
   static async registerDevice(
     userId: string,
     userAgent: string,
-    ipAddress: string
+    ipAddress: string,
   ): Promise<string> {
     const token = generateSessionIdUtil(); // Используем надежный генератор ID как токен
     const tokenHash = computeTokenHash(token);
@@ -60,7 +60,7 @@ export class SessionManager {
         token_hash: tokenHash,
         device_name: deviceName,
         ip_address: ipAddress,
-        last_active: new Date().toISOString()
+        last_active: new Date().toISOString(),
       });
 
       if (error) {
@@ -86,11 +86,7 @@ export class SessionManager {
   static async revokeDeviceById(deviceId: string, userId: string): Promise<void> {
     if (!supabaseAdmin) return;
     // RLS should handle permission check, but good to be explicit
-    await supabaseAdmin
-      .from('user_devices')
-      .delete()
-      .eq('id', deviceId)
-      .eq('user_id', userId);
+    await supabaseAdmin.from('user_devices').delete().eq('id', deviceId).eq('user_id', userId);
   }
 
   /**
@@ -99,7 +95,7 @@ export class SessionManager {
   static async revokeOtherDevices(userId: string, currentToken: string): Promise<void> {
     if (!supabaseAdmin) return;
     const currentTokenHash = computeTokenHash(currentToken);
-    
+
     // Удаляем все устройства пользователя, кроме того, чей хеш совпадает с текущим
     await supabaseAdmin
       .from('user_devices')
@@ -110,7 +106,7 @@ export class SessionManager {
 
   static parseDeviceName(userAgent: string): string {
     let browser = 'Unknown Browser';
-    
+
     // Order matters! Check specific browsers before generic ones (Chrome/Safari)
     if (/Edg\//i.test(userAgent) || /Edge\//i.test(userAgent)) {
       browser = 'Edge';
@@ -121,7 +117,7 @@ export class SessionManager {
     } else if (/Vivaldi\//i.test(userAgent)) {
       browser = 'Vivaldi';
     } else if (/Brave\//i.test(userAgent)) {
-        browser = 'Brave';
+      browser = 'Brave';
     } else if (/Chrome\//i.test(userAgent)) {
       browser = 'Chrome';
     } else if (/Firefox\//i.test(userAgent)) {
@@ -132,7 +128,7 @@ export class SessionManager {
 
     const osMatch = userAgent.match(/(Windows|Mac|Linux|Android|iOS|iPhone|iPad)/i);
     let os = osMatch ? osMatch[1] : 'Unknown OS';
-    
+
     // Normalize OS names
     if (os.toLowerCase().startsWith('mac')) os = 'macOS';
     if (os.toLowerCase() === 'iphone' || os.toLowerCase() === 'ipad') os = 'iOS';
@@ -146,7 +142,7 @@ export class SessionManager {
     ipAddress: string,
     userAgent: string,
     token?: string, // Device token (required for users, optional for admins)
-    userType: 'user' | 'admin' = 'user'
+    userType: 'user' | 'admin' = 'user',
   ): Promise<string> {
     const sessionId = this.generateSessionId();
     const now = Date.now();
@@ -163,18 +159,18 @@ export class SessionManager {
 
     const store = getSessionStore();
     await store.set(sessionId, data, SESSION_TIMEOUT);
-    
+
     // Если это пользователь и есть токен, обновляем last_active в БД
     if (userType === 'user' && token && supabaseAdmin) {
-        const tokenHash = computeTokenHash(token);
-        // Не блокируем создание сессии ожиданием БД
-        supabaseAdmin
-            .from('user_devices')
-            .update({ last_active: new Date().toISOString(), ip_address: ipAddress })
-            .eq('token_hash', tokenHash)
-            .then(({ error }) => {
-                if (error) logger.warn('Failed to update device last_active', { error: error.message });
-            });
+      const tokenHash = computeTokenHash(token);
+      // Не блокируем создание сессии ожиданием БД
+      supabaseAdmin
+        .from('user_devices')
+        .update({ last_active: new Date().toISOString(), ip_address: ipAddress })
+        .eq('token_hash', tokenHash)
+        .then(({ error }) => {
+          if (error) logger.warn('Failed to update device last_active', { error: error.message });
+        });
     }
 
     return sessionId;
@@ -230,7 +226,7 @@ export class SessionManager {
     token: string,
     ipAddress: string,
     userAgent: string,
-    options: { strictIP?: boolean; updateCookie?: boolean } = {}
+    options: { strictIP?: boolean; updateCookie?: boolean } = {},
   ): Promise<{ valid: boolean; reason?: string }> {
     const session = await this.getSession(sessionId);
     if (!session) {
@@ -248,7 +244,9 @@ export class SessionManager {
 
     // Смягченная валидация User-Agent - проверяем только основную часть
     const normalizeUserAgent = (ua: string): string => {
-      const browserMatch = ua.match(/(Chrome|Firefox|Safari|Edge|Opera|Brave|Vivaldi|YandexBrowser|YaBrowser)/i);
+      const browserMatch = ua.match(
+        /(Chrome|Firefox|Safari|Edge|Opera|Brave|Vivaldi|YandexBrowser|YaBrowser)/i,
+      );
       const osMatch = ua.match(/(Windows|Mac|Linux|Android|iOS|iPhone|iPad)/i);
       const browser = browserMatch ? browserMatch[1].toLowerCase() : 'unknown';
       const os = osMatch ? osMatch[1].toLowerCase() : 'unknown';
@@ -264,7 +262,7 @@ export class SessionManager {
         sessionUA: session.userAgent.substring(0, 50),
         requestUA: userAgent.substring(0, 50),
         sessionNormalized: sessionUANormalized,
-        requestNormalized: requestUANormalized
+        requestNormalized: requestUANormalized,
       });
       await this.updateSession(sessionId, { userAgent });
     }
@@ -305,7 +303,7 @@ export class SessionManager {
   static async refreshSessionCookie(
     sessionId: string,
     isLocalhost: boolean = false,
-    cookieName = 'session_id'
+    cookieName = 'session_id',
   ): Promise<void> {
     const session = await this.getSession(sessionId);
     if (!session) return;

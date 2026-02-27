@@ -1,24 +1,29 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import Image from 'next/image';
 import { gsap } from 'gsap';
 import { X, Upload, FileText, Image as ImageIcon } from 'lucide-react';
 import dynamic from 'next/dynamic';
-import { SUPPORT_ATTACHMENT_MAX_BYTES, SUPPORT_ATTACHMENT_MAX_MB, SUPPORT_FILE_SIZE_LIMIT_ERROR } from '@/lib/utils/constants';
+import {
+  SUPPORT_ATTACHMENT_MAX_BYTES,
+  SUPPORT_ATTACHMENT_MAX_MB,
+  SUPPORT_FILE_SIZE_LIMIT_ERROR,
+} from '@/lib/utils/constants';
 
 // Lazy load RateLimitCaptcha для оптимизации bundle size
 const RateLimitCaptcha = dynamic(() => import('@/components/auth/RateLimitCaptcha'), {
   ssr: false,
   loading: () => (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
-      <div className="bg-neutral-900 rounded-2xl p-6 sm:p-8 max-w-md w-full mx-4 border border-neutral-800 shadow-2xl">
+      <div className="mx-4 w-full max-w-md rounded-2xl border border-neutral-800 bg-neutral-900 p-6 shadow-2xl sm:p-8">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-white/20 border-t-white rounded-full animate-spin mx-auto mb-4"></div>
+          <div className="mx-auto mb-4 h-16 w-16 animate-spin rounded-full border-4 border-white/20 border-t-white"></div>
           <p className="text-sm text-neutral-400">Загрузка капчи..</p>
         </div>
       </div>
     </div>
-  )
+  ),
 });
 
 interface UploadedFile {
@@ -31,6 +36,11 @@ interface UploadedFile {
   width?: number;
   height?: number;
   previewUrl?: string; // Для локального отображения
+}
+
+interface SelectedFile {
+  file: File;
+  id: string;
 }
 
 interface FileUploadModalProps {
@@ -48,7 +58,7 @@ export default function FileUploadModal({
   ticketId,
   maxFiles = 2,
 }: FileUploadModalProps) {
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [selectedFiles, setSelectedFiles] = useState<SelectedFile[]>([]);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [previews, setPreviews] = useState<Map<string, string>>(new Map());
@@ -60,7 +70,7 @@ export default function FileUploadModal({
   const dropZoneRef = useRef<HTMLDivElement>(null);
   const isCaptchaOpenRef = useRef(false);
   const isProcessingCaptchaRef = useRef(false);
-  const pendingUploadRef = useRef<{ files: File[] } | null>(null);
+  const pendingUploadRef = useRef<{ files: SelectedFile[] } | null>(null);
   // Убрали предзагрузку WASM на клиенте, чтобы избежать проблем с Turbopack и node-модулем `fs` в браузерном бандле.
   // thumbhash/blur теперь не генерируется на клиенте (можно реализовать серверную генерацию при необходимости).
 
@@ -76,7 +86,7 @@ export default function FileUploadModal({
       isProcessingCaptchaRef.current = false;
       setShowRateLimitCaptcha(false);
       pendingUploadRef.current = null;
-      
+
       gsap.set([backdropRef.current, modalRef.current], { opacity: 0 });
       gsap.to(backdropRef.current, {
         opacity: 1,
@@ -92,7 +102,7 @@ export default function FileUploadModal({
           y: 0,
           duration: 0.3,
           ease: 'power2.out',
-        }
+        },
       );
     } else {
       gsap.to([backdropRef.current, modalRef.current], {
@@ -115,27 +125,29 @@ export default function FileUploadModal({
   }, [isOpen]);
 
   // Храним метаданные изображений (width, height, previewUrl)
-  const [imageMeta, setImageMeta] = useState<Map<string, { width: number; height: number; previewUrl: string }>>(new Map());
+  const [imageMeta, setImageMeta] = useState<
+    Map<string, { width: number; height: number; previewUrl: string }>
+  >(new Map());
 
   useEffect(() => {
     const newPreviews = new Map<string, string>();
-    
-    selectedFiles.forEach((file) => {
+
+    selectedFiles.forEach(({ file }) => {
       if (file.type.startsWith('image/')) {
         // Создаём blob URL для превью
         const blobUrl = URL.createObjectURL(file);
         newPreviews.set(file.name, blobUrl);
         setPreviews(new Map(newPreviews));
-        
+
         // Получаем width/height изображения
-        const img = new Image();
+        const img = new window.Image();
         img.onload = () => {
-          setImageMeta(prev => {
+          setImageMeta((prev) => {
             const updated = new Map(prev);
             updated.set(file.name, {
               width: img.naturalWidth,
               height: img.naturalHeight,
-              previewUrl: blobUrl
+              previewUrl: blobUrl,
             });
             return updated;
           });
@@ -143,7 +155,7 @@ export default function FileUploadModal({
         img.src = blobUrl;
       }
     });
-    
+
     // Cleanup old blob URLs
     return () => {
       newPreviews.forEach((url) => {
@@ -156,20 +168,27 @@ export default function FileUploadModal({
 
   const processFiles = (files: FileList | File[]) => {
     const filesArray = Array.from(files);
-    
+
     if (selectedFiles.length + filesArray.length > maxFiles) {
       setError(`Можно загрузить максимум ${maxFiles} файла`);
       return;
     }
 
-    const allowedImageTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp', 'image/svg+xml'];
+    const allowedImageTypes = [
+      'image/png',
+      'image/jpeg',
+      'image/jpg',
+      'image/gif',
+      'image/webp',
+      'image/svg+xml',
+    ];
     const allowedDocumentTypes = ['application/pdf', 'text/plain'];
 
     const sizeLimitExceeded: boolean[] = [];
     const invalidFormatFiles: string[] = [];
-    const newFiles: File[] = [];
-    const existingFileNames = new Set(selectedFiles.map(f => f.name.toLowerCase()));
-    
+    const newFiles: SelectedFile[] = [];
+    const existingFileNames = new Set(selectedFiles.map((f) => f.file.name.toLowerCase()));
+
     filesArray.forEach((file) => {
       // Проверка на дубликаты
       if (existingFileNames.has(file.name.toLowerCase())) {
@@ -179,30 +198,39 @@ export default function FileUploadModal({
         const nameParts = file.name.split('.');
         const extension = nameParts.pop();
         const baseName = nameParts.join('.');
-        
-        while (existingFileNames.has(newName.toLowerCase()) || 
-               selectedFiles.some(f => f.name.toLowerCase() === newName.toLowerCase())) {
+
+        while (
+          existingFileNames.has(newName.toLowerCase()) ||
+          selectedFiles.some((f) => f.file.name.toLowerCase() === newName.toLowerCase())
+        ) {
           newName = `${baseName} (${counter}).${extension}`;
           counter++;
         }
-        
+
         // Создаем новый File объект с исправленным именем
         const blob = file.slice(0, file.size, file.type);
-        const renamedFile = new File([blob], newName, { type: file.type, lastModified: file.lastModified });
-        newFiles.push(renamedFile);
+        const renamedFile = new File([blob], newName, {
+          type: file.type,
+          lastModified: file.lastModified,
+        });
+        newFiles.push({ file: renamedFile, id: crypto.randomUUID() });
         existingFileNames.add(newName.toLowerCase());
       } else {
-        newFiles.push(file);
+        newFiles.push({ file, id: crypto.randomUUID() });
         existingFileNames.add(file.name.toLowerCase());
       }
-      
+
       // Валидация размера и типа
       if (file.size > SUPPORT_ATTACHMENT_MAX_BYTES) {
         sizeLimitExceeded.push(true);
       } else {
         sizeLimitExceeded.push(false);
-        if (!allowedImageTypes.includes(file.type) && !allowedDocumentTypes.includes(file.type) && 
-            !file.name.toLowerCase().endsWith('.pdf') && !file.name.toLowerCase().endsWith('.txt')) {
+        if (
+          !allowedImageTypes.includes(file.type) &&
+          !allowedDocumentTypes.includes(file.type) &&
+          !file.name.toLowerCase().endsWith('.pdf') &&
+          !file.name.toLowerCase().endsWith('.txt')
+        ) {
           invalidFormatFiles.push(`${file.name} (неподдерживаемый формат)`);
         }
       }
@@ -218,7 +246,7 @@ export default function FileUploadModal({
 
     setSelectedFiles((prev) => [...prev, ...newFiles]);
     setError(null);
-    
+
     // Сбрасываем input для возможности повторного выбора того же файла
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -248,7 +276,10 @@ export default function FileUploadModal({
     e.preventDefault();
     e.stopPropagation();
     // Проверяем, что мы действительно покинули зону (не перешли на дочерний элемент)
-    if (e.currentTarget === dropZoneRef.current && !e.currentTarget.contains(e.relatedTarget as Node)) {
+    if (
+      e.currentTarget === dropZoneRef.current &&
+      !e.currentTarget.contains(e.relatedTarget as Node)
+    ) {
       setIsDragging(false);
     }
   };
@@ -266,12 +297,13 @@ export default function FileUploadModal({
     processFiles(files);
   };
 
-  const removeFile = (index: number) => {
+  const removeFile = (id: string) => {
     setSelectedFiles((prev) => {
-      const newFiles = prev.filter((_, i) => i !== index);
-      if (prev[index] && prev[index].type.startsWith('image/')) {
+      const fileToRemove = prev.find((f) => f.id === id);
+      const newFiles = prev.filter((f) => f.id !== id);
+      if (fileToRemove && fileToRemove.file.type.startsWith('image/')) {
         const newPreviews = new Map(previews);
-        newPreviews.delete(prev[index].name);
+        newPreviews.delete(fileToRemove.file.name);
         setPreviews(newPreviews);
       }
       return newFiles;
@@ -284,11 +316,12 @@ export default function FileUploadModal({
     return `${(bytes / (1024 * 1024)).toFixed(1)} МБ`;
   };
 
-  const performUpload = async (filesToUpload: File[]) => {
+  const performUpload = async (filesToUpload: SelectedFile[]) => {
     const formData = new FormData();
-    const localFileData: Record<string, { previewUrl: string; width?: number; height?: number }> = {};
+    const localFileData: Record<string, { previewUrl: string; width?: number; height?: number }> =
+      {};
 
-    for (const file of filesToUpload) {
+    for (const { file } of filesToUpload) {
       formData.append('files', file);
 
       // Собираем локальные данные изображения (превью + размеры)
@@ -298,12 +331,12 @@ export default function FileUploadModal({
           localFileData[file.name] = {
             previewUrl: meta.previewUrl,
             width: meta.width,
-            height: meta.height
+            height: meta.height,
           };
         } else {
           // Fallback если meta еще не загружена
           localFileData[file.name] = {
-            previewUrl: URL.createObjectURL(file)
+            previewUrl: URL.createObjectURL(file),
           };
         }
       }
@@ -319,13 +352,13 @@ export default function FileUploadModal({
     if (response.status === 429) {
       // Сохраняем файлы для повторной попытки после captcha
       pendingUploadRef.current = { files: filesToUpload };
-      
+
       // Показываем captcha только если она еще не открыта
       if (!isCaptchaOpenRef.current && !isProcessingCaptchaRef.current) {
         isCaptchaOpenRef.current = true;
         setShowRateLimitCaptcha(true);
       }
-      
+
       throw new Error('RATE_LIMIT_EXCEEDED');
     }
 
@@ -337,14 +370,14 @@ export default function FileUploadModal({
 
     // Обогащаем ответ локальными данными (превью + размеры для мгновенного отображения)
     if (data.success && data.files) {
-      data.files = data.files.map((f: any) => {
+      data.files = (data.files as (UploadedFile & { fileName?: string })[]).map((f) => {
         const localData = localFileData[f.fileName];
         return {
           ...f,
           previewUrl: localData?.previewUrl,
           // Используем локальные размеры если сервер не вернул
           width: f.width || localData?.width,
-          height: f.height || localData?.height
+          height: f.height || localData?.height,
         };
       });
     }
@@ -390,22 +423,22 @@ export default function FileUploadModal({
   const handleRateLimitSuccess = async () => {
     // Устанавливаем флаг обработки капчи
     isProcessingCaptchaRef.current = true;
-    
+
     // Закрываем модальное окно captcha
     isCaptchaOpenRef.current = false;
     setShowRateLimitCaptcha(false);
-    
+
     // Ждем применения иммунитета на сервере
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
     // Повторяем загрузку, если есть отложенные файлы
     if (pendingUploadRef.current) {
       setUploading(true);
       setError(null);
-      
+
       try {
         const data = await performUpload(pendingUploadRef.current.files);
-        
+
         if (data.success && data.files) {
           onUploadComplete(data.files);
           setSelectedFiles([]);
@@ -445,53 +478,79 @@ export default function FileUploadModal({
     <>
       <div
         ref={backdropRef}
-        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[1000]"
+        className="fixed inset-0 z-[1000] bg-black/60 backdrop-blur-sm"
         onClick={onClose}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            onClose();
+          }
+        }}
+        aria-label="Close modal"
       />
 
       <div
         ref={modalRef}
-        className="fixed inset-0 z-[1001] flex items-center justify-center p-4 pointer-events-none"
+        className="pointer-events-none fixed inset-0 z-[1001] flex items-center justify-center p-4"
       >
         <div
-          className="bg-neutral-900 border border-white/10 rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col pointer-events-auto"
+          className="pointer-events-auto flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-white/10 bg-neutral-900 shadow-2xl"
           onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') e.stopPropagation();
+          }}
+          role="presentation"
         >
-          <div className="p-4 sm:p-6 border-b border-white/10 flex items-center justify-between flex-shrink-0">
+          <div className="flex flex-shrink-0 items-center justify-between border-b border-white/10 p-4 sm:p-6">
             <h2 className="text-lg font-semibold text-white">Прикрепить файлы</h2>
             <button
               onClick={onClose}
-              className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+              className="rounded-lg p-2 transition-colors hover:bg-white/10"
               aria-label="Закрыть"
             >
-              <X className="w-5 h-5 text-neutral-400" />
+              <X className="h-5 w-5 text-neutral-400" />
             </button>
           </div>
 
           <div className="flex-1 overflow-y-auto p-4 sm:p-6">
             <div
               ref={dropZoneRef}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  if (!uploading && selectedFiles.length < maxFiles) fileInputRef.current?.click();
+                }
+              }}
               onDragEnter={handleDragEnter}
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
-              onClick={() => !uploading && selectedFiles.length < maxFiles && fileInputRef.current?.click()}
-              className={`w-full p-8 border-2 border-dashed rounded-xl transition-all duration-200 mb-4 ${
+              onClick={() =>
+                !uploading && selectedFiles.length < maxFiles && fileInputRef.current?.click()
+              }
+              className={`mb-4 w-full rounded-xl border-2 border-dashed p-8 transition-all duration-200 ${
                 isDragging
-                  ? 'border-blue-500 bg-blue-500/10 scale-[1.02]'
+                  ? 'scale-[1.02] border-blue-500 bg-blue-500/10'
                   : 'border-white/20 hover:border-primary-500/50'
-              } ${uploading || selectedFiles.length >= maxFiles ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+              } ${uploading || selectedFiles.length >= maxFiles ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
             >
               <div className="flex flex-col items-center gap-2">
-                <Upload className={`w-8 h-8 transition-colors ${isDragging ? 'text-blue-400' : 'text-neutral-400'}`} />
-                <span className={`text-sm transition-colors text-center whitespace-normal break-words ${isDragging ? 'text-blue-300' : 'text-neutral-300'}`}>
+                <Upload
+                  className={`h-8 w-8 transition-colors ${isDragging ? 'text-blue-400' : 'text-neutral-400'}`}
+                />
+                <span
+                  className={`whitespace-normal break-words text-center text-sm transition-colors ${isDragging ? 'text-blue-300' : 'text-neutral-300'}`}
+                >
                   {isDragging
                     ? 'Отпустите для загрузки'
                     : selectedFiles.length >= maxFiles
-                    ? 'Достигнут лимит'
-                    : 'Перетащите файлы или выберите их'}
+                      ? 'Достигнут лимит'
+                      : 'Перетащите файлы или выберите их'}
                 </span>
-                <span className="text-xs text-neutral-500 text-center">
+                <span className="text-center text-xs text-neutral-500">
                   До {maxFiles} файлов, максимум {SUPPORT_ATTACHMENT_MAX_MB} МБ каждый
                 </span>
               </div>
@@ -508,48 +567,52 @@ export default function FileUploadModal({
 
             {selectedFiles.length > 0 && (
               <div className="space-y-2">
-                {selectedFiles.map((file, index) => {
+                {selectedFiles.map(({ file, id }) => {
                   const preview = previews.get(file.name);
                   const isImage = file.type.startsWith('image/');
 
                   return (
                     <div
-                      key={`${file.name}-${index}`}
-                      className="flex items-center gap-3 p-3 bg-neutral-800/50 rounded-lg border border-white/10"
+                      key={id}
+                      className="flex items-center gap-3 rounded-lg border border-white/10 bg-neutral-800/50 p-3"
                     >
                       <div className="flex-shrink-0">
                         {isImage && preview ? (
-                          <div className="relative w-12 h-12 rounded-lg overflow-hidden bg-neutral-700">
-                            <img
+                          <div className="relative h-12 w-12 overflow-hidden rounded-lg bg-neutral-700">
+                            <Image
                               src={preview}
                               alt={file.name}
-                              className="w-full h-full object-cover"
+                              fill
+                              sizes="48px"
+                              className="object-cover"
+                              unoptimized
                             />
                           </div>
                         ) : (
-                          <div className="w-12 h-12 rounded-lg bg-neutral-700 flex items-center justify-center">
-                            {file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf') ? (
-                              <FileText className="w-6 h-6 text-red-400" />
+                          <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-neutral-700">
+                            {file.type === 'application/pdf' ||
+                            file.name.toLowerCase().endsWith('.pdf') ? (
+                              <FileText className="h-6 w-6 text-red-400" />
                             ) : (
-                              <FileText className="w-6 h-6 text-neutral-400" />
+                              <FileText className="h-6 w-6 text-neutral-400" />
                             )}
                           </div>
                         )}
                       </div>
 
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-white truncate">{file.name}</p>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-white">{file.name}</p>
                         <p className="text-xs text-neutral-400">{formatFileSize(file.size)}</p>
                       </div>
 
                       <button
                         type="button"
-                        onClick={() => removeFile(index)}
+                        onClick={() => removeFile(id)}
                         disabled={uploading}
-                        className="flex-shrink-0 p-2 hover:bg-red-500/20 rounded-lg transition-colors disabled:opacity-50"
+                        className="flex-shrink-0 rounded-lg p-2 transition-colors hover:bg-red-500/20 disabled:opacity-50"
                         aria-label="Удалить файл"
                       >
-                        <X className="w-4 h-4 text-red-400" />
+                        <X className="h-4 w-4 text-red-400" />
                       </button>
                     </div>
                   );
@@ -558,33 +621,33 @@ export default function FileUploadModal({
             )}
 
             {error && (
-              <div className="mt-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
+              <div className="mt-4 rounded-lg border border-red-500/20 bg-red-500/10 p-3">
                 <p className="text-sm text-red-300">{error}</p>
               </div>
             )}
           </div>
 
-          <div className="p-4 sm:p-6 border-t border-white/10 flex items-center justify-end gap-3 flex-shrink-0">
+          <div className="flex flex-shrink-0 items-center justify-end gap-3 border-t border-white/10 p-4 sm:p-6">
             <button
               onClick={onClose}
               disabled={uploading}
-              className="px-4 py-2 text-neutral-300 hover:text-white transition-colors disabled:opacity-50"
+              className="px-4 py-2 text-neutral-300 transition-colors hover:text-white disabled:opacity-50"
             >
               Отмена
             </button>
             <button
               onClick={handleUpload}
               disabled={uploading || selectedFiles.length === 0}
-              className="px-4 py-2 bg-primary-500 hover:bg-primary-400 disabled:bg-neutral-700 disabled:text-neutral-500 text-white rounded-lg transition-colors flex items-center gap-2"
+              className="flex items-center gap-2 rounded-lg bg-primary-500 px-4 py-2 text-white transition-colors hover:bg-primary-400 disabled:bg-neutral-700 disabled:text-neutral-500"
             >
               {uploading ? (
                 <>
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
                   Загрузка...
                 </>
               ) : (
                 <>
-                  <Upload className="w-4 h-4" />
+                  <Upload className="h-4 w-4" />
                   Загрузить
                 </>
               )}
@@ -593,18 +656,20 @@ export default function FileUploadModal({
         </div>
       </div>
 
-      <RateLimitCaptcha
-        isOpen={showRateLimitCaptcha}
-        onSuccess={handleRateLimitSuccess}
-        onClose={() => {
-          // При закрытии очищаем состояние и сбрасываем флаги
-          isCaptchaOpenRef.current = false;
-          isProcessingCaptchaRef.current = false;
-          setShowRateLimitCaptcha(false);
-          pendingUploadRef.current = null;
-          setUploading(false);
-        }}
-      />
+      {showRateLimitCaptcha && (
+        <RateLimitCaptcha
+          isOpen={showRateLimitCaptcha}
+          onSuccess={handleRateLimitSuccess}
+          onClose={() => {
+            // При закрытии очищаем состояние и сбрасываем флаги
+            isCaptchaOpenRef.current = false;
+            isProcessingCaptchaRef.current = false;
+            setShowRateLimitCaptcha(false);
+            pendingUploadRef.current = null;
+            setUploading(false);
+          }}
+        />
+      )}
     </>
   );
 }

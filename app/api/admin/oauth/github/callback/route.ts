@@ -21,7 +21,7 @@ export async function OPTIONS() {
 async function isTrustedDeveloper(
   email: string | null | undefined,
   username: string,
-  supabaseAdmin: any
+  supabaseAdmin: any,
 ): Promise<boolean> {
   if (!supabaseAdmin) {
     return false;
@@ -68,9 +68,7 @@ async function isTrustedDeveloper(
 export async function GET(request: NextRequest) {
   try {
     const env = getEnv();
-    const origin = domains.mainUrl.endsWith('/') 
-      ? domains.mainUrl.slice(0, -1) 
-      : domains.mainUrl;
+    const origin = domains.mainUrl.endsWith('/') ? domains.mainUrl.slice(0, -1) : domains.mainUrl;
 
     // Get state early to determine if this is a popup request
     const { searchParams } = request.nextUrl;
@@ -121,13 +119,15 @@ export async function GET(request: NextRequest) {
 
     // Verify CSRF state token
     const cleanState = isPopup ? state.split(':')[0] : state;
-    const cleanStoredState = storedState?.includes(':popup') ? storedState.split(':')[0] : storedState;
-    
+    const cleanStoredState = storedState?.includes(':popup')
+      ? storedState.split(':')[0]
+      : storedState;
+
     if (!cleanStoredState || cleanStoredState !== cleanState) {
       const errorUrl = getErrorRedirectUrl('invalid_state', origin, isPopup);
       return setCorsHeaders(NextResponse.redirect(errorUrl));
     }
-    
+
     const redirectUri = `${origin}/api/admin/oauth/github/callback`;
 
     // Exchange authorization code for access token
@@ -147,7 +147,7 @@ export async function GET(request: NextRequest) {
 
     if (!tokenResponse.ok) {
       logger.error('OAuth: Failed to exchange GitHub code.', {
-        status: tokenResponse.status
+        status: tokenResponse.status,
       });
       const errorUrl = getErrorRedirectUrl('token_exchange_failed', origin, isPopup);
       return setCorsHeaders(NextResponse.redirect(errorUrl));
@@ -171,8 +171,8 @@ export async function GET(request: NextRequest) {
     });
 
     if (!userInfoResponse.ok) {
-      logger.error('OAuth: Failed to fetch GitHub user info.', { 
-        status: userInfoResponse.status 
+      logger.error('OAuth: Failed to fetch GitHub user info.', {
+        status: userInfoResponse.status,
       });
       const errorUrl = getErrorRedirectUrl('user_info_failed', origin, isPopup);
       return setCorsHeaders(NextResponse.redirect(errorUrl));
@@ -216,7 +216,7 @@ export async function GET(request: NextRequest) {
     // Check if admin exists with this GitHub username
     // We need to import supabaseAdmin to check directly
     const { supabaseAdmin } = await import('@/lib/database/supabase');
-    
+
     if (!supabaseAdmin) {
       logger.error('OAuth: Database not configured.');
       const errorUrl = getErrorRedirectUrl('internal_error', origin, isPopup);
@@ -228,7 +228,7 @@ export async function GET(request: NextRequest) {
     if (!isTrusted) {
       logger.warn('OAuth: Untrusted GitHub developer attempted admin login.', {
         username: githubUsername,
-        email: email || 'not provided'
+        email: email || 'not provided',
       });
       const errorUrl = getErrorRedirectUrl('oauth_denied', origin, isPopup);
       return setCorsHeaders(NextResponse.redirect(errorUrl));
@@ -247,7 +247,7 @@ export async function GET(request: NextRequest) {
       logger.error('OAuth: Error checking admin existence.', {
         username: githubUsername,
         email: email || 'not provided',
-        error: adminError.message
+        error: adminError.message,
       });
     }
 
@@ -258,7 +258,7 @@ export async function GET(request: NextRequest) {
         .insert({
           username: githubUsername,
           password_hash: null, // No password for GitHub OAuth admins
-          is_root: false // Only Root admin is created via login/password
+          is_root: false, // Only Root admin is created via login/password
         })
         .select()
         .single();
@@ -267,7 +267,7 @@ export async function GET(request: NextRequest) {
         logger.error('OAuth: Failed to create admin for trusted developer.', {
           username: githubUsername,
           email: email || 'not provided',
-          error: createError?.message || 'Unknown error'
+          error: createError?.message || 'Unknown error',
         });
         const errorUrl = getErrorRedirectUrl('internal_error', origin, isPopup);
         return setCorsHeaders(NextResponse.redirect(errorUrl));
@@ -276,7 +276,7 @@ export async function GET(request: NextRequest) {
       admin = newAdmin;
       logger.info('OAuth: Admin created automatically for trusted developer.', {
         username: githubUsername,
-        email: email || 'not provided'
+        email: email || 'not provided',
       });
     }
 
@@ -285,28 +285,31 @@ export async function GET(request: NextRequest) {
     const userAgent = request.headers.get('user-agent') || 'unknown';
     const hostname = request.nextUrl.hostname;
     const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
-    
+
     // Destroy old session if exists
     const oldSessionId = request.cookies.get(ADMIN_SESSION_COOKIE)?.value;
     if (oldSessionId) {
       await SessionManager.destroySession(oldSessionId);
     }
-    
+
     const sessionId = await SessionManager.createSession(
       admin.id,
       sanitizeInput(githubUsername),
       ipAddress,
       userAgent,
       undefined,
-      'admin'
+      'admin',
     );
 
     await SessionManager.setSessionCookie(sessionId, isLocalhost, ADMIN_SESSION_COOKIE);
 
     // Create redirect response
     // For popup, redirect to a handler page that will communicate with parent
-    const redirectUrl = isPopup 
-      ? new URL(`/ui/panel/admin/oauth-handler?success=true&username=${encodeURIComponent(githubUsername)}&popup=true`, origin)
+    const redirectUrl = isPopup
+      ? new URL(
+          `/ui/panel/admin/oauth-handler?success=true&username=${encodeURIComponent(githubUsername)}&popup=true`,
+          origin,
+        )
       : new URL(`/ui/panel/admin`, origin);
     const response = NextResponse.redirect(redirectUrl);
 
@@ -323,33 +326,26 @@ export async function GET(request: NextRequest) {
 
     logger.info('OAuth: Admin login successful', {
       username: githubUsername,
-      ip: ipAddress
+      ip: ipAddress,
     });
 
     return setCorsHeaders(response);
   } catch (error) {
     logger.error('OAuth: GitHub callback error.', {
-      error: error instanceof Error ? error.message : 'Unknown error'
+      error: error instanceof Error ? error.message : 'Unknown error',
     });
-    
+
     try {
       const env = getEnv();
       {
-        const origin = domains.mainUrl.endsWith('/') 
-          ? domains.mainUrl.slice(0, -1) 
+        const origin = domains.mainUrl.endsWith('/')
+          ? domains.mainUrl.slice(0, -1)
           : domains.mainUrl;
         const errorUrl = getErrorRedirectUrl('internal_error', origin, false);
         return setCorsHeaders(NextResponse.redirect(errorUrl));
       }
-    } catch {
-    }
-    
-    return setCorsHeaders(
-      NextResponse.json(
-        { error: 'Internal server error' },
-        { status: 500 }
-      )
-    );
+    } catch {}
+
+    return setCorsHeaders(NextResponse.json({ error: 'Internal server error' }, { status: 500 }));
   }
 }
-

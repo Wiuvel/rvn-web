@@ -17,10 +17,10 @@ export function parseUserDataCookieClient(cookieValue?: string | null): UserData
   try {
     const json = base64UrlDecodeToUtf8(dataB64);
     const payload = JSON.parse(json) as UserDataPayload;
-    
+
     if (!payload.user_id || typeof payload.user_id !== 'string') return null;
     if (!payload.username || typeof payload.username !== 'string') return null;
-    
+
     return payload;
   } catch {
     return null;
@@ -29,7 +29,9 @@ export function parseUserDataCookieClient(cookieValue?: string | null): UserData
 
 function getCookie(name: string): string | null {
   if (typeof document === 'undefined') return null;
-  const match = document.cookie.match(new RegExp('(?:^|;\\s*)' + name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '=([^;]*)'));
+  const match = document.cookie.match(
+    new RegExp('(?:^|;\\s*)' + name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '=([^;]*)'),
+  );
   return match ? decodeURIComponent(match[1]) : null;
 }
 
@@ -39,11 +41,11 @@ function base64UrlDecodeToUtf8(str: string): string {
   // Добавляем паддинг если нужно
   const pad = base64.length % 4;
   if (pad) base64 += '='.repeat(4 - pad);
-  
+
   // Декодируем
   const binary = atob(base64);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  
+
   return new TextDecoder().decode(bytes);
 }

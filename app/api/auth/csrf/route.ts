@@ -15,12 +15,7 @@ export async function GET(request: NextRequest) {
     const rateLimitResult = await generalRateLimit.check(request);
     if (!rateLimitResult.allowed) {
       // Rate limit - не логируем
-      return setCorsHeaders(
-        NextResponse.json(
-          { error: 'Too many requests' },
-          { status: 429 }
-        )
-      );
+      return setCorsHeaders(NextResponse.json({ error: 'Too many requests' }, { status: 429 }));
     }
 
     let sessionId = request.cookies.get('session_id')?.value;
@@ -34,13 +29,13 @@ export async function GET(request: NextRequest) {
     }
 
     const csrfToken = await generateCSRFToken(sessionId);
-    
+
     // Логируем для отладки
     // CSRF токен сгенерирован - не логируем
 
     // Создаем response
     const response = NextResponse.json({
-      csrfToken
+      csrfToken,
     });
 
     // Устанавливаем cookie только если session_id был создан новый
@@ -50,7 +45,7 @@ export async function GET(request: NextRequest) {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production' && !isLocalhost,
         sameSite: 'lax',
-        path: '/'
+        path: '/',
       });
     }
 
@@ -58,13 +53,8 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     logger.error('CSRF token generation error', {
       error: error instanceof Error ? error.message : 'Unknown error',
-      ip: request.headers.get('x-forwarded-for')
+      ip: request.headers.get('x-forwarded-for'),
     });
-    return setCorsHeaders(
-      NextResponse.json(
-        { error: 'Internal server error' },
-        { status: 500 }
-      )
-    );
+    return setCorsHeaders(NextResponse.json({ error: 'Internal server error' }, { status: 500 }));
   }
 }

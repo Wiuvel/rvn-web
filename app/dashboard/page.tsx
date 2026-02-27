@@ -1,38 +1,17 @@
-'use client';
+import { redirect } from 'next/navigation';
+import { getUserData } from '@/lib/auth/user-cookie.server';
 
-import { useRouter } from 'next/navigation';
-import { useAuth } from '@/hooks/useAuth';
-import LoadingSpinner from '@/components/ui/LoadingSpinner';
-import { useEffect } from 'react';
+export default async function DashboardPage() {
+  const userData = await getUserData();
 
-export default function DashboardPage() {
-  const router = useRouter();
-  const { loading, userData } = useAuth({
-    requireAuth: true,
-    redirectOnFail: '/auth',
-    redirectOnTimeout: '/error/500',
-    onSuccess: (data) => {
-      // Redirect to the dashboard with the user_id
-      if (data.user_id) {
-        router.push(`/dashboard/${data.user_id}`);
-      }
-    }
-  });
-
-  useEffect(() => {
-    if (!loading && !userData) {
-      router.push('/auth');
-    }
-  }, [loading, userData, router]);
-
-  if (loading) {
-    return <LoadingSpinner />;
-  }
-
-  // Fallback return if not loading but no userData
   if (!userData) {
-      return null;
+    redirect('/auth');
   }
 
-  return null;
+  if (userData.user_id) {
+    redirect(`/dashboard/${userData.user_id}`);
+  }
+
+  // Fallback if user_id is missing but userData exists (should not happen normally)
+  redirect('/auth');
 }

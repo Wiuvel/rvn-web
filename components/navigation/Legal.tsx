@@ -24,7 +24,7 @@ export default function LegalNavigation() {
       {legalPages.map((page, index) => {
         const isActive = pathname === page.path;
         const isLast = index === legalPages.length - 1;
-        
+
         return (
           <span key={page.path} className="legal-breadcrumb-item">
             {isActive ? (

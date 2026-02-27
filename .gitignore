@@ -1,4 +1,3 @@
-/.trae
 /node_modules
 /.pnp
 .pnp.*
@@ -21,7 +20,9 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 .env
-env.local
+.env.local
+.env.*.local
+!.env.example
 .vercel
 *.tsbuildinfo
 next-env.d.ts

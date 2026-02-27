@@ -1,7 +1,16 @@
-import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import {
+  S3Client,
+  PutObjectCommand,
+  DeleteObjectCommand,
+  GetObjectCommand,
+} from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { getEnv } from '@/lib/validation/env-validation';
-import { AVATAR_MAX_BYTES, SUPPORT_ATTACHMENT_MAX_BYTES, SUPPORT_FILE_SIZE_LIMIT_ERROR } from '@/lib/utils/constants';
+import {
+  AVATAR_MAX_BYTES,
+  SUPPORT_ATTACHMENT_MAX_BYTES,
+  SUPPORT_FILE_SIZE_LIMIT_ERROR,
+} from '@/lib/utils/constants';
 import { Readable } from 'stream';
 
 /**
@@ -9,7 +18,7 @@ import { Readable } from 'stream';
  */
 export function getS3Client(): S3Client | null {
   const env = getEnv();
-  
+
   if (!env.S3_ENDPOINT || !env.S3_ACCESS_KEY || !env.S3_SECRET_KEY) {
     return null;
   }
@@ -36,11 +45,11 @@ export function getS3Client(): S3Client | null {
 export async function uploadFileToS3(
   file: Buffer | Uint8Array,
   key: string,
-  contentType: string
+  contentType: string,
 ): Promise<string> {
   const client = getS3Client();
   const env = getEnv();
-  
+
   if (!client || !env.S3_BUCKET) {
     throw new Error('S3 storage is not configured');
   }
@@ -69,7 +78,7 @@ export async function uploadFileToS3(
 export async function deleteFileFromS3(key: string): Promise<void> {
   const client = getS3Client();
   const env = getEnv();
-  
+
   if (!client || !env.S3_BUCKET) {
     throw new Error('S3 storage is not configured');
   }
@@ -91,7 +100,7 @@ export async function deleteFileFromS3(key: string): Promise<void> {
 export async function getPresignedUrl(key: string, expiresIn: number = 3600): Promise<string> {
   const client = getS3Client();
   const env = getEnv();
-  
+
   if (!client || !env.S3_BUCKET) {
     throw new Error('S3 storage is not configured');
   }
@@ -136,7 +145,12 @@ export async function getObjectAsBuffer(key: string): Promise<{
     const contentType = response.ContentType || 'application/octet-stream';
     return { body, contentType, contentLength: response.ContentLength ?? body.length };
   } catch (err: unknown) {
-    if (err && typeof err === 'object' && 'name' in err && (err as { name: string }).name === 'NoSuchKey') {
+    if (
+      err &&
+      typeof err === 'object' &&
+      'name' in err &&
+      (err as { name: string }).name === 'NoSuchKey'
+    ) {
       return null;
     }
     throw err;
@@ -153,15 +167,15 @@ export async function getObjectAsBuffer(key: string): Promise<{
 export function generateStoragePath(
   ticketId: string,
   fileName: string,
-  messageId?: string
+  messageId?: string,
 ): string {
   const timestamp = Date.now();
   const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
-  
+
   if (messageId) {
     return `support/${ticketId}/${messageId}/${timestamp}_${sanitizedFileName}`;
   }
-  
+
   // Для предварительной загрузки (до создания сообщения)
   return `support/${ticketId}/pending/${timestamp}_${sanitizedFileName}`;
 }
@@ -183,10 +197,10 @@ export function isDocumentFile(mimeType: string, fileName: string): boolean {
     'application/msword',
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   ];
-  
+
   const documentExtensions = ['.pdf', '.txt', '.doc', '.docx'];
   const fileExtension = fileName.toLowerCase().substring(fileName.lastIndexOf('.'));
-  
+
   return documentMimeTypes.includes(mimeType) || documentExtensions.includes(fileExtension);
 }
 
@@ -200,11 +214,11 @@ export function isDocumentFile(mimeType: string, fileName: string): boolean {
 export async function uploadAvatarToS3(
   file: Buffer | Uint8Array,
   key: string,
-  contentType: string
+  contentType: string,
 ): Promise<string> {
   const client = getS3Client();
   const env = getEnv();
-  
+
   if (!client || !env.S3_BUCKET) {
     throw new Error('S3 storage is not configured');
   }
@@ -233,7 +247,7 @@ export async function uploadAvatarToS3(
  */
 export async function uploadAvatarFromUrl(
   imageUrl: string,
-  userId: string
+  userId: string,
 ): Promise<string | null> {
   try {
     // Скачиваем изображение
@@ -326,18 +340,27 @@ export function validateFile(file: { size: number; type: string; name: string })
   }
 
   // Разрешенные типы файлов
-  const allowedImageTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp', 'image/svg+xml'];
+  const allowedImageTypes = [
+    'image/png',
+    'image/jpeg',
+    'image/jpg',
+    'image/gif',
+    'image/webp',
+    'image/svg+xml',
+  ];
   const allowedDocumentTypes = ['application/pdf', 'text/plain'];
-  
+
   const isImage = allowedImageTypes.includes(file.type);
-  const isDocument = allowedDocumentTypes.includes(file.type) || 
-                     file.name.toLowerCase().endsWith('.pdf') || 
-                     file.name.toLowerCase().endsWith('.txt');
+  const isDocument =
+    allowedDocumentTypes.includes(file.type) ||
+    file.name.toLowerCase().endsWith('.pdf') ||
+    file.name.toLowerCase().endsWith('.txt');
 
   if (!isImage && !isDocument) {
     return {
       valid: false,
-      error: 'Разрешены только изображения (.png, .jpg, .gif, .webp, .svg) и документы (.pdf, .txt)',
+      error:
+        'Разрешены только изображения (.png, .jpg, .gif, .webp, .svg) и документы (.pdf, .txt)',
     };
   }
 

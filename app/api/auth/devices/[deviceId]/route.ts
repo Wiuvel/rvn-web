@@ -10,12 +10,12 @@ export async function OPTIONS() {
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ deviceId: string }> }
+  { params }: { params: Promise<{ deviceId: string }> },
 ) {
   try {
     const { deviceId } = await params;
     const auth = await checkAuth({ headers: request.headers });
-    
+
     if (!auth.isAuthenticated || !auth.user) {
       return setCorsHeaders(NextResponse.json({ error: 'Unauthorized' }, { status: 401 }));
     }
@@ -25,7 +25,7 @@ export async function DELETE(
     return setCorsHeaders(NextResponse.json({ success: true }));
   } catch (error) {
     logger.error('Error revoking device', {
-      error: error instanceof Error ? error.message : 'Unknown error'
+      error: error instanceof Error ? error.message : 'Unknown error',
     });
     return setCorsHeaders(NextResponse.json({ error: 'Internal server error' }, { status: 500 }));
   }

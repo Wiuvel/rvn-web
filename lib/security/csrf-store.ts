@@ -40,7 +40,7 @@ class RedisCsrfStore implements ICsrfStore {
     } catch (error) {
       logger.error('Redis CSRF get error', {
         error: error instanceof Error ? error.message : 'Unknown error',
-        sessionId: sessionId.substring(0, 8) + '...'
+        sessionId: sessionId.substring(0, 8) + '...',
       });
       return null;
     }
@@ -57,7 +57,7 @@ class RedisCsrfStore implements ICsrfStore {
     } catch (error) {
       logger.error('Redis CSRF set error', {
         error: error instanceof Error ? error.message : 'Unknown error',
-        sessionId: sessionId.substring(0, 8) + '...'
+        sessionId: sessionId.substring(0, 8) + '...',
       });
     }
   }
@@ -73,7 +73,7 @@ class RedisCsrfStore implements ICsrfStore {
     } catch (error) {
       logger.error('Redis CSRF delete error', {
         error: error instanceof Error ? error.message : 'Unknown error',
-        sessionId: sessionId.substring(0, 8) + '...'
+        sessionId: sessionId.substring(0, 8) + '...',
       });
       return false;
     }

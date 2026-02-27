@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createHmac } from 'crypto';
+import { createHmac, createHash } from 'crypto';
 import { getEnv } from '@/lib/validation/env-validation';
 import { createUserFromOAuth, getUserByEmail } from '@/lib/auth/index';
 import { SessionManager } from '@/lib/auth/session-manager';
@@ -19,9 +19,7 @@ export async function OPTIONS() {
 export async function GET(request: NextRequest) {
   try {
     const env = getEnv();
-    const origin = domains.mainUrl.endsWith('/') 
-      ? domains.mainUrl.slice(0, -1) 
-      : domains.mainUrl;
+    const origin = domains.mainUrl.endsWith('/') ? domains.mainUrl.slice(0, -1) : domains.mainUrl;
 
     // Get state early to determine if this is a popup request
     const { searchParams } = request.nextUrl;
@@ -76,8 +74,10 @@ export async function GET(request: NextRequest) {
     // Verify CSRF state token
     // storedState already retrieved above for isPopup determination
     const cleanState = isPopup && state ? state.split(':')[0] : state;
-    const cleanStoredState = storedState?.includes(':popup') ? storedState.split(':')[0] : storedState;
-    
+    const cleanStoredState = storedState?.includes(':popup')
+      ? storedState.split(':')[0]
+      : storedState;
+
     if (!cleanStoredState || cleanStoredState !== cleanState) {
       // Несоответствие state - не логируем (валидация)
       const errorUrl = getErrorRedirectUrl('invalid_state', origin, isPopup);
@@ -94,23 +94,31 @@ export async function GET(request: NextRequest) {
     if (username) params.push(`username=${username}`);
     if (photoUrl) params.push(`photo_url=${photoUrl}`);
     if (authDate) params.push(`auth_date=${authDate}`);
-    
+
     const dataCheckString = params.sort().join('\n');
 
-    // Calculate secret key: SHA-256("WebAppData" + bot_token)
-    const secretKey = createHmac('sha256', 'WebAppData')
-      .update(env.TELEGRAM_BOT_TOKEN)
-      .digest();
+    // Calculate secret key: SHA-256(bot_token)
+    // For Login Widget (which uses callback URL), the secret key is SHA256 of the bot token
+    const secretKey = createHash('sha256').update(env.TELEGRAM_BOT_TOKEN).digest();
 
     // Calculate hash: HMAC-SHA-256(secret_key, data_check_string)
-    const calculatedHash = createHmac('sha256', secretKey)
-      .update(dataCheckString)
-      .digest('hex');
+    const calculatedHash = createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
 
     if (calculatedHash !== hash) {
-      // Несоответствие hash - не логируем (валидация)
-      const errorUrl = getErrorRedirectUrl('invalid_hash', origin, isPopup);
-      return setCorsHeaders(NextResponse.redirect(errorUrl));
+      // Try Mini App validation as fallback (just in case)
+      const miniAppSecretKey = createHmac('sha256', 'WebAppData')
+        .update(env.TELEGRAM_BOT_TOKEN)
+        .digest();
+
+      const miniAppHash = createHmac('sha256', miniAppSecretKey)
+        .update(dataCheckString)
+        .digest('hex');
+
+      if (miniAppHash !== hash) {
+        // Несоответствие hash - не логируем (валидация)
+        const errorUrl = getErrorRedirectUrl('invalid_hash', origin, isPopup);
+        return setCorsHeaders(NextResponse.redirect(errorUrl));
+      }
     }
 
     // Check auth_date (should be within last 24 hours)
@@ -134,7 +142,7 @@ export async function GET(request: NextRequest) {
     if (!user) {
       const telegramUsernameFromEmail = `telegram_${id}`;
       let sanitizedUsername: string;
-      
+
       if (username) {
         // Sanitize username from Telegram
         sanitizedUsername = username.replace(/[^a-zA-Z0-9_-]/g, '_');
@@ -145,16 +153,21 @@ export async function GET(request: NextRequest) {
           sanitizedUsername = sanitizedUsername.substring(0, 30);
         }
         // If sanitized username is invalid (too short or only underscores), use fallback
-        if (!sanitizedUsername || sanitizedUsername.length < 3 || sanitizedUsername.replace(/_/g, '').length === 0) {
+        if (
+          !sanitizedUsername ||
+          sanitizedUsername.length < 3 ||
+          sanitizedUsername.replace(/_/g, '').length === 0
+        ) {
           sanitizedUsername = telegramUsernameFromEmail;
         }
       } else {
         sanitizedUsername = telegramUsernameFromEmail;
       }
-      
+
       // Передаем URL аватара из Telegram (если есть)
-      const createResult = await createUserFromOAuth(telegramEmail, sanitizedUsername, photoUrl);
-      
+      // ВАЖНО: Мы больше не сохраняем аватарки из соцсетей, используем градиенты
+      const createResult = await createUserFromOAuth(telegramEmail, sanitizedUsername, undefined);
+
       if (!createResult.success || !createResult.user) {
         logger.error('Failed to create user', { error: createResult.error });
         const errorUrl = getErrorRedirectUrl('user_creation_failed', origin, isPopup);
@@ -175,13 +188,13 @@ export async function GET(request: NextRequest) {
     const userAgent = request.headers.get('user-agent') || 'unknown';
     const hostname = request.nextUrl.hostname;
     const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
-    
+
     // Destroy old session if exists
     const oldSessionId = request.cookies.get('session_id')?.value;
     if (oldSessionId) {
       await SessionManager.destroySession(oldSessionId);
     }
-    
+
     // Register device and get new token
     const token = await SessionManager.registerDevice(user.id, userAgent, ipAddress);
 
@@ -191,13 +204,16 @@ export async function GET(request: NextRequest) {
       ipAddress,
       userAgent,
       token,
-      'user'
+      'user',
     );
 
     await SessionManager.setSessionCookie(sessionId, isLocalhost);
 
-    const redirectUrl = isPopup 
-      ? new URL(`/auth/oauth-handler?provider=telegram&success=true&user_id=${user.user_id}&popup=true`, origin)
+    const redirectUrl = isPopup
+      ? new URL(
+          `/auth/oauth-handler?provider=telegram&success=true&user_id=${user.user_id}&popup=true`,
+          origin,
+        )
       : new URL(`/dashboard/${user.user_id}`, origin);
     const response = NextResponse.redirect(redirectUrl);
 
@@ -222,7 +238,7 @@ export async function GET(request: NextRequest) {
         secure: process.env.NODE_ENV === 'production' && !isLocalhost,
         sameSite: 'lax', // Changed from 'strict' to 'lax' for OAuth redirects
         path: '/',
-        ...(cookieDomain && { domain: cookieDomain })
+        ...(cookieDomain && { domain: cookieDomain }),
       });
 
       response.cookies.set('access_hash', accessHash, {
@@ -231,7 +247,7 @@ export async function GET(request: NextRequest) {
         secure: process.env.NODE_ENV === 'production' && !isLocalhost,
         sameSite: 'lax', // Changed from 'strict' to 'lax' for OAuth redirects
         path: '/',
-        ...(cookieDomain && { domain: cookieDomain })
+        ...(cookieDomain && { domain: cookieDomain }),
       });
 
       if (accessTime) {
@@ -241,7 +257,7 @@ export async function GET(request: NextRequest) {
           secure: process.env.NODE_ENV === 'production' && !isLocalhost,
           sameSite: 'lax', // Changed from 'strict' to 'lax' for OAuth redirects
           path: '/',
-          ...(cookieDomain && { domain: cookieDomain })
+          ...(cookieDomain && { domain: cookieDomain }),
         });
       }
     } else {
@@ -251,7 +267,7 @@ export async function GET(request: NextRequest) {
       const tempHash = createHash('sha256')
         .update(`${user.id}-${Date.now()}-oauth-temp`)
         .digest('hex');
-      
+
       // Set cookies with sameSite: 'lax' to ensure they're sent on redirect
       response.cookies.set('access_granted', 'true', {
         maxAge: 60 * 60 * 2,
@@ -259,7 +275,7 @@ export async function GET(request: NextRequest) {
         secure: process.env.NODE_ENV === 'production' && !isLocalhost,
         sameSite: 'lax', // Changed from 'strict' to 'lax' for OAuth redirects
         path: '/',
-        ...(cookieDomain && { domain: cookieDomain })
+        ...(cookieDomain && { domain: cookieDomain }),
       });
 
       response.cookies.set('access_hash', tempHash, {
@@ -268,7 +284,7 @@ export async function GET(request: NextRequest) {
         secure: process.env.NODE_ENV === 'production' && !isLocalhost,
         sameSite: 'lax', // Changed from 'strict' to 'lax' for OAuth redirects
         path: '/',
-        ...(cookieDomain && { domain: cookieDomain })
+        ...(cookieDomain && { domain: cookieDomain }),
       });
 
       response.cookies.set('access_time', Date.now().toString(), {
@@ -277,28 +293,33 @@ export async function GET(request: NextRequest) {
         secure: process.env.NODE_ENV === 'production' && !isLocalhost,
         sameSite: 'lax', // Changed from 'strict' to 'lax' for OAuth redirects
         path: '/',
-        ...(cookieDomain && { domain: cookieDomain })
+        ...(cookieDomain && { domain: cookieDomain }),
       });
     }
 
     const { appConfig } = await import('@/lib/utils/config');
-    const { createUserDataCookie, USER_DATA_COOKIE_NAME, getUserDataCookieOptions } = await import('@/lib/auth/user-cookie.server');
+    const { createUserDataCookie, USER_DATA_COOKIE_NAME, getUserDataCookieOptions } =
+      await import('@/lib/auth/user-cookie.server');
 
     response.cookies.set('token', token, {
       maxAge: appConfig.token.maxAge,
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production' && !isLocalhost,
       sameSite: 'lax',
-      path: '/'
+      path: '/',
     });
 
-    response.cookies.set(USER_DATA_COOKIE_NAME, createUserDataCookie({
-      user_id: user.user_id,
-      username: user.username,
-      avatar: user.avatar ?? null,
-      banner: user.banner ?? null,
-      pex: 'u',
-    }), getUserDataCookieOptions(isLocalhost));
+    response.cookies.set(
+      USER_DATA_COOKIE_NAME,
+      createUserDataCookie({
+        user_id: user.user_id,
+        username: user.username,
+        avatar: user.avatar ?? null,
+        banner: user.banner ?? null,
+        pex: 'u',
+      }),
+      getUserDataCookieOptions(isLocalhost),
+    );
 
     response.cookies.delete('oauth_state');
 
@@ -307,33 +328,27 @@ export async function GET(request: NextRequest) {
     return setCorsHeaders(response);
   } catch (error) {
     logger.error('Telegram OAuth callback error', {
-      error: error instanceof Error ? error.message : 'Unknown error'
+      error: error instanceof Error ? error.message : 'Unknown error',
     });
-    
+
     try {
       const env = getEnv();
       {
-        const origin = domains.mainUrl.endsWith('/') 
-          ? domains.mainUrl.slice(0, -1) 
+        const origin = domains.mainUrl.endsWith('/')
+          ? domains.mainUrl.slice(0, -1)
           : domains.mainUrl;
         // Determine if popup from error context
         const referer = request.headers.get('referer') || '';
-        const isPopup = referer.includes('/auth/oauth-handler') || 
-                        referer.includes('popup') ||
-                        request.nextUrl.searchParams.get('popup') === 'true';
+        const isPopup =
+          referer.includes('/auth/oauth-handler') ||
+          referer.includes('popup') ||
+          request.nextUrl.searchParams.get('popup') === 'true';
         const errorUrl = getErrorRedirectUrl('internal_error', origin, isPopup);
         return setCorsHeaders(NextResponse.redirect(errorUrl));
       }
-    } catch {
-    }
-    
+    } catch {}
+
     // Fallback error response
-    return setCorsHeaders(
-      NextResponse.json(
-        { error: 'Internal server error' },
-        { status: 500 }
-      )
-    );
+    return setCorsHeaders(NextResponse.json({ error: 'Internal server error' }, { status: 500 }));
   }
 }
-

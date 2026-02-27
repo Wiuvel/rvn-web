@@ -19,7 +19,7 @@ export function isValidIP(ip: string): boolean {
   if (ipv4Regex.test(ip)) {
     // Проверяем, что каждый октет в диапазоне 0-255
     const parts = ip.split('.');
-    return parts.every(part => {
+    return parts.every((part) => {
       const num = parseInt(part, 10);
       return num >= 0 && num <= 255;
     });
@@ -63,4 +63,3 @@ export function getClientIP(request: Request): string {
   // Это безопаснее, чем использовать невалидный IP
   return 'unknown';
 }
-

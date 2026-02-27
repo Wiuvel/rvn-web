@@ -3,7 +3,7 @@ name: CodSpeed Performance Analysis
 on:
   push:
     branches:
-      - "main"
+      - 'main'
   pull_request:
   # `workflow_dispatch` allows CodSpeed to trigger backfill builds
   workflow_dispatch:

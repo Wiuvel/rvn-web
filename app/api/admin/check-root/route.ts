@@ -20,9 +20,7 @@ export async function GET(request: NextRequest) {
         ip: request.headers.get('x-forwarded-for'),
         userAgent: request.headers.get('user-agent'),
       });
-      return setCorsHeaders(
-        NextResponse.json({ error: 'Too many requests' }, { status: 429 }),
-      );
+      return setCorsHeaders(NextResponse.json({ error: 'Too many requests' }, { status: 429 }));
     }
 
     if (!supabaseAdmin) {
@@ -37,26 +35,25 @@ export async function GET(request: NextRequest) {
     const token = cookieStore.get('admin_token')?.value;
 
     if (!sessionId) {
-      return setCorsHeaders(
-        NextResponse.json({ error: 'Unauthorized' }, { status: 401 }),
-      );
+      return setCorsHeaders(NextResponse.json({ error: 'Unauthorized' }, { status: 401 }));
     }
 
     const ipAddress = request.headers.get('x-forwarded-for') || 'unknown';
     const userAgent = request.headers.get('user-agent') || 'unknown';
-    const validation = await SessionManager.validateSession(sessionId, token || '', ipAddress, userAgent);
+    const validation = await SessionManager.validateSession(
+      sessionId,
+      token || '',
+      ipAddress,
+      userAgent,
+    );
 
     if (!validation.valid) {
-      return setCorsHeaders(
-        NextResponse.json({ error: 'Unauthorized' }, { status: 401 }),
-      );
+      return setCorsHeaders(NextResponse.json({ error: 'Unauthorized' }, { status: 401 }));
     }
 
     const session = await SessionManager.getSession(sessionId);
     if (!session) {
-      return setCorsHeaders(
-        NextResponse.json({ error: 'Unauthorized' }, { status: 401 }),
-      );
+      return setCorsHeaders(NextResponse.json({ error: 'Unauthorized' }, { status: 401 }));
     }
 
     const { data: admin, error } = await supabaseAdmin
@@ -66,21 +63,14 @@ export async function GET(request: NextRequest) {
       .maybeSingle();
 
     if (error || !admin) {
-      return setCorsHeaders(
-        NextResponse.json({ error: 'Admin not found' }, { status: 404 }),
-      );
+      return setCorsHeaders(NextResponse.json({ error: 'Admin not found' }, { status: 404 }));
     }
 
-    return setCorsHeaders(
-      NextResponse.json({ isRoot: admin.is_root === true }),
-    );
+    return setCorsHeaders(NextResponse.json({ isRoot: admin.is_root === true }));
   } catch (error) {
     logger.error('Error in GET check-root', {
       error: error instanceof Error ? error.message : 'Unknown error',
     });
-    return setCorsHeaders(
-      NextResponse.json({ error: 'Internal server error' }, { status: 500 }),
-    );
+    return setCorsHeaders(NextResponse.json({ error: 'Internal server error' }, { status: 500 }));
   }
 }
-

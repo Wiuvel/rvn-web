@@ -1,12 +1,12 @@
-import type { Metadata, Viewport } from "next";
-import "../globals.css";
-import Script from "next/script";
-import { pageMetadata } from "@/lib/utils/seo";
+import type { Metadata, Viewport } from 'next';
+import '../globals.css';
+import Script from 'next/script';
+import { pageMetadata } from '@/lib/utils/seo';
 
 export const metadata: Metadata = pageMetadata.auth;
 
 export const viewport: Viewport = {
-  themeColor: "#0f7fdb",
+  themeColor: '#0f7fdb',
 };
 
 export default async function AuthLayout({

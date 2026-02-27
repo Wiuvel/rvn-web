@@ -4,8 +4,18 @@ import { generalRateLimit } from '@/lib/security/rate-limit';
 import { logger } from '@/lib/utils/secure-logger';
 import { setCorsHeaders, handleCorsPreflight } from '@/lib/security/cors';
 import { supabaseAdmin } from '@/lib/database/supabase';
-import { grantUserRole, revokeUserRole, getUserRoles, getUsersByRole, UserRole } from '@/lib/auth/user-roles';
-import { ERROR_INTERNAL_SERVER_ERROR, ERROR_NOT_AUTHENTICATED, ERROR_INVALID_REQUEST_DATA } from '@/lib/utils/constants';
+import {
+  grantUserRole,
+  revokeUserRole,
+  getUserRoles,
+  getUsersByRole,
+  UserRole,
+} from '@/lib/auth/user-roles';
+import {
+  ERROR_INTERNAL_SERVER_ERROR,
+  ERROR_NOT_AUTHENTICATED,
+  ERROR_INVALID_REQUEST_DATA,
+} from '@/lib/utils/constants';
 import { SessionManager } from '@/lib/auth/session-manager';
 
 export async function OPTIONS() {
@@ -19,14 +29,9 @@ export async function GET(request: NextRequest) {
     if (!rateLimitResult.allowed) {
       logger.warn('Rate limit exceeded for user roles request', {
         ip: request.headers.get('x-forwarded-for'),
-        userAgent: request.headers.get('user-agent')
+        userAgent: request.headers.get('user-agent'),
       });
-      return setCorsHeaders(
-        NextResponse.json(
-          { error: 'Too many requests' },
-          { status: 429 }
-        )
-      );
+      return setCorsHeaders(NextResponse.json({ error: 'Too many requests' }, { status: 429 }));
     }
 
     // Проверка авторизации админа
@@ -39,17 +44,17 @@ export async function GET(request: NextRequest) {
     if (sessionId) {
       const ipAddress = request.headers.get('x-forwarded-for') || 'unknown';
       const userAgent = request.headers.get('user-agent') || 'unknown';
-      const validation = await SessionManager.validateSession(sessionId, token || '', ipAddress, userAgent);
+      const validation = await SessionManager.validateSession(
+        sessionId,
+        token || '',
+        ipAddress,
+        userAgent,
+      );
       isAuthenticated = validation.valid;
     }
 
     if (!isAuthenticated || !adminUsername) {
-      return setCorsHeaders(
-        NextResponse.json(
-          { error: ERROR_NOT_AUTHENTICATED },
-          { status: 401 }
-        )
-      );
+      return setCorsHeaders(NextResponse.json({ error: ERROR_NOT_AUTHENTICATED }, { status: 401 }));
     }
 
     const { searchParams } = new URL(request.url);
@@ -59,35 +64,25 @@ export async function GET(request: NextRequest) {
     // Если указан userId - возвращаем роли пользователя
     if (userId) {
       const roles = await getUserRoles(userId);
-      return setCorsHeaders(
-        NextResponse.json({ roles })
-      );
+      return setCorsHeaders(NextResponse.json({ roles }));
     }
 
     // Если указан role - возвращаем список пользователей с этой ролью
     if (role && ['support', 'admin'].includes(role)) {
       const users = await getUsersByRole(role);
-      return setCorsHeaders(
-        NextResponse.json({ users })
-      );
+      return setCorsHeaders(NextResponse.json({ users }));
     }
 
     return setCorsHeaders(
-      NextResponse.json(
-        { error: ERROR_INVALID_REQUEST_DATA },
-        { status: 400 }
-      )
+      NextResponse.json({ error: ERROR_INVALID_REQUEST_DATA }, { status: 400 }),
     );
   } catch (error) {
     logger.error('Error in GET /api/admin/users/roles', {
       error: error instanceof Error ? error.message : 'Unknown error',
-      ip: request.headers.get('x-forwarded-for')
+      ip: request.headers.get('x-forwarded-for'),
     });
     return setCorsHeaders(
-      NextResponse.json(
-        { error: ERROR_INTERNAL_SERVER_ERROR },
-        { status: 500 }
-      )
+      NextResponse.json({ error: ERROR_INTERNAL_SERVER_ERROR }, { status: 500 }),
     );
   }
 }
@@ -99,14 +94,9 @@ export async function POST(request: NextRequest) {
     if (!rateLimitResult.allowed) {
       logger.warn('Rate limit exceeded for grant role request', {
         ip: request.headers.get('x-forwarded-for'),
-        userAgent: request.headers.get('user-agent')
+        userAgent: request.headers.get('user-agent'),
       });
-      return setCorsHeaders(
-        NextResponse.json(
-          { error: 'Too many requests' },
-          { status: 429 }
-        )
-      );
+      return setCorsHeaders(NextResponse.json({ error: 'Too many requests' }, { status: 429 }));
     }
 
     // Проверка авторизации админа
@@ -119,26 +109,23 @@ export async function POST(request: NextRequest) {
     if (sessionId) {
       const ipAddress = request.headers.get('x-forwarded-for') || 'unknown';
       const userAgent = request.headers.get('user-agent') || 'unknown';
-      const validation = await SessionManager.validateSession(sessionId, token || '', ipAddress, userAgent);
+      const validation = await SessionManager.validateSession(
+        sessionId,
+        token || '',
+        ipAddress,
+        userAgent,
+      );
       isAuthenticated = validation.valid;
     }
 
     if (!isAuthenticated || !adminUsername) {
-      return setCorsHeaders(
-        NextResponse.json(
-          { error: ERROR_NOT_AUTHENTICATED },
-          { status: 401 }
-        )
-      );
+      return setCorsHeaders(NextResponse.json({ error: ERROR_NOT_AUTHENTICATED }, { status: 401 }));
     }
 
     // Получаем ID админа из БД напрямую
     if (!supabaseAdmin) {
       return setCorsHeaders(
-        NextResponse.json(
-          { error: ERROR_INTERNAL_SERVER_ERROR },
-          { status: 500 }
-        )
+        NextResponse.json({ error: ERROR_INTERNAL_SERVER_ERROR }, { status: 500 }),
       );
     }
 
@@ -149,58 +136,39 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (adminError || !admin) {
-      return setCorsHeaders(
-        NextResponse.json(
-          { error: ERROR_NOT_AUTHENTICATED },
-          { status: 401 }
-        )
-      );
+      return setCorsHeaders(NextResponse.json({ error: ERROR_NOT_AUTHENTICATED }, { status: 401 }));
     }
 
     const { userId, role } = await request.json();
 
     if (!userId || !role) {
       return setCorsHeaders(
-        NextResponse.json(
-          { error: ERROR_INVALID_REQUEST_DATA },
-          { status: 400 }
-        )
+        NextResponse.json({ error: ERROR_INVALID_REQUEST_DATA }, { status: 400 }),
       );
     }
 
     if (!['support', 'admin'].includes(role)) {
-      return setCorsHeaders(
-        NextResponse.json(
-          { error: 'Invalid role' },
-          { status: 400 }
-        )
-      );
+      return setCorsHeaders(NextResponse.json({ error: 'Invalid role' }, { status: 400 }));
     }
 
     const result = await grantUserRole(userId, role as UserRole, admin.id);
 
     if (!result.success) {
       return setCorsHeaders(
-        NextResponse.json(
-          { error: result.error || 'Failed to grant role' },
-          { status: 400 }
-        )
+        NextResponse.json({ error: result.error || 'Failed to grant role' }, { status: 400 }),
       );
     }
 
     return setCorsHeaders(
-      NextResponse.json({ success: true, message: 'Role granted successfully' })
+      NextResponse.json({ success: true, message: 'Role granted successfully' }),
     );
   } catch (error) {
     logger.error('Error in POST /api/admin/users/roles', {
       error: error instanceof Error ? error.message : 'Unknown error',
-      ip: request.headers.get('x-forwarded-for')
+      ip: request.headers.get('x-forwarded-for'),
     });
     return setCorsHeaders(
-      NextResponse.json(
-        { error: ERROR_INTERNAL_SERVER_ERROR },
-        { status: 500 }
-      )
+      NextResponse.json({ error: ERROR_INTERNAL_SERVER_ERROR }, { status: 500 }),
     );
   }
 }
@@ -212,14 +180,9 @@ export async function DELETE(request: NextRequest) {
     if (!rateLimitResult.allowed) {
       logger.warn('Rate limit exceeded for revoke role request', {
         ip: request.headers.get('x-forwarded-for'),
-        userAgent: request.headers.get('user-agent')
+        userAgent: request.headers.get('user-agent'),
       });
-      return setCorsHeaders(
-        NextResponse.json(
-          { error: 'Too many requests' },
-          { status: 429 }
-        )
-      );
+      return setCorsHeaders(NextResponse.json({ error: 'Too many requests' }, { status: 429 }));
     }
 
     // Проверка авторизации админа
@@ -232,17 +195,17 @@ export async function DELETE(request: NextRequest) {
     if (sessionId) {
       const ipAddress = request.headers.get('x-forwarded-for') || 'unknown';
       const userAgent = request.headers.get('user-agent') || 'unknown';
-      const validation = await SessionManager.validateSession(sessionId, token || '', ipAddress, userAgent);
+      const validation = await SessionManager.validateSession(
+        sessionId,
+        token || '',
+        ipAddress,
+        userAgent,
+      );
       isAuthenticated = validation.valid;
     }
 
     if (!isAuthenticated || !adminUsername) {
-      return setCorsHeaders(
-        NextResponse.json(
-          { error: ERROR_NOT_AUTHENTICATED },
-          { status: 401 }
-        )
-      );
+      return setCorsHeaders(NextResponse.json({ error: ERROR_NOT_AUTHENTICATED }, { status: 401 }));
     }
 
     const { searchParams } = new URL(request.url);
@@ -251,47 +214,32 @@ export async function DELETE(request: NextRequest) {
 
     if (!userId || !role) {
       return setCorsHeaders(
-        NextResponse.json(
-          { error: ERROR_INVALID_REQUEST_DATA },
-          { status: 400 }
-        )
+        NextResponse.json({ error: ERROR_INVALID_REQUEST_DATA }, { status: 400 }),
       );
     }
 
     if (!['support', 'admin'].includes(role)) {
-      return setCorsHeaders(
-        NextResponse.json(
-          { error: 'Invalid role' },
-          { status: 400 }
-        )
-      );
+      return setCorsHeaders(NextResponse.json({ error: 'Invalid role' }, { status: 400 }));
     }
 
     const result = await revokeUserRole(userId, role);
 
     if (!result.success) {
       return setCorsHeaders(
-        NextResponse.json(
-          { error: result.error || 'Failed to revoke role' },
-          { status: 400 }
-        )
+        NextResponse.json({ error: result.error || 'Failed to revoke role' }, { status: 400 }),
       );
     }
 
     return setCorsHeaders(
-      NextResponse.json({ success: true, message: 'Role revoked successfully' })
+      NextResponse.json({ success: true, message: 'Role revoked successfully' }),
     );
   } catch (error) {
     logger.error('Error in DELETE /api/admin/users/roles', {
       error: error instanceof Error ? error.message : 'Unknown error',
-      ip: request.headers.get('x-forwarded-for')
+      ip: request.headers.get('x-forwarded-for'),
     });
     return setCorsHeaders(
-      NextResponse.json(
-        { error: ERROR_INTERNAL_SERVER_ERROR },
-        { status: 500 }
-      )
+      NextResponse.json({ error: ERROR_INTERNAL_SERVER_ERROR }, { status: 500 }),
     );
   }
 }
-

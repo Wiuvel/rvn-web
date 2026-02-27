@@ -51,7 +51,9 @@ async function loadWasmPkg(): Promise<WasmModule> {
       }
       throw new Error('Invalid WASM module structure via import');
     } catch (importError) {
-      throw new Error(`Failed to load WASM module. FS error: ${fsError}. Import error: ${importError}`);
+      throw new Error(
+        `Failed to load WASM module. FS error: ${fsError}. Import error: ${importError}`,
+      );
     }
   }
 }
@@ -76,7 +78,7 @@ export async function checkWasmReady(): Promise<boolean> {
  */
 export async function processImage(
   buffer: Buffer,
-  options: ProcessImageOptions = {}
+  options: ProcessImageOptions = {},
 ): Promise<Buffer> {
   // If no resizing is needed, return original immediately
   if (!options.width && !options.height) {
@@ -86,7 +88,7 @@ export async function processImage(
   try {
     const mod = await loadWasmPkg();
     const input = new Uint8Array(buffer);
-    
+
     // Default to 0 if not provided (Rust side handles 0 as "keep original" or logic there)
     // But our logic in Rust: if width==0 || height==0 returns original.
     // So we need to ensure we pass valid dimensions if we want resize.
@@ -98,10 +100,10 @@ export async function processImage(
     const h = options.height ?? 0;
 
     if (w > 0 && h > 0) {
-       const out = mod.resize_image(input, w, h);
-       return Buffer.from(out);
+      const out = mod.resize_image(input, w, h);
+      return Buffer.from(out);
     }
-    
+
     return buffer;
   } catch (error) {
     // Log the error but don't crash the request

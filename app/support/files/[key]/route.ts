@@ -1,7 +1,7 @@
 /**
  * API endpoint для получения файлов вложений поддержки из S3 с авторизацией
  * Проверяет права доступа пользователя к тикету перед выдачей файла
- * 
+ *
  * Примечание: Аватары обрабатываются через /images/users/ endpoint (публичный доступ)
  */
 
@@ -11,7 +11,12 @@ import { hasUserRole } from '@/lib/auth/user-roles';
 import { setCorsHeaders, handleCorsPreflight } from '@/lib/security/cors';
 import { generalRateLimit } from '@/lib/security/rate-limit';
 import { logger } from '@/lib/utils/secure-logger';
-import { ERROR_INTERNAL_SERVER_ERROR, ERROR_NOT_AUTHENTICATED, ERROR_TOO_MANY_REQUESTS, ERROR_ACCESS_DENIED } from '@/lib/utils/constants';
+import {
+  ERROR_INTERNAL_SERVER_ERROR,
+  ERROR_NOT_AUTHENTICATED,
+  ERROR_TOO_MANY_REQUESTS,
+  ERROR_ACCESS_DENIED,
+} from '@/lib/utils/constants';
 import { supabaseAdmin } from '@/lib/database/supabase';
 import { getS3Client, getObjectAsBuffer } from '@/lib/storage/s3-client';
 import { getMediaFromCache, setMediaCache } from '@/lib/storage/media-cache';
@@ -27,19 +32,11 @@ export async function OPTIONS() {
 /**
  * GET - Получить presigned URL для доступа к файлу
  */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ key: string }> }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ key: string }> }) {
   try {
     const authResult = await checkAuth(request);
     if (!authResult.isAuthenticated || !authResult.user) {
-      return setCorsHeaders(
-        NextResponse.json(
-          { error: ERROR_NOT_AUTHENTICATED },
-          { status: 401 }
-        )
-      );
+      return setCorsHeaders(NextResponse.json({ error: ERROR_NOT_AUTHENTICATED }, { status: 401 }));
     }
     const user = authResult.user;
 
@@ -55,52 +52,36 @@ export async function GET(
       return setCorsHeaders(
         NextResponse.json(
           { error: 'Invalid file path. This endpoint only handles support attachments.' },
-          { status: 400 }
-        )
+          { status: 400 },
+        ),
       );
     }
 
     // Rate limiting для файлов поддержки
     const rateLimitResult = await generalRateLimit.check(request);
     if (!rateLimitResult.allowed) {
-      return setCorsHeaders(
-        NextResponse.json(
-          { error: ERROR_TOO_MANY_REQUESTS },
-          { status: 429 }
-        )
-      );
+      return setCorsHeaders(NextResponse.json({ error: ERROR_TOO_MANY_REQUESTS }, { status: 429 }));
     }
 
     // Извлекаем ticketId из пути (формат: support/{ticketId}/...)
     const pathParts = decodedKey.split('/');
     if (pathParts.length < 2) {
       return setCorsHeaders(
-        NextResponse.json(
-          { error: 'Invalid file path format' },
-          { status: 400 }
-        )
+        NextResponse.json({ error: 'Invalid file path format' }, { status: 400 }),
       );
     }
 
     const ticketId = pathParts[1];
-    
+
     // Валидация UUID формата ticketId
     if (!isValidUUID(ticketId)) {
-      return setCorsHeaders(
-        NextResponse.json(
-          { error: 'Invalid ticket ID' },
-          { status: 400 }
-        )
-      );
+      return setCorsHeaders(NextResponse.json({ error: 'Invalid ticket ID' }, { status: 400 }));
     }
 
     // Проверяем доступ к тикету
     if (!supabaseAdmin) {
       return setCorsHeaders(
-        NextResponse.json(
-          { error: ERROR_INTERNAL_SERVER_ERROR },
-          { status: 500 }
-        )
+        NextResponse.json({ error: ERROR_INTERNAL_SERVER_ERROR }, { status: 500 }),
       );
     }
 
@@ -111,28 +92,18 @@ export async function GET(
       .single();
 
     if (ticketError || !ticket) {
-      return setCorsHeaders(
-        NextResponse.json(
-          { error: 'Ticket not found' },
-          { status: 404 }
-        )
-      );
+      return setCorsHeaders(NextResponse.json({ error: 'Ticket not found' }, { status: 404 }));
     }
 
     // Проверяем права доступа: пользователь может видеть только свои тикеты, поддержка - все
     if (!isSupport && ticket.user_id !== user.id) {
-      return setCorsHeaders(
-        NextResponse.json(
-          { error: ERROR_ACCESS_DENIED },
-          { status: 403 }
-        )
-      );
+      return setCorsHeaders(NextResponse.json({ error: ERROR_ACCESS_DENIED }, { status: 403 }));
     }
 
     // Проверяем, что файл существует в базе данных (дополнительная проверка безопасности)
     // Извлекаем messageId из пути, если есть (формат: support/{ticketId}/{messageId}/...)
     const messageId = pathParts.length >= 3 && pathParts[2] !== 'pending' ? pathParts[2] : null;
-    
+
     if (messageId && isValidUUID(messageId)) {
       // Проверяем, что файл привязан к сообщению в тикете
       const { data: attachment, error: attachmentError } = await supabaseAdmin
@@ -152,10 +123,7 @@ export async function GET(
 
         if (messageError || !message) {
           return setCorsHeaders(
-            NextResponse.json(
-              { error: 'File not found in ticket' },
-              { status: 404 }
-            )
+            NextResponse.json({ error: 'File not found in ticket' }, { status: 404 }),
           );
         }
       }
@@ -173,7 +141,7 @@ export async function GET(
       headers.set('Content-Length', cached.body.length.toString());
       headers.set('X-Cache', 'HIT');
       return setCorsHeaders(
-        new NextResponse(new Uint8Array(cached.body), { status: 200, headers })
+        new NextResponse(new Uint8Array(cached.body), { status: 200, headers }),
       );
     }
 
@@ -182,22 +150,14 @@ export async function GET(
     const env = getEnv();
     if (!client || !env.S3_BUCKET) {
       return setCorsHeaders(
-        NextResponse.json(
-          { error: ERROR_INTERNAL_SERVER_ERROR },
-          { status: 500 }
-        )
+        NextResponse.json({ error: ERROR_INTERNAL_SERVER_ERROR }, { status: 500 }),
       );
     }
 
     try {
       const s3Result = await getObjectAsBuffer(decodedKey);
       if (!s3Result) {
-        return setCorsHeaders(
-          NextResponse.json(
-            { error: 'File not found' },
-            { status: 404 }
-          )
-        );
+        return setCorsHeaders(NextResponse.json({ error: 'File not found' }, { status: 404 }));
       }
 
       let { body, contentType } = s3Result;
@@ -213,39 +173,26 @@ export async function GET(
       headers.set('Content-Length', body.length.toString());
       headers.set('X-Cache', 'MISS');
 
-      return setCorsHeaders(
-        new NextResponse(new Uint8Array(body), { status: 200, headers })
-      );
+      return setCorsHeaders(new NextResponse(new Uint8Array(body), { status: 200, headers }));
     } catch (s3Error: unknown) {
       const err = s3Error as { name?: string; $metadata?: { httpStatusCode?: number } };
       if (err.name === 'NoSuchKey' || err.$metadata?.httpStatusCode === 404) {
-        return setCorsHeaders(
-          NextResponse.json(
-            { error: 'File not found' },
-            { status: 404 }
-          )
-        );
+        return setCorsHeaders(NextResponse.json({ error: 'File not found' }, { status: 404 }));
       }
       logger.error('Error getting file from S3', {
         error: err instanceof Error ? err.message : 'Unknown error',
-        key: decodedKey
+        key: decodedKey,
       });
       return setCorsHeaders(
-        NextResponse.json(
-          { error: ERROR_INTERNAL_SERVER_ERROR },
-          { status: 500 }
-        )
+        NextResponse.json({ error: ERROR_INTERNAL_SERVER_ERROR }, { status: 500 }),
       );
     }
   } catch (error) {
     logger.error('Error getting presigned URL', {
-      error: error instanceof Error ? error.message : 'Unknown error'
+      error: error instanceof Error ? error.message : 'Unknown error',
     });
     return setCorsHeaders(
-      NextResponse.json(
-        { error: ERROR_INTERNAL_SERVER_ERROR },
-        { status: 500 }
-      )
+      NextResponse.json({ error: ERROR_INTERNAL_SERVER_ERROR }, { status: 500 }),
     );
   }
 }

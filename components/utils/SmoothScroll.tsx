@@ -29,20 +29,20 @@ export default function SmoothScroll() {
           duration: 0.5,
           scrollTo: {
             y: targetElement,
-            offsetY: 80
+            offsetY: 80,
           },
-          ease: "power2.inOut"
+          ease: 'power2.inOut',
         });
       }
     };
 
     const anchorLinks = document.querySelectorAll('a[href^="#"]');
-    anchorLinks.forEach(link => {
+    anchorLinks.forEach((link) => {
       link.addEventListener('click', handleSmoothScroll);
     });
 
     return () => {
-      anchorLinks.forEach(link => {
+      anchorLinks.forEach((link) => {
         link.removeEventListener('click', handleSmoothScroll);
       });
     };
@@ -50,4 +50,3 @@ export default function SmoothScroll() {
 
   return null;
 }
-

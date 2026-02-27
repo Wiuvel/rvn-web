@@ -16,15 +16,14 @@ export async function OPTIONS() {
 export async function GET(request: NextRequest) {
   try {
     const env = getEnv();
-    const origin = domains.mainUrl.endsWith('/') 
-      ? domains.mainUrl.slice(0, -1) 
-      : domains.mainUrl;
+    const origin = domains.mainUrl.endsWith('/') ? domains.mainUrl.slice(0, -1) : domains.mainUrl;
 
     // Check if request is from popup (oauth-handler page opens in popup)
     const referer = request.headers.get('referer') || '';
-    const isPopup = referer.includes('/auth/oauth-handler') || 
-                    referer.includes('popup') ||
-                    request.nextUrl.searchParams.get('popup') === 'true';
+    const isPopup =
+      referer.includes('/auth/oauth-handler') ||
+      referer.includes('popup') ||
+      request.nextUrl.searchParams.get('popup') === 'true';
 
     // Rate limiting
     const rateLimitResult = await authRateLimit.check(request);
@@ -46,7 +45,7 @@ export async function GET(request: NextRequest) {
 
     const hostname = request.nextUrl.hostname;
     const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
-    
+
     // Store popup flag in state cookie for callback
     const stateWithPopup = isPopup ? `${state}:popup` : state;
 
@@ -59,7 +58,7 @@ export async function GET(request: NextRequest) {
         redirect_uri: redirectUri,
         state: stateWithPopup,
         scope: 'login:info login:avatar login:email',
-      }).toString()}`
+      }).toString()}`,
     );
 
     // Store state in cookie for CSRF protection (with popup flag if needed)
@@ -74,27 +73,20 @@ export async function GET(request: NextRequest) {
     return setCorsHeaders(response);
   } catch (error) {
     logger.error('OAuth: Yandex initiation error.', {
-      error: error instanceof Error ? error.message : 'Unknown error'
+      error: error instanceof Error ? error.message : 'Unknown error',
     });
-    
+
     try {
       const env = getEnv();
       if (domains.mainUrl) {
-        const origin = domains.mainUrl.endsWith('/') 
-          ? domains.mainUrl.slice(0, -1) 
+        const origin = domains.mainUrl.endsWith('/')
+          ? domains.mainUrl.slice(0, -1)
           : domains.mainUrl;
         const errorUrl = getErrorRedirectUrl('oauth_init_error', origin, false);
         return setCorsHeaders(NextResponse.redirect(errorUrl));
       }
-    } catch {
-    }
-    
-    return setCorsHeaders(
-      NextResponse.json(
-        { error: 'Internal server error' },
-        { status: 500 }
-      )
-    );
+    } catch {}
+
+    return setCorsHeaders(NextResponse.json({ error: 'Internal server error' }, { status: 500 }));
   }
 }
-

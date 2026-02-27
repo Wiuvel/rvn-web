@@ -23,23 +23,25 @@ export const MAX_TICKETS_PER_USER = appConfig.limits.maxTicketsPerUser;
 
 // GSAP animation defaults
 export const GSAP_DEFAULT_DURATION = 0.5;
-export const GSAP_DEFAULT_EASE = "power2.out";
+export const GSAP_DEFAULT_EASE = 'power2.out';
 export const GSAP_STAGGER_DELAY = 0.1;
 
 // Scroll trigger defaults
-export const SCROLL_TRIGGER_START = "top 85%";
-export const SCROLL_TRIGGER_END = "bottom 15%";
+export const SCROLL_TRIGGER_START = 'top 85%';
+export const SCROLL_TRIGGER_END = 'bottom 15%';
 
 // API Error Messages (English - для серверной части)
 export const ERROR_TOO_MANY_LOGIN_ATTEMPTS = 'Too many login attempts. Please try again later.';
-export const ERROR_TOO_MANY_REGISTRATION_ATTEMPTS = 'Too many registration attempts. Please try again later.';
+export const ERROR_TOO_MANY_REGISTRATION_ATTEMPTS =
+  'Too many registration attempts. Please try again later.';
 export const ERROR_TOO_MANY_REQUESTS = 'Too many requests';
 export const ERROR_INVALID_REQUEST_DATA = 'Invalid request data';
 export const ERROR_INVALID_USERNAME_FORMAT = 'Invalid username format';
 export const ERROR_INVALID_PASSWORD_FORMAT = 'Invalid password format';
 export const ERROR_INVALID_REQUEST = 'Invalid request';
 export const ERROR_INVALID_REQUEST_REFRESH = 'Invalid request. Please refresh the page.';
-export const ERROR_INVALID_REQUEST_REFRESH_AGAIN = 'Invalid request. Please refresh the page and try again.';
+export const ERROR_INVALID_REQUEST_REFRESH_AGAIN =
+  'Invalid request. Please refresh the page and try again.';
 export const ERROR_AUTHENTICATION_FAILED = 'Authentication failed';
 export const ERROR_INVALID_CREDENTIALS = 'Invalid credentials';
 export const ERROR_ACCOUNT_DISABLED = 'Account is disabled';

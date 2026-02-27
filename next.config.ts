@@ -1,4 +1,4 @@
-import type { NextConfig } from "next";
+import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   output: 'standalone',
@@ -21,7 +21,8 @@ const nextConfig: NextConfig = {
       {
         // Apply security headers to all routes except static files
         // Exclude static file extensions to avoid HTTP/2 protocol errors
-        source: '/:path((?!_next/static|static|favicon\\.ico|.*\\.svg$|.*\\.png$|.*\\.jpg$|.*\\.jpeg$|.*\\.gif$|.*\\.webp$|.*\\.ico$|.*\\.woff$|.*\\.woff2$|.*\\.ttf$|.*\\.eot$|.*\\.css$|.*\\.js$|.*\\.map$).*)',
+        source:
+          '/:path((?!_next/static|static|favicon\\.ico|.*\\.svg$|.*\\.png$|.*\\.jpg$|.*\\.jpeg$|.*\\.gif$|.*\\.webp$|.*\\.ico$|.*\\.woff$|.*\\.woff2$|.*\\.ttf$|.*\\.eot$|.*\\.css$|.*\\.js$|.*\\.map$).*)',
         headers: [
           {
             key: 'X-Content-Type-Options',
@@ -37,56 +38,13 @@ const nextConfig: NextConfig = {
           },
         ],
       },
-      // CORS headers for static files - minimal headers to avoid HTTP/2 errors
+      // CORS headers for static files: /static/*, /_next/static/*, /favicon.ico
       {
-        source: '/static/:path*',
+        source: '/:path((?:static(?:/.*)?|_next/static(?:/.*)?|favicon\\.ico))',
         headers: [
-          {
-            key: 'Access-Control-Allow-Origin',
-            value: '*',
-          },
-          {
-            key: 'Access-Control-Allow-Methods',
-            value: 'GET, HEAD, OPTIONS',
-          },
-          {
-            key: 'Access-Control-Max-Age',
-            value: '86400',
-          },
-        ],
-      },
-      {
-        source: '/_next/static/:path*',
-        headers: [
-          {
-            key: 'Access-Control-Allow-Origin',
-            value: '*',
-          },
-          {
-            key: 'Access-Control-Allow-Methods',
-            value: 'GET, HEAD, OPTIONS',
-          },
-          {
-            key: 'Access-Control-Max-Age',
-            value: '86400',
-          },
-        ],
-      },
-      {
-        source: '/favicon.ico',
-        headers: [
-          {
-            key: 'Access-Control-Allow-Origin',
-            value: '*',
-          },
-          {
-            key: 'Access-Control-Allow-Methods',
-            value: 'GET, HEAD, OPTIONS',
-          },
-          {
-            key: 'Access-Control-Max-Age',
-            value: '86400',
-          },
+          { key: 'Access-Control-Allow-Origin', value: '*' },
+          { key: 'Access-Control-Allow-Methods', value: 'GET, HEAD, OPTIONS' },
+          { key: 'Access-Control-Max-Age', value: '86400' },
         ],
       },
     ];

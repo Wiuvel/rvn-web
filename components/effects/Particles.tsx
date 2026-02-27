@@ -36,7 +36,7 @@ export default function ParticlesBackground() {
     };
 
     resizeCanvas();
-    
+
     const handleResize = () => {
       if (window.innerWidth < 1025) {
         canvas.style.display = 'none';
@@ -50,7 +50,7 @@ export default function ParticlesBackground() {
         animate();
       }
     };
-    
+
     window.addEventListener('resize', handleResize);
 
     const createParticles = () => {
@@ -65,7 +65,7 @@ export default function ParticlesBackground() {
           vy: (Math.random() - 0.5) * 0.6,
           size: Math.random() * 1 + 1,
           opacity: 0.4,
-          color: '#16a3ff'
+          color: '#16a3ff',
         });
       }
       return particles;
@@ -106,7 +106,7 @@ export default function ParticlesBackground() {
   return (
     <canvas
       ref={canvasRef}
-      className="absolute inset-0 w-full h-full pointer-events-none z-0"
+      className="pointer-events-none absolute inset-0 z-0 h-full w-full"
       style={{ background: 'transparent' }}
     />
   );

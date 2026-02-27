@@ -19,10 +19,7 @@ export async function POST(request: NextRequest) {
     const adminAlreadyExists = await checkAdminExists();
     if (adminAlreadyExists) {
       return setCorsHeaders(
-        NextResponse.json(
-          { error: 'Admin account already exists' },
-          { status: 403 },
-        ),
+        NextResponse.json({ error: 'Admin account already exists' }, { status: 403 }),
       );
     }
 
@@ -51,9 +48,7 @@ export async function POST(request: NextRequest) {
     const currentSessionId = request.cookies.get(ADMIN_SESSION_COOKIE)?.value;
     if (currentSessionId && csrfToken && !(await verifyCSRFToken(csrfToken, currentSessionId))) {
       // Невалидный CSRF токен - не логируем
-      return setCorsHeaders(
-        NextResponse.json({ error: 'Invalid request' }, { status: 403 }),
-      );
+      return setCorsHeaders(NextResponse.json({ error: 'Invalid request' }, { status: 403 }));
     }
 
     const result = await createAdmin(username, password);
@@ -69,20 +64,13 @@ export async function POST(request: NextRequest) {
     });
 
     return setCorsHeaders(
-      NextResponse.json(
-        { message: 'Admin created successfully' },
-        { status: 201 },
-      ),
+      NextResponse.json({ message: 'Admin created successfully' }, { status: 201 }),
     );
   } catch (error) {
     logger.error('Admin registration error', {
       error: error instanceof Error ? error.message : 'Unknown error',
       ip: request.headers.get('x-forwarded-for'),
     });
-    return setCorsHeaders(
-      NextResponse.json({ error: 'Internal server error' }, { status: 500 }),
-    );
+    return setCorsHeaders(NextResponse.json({ error: 'Internal server error' }, { status: 500 }));
   }
 }
-
-

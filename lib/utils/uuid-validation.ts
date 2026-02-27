@@ -19,4 +19,3 @@ export function validateUUID(value: string, fieldName: string = 'id'): void {
     throw new Error(`Invalid UUID format for ${fieldName}: ${value}`);
   }
 }
-

@@ -1,52 +1,58 @@
 'use client';
 
 import { useState, useEffect, useRef, useMemo } from 'react';
+import Image from 'next/image';
 import { AlertCircle } from 'lucide-react';
 import { decodeThumbHash } from '@/lib/utils/thumbhash-decoder';
 import type { ImageWithBlurProps } from './types';
 
-// Ограничения размеров изображения в чате (как в Telegram)
-const MAX_IMAGE_WIDTH = 400; // Максимальная ширина
-const MAX_IMAGE_HEIGHT = 500; // Максимальная высота
-const MIN_IMAGE_WIDTH = 100; // Минимальная ширина
-const MIN_IMAGE_HEIGHT = 100; // Минимальная высота
+const DESKTOP_MAX_WIDTH = 400;
+const DESKTOP_MAX_HEIGHT = 500;
+const MOBILE_MAX_WIDTH = 240;
+const MOBILE_MAX_HEIGHT = 320;
+const MIN_IMAGE_WIDTH = 100;
+const MIN_IMAGE_HEIGHT = 100;
+
+function getIsMobile() {
+  return typeof window !== 'undefined' && window.innerWidth < 640;
+}
 
 /**
  * Вычисляет размеры контейнера с сохранением aspect ratio.
- * Масштабирует изображение чтобы оно помещалось в заданные ограничения.
+ * На мобильных устройствах использует уменьшенные ограничения.
  */
 function calculateDisplaySize(
   originalWidth?: number,
-  originalHeight?: number
+  originalHeight?: number,
+  mobile?: boolean,
 ): { width: number; height: number } {
-  // Fallback размеры если width/height неизвестны
+  const maxW = mobile ? MOBILE_MAX_WIDTH : DESKTOP_MAX_WIDTH;
+  const maxH = mobile ? MOBILE_MAX_HEIGHT : DESKTOP_MAX_HEIGHT;
+
   if (!originalWidth || !originalHeight) {
-    return { width: 280, height: 200 };
+    return { width: mobile ? 200 : 280, height: mobile ? 140 : 200 };
   }
 
   const aspectRatio = originalWidth / originalHeight;
-  
+
   let displayWidth = originalWidth;
   let displayHeight = originalHeight;
 
-  // Ограничиваем по максимальной ширине
-  if (displayWidth > MAX_IMAGE_WIDTH) {
-    displayWidth = MAX_IMAGE_WIDTH;
+  if (displayWidth > maxW) {
+    displayWidth = maxW;
     displayHeight = displayWidth / aspectRatio;
   }
 
-  // Ограничиваем по максимальной высоте
-  if (displayHeight > MAX_IMAGE_HEIGHT) {
-    displayHeight = MAX_IMAGE_HEIGHT;
+  if (displayHeight > maxH) {
+    displayHeight = maxH;
     displayWidth = displayHeight * aspectRatio;
   }
 
-  // Устанавливаем минимальные размеры
   if (displayWidth < MIN_IMAGE_WIDTH) {
     displayWidth = MIN_IMAGE_WIDTH;
     displayHeight = displayWidth / aspectRatio;
   }
-  
+
   if (displayHeight < MIN_IMAGE_HEIGHT) {
     displayHeight = MIN_IMAGE_HEIGHT;
     displayWidth = displayHeight * aspectRatio;
@@ -54,7 +60,7 @@ function calculateDisplaySize(
 
   return {
     width: Math.round(displayWidth),
-    height: Math.round(displayHeight)
+    height: Math.round(displayHeight),
   };
 }
 
@@ -76,10 +82,19 @@ export default function ImageWithBlur({
   const [hasError, setHasError] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
   const [isInView, setIsInView] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => getIsMobile());
   const imgRef = useRef<HTMLDivElement>(null);
 
-  // Вычисляем размеры контейнера (всегда возвращает валидные размеры)
-  const displaySize = useMemo(() => calculateDisplaySize(width, height), [width, height]);
+  useEffect(() => {
+    const check = () => setIsMobile(getIsMobile());
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+
+  const displaySize = useMemo(
+    () => calculateDisplaySize(width, height, isMobile),
+    [width, height, isMobile],
+  );
 
   // Генерируем blur URL из ThumbHash
   const blurUrl = useMemo(() => {
@@ -108,7 +123,7 @@ export default function ImageWithBlur({
           }
         });
       },
-      { rootMargin: '100px' }
+      { rootMargin: '100px' },
     );
 
     observer.observe(imgRef.current);
@@ -146,14 +161,21 @@ export default function ImageWithBlur({
   return (
     <div
       ref={imgRef}
-      className={`relative rounded-lg overflow-hidden bg-neutral-800 cursor-pointer ${className || ''}`}
+      className={`relative cursor-pointer overflow-hidden rounded-lg bg-neutral-800 ${className || ''}`}
       style={containerStyle}
       onClick={onClick}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (onClick && (e.key === 'Enter' || e.key === ' ')) {
+          onClick(e as any);
+        }
+      }}
     >
       {hasError ? (
         <div className="absolute inset-0 flex items-center justify-center p-4">
           <div className="text-center">
-            <AlertCircle className="w-8 h-8 text-red-400 mx-auto mb-2" />
+            <AlertCircle className="mx-auto mb-2 h-8 w-8 text-red-400" />
             <p className="text-xs text-red-300">Ошибка загрузки</p>
           </div>
         </div>
@@ -163,20 +185,23 @@ export default function ImageWithBlur({
           {showPlaceholder && (
             <div className="absolute inset-0">
               {blurUrl ? (
-                <img
+                <Image
                   src={blurUrl}
                   alt=""
-                  className="w-full h-full object-cover"
-                  style={{ filter: 'blur(20px)', transform: 'scale(1.2)' }}
+                  fill
+                  sizes="(max-width: 768px) 100vw, 50vw"
+                  className="object-cover"
+                  style={{ filter: 'blur(10px)', transform: 'scale(1.2)' }}
                   aria-hidden="true"
+                  unoptimized
                 />
               ) : (
                 <div
-                  className="w-full h-full"
+                  className="h-full w-full"
                   style={{
                     backgroundImage: skeletonGradient,
                     backgroundSize: '200% 100%',
-                    animation: 'shimmer 1.5s ease-in-out infinite'
+                    animation: 'shimmer 1.5s ease-in-out infinite',
                   }}
                 />
               )}
@@ -185,11 +210,13 @@ export default function ImageWithBlur({
 
           {/* Реальное изображение */}
           {isInView && (
-            <img
+            <Image
               src={src}
               alt={alt}
+              fill
+              sizes="(max-width: 768px) 100vw, 50vw"
               loading={loading}
-              className={`w-full h-full object-cover transition-opacity duration-300 ${
+              className={`object-cover transition-opacity duration-300 ${
                 isLoaded ? 'opacity-100' : 'opacity-0'
               }`}
               onLoad={() => setIsLoaded(true)}
@@ -197,6 +224,7 @@ export default function ImageWithBlur({
                 setHasError(true);
                 setIsLoaded(false);
               }}
+              unoptimized
             />
           )}
         </>

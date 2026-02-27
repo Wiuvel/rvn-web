@@ -4,10 +4,77 @@ import { logger } from '@/lib/utils/secure-logger';
 import { setCorsHeaders, handleCorsPreflight } from '@/lib/security/cors';
 import { SessionManager } from '@/lib/auth/session-manager';
 import { revokeCSRFToken } from '@/lib/security/csrf';
-import { getCookieDomain } from '@/lib/utils';
 
 export async function OPTIONS() {
   return handleCorsPreflight();
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    const cookieStore = await cookies();
+    const sessionId = cookieStore.get('session_id')?.value;
+    const token = cookieStore.get('token')?.value;
+
+    // Destroy session if exists
+    if (sessionId) {
+      await SessionManager.destroySession(sessionId);
+      await revokeCSRFToken(sessionId);
+    }
+
+    // Revoke device if token exists
+    if (token) {
+      await SessionManager.revokeDevice(token);
+    }
+
+    // Get redirect URL
+    const redirectUrl = request.nextUrl.searchParams.get('redirect') || '/auth';
+
+    // Create redirect response with correct host
+    const host = request.headers.get('host') || request.nextUrl.host;
+    const protocol =
+      request.headers.get('x-forwarded-proto') || request.nextUrl.protocol.replace(':', '');
+    const baseUrl = `${protocol}://${host}`;
+
+    let targetUrl: URL;
+    try {
+      targetUrl = new URL(redirectUrl, baseUrl);
+    } catch (e) {
+      targetUrl = new URL('/auth', baseUrl);
+    }
+
+    const response = NextResponse.redirect(targetUrl);
+
+    // Delete all authentication cookies explicitly with proper path
+    response.cookies.set('session_id', '', { maxAge: 0, path: '/' });
+    response.cookies.set('token', '', { maxAge: 0, path: '/' });
+    response.cookies.set('user_data', '', { maxAge: 0, path: '/' });
+    response.cookies.set('oauth_state', '', { maxAge: 0, path: '/' });
+
+    // Clear cookies in store as well (server-side effect)
+    await SessionManager.clearSessionCookie();
+    cookieStore.delete('token');
+    cookieStore.delete('user_data');
+    cookieStore.delete('oauth_state');
+
+    return setCorsHeaders(response);
+  } catch (error) {
+    logger.error('Logout error (GET)', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      ip: request.headers.get('x-forwarded-for'),
+    });
+
+    const host = request.headers.get('host') || request.nextUrl.host;
+    const protocol =
+      request.headers.get('x-forwarded-proto') || request.nextUrl.protocol.replace(':', '');
+    const baseUrl = `${protocol}://${host}`;
+
+    // Fallback to auth page on error
+    const response = NextResponse.redirect(new URL('/auth', baseUrl));
+    response.cookies.set('session_id', '', { maxAge: 0, path: '/' });
+    response.cookies.set('token', '', { maxAge: 0, path: '/' });
+    response.cookies.set('user_data', '', { maxAge: 0, path: '/' });
+    return setCorsHeaders(response);
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -26,46 +93,27 @@ export async function POST(request: NextRequest) {
     if (token) {
       await SessionManager.revokeDevice(token);
     }
-    
-    // Get hostname for cookie domain handling
-    const hostname = request.nextUrl.hostname;
-    const cookieDomain = getCookieDomain(hostname);
 
-    // Create response
-    const response = NextResponse.json(
-      { message: 'Logout successful' },
-      { status: 200 }
-    );
+    // For API calls (POST), just return success with cleared cookies
+    const response = NextResponse.json({ success: true });
 
     // Delete all authentication cookies
-    response.cookies.delete('session_id');
-    response.cookies.delete('token');
-    response.cookies.delete('user_data');
-    
-    // Delete OAuth state cookie if exists
-    response.cookies.delete('oauth_state');
-    
-    // ВАЖНО: НЕ удаляем protection cookies (access_granted, access_hash, access_time)
-    // Эти куки дают иммунитет на 2 часа от Bot Challenge и не связаны с авторизацией пользователя
-    // Они должны сохраняться при выходе из аккаунта для удобства пользователя
+    response.cookies.set('session_id', '', { maxAge: 0, path: '/' });
+    response.cookies.set('token', '', { maxAge: 0, path: '/' });
+    response.cookies.set('user_data', '', { maxAge: 0, path: '/' });
+    response.cookies.set('oauth_state', '', { maxAge: 0, path: '/' });
 
     await SessionManager.clearSessionCookie();
     cookieStore.delete('token');
     cookieStore.delete('user_data');
     cookieStore.delete('oauth_state');
-    // НЕ удаляем protection cookies из cookieStore
 
     return setCorsHeaders(response);
   } catch (error) {
-    logger.error('Logout error', {
+    logger.error('Logout error (POST)', {
       error: error instanceof Error ? error.message : 'Unknown error',
-      ip: request.headers.get('x-forwarded-for')
+      ip: request.headers.get('x-forwarded-for'),
     });
-    return setCorsHeaders(
-      NextResponse.json(
-        { error: 'Internal server error' },
-        { status: 500 }
-      )
-    );
+    return setCorsHeaders(NextResponse.json({ error: 'Internal server error' }, { status: 500 }));
   }
 }

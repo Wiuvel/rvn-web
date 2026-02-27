@@ -19,23 +19,37 @@ export async function GET(request: NextRequest) {
     if (!authResult.isAuthenticated || !authResult.user) {
       // Clear invalid cookies to prevent redirect loops
       const response = NextResponse.json({ authenticated: false });
-      
+
+      // Only clear cookies if explicitly authenticated failed (not just missing session)
+      // This allows client-side to detect session expiry vs just not logged in
+
       // Clear user_data cookie
       response.cookies.set('user_data', '', {
         maxAge: 0,
         path: '/',
         secure: process.env.NODE_ENV === 'production' && !isLocalhost,
-        sameSite: 'strict'
+        sameSite: 'strict',
       });
-      
+
       // Clear session cookies if they exist but are invalid
       response.cookies.set('session_id', '', {
         maxAge: 0,
         path: '/',
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production' && !isLocalhost,
-        sameSite: 'strict'
+        sameSite: 'strict',
       });
+
+      // Clear token cookie if authentication failed completely (invalid token)
+      if (request.cookies.get('token')?.value) {
+        response.cookies.set('token', '', {
+          maxAge: 0,
+          path: '/',
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production' && !isLocalhost,
+          sameSite: 'strict',
+        });
+      }
 
       return setCorsHeaders(response);
     }
@@ -54,7 +68,7 @@ export async function GET(request: NextRequest) {
     } catch (error) {
       logger.error('Error checking user roles', {
         error: error instanceof Error ? error.message : 'Unknown error',
-        userId: user.id
+        userId: user.id,
       });
     }
 
@@ -72,7 +86,7 @@ export async function GET(request: NextRequest) {
       avatar: user.avatar,
       banner: user.banner || null,
       isSupport,
-      isAdmin
+      isAdmin,
     });
 
     // Продлеваем cookie сессии при активности
@@ -90,14 +104,8 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     logger.error('Error getting user', {
       error: error instanceof Error ? error.message : 'Unknown error',
-      ip: request.headers.get('x-forwarded-for')
+      ip: request.headers.get('x-forwarded-for'),
     });
-    return setCorsHeaders(
-      NextResponse.json(
-        { error: 'Internal server error' },
-        { status: 500 }
-      )
-    );
+    return setCorsHeaders(NextResponse.json({ error: 'Internal server error' }, { status: 500 }));
   }
 }
-

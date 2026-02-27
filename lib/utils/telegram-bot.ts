@@ -70,4 +70,3 @@ export async function getTelegramBotId(botToken: string): Promise<number | null>
 export function clearTelegramBotIdCache(): void {
   cachedBotId = null;
 }
-

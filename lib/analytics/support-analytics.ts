@@ -13,20 +13,20 @@ const REDIS_KEYS = {
   TICKETS_CLOSED: 'analytics:support:tickets:closed',
   MESSAGES_SENT: 'analytics:support:messages:sent',
   TICKETS_BY_STATUS: 'analytics:support:tickets:by_status',
-  
+
   // Временные серии (по дням)
   TICKETS_CREATED_DAILY: 'analytics:support:tickets:created:daily',
   TICKETS_CLOSED_DAILY: 'analytics:support:tickets:closed:daily',
   MESSAGES_SENT_DAILY: 'analytics:support:messages:sent:daily',
-  
+
   // Временные серии (по часам)
   TICKETS_CREATED_HOURLY: 'analytics:support:tickets:created:hourly',
   MESSAGES_SENT_HOURLY: 'analytics:support:messages:sent:hourly',
-  
+
   // Средние значения
   AVG_RESPONSE_TIME: 'analytics:support:avg_response_time',
   AVG_RESOLUTION_TIME: 'analytics:support:avg_resolution_time',
-  
+
   // WebSocket метрики
   WEBSOCKET_CONNECTIONS: 'analytics:support:websocket:connections',
   WEBSOCKET_MESSAGES: 'analytics:support:websocket:messages',
@@ -54,120 +54,10 @@ function getHourlyKey(baseKey: string, date?: Date): string {
 /**
  * Записать событие создания тикета
  */
-export async function trackTicketCreated(ticketId: string, userId: string, status: string): Promise<void> {
-  const client = getRedisClient();
-  if (!client) return;
-
-  try {
-    // Проверяем состояние соединения и переподключаемся при необходимости
-    if (client.status !== 'ready') {
-      try {
-        await client.connect();
-      } catch (connectError) {
-        // Redis необязателен - не логируем ошибки переподключения
-        return;
-      }
-    }
-
-    const now = new Date();
-    
-    // Увеличиваем счетчики
-    await Promise.all([
-      client.incr(REDIS_KEYS.TICKETS_CREATED),
-      client.incr(getDailyKey(REDIS_KEYS.TICKETS_CREATED_DAILY, now)),
-      client.incr(getHourlyKey(REDIS_KEYS.TICKETS_CREATED_HOURLY, now)),
-      client.hincrby(REDIS_KEYS.TICKETS_BY_STATUS, status, 1),
-    ]);
-
-    // Сохраняем информацию о тикете для расчета времени ответа
-    await client.setex(`analytics:support:ticket:${ticketId}:created`, 86400 * 30, now.toISOString()); // 30 дней
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    
-    // Если ошибка связана с закрытым соединением, не логируем как ошибку
-    // Redis необязателен для работы системы
-    if (errorMessage.includes('Connection is closed') || errorMessage.includes('Connection closed')) {
-      // Не логируем - Redis необязателен
-      return;
-    }
-    
-    // Логируем только другие ошибки
-    logger.error('Error tracking ticket creation', {
-      error: errorMessage,
-      ticketId
-    });
-  }
-}
-
-/**
- * Записать событие закрытия тикета
- */
-export async function trackTicketClosed(ticketId: string, userId: string, status: string): Promise<void> {
-  const client = getRedisClient();
-  if (!client) return;
-
-  try {
-    // Проверяем состояние соединения и переподключаемся при необходимости
-    if (client.status !== 'ready') {
-      try {
-        await client.connect();
-      } catch (connectError) {
-        // Redis необязателен - не логируем ошибки переподключения
-        return;
-      }
-    }
-
-    const now = new Date();
-    
-    // Увеличиваем счетчики
-    await Promise.all([
-      client.incr(REDIS_KEYS.TICKETS_CLOSED),
-      client.incr(getDailyKey(REDIS_KEYS.TICKETS_CLOSED_DAILY, now)),
-      client.hincrby(REDIS_KEYS.TICKETS_BY_STATUS, status, -1), // Уменьшаем счетчик открытых
-      client.hincrby(REDIS_KEYS.TICKETS_BY_STATUS, 'closed', 1), // Увеличиваем счетчик закрытых
-    ]);
-
-    // Рассчитываем время решения
-    const createdTime = await client.get(`analytics:support:ticket:${ticketId}:created`);
-    if (createdTime) {
-      const created = new Date(createdTime);
-      const resolutionTime = now.getTime() - created.getTime(); // в миллисекундах
-      
-      // Обновляем среднее время решения (используем скользящее среднее)
-      const currentAvg = await client.get(REDIS_KEYS.AVG_RESOLUTION_TIME);
-      if (currentAvg) {
-        const avg = parseFloat(currentAvg);
-        const newAvg = (avg * 0.9) + (resolutionTime / 1000 / 60 * 0.1); // в минутах, экспоненциальное сглаживание
-        await client.set(REDIS_KEYS.AVG_RESOLUTION_TIME, newAvg.toString());
-      } else {
-        await client.set(REDIS_KEYS.AVG_RESOLUTION_TIME, (resolutionTime / 1000 / 60).toString());
-      }
-    }
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    
-    // Если ошибка связана с закрытым соединением, не логируем как ошибку
-    // Redis необязателен для работы системы
-    if (errorMessage.includes('Connection is closed') || errorMessage.includes('Connection closed')) {
-      // Не логируем - Redis необязателен
-      return;
-    }
-    
-    // Логируем только другие ошибки
-    logger.error('Error tracking ticket closure', {
-      error: errorMessage,
-      ticketId
-    });
-  }
-}
-
-/**
- * Записать событие отправки сообщения
- */
-export async function trackMessageSent(
+export async function trackTicketCreated(
   ticketId: string,
   userId: string,
-  senderType: 'user' | 'support' | 'system'
+  status: string,
 ): Promise<void> {
   const client = getRedisClient();
   if (!client) return;
@@ -184,7 +74,135 @@ export async function trackMessageSent(
     }
 
     const now = new Date();
-    
+
+    // Увеличиваем счетчики
+    await Promise.all([
+      client.incr(REDIS_KEYS.TICKETS_CREATED),
+      client.incr(getDailyKey(REDIS_KEYS.TICKETS_CREATED_DAILY, now)),
+      client.incr(getHourlyKey(REDIS_KEYS.TICKETS_CREATED_HOURLY, now)),
+      client.hincrby(REDIS_KEYS.TICKETS_BY_STATUS, status, 1),
+    ]);
+
+    // Сохраняем информацию о тикете для расчета времени ответа
+    await client.setex(
+      `analytics:support:ticket:${ticketId}:created`,
+      86400 * 30,
+      now.toISOString(),
+    ); // 30 дней
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+    // Если ошибка связана с закрытым соединением, не логируем как ошибку
+    // Redis необязателен для работы системы
+    if (
+      errorMessage.includes('Connection is closed') ||
+      errorMessage.includes('Connection closed')
+    ) {
+      // Не логируем - Redis необязателен
+      return;
+    }
+
+    // Логируем только другие ошибки
+    logger.error('Error tracking ticket creation', {
+      error: errorMessage,
+      ticketId,
+    });
+  }
+}
+
+/**
+ * Записать событие закрытия тикета
+ */
+export async function trackTicketClosed(
+  ticketId: string,
+  userId: string,
+  status: string,
+): Promise<void> {
+  const client = getRedisClient();
+  if (!client) return;
+
+  try {
+    // Проверяем состояние соединения и переподключаемся при необходимости
+    if (client.status !== 'ready') {
+      try {
+        await client.connect();
+      } catch (connectError) {
+        // Redis необязателен - не логируем ошибки переподключения
+        return;
+      }
+    }
+
+    const now = new Date();
+
+    // Увеличиваем счетчики
+    await Promise.all([
+      client.incr(REDIS_KEYS.TICKETS_CLOSED),
+      client.incr(getDailyKey(REDIS_KEYS.TICKETS_CLOSED_DAILY, now)),
+      client.hincrby(REDIS_KEYS.TICKETS_BY_STATUS, status, -1), // Уменьшаем счетчик открытых
+      client.hincrby(REDIS_KEYS.TICKETS_BY_STATUS, 'closed', 1), // Увеличиваем счетчик закрытых
+    ]);
+
+    // Рассчитываем время решения
+    const createdTime = await client.get(`analytics:support:ticket:${ticketId}:created`);
+    if (createdTime) {
+      const created = new Date(createdTime);
+      const resolutionTime = now.getTime() - created.getTime(); // в миллисекундах
+
+      // Обновляем среднее время решения (используем скользящее среднее)
+      const currentAvg = await client.get(REDIS_KEYS.AVG_RESOLUTION_TIME);
+      if (currentAvg) {
+        const avg = parseFloat(currentAvg);
+        const newAvg = avg * 0.9 + (resolutionTime / 1000 / 60) * 0.1; // в минутах, экспоненциальное сглаживание
+        await client.set(REDIS_KEYS.AVG_RESOLUTION_TIME, newAvg.toString());
+      } else {
+        await client.set(REDIS_KEYS.AVG_RESOLUTION_TIME, (resolutionTime / 1000 / 60).toString());
+      }
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+    // Если ошибка связана с закрытым соединением, не логируем как ошибку
+    // Redis необязателен для работы системы
+    if (
+      errorMessage.includes('Connection is closed') ||
+      errorMessage.includes('Connection closed')
+    ) {
+      // Не логируем - Redis необязателен
+      return;
+    }
+
+    // Логируем только другие ошибки
+    logger.error('Error tracking ticket closure', {
+      error: errorMessage,
+      ticketId,
+    });
+  }
+}
+
+/**
+ * Записать событие отправки сообщения
+ */
+export async function trackMessageSent(
+  ticketId: string,
+  userId: string,
+  senderType: 'user' | 'support' | 'system',
+): Promise<void> {
+  const client = getRedisClient();
+  if (!client) return;
+
+  try {
+    // Проверяем состояние соединения и переподключаемся при необходимости
+    if (client.status !== 'ready') {
+      try {
+        await client.connect();
+      } catch (connectError) {
+        // Redis необязателен - не логируем ошибки переподключения
+        return;
+      }
+    }
+
+    const now = new Date();
+
     // Увеличиваем счетчики
     await Promise.all([
       client.incr(REDIS_KEYS.MESSAGES_SENT),
@@ -198,12 +216,12 @@ export async function trackMessageSent(
       if (createdTime) {
         const created = new Date(createdTime);
         const responseTime = now.getTime() - created.getTime(); // в миллисекундах
-        
+
         // Обновляем среднее время ответа
         const currentAvg = await client.get(REDIS_KEYS.AVG_RESPONSE_TIME);
         if (currentAvg) {
           const avg = parseFloat(currentAvg);
-          const newAvg = (avg * 0.9) + (responseTime / 1000 / 60 * 0.1); // в минутах
+          const newAvg = avg * 0.9 + (responseTime / 1000 / 60) * 0.1; // в минутах
           await client.set(REDIS_KEYS.AVG_RESPONSE_TIME, newAvg.toString());
         } else {
           await client.set(REDIS_KEYS.AVG_RESPONSE_TIME, (responseTime / 1000 / 60).toString());
@@ -212,18 +230,21 @@ export async function trackMessageSent(
     }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    
+
     // Если ошибка связана с закрытым соединением, не логируем как ошибку
     // Redis необязателен для работы системы
-    if (errorMessage.includes('Connection is closed') || errorMessage.includes('Connection closed')) {
+    if (
+      errorMessage.includes('Connection is closed') ||
+      errorMessage.includes('Connection closed')
+    ) {
       // Не логируем - Redis необязателен
       return;
     }
-    
+
     // Логируем только другие ошибки
     logger.error('Error tracking message sent', {
       error: errorMessage,
-      ticketId
+      ticketId,
     });
   }
 }
@@ -239,7 +260,7 @@ export async function trackWebSocketConnection(): Promise<void> {
     await client.incr(REDIS_KEYS.WEBSOCKET_CONNECTIONS);
   } catch (error) {
     logger.error('Error tracking WebSocket connection', {
-      error: error instanceof Error ? error.message : 'Unknown error'
+      error: error instanceof Error ? error.message : 'Unknown error',
     });
   }
 }
@@ -255,7 +276,7 @@ export async function trackWebSocketMessage(): Promise<void> {
     await client.incr(REDIS_KEYS.WEBSOCKET_MESSAGES);
   } catch (error) {
     logger.error('Error tracking WebSocket message', {
-      error: error instanceof Error ? error.message : 'Unknown error'
+      error: error instanceof Error ? error.message : 'Unknown error',
     });
   }
 }
@@ -268,34 +289,36 @@ export interface SupportAnalytics {
   totalTicketsCreated: number;
   totalTicketsClosed: number;
   totalMessagesSent: number;
-  
+
   // По статусам
   ticketsByStatus: Record<string, number>;
-  
+
   // Средние значения
   avgResponseTime: number; // в минутах
   avgResolutionTime: number; // в минутах
-  
+
   // Временные серии (последние 30 дней)
   ticketsCreatedDaily: Array<{ date: string; count: number }>;
   ticketsClosedDaily: Array<{ date: string; count: number }>;
   messagesSentDaily: Array<{ date: string; count: number }>;
-  
+
   // Временные серии (последние 24 часа)
   ticketsCreatedHourly: Array<{ hour: number; count: number }>;
   messagesSentHourly: Array<{ hour: number; count: number }>;
-  
+
   // WebSocket метрики
   websocketConnections: number;
   websocketMessages: number;
-  
+
   // Период аналитики
   period: AnalyticsPeriod;
 }
 
 export type AnalyticsPeriod = 'hour' | 'day' | 'week' | 'month';
 
-export async function getSupportAnalytics(period: AnalyticsPeriod = 'month'): Promise<SupportAnalytics> {
+export async function getSupportAnalytics(
+  period: AnalyticsPeriod = 'month',
+): Promise<SupportAnalytics> {
   const client = getRedisClient();
   if (!client) {
     // Redis необязателен - не логируем
@@ -325,7 +348,7 @@ export async function getSupportAnalytics(period: AnalyticsPeriod = 'month'): Pr
       await client.connect();
     } catch (error) {
       logger.error('Failed to reconnect to Redis', {
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error instanceof Error ? error.message : 'Unknown error',
       });
       // Возвращаем пустую аналитику при ошибке переподключения
       return {
@@ -381,7 +404,7 @@ export async function getSupportAnalytics(period: AnalyticsPeriod = 'month'): Pr
     // Определяем количество дней/часов в зависимости от периода
     let daysToFetch = 30;
     let hoursToFetch = 24;
-    
+
     switch (period) {
       case 'hour':
         daysToFetch = 0;
@@ -430,7 +453,7 @@ export async function getSupportAnalytics(period: AnalyticsPeriod = 'month'): Pr
 
     if (hoursToFetch > 0) {
       const now = new Date();
-      
+
       if (period === 'hour') {
         // Для периода "1 час" получаем данные только за текущий час
         const currentHour = now.getUTCHours();
@@ -485,19 +508,22 @@ export async function getSupportAnalytics(period: AnalyticsPeriod = 'month'): Pr
     };
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-    
+
     // Если ошибка связана с закрытым соединением, логируем как предупреждение
-    if (errorMessage.includes('Connection is closed') || errorMessage.includes('Connection closed')) {
+    if (
+      errorMessage.includes('Connection is closed') ||
+      errorMessage.includes('Connection closed')
+    ) {
       logger.warn('Redis connection closed during analytics fetch', {
-        error: errorMessage
+        error: errorMessage,
       });
     } else {
       logger.error('Error getting support analytics', {
         error: errorMessage,
-        stack: err instanceof Error ? err.stack : undefined
+        stack: err instanceof Error ? err.stack : undefined,
       });
     }
-    
+
     // Возвращаем пустую аналитику вместо null при ошибке
     return {
       totalTicketsCreated: 0,
@@ -517,4 +543,3 @@ export async function getSupportAnalytics(period: AnalyticsPeriod = 'month'): Pr
     };
   }
 }
-

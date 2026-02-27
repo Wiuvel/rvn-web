@@ -29,25 +29,22 @@ export function generateMetadata({
   author,
   section,
   tags = [],
-  noindex = false
+  noindex = false,
 }: SEOProps): Metadata {
-  const fullTitle = title ? 
-    (title === siteName || title.includes('RVN - безопасный доступ в сеть') ? title : `${title} | ${siteName}`) : 
-    `${siteName} - безопасный доступ в сеть`;
-  const fullDescription = description || 'RVN.MARKET - современный сервис приватного доступа в сеть. Высокая скорость и полная анонимность. Стабильные сервера с минимальным пингом.';
+  const fullTitle = title
+    ? title === siteName || title.includes('RVN - безопасный доступ в сеть')
+      ? title
+      : `${title} | ${siteName}`
+    : `${siteName} - безопасный доступ в сеть`;
+  const fullDescription =
+    description ||
+    'RVN.MARKET - современный сервис приватного доступа в сеть. Высокая скорость и полная анонимность. Стабильные сервера с минимальным пингом.';
   const fullUrl = url ? `${baseUrl}${url}` : baseUrl;
 
   const metadata: Metadata = {
     title: fullTitle,
     description: fullDescription,
-    keywords: [
-      'RVN',
-      'rvn.market',
-      'Vless',
-      'Hysteria',
-      'Proxy',
-      ...keywords
-    ].join(', '),
+    keywords: ['RVN', 'rvn.market', 'Vless', 'Hysteria', 'Proxy', ...keywords].join(', '),
     openGraph: {
       type,
       siteName,
@@ -61,20 +58,20 @@ export function generateMetadata({
           width: 1200,
           height: 630,
           alt: fullTitle,
-        }
+        },
       ],
       ...(publishedTime && { publishedTime }),
       ...(modifiedTime && { modifiedTime }),
       ...(author && { authors: [author] }),
       ...(section && { section }),
-      ...(tags.length > 0 && { tags })
+      ...(tags.length > 0 && { tags }),
     },
     twitter: {
       card: 'summary_large_image',
       title: fullTitle,
       description: fullDescription,
-      site: '@rvnprivate',
-      images: [`${baseUrl}/og-image.png`]
+      site: '@rvnmarket',
+      images: [`${baseUrl}/og-image.png`],
     },
     robots: {
       index: !noindex,
@@ -93,7 +90,7 @@ export function generateMetadata({
     category: 'Technology',
     other: {
       'theme-color': '#0f7fdb',
-    }
+    },
   };
 
   return metadata;
@@ -102,16 +99,17 @@ export function generateMetadata({
 export const pageMetadata = {
   home: generateMetadata({
     title: 'RVN',
-    description: 'RVN.MARKET - современный сервис приватного доступа в сеть. Высокая скорость и полная анонимность. Стабильные сервера с минимальным пингом.',
+    description:
+      'RVN.MARKET - современный сервис приватного доступа в сеть. Высокая скорость и полная анонимность. Стабильные сервера с минимальным пингом.',
     keywords: ['Main Page', 'Home Page', 'Main'],
-    url: '/'
+    url: '/',
   }),
 
   auth: generateMetadata({
     title: 'Авторизация',
     description: 'Регистрация и вход в личный кабинет RVN.',
     keywords: ['login', 'registration', 'authorization'],
-    url: '/auth'
+    url: '/auth',
   }),
 
   dashboard: generateMetadata({
@@ -119,7 +117,7 @@ export const pageMetadata = {
     description: 'Удобная панель управления для вашей подписки и настроек.',
     keywords: ['profile', 'account', 'settings'],
     url: '/dashboard',
-    noindex: true
+    noindex: true,
   }),
 
   protection: generateMetadata({
@@ -127,30 +125,31 @@ export const pageMetadata = {
     description: 'Подтвердите, что вы человек, чтобы получить доступ к сайту RVN.',
     keywords: ['captcha'],
     url: '/protection',
-    noindex: true
+    noindex: true,
   }),
 
   legal: generateMetadata({
     title: 'Правовая информация',
     description: 'Соглашения и политики. Другие правовые документы RVN.',
     keywords: ['legal information', 'user agreement', 'privacy policy'],
-    url: '/legal'
+    url: '/legal',
   }),
 
   support: generateMetadata({
     title: 'Поддержка',
     description: 'Служба поддержки сервиса RVN.',
     keywords: ['support', 'technical support', 'help'],
-    url: '/support'
+    url: '/support',
   }),
 
   supportHelp: generateMetadata({
     title: 'Требуется авторизация',
-    description: 'Для доступа к центру поддержки требуется авторизация. Войдите в аккаунт или обратитесь в Telegram.',
+    description:
+      'Для доступа к центру поддержки требуется авторизация. Войдите в аккаунт или обратитесь в Telegram.',
     keywords: ['login', 'registration', 'authorization'],
     url: '/support/help',
-    noindex: true
-  })
+    noindex: true,
+  }),
 };
 
 export function createArticleMetadata({
@@ -161,7 +160,7 @@ export function createArticleMetadata({
   author = 'RVN',
   section = 'Новости',
   tags = [],
-  url
+  url,
 }: {
   title: string;
   description: string;
@@ -181,7 +180,6 @@ export function createArticleMetadata({
     section,
     tags,
     url,
-    type: 'article'
+    type: 'article',
   });
 }
-

@@ -14,17 +14,11 @@ function OAuthHandlerContent() {
     if (isPopup && window.opener) {
       if (success === 'true') {
         // Send success message to parent window
-        window.opener.postMessage(
-          { type: 'oauth-success', username },
-          window.location.origin
-        );
+        window.opener.postMessage({ type: 'oauth-success', username }, window.location.origin);
         window.close();
       } else if (error) {
         // Send error message to parent window
-        window.opener.postMessage(
-          { type: 'oauth-error', error },
-          window.location.origin
-        );
+        window.opener.postMessage({ type: 'oauth-error', error }, window.location.origin);
         window.close();
       }
     } else if (!isPopup) {
@@ -34,9 +28,9 @@ function OAuthHandlerContent() {
   }, [success, error, username, isPopup]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center">
+    <div className="flex min-h-screen items-center justify-center">
       <div className="text-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto"></div>
+        <div className="mx-auto h-8 w-8 animate-spin rounded-full border-b-2 border-white"></div>
         <p className="mt-4 text-white">Обработка авторизации...</p>
       </div>
     </div>
@@ -45,16 +39,17 @@ function OAuthHandlerContent() {
 
 export default function AdminOAuthHandler() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto"></div>
-          <p className="mt-4 text-white">Загрузка...</p>
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center">
+          <div className="text-center">
+            <div className="mx-auto h-8 w-8 animate-spin rounded-full border-b-2 border-white"></div>
+            <p className="mt-4 text-white">Загрузка...</p>
+          </div>
         </div>
-      </div>
-    }>
+      }
+    >
       <OAuthHandlerContent />
     </Suspense>
   );
 }
-

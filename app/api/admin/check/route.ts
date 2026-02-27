@@ -18,21 +18,24 @@ export async function GET(request: NextRequest) {
         ip: request.headers.get('x-forwarded-for'),
         userAgent: request.headers.get('user-agent'),
       });
-      return setCorsHeaders(
-        NextResponse.json({ error: 'Too many requests' }, { status: 429 }),
-      );
+      return setCorsHeaders(NextResponse.json({ error: 'Too many requests' }, { status: 429 }));
     }
 
     const adminExists = await checkAdminExists();
     const cookieStore = await cookies();
     const sessionId = cookieStore.get('admin_sid')?.value;
     const token = cookieStore.get('admin_token')?.value;
-    
+
     let isAuthenticated = false;
     if (sessionId) {
       const ipAddress = request.headers.get('x-forwarded-for') || 'unknown';
       const userAgent = request.headers.get('user-agent') || 'unknown';
-      const validation = await SessionManager.validateSession(sessionId, token || '', ipAddress, userAgent);
+      const validation = await SessionManager.validateSession(
+        sessionId,
+        token || '',
+        ipAddress,
+        userAgent,
+      );
       isAuthenticated = validation.valid;
     }
 
@@ -50,8 +53,6 @@ export async function GET(request: NextRequest) {
       error: error instanceof Error ? error.message : 'Unknown error',
       ip: request.headers.get('x-forwarded-for'),
     });
-    return setCorsHeaders(
-      NextResponse.json({ error: 'Internal server error' }, { status: 500 }),
-    );
+    return setCorsHeaders(NextResponse.json({ error: 'Internal server error' }, { status: 500 }));
   }
 }

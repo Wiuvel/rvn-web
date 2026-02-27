@@ -11,20 +11,11 @@ export const metadata: Metadata = {
     noimageindex: true,
   },
   other: {
-    'googlebot': 'noindex, nofollow, noarchive, nosnippet, noimageindex',
-    'bingbot': 'noindex, nofollow, noarchive, nosnippet, noimageindex',
+    googlebot: 'noindex, nofollow, noarchive, nosnippet, noimageindex',
+    bingbot: 'noindex, nofollow, noarchive, nosnippet, noimageindex',
   },
 };
 
-export default function SupportPanelLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="min-h-screen bg-neutral-950 text-neutral-100">
-      {children}
-    </div>
-  );
+export default function SupportPanelLayout({ children }: { children: React.ReactNode }) {
+  return <div className="min-h-screen bg-neutral-950 text-neutral-100">{children}</div>;
 }
-

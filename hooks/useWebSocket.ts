@@ -68,7 +68,10 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
     if (!token) {
       // Dev-only log to trace why messages are not loading (missing token blocks socket creation)
       if (process.env.NODE_ENV === 'development') {
-        console.info('%cWebSocket: No token available. Skipping connection..', 'color: #a855f7; font-weight: 500;');
+        console.info(
+          '%cWebSocket: No token available. Skipping connection..',
+          'color: #a855f7; font-weight: 500;',
+        );
       }
       if (cleanupRef.current) {
         cleanupRef.current();
@@ -84,7 +87,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
       return;
     }
 
-    // Debounce reconnection to prevent rapid reconnection attempts when the token changes quickly (e.g., during async token fetch on initial load). 
+    // Debounce reconnection to prevent rapid reconnection attempts when the token changes quickly (e.g., during async token fetch on initial load).
     // A 100ms delay stops cyclic reconnects and avoids multiple sockets when the token updates in quick succession.
     reconnectTimeoutRef.current = setTimeout(() => {
       isConnectingRef.current = false;
@@ -104,9 +107,11 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
       }
 
       // Create a fresh Socket.IO connection using the current origin or the env var NEXT_PUBLIC_WS_URL.
-      const wsUrl = process.env.NEXT_PUBLIC_WS_URL || (typeof window !== 'undefined' ? window.location.origin : '');
+      const wsUrl =
+        process.env.NEXT_PUBLIC_WS_URL ||
+        (typeof window !== 'undefined' ? window.location.origin : '');
 
-      // Use the token passed via the hook's options. The server sets token as an httpOnly cookie, so it is inaccessible to JS. 
+      // Use the token passed via the hook's options. The server sets token as an httpOnly cookie, so it is inaccessible to JS.
       // The consuming component must fetch the token from an API endpoint and pass it here.
       const authToken = token;
 
@@ -121,8 +126,8 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
         forceNew: false,
         autoConnect: true,
         auth: {
-          token: authToken || undefined
-        }
+          token: authToken || undefined,
+        },
       });
 
       socketRef.current = socket;
@@ -138,7 +143,9 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
         if (currentTicketIdRef.current) {
           socket.emit('support:join', { ticketId: currentTicketIdRef.current });
           if (process.env.NODE_ENV === 'development') {
-            console.log(`WebSocket: Auto-joined room ticket:${currentTicketIdRef.current} after connection`);
+            console.log(
+              `WebSocket: Auto-joined room ticket:${currentTicketIdRef.current} after connection`,
+            );
           }
         }
       });
@@ -159,11 +166,15 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
           message: error.message,
           type: error.name,
           url: wsUrl,
-          path: '/api/socket'
+          path: '/api/socket',
         });
 
         // Detect and handle auth failures early to avoid reconnect loops with an invalid token.
-        if (error.message.includes('Authentication') || error.message.includes('Invalid token') || error.message.includes('Authentication required')) {
+        if (
+          error.message.includes('Authentication') ||
+          error.message.includes('Invalid token') ||
+          error.message.includes('Authentication required')
+        ) {
           console.error('WebSocket authentication failed - token may be invalid or expired');
           // Token is invalid or expired; refresh it via API or redirect to login. Do NOT auto-reconnect with a bad token.
           currentTokenRef.current = undefined;
@@ -299,4 +310,3 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
     sendTyping,
   };
 }
-

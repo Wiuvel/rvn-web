@@ -1,7 +1,7 @@
 /**
  * Умная система определения подозрительных посетителей
  * Анализирует различные факторы для выявления ботов, DDoS и подозрительной активности
- * 
+ *
  * Система работает по принципу многоуровневой защиты:
  * 1. Анализ User-Agent на подозрительные паттерны
  * 2. Проверка наличия важных браузерных заголовков
@@ -9,7 +9,7 @@
  * 4. Определение паттернов ботов и автоматизированных инструментов
  * 5. Анализ поведенческих сигналов (заголовки, referer)
  * 6. Rate limiting (выполняется отдельно в proxy.ts)
- * 
+ *
  * Каждый фактор добавляет баллы к общему счету подозрительности (0-100).
  * Если счет >= порога (30), посетитель перенаправляется на страницу защиты.
  */
@@ -69,8 +69,10 @@ const SUSPICIOUS_BOT_PATTERNS = [
 const IPV4_REGEX = /^(\d{1,3}\.){3}\d{1,3}$/;
 const IPV6_REGEX = /^([0-9a-fA-F]{0,4}:){7}[0-9a-fA-F]{0,4}$/;
 
-const BROWSER_ACCEPT_TYPES = /text\/html|application\/xhtml|image|text\/css|application\/javascript|application\/json|text\/plain/i;
-const VALID_ACCEPT_LANGUAGE = /^[a-z]{2}(-[a-z]{2})?(\s*,\s*[a-z]{2}(-[a-z]{2})?(\s*;\s*q\s*=\s*0\.\d+)?)*$/i;
+const BROWSER_ACCEPT_TYPES =
+  /text\/html|application\/xhtml|image|text\/css|application\/javascript|application\/json|text\/plain/i;
+const VALID_ACCEPT_LANGUAGE =
+  /^[a-z]{2}(-[a-z]{2})?(\s*,\s*[a-z]{2}(-[a-z]{2})?(\s*;\s*q\s*=\s*0\.\d+)?)*$/i;
 const VALID_ACCEPT_ENCODING = /gzip|deflate|br|compress|identity/i;
 
 /**
@@ -98,7 +100,7 @@ function isSuspiciousUserAgent(userAgent: string): boolean {
     return true;
   }
 
-  return SUSPICIOUS_UA_PATTERNS.some(pattern => pattern.test(userAgent));
+  return SUSPICIOUS_UA_PATTERNS.some((pattern) => pattern.test(userAgent));
 }
 
 /**
@@ -108,19 +110,21 @@ function isSuspiciousUserAgent(userAgent: string): boolean {
 function hasMissingHeaders(headers: Record<string, string | null>): boolean {
   // Проверяем наличие важных заголовков браузера
   const importantHeaders = ['accept', 'accept-language', 'accept-encoding'];
-  
+
   // Если отсутствуют 2 или более важных заголовка - подозрительно
-  const missingCount = importantHeaders.filter(header => !headers[header] || headers[header]?.trim() === '').length;
-  
+  const missingCount = importantHeaders.filter(
+    (header) => !headers[header] || headers[header]?.trim() === '',
+  ).length;
+
   const hasAccept = !!headers['accept'] && headers['accept']!.length > 0;
   const hasAcceptLanguage = !!headers['accept-language'] && headers['accept-language']!.length > 0;
   const hasAcceptEncoding = !!headers['accept-encoding'] && headers['accept-encoding']!.length > 0;
-  
+
   // Если отсутствуют все три - очень подозрительно
   if (!hasAccept && !hasAcceptLanguage && !hasAcceptEncoding) {
     return true;
   }
-  
+
   return missingCount >= 2;
 }
 
@@ -137,7 +141,7 @@ function isSuspiciousIP(ip: string): boolean {
  */
 export function isAllowedBot(userAgent: string): boolean {
   if (!userAgent) return false;
-  return ALLOWED_BOTS.some(pattern => pattern.test(userAgent));
+  return ALLOWED_BOTS.some((pattern) => pattern.test(userAgent));
 }
 
 /**
@@ -151,13 +155,16 @@ function isBotPattern(userAgent: string): boolean {
     return false;
   }
 
-  return SUSPICIOUS_BOT_PATTERNS.some(pattern => pattern.test(userAgent));
+  return SUSPICIOUS_BOT_PATTERNS.some((pattern) => pattern.test(userAgent));
 }
 
 /**
  * Проверяет подозрительное поведение на основе заголовков и паттернов запроса
  */
-function hasSuspiciousBehavior(headers: Record<string, string | null>, referer: string | null): boolean {
+function hasSuspiciousBehavior(
+  headers: Record<string, string | null>,
+  referer: string | null,
+): boolean {
   const hasAccept = !!headers['accept'] && headers['accept']!.length > 0;
   const hasAcceptLanguage = !!headers['accept-language'] && headers['accept-language']!.length > 0;
   const hasAcceptEncoding = !!headers['accept-encoding'] && headers['accept-encoding']!.length > 0;
@@ -171,12 +178,12 @@ function hasSuspiciousBehavior(headers: Record<string, string | null>, referer: 
   if (headers['accept']) {
     const acceptValue = headers['accept'].toLowerCase();
     const hasBrowserAccept = BROWSER_ACCEPT_TYPES.test(acceptValue);
-    
+
     // Если accept не содержит типичных браузерных типов - подозрительно
     if (!hasBrowserAccept) {
       return true;
     }
-    
+
     // Проверка на подозрительные паттерны в Accept
     if (/^\*\/\*$/.test(acceptValue.trim())) {
       return true;
@@ -205,7 +212,7 @@ function hasSuspiciousBehavior(headers: Record<string, string | null>, referer: 
 /**
  * Определяет, является ли посетитель подозрительным
  * Использует многофакторный анализ для точного определения ботов и автоматизированных запросов
- * 
+ *
  * @param requestInfo - Информация о запросе
  * @returns Объект с факторами подозрительности и общим счетом (0-100)
  */
@@ -242,10 +249,7 @@ export function detectSuspiciousVisitor(requestInfo: RequestInfo): SuspicionFact
  * @param hasValidCookie - Есть ли валидная кука доступа
  * @returns true если нужно показать страницу защиты
  */
-export function shouldShowProtection(
-  requestInfo: RequestInfo,
-  hasValidCookie: boolean
-): boolean {
+export function shouldShowProtection(requestInfo: RequestInfo, hasValidCookie: boolean): boolean {
   // Если есть валидная кука - не показываем
   if (hasValidCookie) {
     return false;

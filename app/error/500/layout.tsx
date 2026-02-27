@@ -7,11 +7,6 @@ export const metadata: Metadata = {
   },
 };
 
-export default function Error500Layout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function Error500Layout({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
-

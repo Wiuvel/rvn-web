@@ -8,13 +8,13 @@ import ErrorState from '@/components/ui/ErrorState';
  */
 export default function ServerError() {
   return (
-    <ErrorState 
+    <ErrorState
       code="500"
       title="Технические неполадки"
       description="Произошла внутренняя ошибка сервера. Мы уже работаем над устранением данной проблемы. Скоро вернемся к вам."
       showButton={true}
       showImage={true}
-      imageSrc="/static/ErrorState_ServerIssue.png"
+      imageSrc="/static/ErrorState_ServerIssue.webp"
       imageAlt="Server Issue"
       glowColor="bg-red-900/20"
     />

@@ -18,9 +18,7 @@ export async function GET(request: NextRequest) {
         ip: request.headers.get('x-forwarded-for'),
         userAgent: request.headers.get('user-agent'),
       });
-      return setCorsHeaders(
-        NextResponse.json({ error: 'Too many requests' }, { status: 429 }),
-      );
+      return setCorsHeaders(NextResponse.json({ error: 'Too many requests' }, { status: 429 }));
     }
 
     // Проверяем аутентификацию админа
@@ -32,14 +30,17 @@ export async function GET(request: NextRequest) {
     if (sessionId) {
       const ipAddress = request.headers.get('x-forwarded-for') || 'unknown';
       const userAgent = request.headers.get('user-agent') || 'unknown';
-      const validation = await SessionManager.validateSession(sessionId, token || '', ipAddress, userAgent);
+      const validation = await SessionManager.validateSession(
+        sessionId,
+        token || '',
+        ipAddress,
+        userAgent,
+      );
       isAuthenticated = validation.valid;
     }
-    
+
     if (!isAuthenticated) {
-      return setCorsHeaders(
-        NextResponse.json({ error: 'Unauthorized' }, { status: 401 }),
-      );
+      return setCorsHeaders(NextResponse.json({ error: 'Unauthorized' }, { status: 401 }));
     }
 
     if (!supabaseAdmin) {
@@ -60,22 +61,19 @@ export async function GET(request: NextRequest) {
     if (roleError) {
       logger.error('Error fetching team roles', {
         error: roleError.message,
-        code: roleError.code
+        code: roleError.code,
       });
       return setCorsHeaders(
-        NextResponse.json(
-          { error: 'Failed to fetch team roles' },
-          { status: 500 }
-        )
+        NextResponse.json({ error: 'Failed to fetch team roles' }, { status: 500 }),
       );
     }
 
     // Получаем уникальные user_id
     const uniqueUserIds = new Set<string>();
-    const supportCount = roleData?.filter(r => r.role === 'support').length || 0;
-    const adminCount = roleData?.filter(r => r.role === 'admin').length || 0;
-    
-    roleData?.forEach(role => {
+    const supportCount = roleData?.filter((r) => r.role === 'support').length || 0;
+    const adminCount = roleData?.filter((r) => r.role === 'admin').length || 0;
+
+    roleData?.forEach((role) => {
       uniqueUserIds.add(role.user_id);
     });
 
@@ -85,19 +83,15 @@ export async function GET(request: NextRequest) {
       NextResponse.json({
         count: totalCount,
         support: supportCount,
-        admin: adminCount
-      })
+        admin: adminCount,
+      }),
     );
   } catch (error) {
     logger.error('Error counting team members', {
       error: error instanceof Error ? error.message : 'Unknown error',
     });
     return setCorsHeaders(
-      NextResponse.json(
-        { error: 'Failed to count team members' },
-        { status: 500 }
-      )
+      NextResponse.json({ error: 'Failed to count team members' }, { status: 500 }),
     );
   }
 }
-

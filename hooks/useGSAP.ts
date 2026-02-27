@@ -17,34 +17,33 @@ export const useGSAP = () => {
     const ctx = gsap.context(() => {
       gsap.config({
         force3D: true,
-        nullTargetWarn: false
+        nullTargetWarn: false,
       });
 
       ScrollTrigger.config({
         ignoreMobileResize: true,
-        syncInterval: 60
+        syncInterval: 60,
       });
 
       if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
         gsap.globalTimeline.timeScale(0);
-        ScrollTrigger.getAll().forEach(trigger => trigger.disable());
+        ScrollTrigger.getAll().forEach((trigger) => trigger.disable());
       }
 
       window.matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', (e) => {
         if (e.matches) {
           gsap.globalTimeline.timeScale(0);
-          ScrollTrigger.getAll().forEach(trigger => trigger.disable());
+          ScrollTrigger.getAll().forEach((trigger) => trigger.disable());
         } else {
           gsap.globalTimeline.timeScale(1);
-          ScrollTrigger.getAll().forEach(trigger => trigger.enable());
+          ScrollTrigger.getAll().forEach((trigger) => trigger.enable());
         }
       });
 
       const isMobile = window.innerWidth < 768;
       if (isMobile) {
-        ScrollTrigger.getAll().forEach(trigger => trigger.disable());
+        ScrollTrigger.getAll().forEach((trigger) => trigger.disable());
       }
-
     }, containerRef);
 
     return () => ctx.revert();
@@ -61,30 +60,31 @@ export const useFadeIn = (delay: number = 0) => {
 
     const element = elementRef.current;
     const isMobile = window.innerWidth < 768;
-    
+
     if (isMobile) {
       gsap.set(element, { opacity: 1, y: 0 });
       return;
     }
 
-    const animation = gsap.fromTo(element, 
-      { 
-        opacity: 0, 
-        y: 15 
+    const animation = gsap.fromTo(
+      element,
+      {
+        opacity: 0,
+        y: 15,
       },
-      { 
-        opacity: 1, 
-        y: 0, 
-        duration: 0.4, 
-        ease: "power2.out",
+      {
+        opacity: 1,
+        y: 0,
+        duration: 0.4,
+        ease: 'power2.out',
         delay,
         scrollTrigger: {
           trigger: element,
-          start: "top 92%",
-          end: "bottom 8%",
-          toggleActions: "play none none none"
-        }
-      }
+          start: 'top 92%',
+          end: 'bottom 8%',
+          toggleActions: 'play none none none',
+        },
+      },
     );
 
     return () => {
@@ -95,7 +95,6 @@ export const useFadeIn = (delay: number = 0) => {
   return elementRef;
 };
 
-
 export const useStaggeredFadeIn = (delay: number = 0, stagger: number = 0.05) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -104,7 +103,7 @@ export const useStaggeredFadeIn = (delay: number = 0, stagger: number = 0.05) =>
 
     const isMobile = window.innerWidth < 768;
     const elements = containerRef.current.children;
-    
+
     if (isMobile) {
       gsap.set(elements, { opacity: 1, y: 0, scale: 1 });
       return;
@@ -112,31 +111,31 @@ export const useStaggeredFadeIn = (delay: number = 0, stagger: number = 0.05) =>
 
     const timeout = setTimeout(() => {
       if (!containerRef.current) return;
-      
+
       const rect = containerRef.current.getBoundingClientRect();
       const isAlreadyVisible = rect.top < window.innerHeight * 0.92;
-      
+
       if (isAlreadyVisible) {
         gsap.set(elements, { opacity: 1, y: 0, scale: 1 });
         return;
       }
 
       gsap.set(elements, { opacity: 0, y: 10, scale: 0.98 });
-      
+
       const animation = gsap.to(elements, {
         opacity: 1,
         y: 0,
         scale: 1,
         duration: 0.35,
-        ease: "power2.out",
+        ease: 'power2.out',
         delay,
         stagger,
         scrollTrigger: {
           trigger: containerRef.current,
-          start: "top 92%",
-          end: "bottom 8%",
-          toggleActions: "play none none none"
-        }
+          start: 'top 92%',
+          end: 'bottom 8%',
+          toggleActions: 'play none none none',
+        },
       });
 
       (containerRef.current as any).__gsapAnimation = animation;
@@ -153,4 +152,3 @@ export const useStaggeredFadeIn = (delay: number = 0, stagger: number = 0.05) =>
 
   return containerRef;
 };
-

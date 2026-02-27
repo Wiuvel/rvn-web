@@ -2,6 +2,8 @@
  * Shared types for support system components.
  */
 
+import type { MouseEvent } from 'react';
+
 /**
  * Attachment data for a message.
  */
@@ -112,7 +114,7 @@ export interface ImageWithBlurProps {
   width?: number;
   height?: number;
   isPending?: boolean;
-  onClick?: () => void;
+  onClick?: (e?: MouseEvent<HTMLElement>) => void;
 }
 
 /**

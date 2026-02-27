@@ -5,7 +5,11 @@ import { getUserByToken, getUserById, type User } from './index';
 import { hasUserRole } from './user-roles';
 import { ERROR_NOT_AUTHENTICATED } from '../utils/constants';
 import { SessionManager } from './session-manager';
-import { createUserDataCookie, USER_DATA_COOKIE_NAME, getUserDataCookieOptions } from './user-cookie.server';
+import {
+  createUserDataCookie,
+  USER_DATA_COOKIE_NAME,
+  getUserDataCookieOptions,
+} from './user-cookie.server';
 
 export interface AuthResult {
   isAuthenticated: boolean;
@@ -19,7 +23,7 @@ export interface AuthResult {
 export async function setUserDataCookie(user: User, isLocalhost: boolean): Promise<void> {
   const isAdmin = await hasUserRole(user.id, 'admin');
   const isSupport = await hasUserRole(user.id, 'support');
-  
+
   const payload = {
     user_id: user.user_id,
     username: user.username,
@@ -37,8 +41,15 @@ export async function setUserDataCookie(user: User, isLocalhost: boolean): Promi
  * checkAuth: Session + Token binding с refresh flow.
  * Cookies: session_id (httpOnly), token (httpOnly).
  * При истекшей сессии и валидном token — создаём новую сессию (refresh).
+ *
+ * @param request Optional request object (usually from headers()) to get IP/UA
+ * @param options Configuration options
+ * @param options.readOnly If true, prevents creating new session/cookies (use in Server Components)
  */
-export async function checkAuth(request?: { headers: Headers }): Promise<AuthResult> {
+export async function checkAuth(
+  request?: { headers: Headers },
+  options: { readOnly?: boolean } = {},
+): Promise<AuthResult> {
   const cookieStore = await cookies();
   const token = cookieStore.get('token')?.value;
   const sessionId = cookieStore.get('session_id')?.value;
@@ -53,8 +64,16 @@ export async function checkAuth(request?: { headers: Headers }): Promise<AuthRes
     if (!user) {
       return { isAuthenticated: false, user: null, error: ERROR_NOT_AUTHENTICATED };
     }
+
+    // In read-only mode (Server Components), we verify the user exists but cannot create a session cookie
+    if (options.readOnly) {
+      return { isAuthenticated: true, user };
+    }
+
     if (!request) {
-      return { isAuthenticated: false, user: null, error: ERROR_NOT_AUTHENTICATED };
+      // Если запроса нет, но есть токен и пользователь валиден - возвращаем успех
+      // Это позволяет серверным компонентам получать данные, но не создавать сессию без request
+      return { isAuthenticated: true, user };
     }
     const ipAddress = request.headers.get('x-forwarded-for') || 'unknown';
     const userAgent = request.headers.get('user-agent') || 'unknown';
@@ -64,7 +83,7 @@ export async function checkAuth(request?: { headers: Headers }): Promise<AuthRes
       ipAddress,
       userAgent,
       token,
-      'user'
+      'user',
     );
     const host = request.headers.get('host') || '';
     const isLocalhost = host.includes('localhost') || host.includes('127.0.0.1');
@@ -72,7 +91,16 @@ export async function checkAuth(request?: { headers: Headers }): Promise<AuthRes
     return { isAuthenticated: true, user };
   }
 
+  // Session ID exists
+  // If we don't have a request object (e.g. called from Server Component without headers),
+  // we cannot validate IP/UA. However, if readOnly is true, we can fallback to token validation.
   if (!request) {
+    if (options.readOnly) {
+      const user = await getUserByToken(token);
+      if (user) {
+        return { isAuthenticated: true, user };
+      }
+    }
     return { isAuthenticated: false, user: null, error: ERROR_NOT_AUTHENTICATED };
   }
 
@@ -80,8 +108,31 @@ export async function checkAuth(request?: { headers: Headers }): Promise<AuthRes
   const userAgent = request.headers.get('user-agent') || 'unknown';
   const validation = await SessionManager.validateSession(sessionId, token, ipAddress, userAgent);
 
+  // If session is invalid (expired, IP mismatch, etc.), try to recover using token (Refresh flow)
   if (!validation.valid) {
-    return { isAuthenticated: false, user: null, error: ERROR_NOT_AUTHENTICATED };
+    const user = await getUserByToken(token);
+    if (!user) {
+      return { isAuthenticated: false, user: null, error: ERROR_NOT_AUTHENTICATED };
+    }
+
+    // In read-only mode, we just accept the valid token
+    if (options.readOnly) {
+      return { isAuthenticated: true, user };
+    }
+
+    // If not read-only, create a new session
+    const newSessionId = await SessionManager.createSession(
+      user.id,
+      user.username,
+      ipAddress,
+      userAgent,
+      token,
+      'user',
+    );
+    const host = request.headers.get('host') || '';
+    const isLocalhost = host.includes('localhost') || host.includes('127.0.0.1');
+    await SessionManager.setSessionCookie(newSessionId, isLocalhost);
+    return { isAuthenticated: true, user };
   }
 
   const user = await getUserByToken(token);

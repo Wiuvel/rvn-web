@@ -9,9 +9,8 @@ interface CorsOptions {
 }
 
 const defaultOptions: CorsOptions = {
-  origin: process.env.NODE_ENV === 'production' 
-    ? process.env.ALLOWED_ORIGINS?.split(',') || false
-    : true,
+  origin:
+    process.env.NODE_ENV === 'production' ? process.env.ALLOWED_ORIGINS?.split(',') || false : true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: [
     'Content-Type',
@@ -19,10 +18,10 @@ const defaultOptions: CorsOptions = {
     'X-CSRF-Token',
     'X-Requested-With',
     'Accept',
-    'Origin'
+    'Origin',
   ],
   credentials: true,
-  maxAge: 86400
+  maxAge: 86400,
 };
 
 export function setCorsHeaders(response: NextResponse, options: CorsOptions = {}): NextResponse {
@@ -70,4 +69,3 @@ export function handleCorsPreflight(options: CorsOptions = {}): NextResponse {
   const response = new NextResponse(null, { status: 200 });
   return setCorsHeaders(response, options);
 }
-

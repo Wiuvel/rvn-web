@@ -20,19 +20,22 @@ class SimpleCache {
 
   private startCleanup() {
     if (this.cleanupInterval) return;
-    
-    this.cleanupInterval = setInterval(() => {
-      const now = Date.now();
-      const keysToDelete: string[] = [];
-      
-      this.cache.forEach((entry, key) => {
-        if (entry.expiresAt < now) {
-          keysToDelete.push(key);
-        }
-      });
-      
-      keysToDelete.forEach(key => this.cache.delete(key));
-    }, 5 * 60 * 1000); // 5 минут
+
+    this.cleanupInterval = setInterval(
+      () => {
+        const now = Date.now();
+        const keysToDelete: string[] = [];
+
+        this.cache.forEach((entry, key) => {
+          if (entry.expiresAt < now) {
+            keysToDelete.push(key);
+          }
+        });
+
+        keysToDelete.forEach((key) => this.cache.delete(key));
+      },
+      5 * 60 * 1000,
+    ); // 5 минут
   }
 
   /**
@@ -40,16 +43,16 @@ class SimpleCache {
    */
   get<T>(key: string): T | null {
     const entry = this.cache.get(key) as CacheEntry<T> | undefined;
-    
+
     if (!entry) {
       return null;
     }
-    
+
     if (entry.expiresAt < Date.now()) {
       this.cache.delete(key);
       return null;
     }
-    
+
     return entry.data;
   }
 
@@ -60,7 +63,7 @@ class SimpleCache {
    * @param ttlSeconds - Время жизни в секундах (по умолчанию 5 минут)
    */
   set<T>(key: string, data: T, ttlSeconds: number = 300): void {
-    const expiresAt = Date.now() + (ttlSeconds * 1000);
+    const expiresAt = Date.now() + ttlSeconds * 1000;
     this.cache.set(key, { data, expiresAt });
   }
 
@@ -84,12 +87,12 @@ class SimpleCache {
   has(key: string): boolean {
     const entry = this.cache.get(key);
     if (!entry) return false;
-    
+
     if (entry.expiresAt < Date.now()) {
       this.cache.delete(key);
       return false;
     }
-    
+
     return true;
   }
 
@@ -99,7 +102,7 @@ class SimpleCache {
   keys(): string[] {
     const now = Date.now();
     const validKeys: string[] = [];
-    
+
     this.cache.forEach((entry, key) => {
       if (entry.expiresAt >= now) {
         validKeys.push(key);
@@ -108,7 +111,7 @@ class SimpleCache {
         this.cache.delete(key);
       }
     });
-    
+
     return validKeys;
   }
 
@@ -118,19 +121,19 @@ class SimpleCache {
   deleteByPattern(pattern: RegExp): number {
     let deletedCount = 0;
     const keysToDelete: string[] = [];
-    
+
     this.cache.forEach((_, key) => {
       if (pattern.test(key)) {
         keysToDelete.push(key);
       }
     });
-    
-    keysToDelete.forEach(key => {
+
+    keysToDelete.forEach((key) => {
       if (this.cache.delete(key)) {
         deletedCount++;
       }
     });
-    
+
     return deletedCount;
   }
 
@@ -154,15 +157,14 @@ export const cache = new SimpleCache();
 export async function cached<T>(
   key: string,
   fn: () => Promise<T>,
-  ttlSeconds: number = 300
+  ttlSeconds: number = 300,
 ): Promise<T> {
   const cached = cache.get<T>(key);
   if (cached !== null) {
     return cached;
   }
-  
+
   const result = await fn();
   cache.set(key, result, ttlSeconds);
   return result;
 }
-

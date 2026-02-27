@@ -3,47 +3,35 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import dynamic from 'next/dynamic';
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { getStaticUrl } from "@/lib/utils";
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { getStaticUrl } from '@/lib/utils';
+import FloatingParticles from '@/components/decorative/FloatingParticles';
+import { Shield, ChevronRight } from 'lucide-react';
 
-interface HeroSectionProps {
-  onLightRaysLoad?: () => void;
-}
+const INITIAL_PING = () => Math.floor(Math.random() * 15) + 48;
 
-const MOBILE_BREAKPOINT_PX = 768;
-
-// Heavy WebGL effect — load client-side only; include gentle fade-in on mount. Disabled on mobile.
-const LightRays = dynamic(() => import('@/components/LightRays'), {
-  ssr: false,
-  loading: () => <div className="absolute inset-0" aria-hidden="true" />
-});
-
-export default function HeroSection({ onLightRaysLoad }: HeroSectionProps = {}) {
-  const [ping, setPing] = useState(0);
+export default function HeroSection() {
+  const [ping, setPing] = useState(INITIAL_PING);
   const [connected, setConnected] = useState(false);
-  const [serverInfo, setServerInfo] = useState<{ country: string, code: string, flag: string } | null>(null);
-  const [isMobile, setIsMobile] = useState(true);
-
-  useEffect(() => {
-    const check = () => setIsMobile(typeof window !== 'undefined' && window.innerWidth < MOBILE_BREAKPOINT_PX);
-    check();
-    window.addEventListener('resize', check);
-    return () => window.removeEventListener('resize', check);
-  }, []);
+  const [serverInfo, setServerInfo] = useState<{
+    country: string;
+    code: string;
+    flag: string;
+  } | null>(null);
 
   useEffect(() => {
     const servers = [
-      { country: "Германия", code: "DE-1", flag: getStaticUrl("/static/icons/flags/de.svg") },
-      { country: "Германия", code: "DE-2", flag: getStaticUrl("/static/icons/flags/de.svg") },
-      { country: "Швеция", code: "SWE-1", flag: getStaticUrl("/static/icons/flags/swe.svg") },
-      { country: "Швеция", code: "SWE-2", flag: getStaticUrl("/static/icons/flags/swe.svg") }
+      { country: 'Германия', code: 'DE-1', flag: getStaticUrl('/static/icons/flags/de.svg') },
+      { country: 'Германия', code: 'DE-2', flag: getStaticUrl('/static/icons/flags/de.svg') },
+      { country: 'Швеция', code: 'SWE-1', flag: getStaticUrl('/static/icons/flags/swe.svg') },
+      { country: 'Швеция', code: 'SWE-2', flag: getStaticUrl('/static/icons/flags/swe.svg') },
     ];
 
     const timer = setTimeout(() => {
       setConnected(true);
+      setPing(INITIAL_PING);
       const randomServer = servers[Math.floor(Math.random() * servers.length)];
       setServerInfo(randomServer);
     }, 1000);
@@ -56,7 +44,7 @@ export default function HeroSection({ onLightRaysLoad }: HeroSectionProps = {}) 
 
     const updatePing = () => {
       const change = (Math.random() * 7 + 5) * (Math.random() > 0.5 ? 1 : -1);
-      setPing(prev => {
+      setPing((prev) => {
         let newPing = prev + change + (50 - prev) * 0.02;
         if (Math.random() < 0.15) newPing += Math.random() * 20;
         return Math.min(Math.max(newPing, 45), 95);
@@ -67,168 +55,124 @@ export default function HeroSection({ onLightRaysLoad }: HeroSectionProps = {}) 
     return () => clearInterval(interval);
   }, [connected]);
 
-
   const getPingColor = (pingValue: number) => {
-    if (pingValue <= 65) return "text-green-400";
-    if (pingValue <= 80) return "text-yellow-400";
-    return "text-orange-400";
+    if (pingValue <= 65) return 'text-green-400';
+    if (pingValue <= 80) return 'text-yellow-400';
+    return 'text-orange-400';
   };
 
-  // На мобильных LightRays не рендерится — сразу сигнализируем загрузку
-  useEffect(() => {
-    if (onLightRaysLoad && isMobile) {
-      onLightRaysLoad();
-    }
-  }, [onLightRaysLoad, isMobile]);
-
-  // Отслеживаем загрузку LightRays (только для десктопа)
-  useEffect(() => {
-    if (!onLightRaysLoad || isMobile) return;
-
-    let hasCalled = false;
-
-    const checkLightRaysLoaded = () => {
-      if (hasCalled) return;
-      
-      // Ищем canvas внутри секции Hero
-      const heroSection = document.querySelector('#home');
-      if (!heroSection) return;
-      
-      const canvas = heroSection.querySelector('canvas');
-      if (canvas && canvas.width > 0 && canvas.height > 0) {
-        // Canvas инициализирован и имеет размеры - LightRays загружен
-        hasCalled = true;
-        // Даем небольшую задержку для завершения инициализации WebGL
-        setTimeout(() => {
-          onLightRaysLoad();
-        }, 150);
-        return true;
-      }
-      return false;
-    };
-
-    // Используем MutationObserver для отслеживания появления canvas
-    const observer = new MutationObserver(() => {
-      checkLightRaysLoaded();
-    });
-
-    // Наблюдаем за изменениями в document
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ['width', 'height']
-    });
-
-    // Проверяем сразу и через небольшие интервалы
-    if (checkLightRaysLoaded()) {
-      observer.disconnect();
-      return;
-    }
-
-    const interval = setInterval(() => {
-      if (checkLightRaysLoaded()) {
-        clearInterval(interval);
-        observer.disconnect();
-      }
-    }, 50);
-
-    // Таймаут на случай если LightRays не загрузится
-    const timeout = setTimeout(() => {
-      if (!hasCalled && onLightRaysLoad) {
-        hasCalled = true;
-        onLightRaysLoad();
-      }
-      clearInterval(interval);
-      observer.disconnect();
-    }, 3000);
-
-    return () => {
-      observer.disconnect();
-      clearInterval(interval);
-      clearTimeout(timeout);
-    };
-  }, [onLightRaysLoad, isMobile]);
-
   return (
-    <section id="home" className="relative overflow-visible bg-neutral-950">
-      <div className="absolute inset-0 w-full h-full pointer-events-none" style={{ overflow: 'visible' }}>
-        {!isMobile && (
-        <LightRays
-          raysOrigin="top-center"
-          raysColor="#45beff"
-          raysSpeed={1.0}
-          lightSpread={0.8}
-          rayLength={3.0}
-          followMouse={false}
-          mouseInfluence={0.1}
-          noiseAmount={0.1}
-          distortion={0.05}
-          fadeDistance={2.0}
-          className="custom-rays"
-        />
-        )}
-      </div>
-      <div className="absolute bottom-0 left-0 right-0 h-32 pointer-events-none z-10 bg-gradient-to-t from-neutral-950 to-transparent" />
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-8 pb-24 lg:pt-32 lg:pb-36 relative z-10">
-        <div className="flex flex-col lg:grid lg:grid-cols-2 gap-8 md:gap-12 items-center">
-          <div className="order-2 lg:order-1 text-center lg:text-left">
-            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-semibold tracking-tight leading-tight">
-              Свобода и безопасность в <br className="hidden sm:block" />один <u>клик</u>
+    <section id="home" className="relative overflow-hidden bg-transparent">
+      {/* Hero mesh gradient background */}
+      <div
+        className="hero-mesh pointer-events-none absolute inset-0 opacity-40"
+        aria-hidden="true"
+      />
+
+      {/* Top radial glow - reduced intensity */}
+      <div
+        className="pointer-events-none absolute left-1/2 top-0 h-[500px] w-[min(1000px,100vw)] -translate-x-1/2 rounded-full bg-primary-500/[0.04] blur-[100px]"
+        aria-hidden="true"
+      />
+
+      {/* Floating particles — desktop only */}
+      <div className="hidden md:block">{/* FloatingParticles removed */}</div>
+
+      <div className="relative z-10 mx-auto max-w-7xl px-4 pb-24 pt-8 sm:px-6 lg:px-8 lg:pb-36 lg:pt-32">
+        <div className="flex flex-col items-center gap-8 md:gap-12 lg:grid lg:grid-cols-2">
+          <div className="order-2 text-center lg:order-1 lg:text-left">
+            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-primary-500/20 bg-primary-500/[0.06] px-4 py-1.5 text-xs text-primary-300 backdrop-blur-sm md:mb-6">
+              <Shield className="h-3.5 w-3.5" />
+              <span>Надёжная защита данных</span>
+              <ChevronRight className="h-3 w-3 opacity-50" />
+            </div>
+
+            <h1 className="text-3xl font-semibold leading-tight tracking-tight sm:text-4xl md:text-5xl lg:text-6xl">
+              Свобода и безопасность в <br className="hidden sm:block" />
+              один <span className="text-primary-400">клик</span>
             </h1>
-            <p className="mt-3 md:mt-4 text-neutral-300 text-base md:text-lg max-w-xl mx-auto lg:mx-0">
-              Быстрое и надежное решение с низкими тарифами и доступными серверами. Выбирайте лучшее для себя.
+            <p className="mx-auto mt-3 max-w-xl text-base leading-relaxed text-neutral-400 md:mt-4 md:text-lg lg:mx-0">
+              Быстрое и надежное решение с низкими тарифами и доступными серверами. Выбирайте лучшее
+              для себя.
             </p>
-            <div className="mt-6 md:mt-8 flex flex-col sm:flex-row gap-3 justify-center lg:justify-start">
-              <Button asChild size="lg" className="bg-primary-400 text-black hover:bg-primary-500 shadow-lg hover:shadow-blue-500/50 hover:scale-105 disabled:bg-neutral-800 disabled:text-neutral-500 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:scale-100 disabled:hover:shadow-lg">
+            <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row md:mt-8 lg:justify-start">
+              <Button
+                asChild
+                size="lg"
+                className="bg-primary-500 text-white shadow-lg shadow-primary-500/20 transition-all duration-300 hover:scale-105 hover:bg-primary-400 hover:shadow-primary-500/40 disabled:cursor-not-allowed disabled:bg-neutral-800 disabled:text-neutral-500 disabled:opacity-60 disabled:hover:scale-100 disabled:hover:shadow-lg"
+              >
                 <Link href="#pricing">Выбрать тариф</Link>
               </Button>
-              <Button asChild variant="ghost" size="lg" className="border-2 border-neutral-800/50 bg-transparent hover:bg-neutral-900/50 hover:border-neutral-700">
+              <Button
+                asChild
+                variant="ghost"
+                size="lg"
+                className="border border-neutral-700/50 bg-neutral-900/30 backdrop-blur-sm transition-all duration-300 hover:border-neutral-600 hover:bg-neutral-800/50"
+              >
                 <Link href="#apps">Подробнее</Link>
               </Button>
             </div>
-            <div className="mt-4 md:mt-6 flex flex-wrap justify-center lg:justify-start gap-3 md:gap-4 text-xs text-neutral-400 animate-fadeIn">
+            <div className="mt-5 flex animate-fadeIn flex-wrap justify-center gap-4 text-xs text-neutral-500 md:mt-7 md:gap-5 lg:justify-start">
               <div className="flex items-center gap-2">
-                <span className="inline-block h-2 w-2 rounded-full bg-green-400 animate-pulse"></span>
+                <span className="pulse-ring inline-block h-2 w-2 rounded-full bg-green-400"></span>
                 <span>Высокая надежность</span>
               </div>
-              <div>7-дн. гарантия</div>
-              <div>Поддержка 24/7</div>
+              <div className="flex items-center gap-2">
+                <span className="inline-block h-1.5 w-1.5 rounded-full bg-primary-400/60"></span>
+                <span>7-дн. гарантия</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="inline-block h-1.5 w-1.5 rounded-full bg-primary-400/60"></span>
+                <span>Поддержка 24/7</span>
+              </div>
             </div>
           </div>
-          <div className="hidden sm:flex order-2 lg:order-1 w-full max-w-md mx-auto lg:mx-0 lg:ml-auto flex justify-center lg:justify-end">
-            <div className="relative w-full">
-              <div className="absolute -inset-4 md:-inset-8 rounded-full bg-gradient-to-br from-primary-500/20 to-transparent blur-2xl md:blur-3xl"></div>
-              <Card className="relative border-neutral-800/50 bg-neutral-900/50 backdrop-blur-sm shadow-soft">
+          <div className="order-2 mx-auto hidden w-full max-w-md justify-center sm:flex lg:order-1 lg:mx-0 lg:ml-auto lg:justify-end">
+            <div className="relative isolate w-full">
+              {/* Glow строго сзади: z-0, карточка поверх z-10 */}
+              <div
+                className="pointer-events-none absolute -inset-4 z-0 rounded-full bg-gradient-to-br from-primary-500/20 to-transparent blur-2xl md:-inset-8 md:blur-3xl"
+                aria-hidden="true"
+              />
+              <Card className="glass-card-no-flicker relative z-10 border-neutral-800/50 bg-neutral-900/60 shadow-2xl shadow-black/20 backdrop-blur-md">
                 <CardHeader className="p-4 md:p-6">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-white">
-                      {connected ? "Сеанс защищён" : "Подключение…"}
+                    <span className="font-medium text-white">
+                      {connected ? 'Сеанс защищён' : 'Подключение…'}
                     </span>
-                    <Badge variant={connected ? "default" : "secondary"} className={`${connected ? "bg-green-500/20 text-green-400 border-green-500/30 hover:!bg-green-500/20" : "bg-yellow-500/20 text-yellow-400 border-yellow-500/30 hover:!bg-yellow-500/20"} flex items-center gap-1`}>
-                      <span className={`h-2 w-2 rounded-full ${connected ? "bg-green-400" : "bg-yellow-400"} ${connected ? "" : "animate-ping"}`}></span>
-                      {connected ? "Подключено" : "Проверка"}
+                    <Badge
+                      variant={connected ? 'default' : 'secondary'}
+                      className={`${connected ? 'border-green-500/25 bg-green-500/15 text-green-400 hover:!bg-green-500/15' : 'border-yellow-500/25 bg-yellow-500/15 text-yellow-400 hover:!bg-yellow-500/15'} flex items-center gap-1.5 backdrop-blur-sm`}
+                    >
+                      <span
+                        className={`h-2 w-2 rounded-full ${connected ? 'pulse-ring bg-green-400' : 'bg-yellow-400'}`}
+                      ></span>
+                      {connected ? 'Подключено' : 'Проверка'}
                     </Badge>
                   </div>
                 </CardHeader>
-                <CardContent className="p-4 md:p-6 pt-0">
+                <CardContent className="p-4 pt-0 md:p-6">
                   <div className="grid grid-cols-2 gap-3 md:gap-4">
-                    <div className="rounded-xl border border-neutral-800 p-3 md:p-4">
-                      <div className="text-neutral-400 text-xs">Макс. скорость</div>
-                      <div className="mt-1 text-xl md:text-2xl font-semibold">1 Гбит/с</div>
-                    </div>
-                    <div className="rounded-xl border border-neutral-800 p-3 md:p-4">
-                      <div className="text-neutral-400 text-xs">Пинг</div>
-                      <div className={`mt-1 text-xl md:text-2xl font-semibold ${getPingColor(ping)}`}>
-                        {connected ? `${Math.round(ping)} ms` : "– ms"}
+                    <div className="rounded-xl border border-neutral-800/70 bg-neutral-950/50 p-3 md:p-4">
+                      <div className="text-xs text-neutral-500">Макс. скорость</div>
+                      <div className="mt-1 text-xl font-semibold text-white md:text-2xl">
+                        1 Гбит/с
                       </div>
                     </div>
-                    <div className="rounded-xl border border-neutral-800 p-3 md:p-4 col-span-2">
-                      <div className="text-neutral-400 text-xs">Текущий сервер</div>
+                    <div className="rounded-xl border border-neutral-800/70 bg-neutral-950/50 p-3 md:p-4">
+                      <div className="text-xs text-neutral-500">Пинг</div>
+                      <div
+                        className={`mt-1 text-xl font-semibold md:text-2xl ${getPingColor(ping)}`}
+                      >
+                        {connected ? `${Math.round(ping)} ms` : '– ms'}
+                      </div>
+                    </div>
+                    <div className="col-span-2 rounded-xl border border-neutral-800/70 bg-neutral-950/50 p-3 md:p-4">
+                      <div className="text-xs text-neutral-500">Текущий сервер</div>
                       {!connected ? (
-                      <div className="mt-1 flex items-center gap-2 text-neutral-500 animate-pulse">
+                        <div className="mt-1 flex animate-pulse items-center gap-2 text-neutral-500">
                           <span>Выбор сервера…</span>
-                      </div>
+                        </div>
                       ) : serverInfo ? (
                         <div className="mt-1 flex items-center gap-2">
                           <Image
@@ -238,7 +182,7 @@ export default function HeroSection({ onLightRaysLoad }: HeroSectionProps = {}) 
                             height={16}
                             className="h-4 w-6 rounded-sm border border-neutral-700"
                           />
-                          <span className="font-medium text-sm md:text-base">
+                          <span className="text-sm font-medium text-white md:text-base">
                             {serverInfo.country} · {serverInfo.code}
                           </span>
                         </div>
@@ -246,7 +190,7 @@ export default function HeroSection({ onLightRaysLoad }: HeroSectionProps = {}) 
                     </div>
                   </div>
                   <Button
-                    className="mt-4 md:mt-6 w-full bg-white text-neutral-900 hover:bg-white/90 hover:shadow-glow"
+                    className="mt-4 w-full bg-white text-neutral-900 transition-all duration-300 hover:bg-white/90 hover:shadow-glow md:mt-6"
                     disabled
                   >
                     Отключить

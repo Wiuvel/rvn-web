@@ -15,43 +15,41 @@ export async function POST(request: NextRequest) {
     const { captchaToken } = await request.json();
 
     if (!captchaToken || typeof captchaToken !== 'string') {
-      return setCorsHeaders(
-        NextResponse.json(
-          { error: 'Invalid request data' },
-          { status: 400 }
-        )
-      );
+      return setCorsHeaders(NextResponse.json({ error: 'Invalid request data' }, { status: 400 }));
     }
 
     const secretKey = process.env.TURNSTILE_SECRET_KEY;
     if (!secretKey || secretKey === '1x0000000000000000000000000000000AA') {
       logger.error('Turnstile secret key not configured for protection');
       return setCorsHeaders(
-        NextResponse.json(
-          { error: 'CAPTCHA service not configured' },
-          { status: 500 }
-        )
+        NextResponse.json({ error: 'CAPTCHA service not configured' }, { status: 500 }),
       );
     }
-    
-    const verifyResponse = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
+
+    const verifyResponse = await fetch(
+      'https://challenges.cloudflare.com/turnstile/v0/siteverify',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          secret: secretKey,
+          response: captchaToken,
+          remoteip:
+            request.headers.get('x-forwarded-for')?.split(',')[0] ||
+            request.headers.get('x-real-ip') ||
+            undefined,
+        }),
       },
-      body: JSON.stringify({
-        secret: secretKey,
-        response: captchaToken,
-        remoteip: request.headers.get('x-forwarded-for')?.split(',')[0] || request.headers.get('x-real-ip') || undefined
-      })
-    });
+    );
 
     const verifyData = await verifyResponse.json();
 
     if (!verifyData.success) {
       const errorCodes = verifyData['error-codes'] || [];
       // Ошибка верификации Turnstile - не логируем (валидация)
-      
+
       let errorMessage = 'CAPTCHA verification failed';
       if (errorCodes.includes('invalid-input-secret')) {
         logger.error('Turnstile secret key is invalid or not configured');
@@ -61,30 +59,26 @@ export async function POST(request: NextRequest) {
       } else if (errorCodes.includes('timeout-or-duplicate')) {
         errorMessage = 'CAPTCHA verification failed: Token expired or already used';
       }
-      
-      return setCorsHeaders(
-        NextResponse.json(
-          { error: errorMessage },
-          { status: 400 }
-        )
-      );
+
+      return setCorsHeaders(NextResponse.json({ error: errorMessage }, { status: 400 }));
     }
 
     // Успешная верификация Turnstile - генерируем защищенные куки
     // Используем HMAC-SHA256 для подписи данных (IP + UserAgent)
-    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || request.headers.get('x-real-ip') || 'unknown';
+    const ip =
+      request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+      request.headers.get('x-real-ip') ||
+      'unknown';
     const userAgent = request.headers.get('user-agent') || '';
-    
+
     // Формируем подпись: HMAC(IP|UserAgent, Secret)
     // Это связывает куку с конкретным IP и браузером, предотвращая кражу и подделку
     const data = `${ip}|${userAgent}`;
-    const signature = crypto.createHmac('sha256', secretKey)
-      .update(data)
-      .digest('hex');
+    const signature = crypto.createHmac('sha256', secretKey).update(data).digest('hex');
 
     const response = NextResponse.json({
       success: true,
-      verified: true
+      verified: true,
     });
 
     // Устанавливаем защищенные HttpOnly куки
@@ -93,7 +87,7 @@ export async function POST(request: NextRequest) {
       httpOnly: true, // Недоступно через JS (защита от XSS)
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict' as const,
-      path: '/'
+      path: '/',
     };
 
     response.cookies.set('access_granted', 'true', cookieOptions);
@@ -104,14 +98,8 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     logger.error('Error verifying Turnstile token', {
       error: error instanceof Error ? error.message : 'Unknown error',
-      ip: request.headers.get('x-forwarded-for')
+      ip: request.headers.get('x-forwarded-for'),
     });
-    return setCorsHeaders(
-      NextResponse.json(
-        { error: 'Internal server error' },
-        { status: 500 }
-      )
-    );
+    return setCorsHeaders(NextResponse.json({ error: 'Internal server error' }, { status: 500 }));
   }
 }
-

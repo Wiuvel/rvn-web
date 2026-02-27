@@ -115,13 +115,13 @@ export default function BannerUploadModal({
 
     setError(null);
     setSelectedFile(file);
-    
+
     // Создаем preview изображения
     const reader = new FileReader();
     reader.onload = (e) => {
       const result = e.target?.result as string;
       setImagePreview(result);
-      
+
       // Инициализируем crop область после загрузки изображения (только на десктопе)
       if (!isMobile) {
         setTimeout(() => {
@@ -130,27 +130,27 @@ export default function BannerUploadModal({
       }
     };
     reader.readAsDataURL(file);
-    
+
     return true;
   };
 
   // Вычисляем реальные размеры изображения в контейнере (с учетом object-contain)
   const getImageBounds = () => {
     if (!imageRef.current || !imageContainerRef.current) return null;
-    
+
     const img = imageRef.current;
     const container = imageContainerRef.current;
     const containerWidth = container.clientWidth;
     const containerHeight = container.clientHeight;
-    
+
     const imgAspect = img.naturalWidth / img.naturalHeight;
     const containerAspect = containerWidth / containerHeight;
-    
+
     let imgDisplayWidth: number;
     let imgDisplayHeight: number;
     let imgDisplayX: number;
     let imgDisplayY: number;
-    
+
     if (imgAspect > containerAspect) {
       // Изображение шире контейнера
       imgDisplayWidth = containerWidth;
@@ -164,7 +164,7 @@ export default function BannerUploadModal({
       imgDisplayX = (containerWidth - imgDisplayWidth) / 2;
       imgDisplayY = 0;
     }
-    
+
     return { x: imgDisplayX, y: imgDisplayY, width: imgDisplayWidth, height: imgDisplayHeight };
   };
 
@@ -173,22 +173,22 @@ export default function BannerUploadModal({
 
     const imgBounds = getImageBounds();
     if (!imgBounds) return;
-    
+
     const cropAspect = ASPECT_RATIO;
-    
+
     let cropWidth: number;
     let cropHeight: number;
-    
+
     // Используем 80% от размера изображения
     cropWidth = Math.min(imgBounds.width * 0.8, imgBounds.width);
     cropHeight = cropWidth / cropAspect;
-    
+
     // Если высота больше доступной, уменьшаем
     if (cropHeight > imgBounds.height * 0.8) {
       cropHeight = imgBounds.height * 0.8;
       cropWidth = cropHeight * cropAspect;
     }
-    
+
     // Убеждаемся, что размеры не меньше минимальных
     if (cropWidth < MIN_CROP_WIDTH) {
       cropWidth = MIN_CROP_WIDTH;
@@ -198,7 +198,7 @@ export default function BannerUploadModal({
       cropHeight = MIN_CROP_HEIGHT;
       cropWidth = cropHeight * cropAspect;
     }
-    
+
     // Ограничиваем размеры в пределах изображения
     if (cropWidth > imgBounds.width) {
       cropWidth = imgBounds.width;
@@ -208,10 +208,10 @@ export default function BannerUploadModal({
       cropHeight = imgBounds.height;
       cropWidth = cropHeight * cropAspect;
     }
-    
+
     const x = imgBounds.x + (imgBounds.width - cropWidth) / 2;
     const y = imgBounds.y + (imgBounds.height - cropHeight) / 2;
-    
+
     setCropArea({ x, y, width: cropWidth, height: cropHeight });
   };
 
@@ -255,37 +255,49 @@ export default function BannerUploadModal({
 
     const handleMove = (e: MouseEvent) => {
       if (!cropArea || !imageContainerRef.current || !imageRef.current) return;
-      
+
       const container = imageContainerRef.current;
       const rect = container.getBoundingClientRect();
       const containerWidth = container.clientWidth;
       const containerHeight = container.clientHeight;
-      
+
       if (isDraggingCrop) {
         // Перемещение области обрезки
         const imgBounds = getImageBounds();
         if (!imgBounds) return;
-        
+
         let newX = e.clientX - rect.left - dragStart.x;
         let newY = e.clientY - rect.top - dragStart.y;
-        
+
         // Ограничиваем перемещение в пределах изображения
-        newX = Math.max(imgBounds.x, Math.min(newX, imgBounds.x + imgBounds.width - cropArea.width));
-        newY = Math.max(imgBounds.y, Math.min(newY, imgBounds.y + imgBounds.height - cropArea.height));
-        
-        setCropArea(prev => prev ? { ...prev, x: newX, y: newY } : null);
+        newX = Math.max(
+          imgBounds.x,
+          Math.min(newX, imgBounds.x + imgBounds.width - cropArea.width),
+        );
+        newY = Math.max(
+          imgBounds.y,
+          Math.min(newY, imgBounds.y + imgBounds.height - cropArea.height),
+        );
+
+        setCropArea((prev) => (prev ? { ...prev, x: newX, y: newY } : null));
       } else if (isResizing && resizeHandle && cropStart) {
         // Изменение размера области обрезки
         const imgBounds = getImageBounds();
         if (!imgBounds) return;
-        
-        const mouseX = Math.max(imgBounds.x, Math.min(e.clientX - rect.left, imgBounds.x + imgBounds.width));
-        const mouseY = Math.max(imgBounds.y, Math.min(e.clientY - rect.top, imgBounds.y + imgBounds.height));
-        
+
+        const mouseX = Math.max(
+          imgBounds.x,
+          Math.min(e.clientX - rect.left, imgBounds.x + imgBounds.width),
+        );
+        const mouseY = Math.max(
+          imgBounds.y,
+          Math.min(e.clientY - rect.top, imgBounds.y + imgBounds.height),
+        );
+
         let newCropArea = { ...cropStart };
         const startRight = cropStart.x + cropStart.width;
         const startBottom = cropStart.y + cropStart.height;
-        
+
         // Определяем направление изменения размера
         switch (resizeHandle) {
           case 'nw': // Северо-запад (верхний левый угол)
@@ -328,7 +340,7 @@ export default function BannerUploadModal({
             newCropArea.height = newCropArea.width / ASPECT_RATIO;
             break;
         }
-        
+
         // Проверяем минимальный размер
         if (newCropArea.width < MIN_CROP_WIDTH) {
           newCropArea.width = MIN_CROP_WIDTH;
@@ -338,7 +350,7 @@ export default function BannerUploadModal({
           newCropArea.height = MIN_CROP_HEIGHT;
           newCropArea.width = newCropArea.height * ASPECT_RATIO;
         }
-        
+
         // Корректируем позицию при изменении размера с углов/сторон
         if (resizeHandle === 'nw' || resizeHandle === 'w' || resizeHandle === 'sw') {
           newCropArea.x = startRight - newCropArea.width;
@@ -346,7 +358,7 @@ export default function BannerUploadModal({
         if (resizeHandle === 'nw' || resizeHandle === 'n' || resizeHandle === 'ne') {
           newCropArea.y = startBottom - newCropArea.height;
         }
-        
+
         // Ограничиваем в пределах изображения
         if (newCropArea.x < imgBounds.x) {
           newCropArea.x = imgBounds.x;
@@ -362,7 +374,7 @@ export default function BannerUploadModal({
           newCropArea.height = imgBounds.y + imgBounds.height - newCropArea.y;
           newCropArea.width = newCropArea.height * ASPECT_RATIO;
         }
-        
+
         // Финальная проверка минимального размера
         if (newCropArea.width >= MIN_CROP_WIDTH && newCropArea.height >= MIN_CROP_HEIGHT) {
           setCropArea(newCropArea);
@@ -372,7 +384,7 @@ export default function BannerUploadModal({
 
     document.addEventListener('mousemove', handleMove);
     document.addEventListener('mouseup', handleCropMouseUp);
-    
+
     return () => {
       document.removeEventListener('mousemove', handleMove);
       document.removeEventListener('mouseup', handleCropMouseUp);
@@ -390,7 +402,7 @@ export default function BannerUploadModal({
       img.onload = () => {
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
-        
+
         if (!ctx) {
           reject(new Error('Could not get canvas context'));
           return;
@@ -406,34 +418,44 @@ export default function BannerUploadModal({
         // Вычисляем реальные координаты и размеры на исходном изображении
         const scaleX = img.naturalWidth / imgBounds.width;
         const scaleY = img.naturalHeight / imgBounds.height;
-        
+
         // Координаты относительно изображения (не контейнера)
         const relativeX = cropArea.x - imgBounds.x;
         const relativeY = cropArea.y - imgBounds.y;
-        
+
         const sourceX = relativeX * scaleX;
         const sourceY = relativeY * scaleY;
         const sourceWidth = cropArea.width * scaleX;
         const sourceHeight = cropArea.height * scaleY;
-        
+
         canvas.width = sourceWidth;
         canvas.height = sourceHeight;
-        
+
         ctx.drawImage(
           img,
-          sourceX, sourceY, sourceWidth, sourceHeight,
-          0, 0, sourceWidth, sourceHeight
+          sourceX,
+          sourceY,
+          sourceWidth,
+          sourceHeight,
+          0,
+          0,
+          sourceWidth,
+          sourceHeight,
         );
-        
-        canvas.toBlob((blob) => {
-          if (blob) {
-            resolve(blob);
-          } else {
-            reject(new Error('Failed to create blob'));
-          }
-        }, 'image/jpeg', 0.9);
+
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              resolve(blob);
+            } else {
+              reject(new Error('Failed to create blob'));
+            }
+          },
+          'image/jpeg',
+          0.9,
+        );
       };
-      
+
       img.onerror = () => reject(new Error('Failed to load image'));
       img.src = imagePreview;
     });
@@ -460,7 +482,10 @@ export default function BannerUploadModal({
     e.preventDefault();
     e.stopPropagation();
     // Проверяем, что мы действительно покинули зону (не перешли на дочерний элемент)
-    if (e.currentTarget === dropZoneRef.current && !e.currentTarget.contains(e.relatedTarget as Node)) {
+    if (
+      e.currentTarget === dropZoneRef.current &&
+      !e.currentTarget.contains(e.relatedTarget as Node)
+    ) {
       setIsDragging(false);
     }
   };
@@ -491,7 +516,7 @@ export default function BannerUploadModal({
 
     try {
       let fileToUpload: File;
-      
+
       // На мобильных устройствах загружаем оригинальный файл без обрезки
       if (isMobile || !cropArea) {
         fileToUpload = selectedFile;
@@ -534,33 +559,43 @@ export default function BannerUploadModal({
     <>
       <div
         ref={backdropRef}
-        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[1000]"
+        className="fixed inset-0 z-[1000] bg-black/60 backdrop-blur-sm"
         onClick={onClose}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') onClose();
+        }}
+        role="button"
+        tabIndex={0}
+        aria-label="Закрыть"
       />
 
       <div
         ref={modalRef}
-        className="fixed inset-0 z-[1001] flex items-center justify-center p-4 pointer-events-none"
+        className="pointer-events-none fixed inset-0 z-[1001] flex items-center justify-center p-4"
       >
         <div
-          className="bg-neutral-900 border border-white/10 rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col pointer-events-auto"
+          className="pointer-events-auto flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-white/10 bg-neutral-900 shadow-2xl"
           onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') e.stopPropagation();
+          }}
+          role="presentation"
         >
-          <div className="p-4 sm:p-6 border-b border-white/10 flex items-center justify-between flex-shrink-0">
+          <div className="flex flex-shrink-0 items-center justify-between border-b border-white/10 p-4 sm:p-6">
             <h2 className="text-lg font-semibold text-white">Изменить баннер</h2>
             <button
               onClick={onClose}
-              className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+              className="rounded-lg p-2 transition-colors hover:bg-white/10"
               aria-label="Закрыть"
               disabled={uploading}
             >
-              <X className="w-5 h-5 text-neutral-400" />
+              <X className="h-5 w-5 text-neutral-400" />
             </button>
           </div>
 
           <div className="flex-1 overflow-y-auto p-4 sm:p-6">
             {error && (
-              <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-sm text-red-400">
+              <div className="mb-4 rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-400">
                 {error}
               </div>
             )}
@@ -575,28 +610,41 @@ export default function BannerUploadModal({
                   onChange={handleFileSelect}
                   className="hidden"
                   disabled={uploading}
+                  aria-label="Загрузить баннер"
                 />
                 <div
                   ref={dropZoneRef}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      if (!uploading) fileInputRef.current?.click();
+                    }
+                  }}
                   onDragEnter={handleDragEnter}
                   onDragOver={handleDragOver}
                   onDragLeave={handleDragLeave}
                   onDrop={handleDrop}
-                  className={`w-full p-4 border-2 border-dashed rounded-lg transition-all duration-200 ${
+                  className={`w-full rounded-lg border-2 border-dashed p-4 transition-all duration-200 ${
                     isDragging
-                      ? 'border-blue-500 bg-blue-500/10 scale-[1.02]'
+                      ? 'scale-[1.02] border-blue-500 bg-blue-500/10'
                       : 'border-white/20 hover:border-white/40'
-                  } ${uploading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                  } ${uploading ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
                   onClick={() => !uploading && fileInputRef.current?.click()}
                 >
                   <div className="flex flex-col items-center gap-2">
-                    <ImageIcon className={`w-8 h-8 transition-colors ${isDragging ? 'text-blue-400' : 'text-neutral-400'}`} />
-                    <span className={`text-sm transition-colors text-center whitespace-normal break-words ${isDragging ? 'text-blue-300' : 'text-neutral-300'}`}>
+                    <ImageIcon
+                      className={`h-8 w-8 transition-colors ${isDragging ? 'text-blue-400' : 'text-neutral-400'}`}
+                    />
+                    <span
+                      className={`whitespace-normal break-words text-center text-sm transition-colors ${isDragging ? 'text-blue-300' : 'text-neutral-300'}`}
+                    >
                       {isDragging
                         ? 'Отпустите для загрузки'
                         : 'Перетащите изображение или выберите файл'}
                     </span>
-                    <span className="text-xs text-neutral-500 text-center">
+                    <span className="text-center text-xs text-neutral-500">
                       PNG, JPG, WEBP (макс. 2MB)
                     </span>
                   </div>
@@ -606,118 +654,162 @@ export default function BannerUploadModal({
               /* Область обрезки изображения */
               <div className="mb-4">
                 {selectedFile && (
-                  <p className="text-sm text-neutral-400 truncate max-w-full mb-2" title={selectedFile.name}>
+                  <p
+                    className="mb-2 max-w-full truncate text-sm text-neutral-400"
+                    title={selectedFile.name}
+                  >
                     {truncateFileName(selectedFile.name)}
                   </p>
                 )}
                 <div
                   ref={imageContainerRef}
-                  className="relative w-full bg-neutral-950 rounded-lg overflow-hidden border border-neutral-800"
+                  className="relative w-full overflow-hidden rounded-lg border border-neutral-800 bg-neutral-950"
                   style={{ minHeight: '200px', maxHeight: '400px' }}
                 >
+                  {/* Native img required: ref + onLoad for crop area init (getBoundingClientRect, naturalWidth) */}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     ref={imageRef}
                     src={imagePreview}
                     alt="Preview"
-                    className="w-full h-auto max-h-[400px] object-contain"
+                    className="h-auto max-h-[400px] w-full object-contain"
                     onLoad={initializeCropArea}
                   />
-                  {cropArea && !isMobile && imageContainerRef.current && (() => {
-                    const container = imageContainerRef.current;
-                    return (
-                      <>
-                        {/* Затемнение вне области обрезки */}
-                        <div
-                          className="absolute inset-0 pointer-events-none"
-                          style={{
-                            background: `linear-gradient(to right, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.6) ${(cropArea.x / container.clientWidth) * 100}%, transparent ${(cropArea.x / container.clientWidth) * 100}%, transparent ${((cropArea.x + cropArea.width) / container.clientWidth) * 100}%, rgba(0,0,0,0.6) ${((cropArea.x + cropArea.width) / container.clientWidth) * 100}%, rgba(0,0,0,0.6) 100%),
+                  {cropArea &&
+                    !isMobile &&
+                    imageContainerRef.current &&
+                    (() => {
+                      const container = imageContainerRef.current;
+                      return (
+                        <>
+                          {/* Затемнение вне области обрезки */}
+                          <div
+                            className="pointer-events-none absolute inset-0"
+                            style={{
+                              background: `linear-gradient(to right, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.6) ${(cropArea.x / container.clientWidth) * 100}%, transparent ${(cropArea.x / container.clientWidth) * 100}%, transparent ${((cropArea.x + cropArea.width) / container.clientWidth) * 100}%, rgba(0,0,0,0.6) ${((cropArea.x + cropArea.width) / container.clientWidth) * 100}%, rgba(0,0,0,0.6) 100%),
                                       linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.6) ${(cropArea.y / container.clientHeight) * 100}%, transparent ${(cropArea.y / container.clientHeight) * 100}%, transparent ${((cropArea.y + cropArea.height) / container.clientHeight) * 100}%, rgba(0,0,0,0.6) ${((cropArea.y + cropArea.height) / container.clientHeight) * 100}%, rgba(0,0,0,0.6) 100%)`,
-                          }}
-                        />
-                        
-                        {/* Область обрезки */}
-                        <div
-                          className="absolute border-2 border-white/90 shadow-[0_0_0_1px_rgba(0,0,0,0.8),0_0_20px_rgba(59,130,246,0.3)] cursor-move"
-                          style={{
-                            left: `${cropArea.x}px`,
-                            top: `${cropArea.y}px`,
-                            width: `${cropArea.width}px`,
-                            height: `${cropArea.height}px`,
-                          }}
-                          onMouseDown={handleCropMouseDown}
-                        />
-                        
-                        {/* Ручки для изменения размера - всегда привязаны к рамке */}
-                        {/* Углы */}
-                        <div
-                          className="absolute w-5 h-5 bg-white border-2 border-blue-500 rounded-sm cursor-nwse-resize z-20 shadow-lg hover:bg-blue-50 active:scale-90 transition-transform"
-                          style={{
-                            left: `${cropArea.x - 10}px`,
-                            top: `${cropArea.y - 10}px`,
-                          }}
-                          onMouseDown={(e) => handleResizeMouseDown(e, 'nw')}
-                        />
-                        <div
-                          className="absolute w-5 h-5 bg-white border-2 border-blue-500 rounded-sm cursor-nesw-resize z-20 shadow-lg hover:bg-blue-50 active:scale-90 transition-transform"
-                          style={{
-                            left: `${cropArea.x + cropArea.width - 10}px`,
-                            top: `${cropArea.y - 10}px`,
-                          }}
-                          onMouseDown={(e) => handleResizeMouseDown(e, 'ne')}
-                        />
-                        <div
-                          className="absolute w-5 h-5 bg-white border-2 border-blue-500 rounded-sm cursor-nesw-resize z-20 shadow-lg hover:bg-blue-50 active:scale-90 transition-transform"
-                          style={{
-                            left: `${cropArea.x - 10}px`,
-                            top: `${cropArea.y + cropArea.height - 10}px`,
-                          }}
-                          onMouseDown={(e) => handleResizeMouseDown(e, 'sw')}
-                        />
-                        <div
-                          className="absolute w-5 h-5 bg-white border-2 border-blue-500 rounded-sm cursor-nwse-resize z-20 shadow-lg hover:bg-blue-50 active:scale-90 transition-transform"
-                          style={{
-                            left: `${cropArea.x + cropArea.width - 10}px`,
-                            top: `${cropArea.y + cropArea.height - 10}px`,
-                          }}
-                          onMouseDown={(e) => handleResizeMouseDown(e, 'se')}
-                        />
-                        
-                        {/* Стороны */}
-                        <div
-                          className="absolute w-5 h-5 bg-white border-2 border-blue-500 rounded-sm cursor-ns-resize z-20 shadow-lg hover:bg-blue-50 active:scale-90 transition-transform"
-                          style={{
-                            left: `${cropArea.x + cropArea.width / 2 - 10}px`,
-                            top: `${cropArea.y - 10}px`,
-                          }}
-                          onMouseDown={(e) => handleResizeMouseDown(e, 'n')}
-                        />
-                        <div
-                          className="absolute w-5 h-5 bg-white border-2 border-blue-500 rounded-sm cursor-ns-resize z-20 shadow-lg hover:bg-blue-50 active:scale-90 transition-transform"
-                          style={{
-                            left: `${cropArea.x + cropArea.width / 2 - 10}px`,
-                            top: `${cropArea.y + cropArea.height - 10}px`,
-                          }}
-                          onMouseDown={(e) => handleResizeMouseDown(e, 's')}
-                        />
-                        <div
-                          className="absolute w-5 h-5 bg-white border-2 border-blue-500 rounded-sm cursor-ew-resize z-20 shadow-lg hover:bg-blue-50 active:scale-90 transition-transform"
-                          style={{
-                            left: `${cropArea.x - 10}px`,
-                            top: `${cropArea.y + cropArea.height / 2 - 10}px`,
-                          }}
-                          onMouseDown={(e) => handleResizeMouseDown(e, 'w')}
-                        />
-                        <div
-                          className="absolute w-5 h-5 bg-white border-2 border-blue-500 rounded-sm cursor-ew-resize z-20 shadow-lg hover:bg-blue-50 active:scale-90 transition-transform"
-                          style={{
-                            left: `${cropArea.x + cropArea.width - 10}px`,
-                            top: `${cropArea.y + cropArea.height / 2 - 10}px`,
-                          }}
-                          onMouseDown={(e) => handleResizeMouseDown(e, 'e')}
-                        />
-                      </>
-                    );
-                  })()}
+                            }}
+                          />
+
+                          {/* Область обрезки */}
+                          <div
+                            className="absolute cursor-move border-2 border-white/90 shadow-[0_0_0_1px_rgba(0,0,0,0.8),0_0_20px_rgba(59,130,246,0.3)]"
+                            style={{
+                              left: `${cropArea.x}px`,
+                              top: `${cropArea.y}px`,
+                              width: `${cropArea.width}px`,
+                              height: `${cropArea.height}px`,
+                            }}
+                            onMouseDown={handleCropMouseDown}
+                            role="button"
+                            tabIndex={0}
+                            aria-label="Crop area"
+                            onKeyDown={() => {}}
+                          />
+
+                          {/* Ручки для изменения размера - всегда привязаны к рамке */}
+                          {/* Углы */}
+                          <div
+                            className="absolute z-20 h-5 w-5 cursor-nwse-resize rounded-sm border-2 border-blue-500 bg-white shadow-lg transition-transform hover:bg-blue-50 active:scale-90"
+                            style={{
+                              left: `${cropArea.x - 10}px`,
+                              top: `${cropArea.y - 10}px`,
+                            }}
+                            onMouseDown={(e) => handleResizeMouseDown(e, 'nw')}
+                            role="button"
+                            tabIndex={0}
+                            aria-label="Resize NW"
+                            onKeyDown={() => {}}
+                          />
+                          <div
+                            className="absolute z-20 h-5 w-5 cursor-nesw-resize rounded-sm border-2 border-blue-500 bg-white shadow-lg transition-transform hover:bg-blue-50 active:scale-90"
+                            style={{
+                              left: `${cropArea.x + cropArea.width - 10}px`,
+                              top: `${cropArea.y - 10}px`,
+                            }}
+                            onMouseDown={(e) => handleResizeMouseDown(e, 'ne')}
+                            role="button"
+                            tabIndex={0}
+                            aria-label="Resize NE"
+                            onKeyDown={() => {}}
+                          />
+                          <div
+                            className="absolute z-20 h-5 w-5 cursor-nesw-resize rounded-sm border-2 border-blue-500 bg-white shadow-lg transition-transform hover:bg-blue-50 active:scale-90"
+                            style={{
+                              left: `${cropArea.x - 10}px`,
+                              top: `${cropArea.y + cropArea.height - 10}px`,
+                            }}
+                            onMouseDown={(e) => handleResizeMouseDown(e, 'sw')}
+                            role="button"
+                            tabIndex={0}
+                            aria-label="Resize SW"
+                            onKeyDown={() => {}}
+                          />
+                          <div
+                            className="absolute z-20 h-5 w-5 cursor-nwse-resize rounded-sm border-2 border-blue-500 bg-white shadow-lg transition-transform hover:bg-blue-50 active:scale-90"
+                            style={{
+                              left: `${cropArea.x + cropArea.width - 10}px`,
+                              top: `${cropArea.y + cropArea.height - 10}px`,
+                            }}
+                            onMouseDown={(e) => handleResizeMouseDown(e, 'se')}
+                            role="button"
+                            tabIndex={0}
+                            aria-label="Resize SE"
+                            onKeyDown={() => {}}
+                          />
+
+                          {/* Стороны */}
+                          <div
+                            className="absolute z-20 h-5 w-5 cursor-ns-resize rounded-sm border-2 border-blue-500 bg-white shadow-lg transition-transform hover:bg-blue-50 active:scale-90"
+                            style={{
+                              left: `${cropArea.x + cropArea.width / 2 - 10}px`,
+                              top: `${cropArea.y - 10}px`,
+                            }}
+                            onMouseDown={(e) => handleResizeMouseDown(e, 'n')}
+                            role="button"
+                            tabIndex={0}
+                            aria-label="Resize N"
+                            onKeyDown={() => {}}
+                          />
+                          <div
+                            className="absolute z-20 h-5 w-5 cursor-ns-resize rounded-sm border-2 border-blue-500 bg-white shadow-lg transition-transform hover:bg-blue-50 active:scale-90"
+                            style={{
+                              left: `${cropArea.x + cropArea.width / 2 - 10}px`,
+                              top: `${cropArea.y + cropArea.height - 10}px`,
+                            }}
+                            onMouseDown={(e) => handleResizeMouseDown(e, 's')}
+                            role="button"
+                            tabIndex={0}
+                            aria-label="Resize S"
+                            onKeyDown={() => {}}
+                          />
+                          <div
+                            className="absolute z-20 h-5 w-5 cursor-ew-resize rounded-sm border-2 border-blue-500 bg-white shadow-lg transition-transform hover:bg-blue-50 active:scale-90"
+                            style={{
+                              left: `${cropArea.x - 10}px`,
+                              top: `${cropArea.y + cropArea.height / 2 - 10}px`,
+                            }}
+                            onMouseDown={(e) => handleResizeMouseDown(e, 'w')}
+                            role="button"
+                            tabIndex={0}
+                            aria-label="Resize W"
+                            onKeyDown={() => {}}
+                          />
+                          <div
+                            className="absolute z-20 h-5 w-5 cursor-ew-resize rounded-sm border-2 border-blue-500 bg-white shadow-lg transition-transform hover:bg-blue-50 active:scale-90"
+                            style={{
+                              left: `${cropArea.x + cropArea.width - 10}px`,
+                              top: `${cropArea.y + cropArea.height / 2 - 10}px`,
+                            }}
+                            onMouseDown={(e) => handleResizeMouseDown(e, 'e')}
+                            role="button"
+                            tabIndex={0}
+                            aria-label="Resize E"
+                            onKeyDown={() => {}}
+                          />
+                        </>
+                      );
+                    })()}
                 </div>
                 <button
                   onClick={() => {
@@ -728,7 +820,7 @@ export default function BannerUploadModal({
                       fileInputRef.current.value = '';
                     }
                   }}
-                  className="mt-2 text-sm text-neutral-400 hover:text-neutral-300 transition-colors"
+                  className="mt-2 text-sm text-neutral-400 transition-colors hover:text-neutral-300"
                 >
                   Выбрать другое изображение
                 </button>
@@ -737,27 +829,27 @@ export default function BannerUploadModal({
           </div>
 
           {/* Кнопки действий */}
-          <div className="p-4 sm:p-6 border-t border-white/10 flex gap-3 flex-shrink-0">
+          <div className="flex flex-shrink-0 gap-3 border-t border-white/10 p-4 sm:p-6">
             <button
               onClick={onClose}
               disabled={uploading}
-              className="flex-1 px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 rounded-lg bg-neutral-800 px-4 py-2 text-white transition-colors hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Отмена
             </button>
             <button
               onClick={handleUpload}
               disabled={!selectedFile || (!isMobile && !cropArea) || uploading}
-              className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {uploading ? (
                 <>
-                  <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/20 border-t-white"></div>
                   Загрузка...
                 </>
               ) : (
                 <>
-                  <Upload className="w-4 h-4" />
+                  <Upload className="h-4 w-4" />
                   Загрузить
                 </>
               )}

@@ -2,11 +2,11 @@ import { createClient } from '@supabase/supabase-js';
 
 /**
  * Supabase клиенты с новыми API ключами
- * 
+ *
  * Требуемые переменные окружения:
  * - NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY (Publishable Key: sb_publishable_...)
  * - SUPABASE_SECRET_KEY (Secret Key: sb_secret_...)
- * 
+ *
  * См. SUPABASE_MIGRATION.md для инструкций
  */
 
@@ -25,33 +25,35 @@ if (!supabaseUrl || !supabasePublishableKey) {
 
 // Client-side Supabase (limited access)
 // Использует Publishable Key - безопасен при включенном RLS
-export const supabase = supabaseUrl && supabasePublishableKey 
-  ? createClient(supabaseUrl, supabasePublishableKey, {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false
-      }
-    })
-  : null;
+export const supabase =
+  supabaseUrl && supabasePublishableKey
+    ? createClient(supabaseUrl, supabasePublishableKey, {
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+        },
+      })
+    : null;
 
 // Server-side Supabase (full access with SSL verification)
 // Использует Secret Key - обходит RLS, только для сервера!
-export const supabaseAdmin = supabaseUrl && supabaseSecretKey
-  ? createClient(supabaseUrl, supabaseSecretKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false
-      },
-      db: {
-        schema: 'public'
-      },
-      global: {
-        headers: {
-          'X-Client-Info': 'raven-admin-panel'
-        }
-      }
-    })
-  : null;
+export const supabaseAdmin =
+  supabaseUrl && supabaseSecretKey
+    ? createClient(supabaseUrl, supabaseSecretKey, {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+        },
+        db: {
+          schema: 'public',
+        },
+        global: {
+          headers: {
+            'X-Client-Info': 'raven-admin-panel',
+          },
+        },
+      })
+    : null;
 
 export interface Admin {
   id: string;
@@ -60,4 +62,3 @@ export interface Admin {
   created_at: string;
   updated_at: string;
 }
-

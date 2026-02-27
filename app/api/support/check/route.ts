@@ -19,14 +19,9 @@ export async function GET(request: NextRequest) {
     if (!rateLimitResult.allowed) {
       logger.warn('Rate limit exceeded for support check', {
         ip: request.headers.get('x-forwarded-for'),
-        userAgent: request.headers.get('user-agent')
+        userAgent: request.headers.get('user-agent'),
       });
-      return setCorsHeaders(
-        NextResponse.json(
-          { error: ERROR_TOO_MANY_REQUESTS },
-          { status: 429 }
-        )
-      );
+      return setCorsHeaders(NextResponse.json({ error: ERROR_TOO_MANY_REQUESTS }, { status: 429 }));
     }
 
     const authResult = await checkAuth(request);
@@ -34,8 +29,8 @@ export async function GET(request: NextRequest) {
       return setCorsHeaders(
         NextResponse.json({
           isAuthenticated: false,
-          hasSupportAccess: false
-        })
+          hasSupportAccess: false,
+        }),
       );
     }
     const user = authResult.user;
@@ -50,19 +45,19 @@ export async function GET(request: NextRequest) {
       // Если ошибка БД, возвращаем информацию о пользователе, но без доступа
       logger.error('Database error in support check', {
         error: dbError instanceof Error ? dbError.message : 'Unknown error',
-        userId: user.id
+        userId: user.id,
       });
-        return setCorsHeaders(
-          NextResponse.json({
-            isAuthenticated: true,
-            hasSupportAccess: false,
-            username: user.username,
-            userId: user.id,
-            user_id: user.user_id,
-            token: currentToken, // Valid device token from cookie
-            error: 'Database not configured'
-          })
-        );
+      return setCorsHeaders(
+        NextResponse.json({
+          isAuthenticated: true,
+          hasSupportAccess: false,
+          username: user.username,
+          userId: user.id,
+          user_id: user.user_id,
+          token: currentToken, // Valid device token from cookie
+          error: 'Database not configured',
+        }),
+      );
     }
 
     return setCorsHeaders(
@@ -72,13 +67,13 @@ export async function GET(request: NextRequest) {
         username: user.username,
         userId: user.id,
         user_id: user.user_id, // Добавляем user_id для отображения
-        token: currentToken // Valid device token from cookie
-      })
+        token: currentToken, // Valid device token from cookie
+      }),
     );
   } catch (error) {
     logger.error('Error in GET /api/support/check', {
       error: error instanceof Error ? error.message : 'Unknown error',
-      ip: request.headers.get('x-forwarded-for')
+      ip: request.headers.get('x-forwarded-for'),
     });
 
     const authResult = await checkAuth(request);
@@ -92,21 +87,20 @@ export async function GET(request: NextRequest) {
           userId: user.id,
           user_id: user.user_id,
           token: user.token,
-          error: 'Database not configured'
-        })
+          error: 'Database not configured',
+        }),
       );
     }
 
     return setCorsHeaders(
       NextResponse.json(
-        { 
+        {
           error: ERROR_INTERNAL_SERVER_ERROR,
           isAuthenticated: false,
-          hasSupportAccess: false
+          hasSupportAccess: false,
         },
-        { status: 500 }
-      )
+        { status: 500 },
+      ),
     );
   }
 }
-

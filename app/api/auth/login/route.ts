@@ -22,8 +22,8 @@ export async function POST(request: NextRequest) {
       return setCorsHeaders(
         NextResponse.json(
           { error: 'Too many login attempts. Please try again later.' },
-          { status: 429 }
-        )
+          { status: 429 },
+        ),
       );
     }
 
@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
     const { username, password, csrfToken } = validation.data;
 
     const currentSessionId = request.cookies.get('session_id')?.value;
-    
+
     // Если есть session_id, CSRF токен обязателен и должен быть валидным
     // Если session_id нет, CSRF токен не требуется (первый запрос, но все равно проверяем если передан)
     if (currentSessionId) {
@@ -45,21 +45,21 @@ export async function POST(request: NextRequest) {
         return setCorsHeaders(
           NextResponse.json(
             { error: 'Invalid request. Please refresh the page.' },
-            { status: 403 }
-          )
+            { status: 403 },
+          ),
         );
       }
-      
+
       // Проверка CSRF токена - не логируем
-      
+
       const csrfValidation = await verifyCSRFToken(csrfToken, currentSessionId, true);
       if (!csrfValidation.valid) {
         // Невалидный CSRF токен - не логируем (нормальная валидация)
         return setCorsHeaders(
           NextResponse.json(
             { error: 'Invalid request. Please refresh the page and try again.' },
-            { status: 403 }
-          )
+            { status: 403 },
+          ),
         );
       }
     } else if (csrfToken) {
@@ -73,10 +73,7 @@ export async function POST(request: NextRequest) {
     if (!result.success) {
       // Неудачная попытка входа - не логируем (безопасность)
       return setCorsHeaders(
-        NextResponse.json(
-          { error: result.error || 'Authentication failed' },
-          { status: 401 }
-        )
+        NextResponse.json({ error: result.error || 'Authentication failed' }, { status: 401 }),
       );
     }
 
@@ -85,16 +82,16 @@ export async function POST(request: NextRequest) {
     const userAgent = request.headers.get('user-agent') || 'unknown';
     const hostname = request.nextUrl.hostname;
     const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
-    
+
     // Session rotation: destroy old session if exists (prevents session fixation)
     const oldSessionId = currentSessionId;
     if (oldSessionId) {
       await SessionManager.destroySession(oldSessionId);
       await revokeCSRFToken(oldSessionId);
     }
-    
+
     const user = result.user!;
-    
+
     // Register device and get new token
     const token = await SessionManager.registerDevice(user.id, userAgent, ipAddress);
 
@@ -104,7 +101,7 @@ export async function POST(request: NextRequest) {
       ipAddress,
       userAgent,
       token,
-      'user'
+      'user',
     );
 
     await revokeCSRFToken(sessionId);
@@ -112,7 +109,7 @@ export async function POST(request: NextRequest) {
 
     const response = NextResponse.json(
       { message: 'Login successful', user_id: user.user_id },
-      { status: 200 }
+      { status: 200 },
     );
 
     response.cookies.set('token', token, {
@@ -120,14 +117,15 @@ export async function POST(request: NextRequest) {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production' && !isLocalhost,
       sameSite: 'strict',
-      path: '/'
+      path: '/',
     });
 
     const { hasUserRole } = await import('@/lib/auth/user-roles');
     const isAdmin = await hasUserRole(user.id, 'admin');
     const isSupport = await hasUserRole(user.id, 'support');
 
-    const { createUserDataCookie, USER_DATA_COOKIE_NAME, getUserDataCookieOptions } = await import('@/lib/auth/user-cookie.server');
+    const { createUserDataCookie, USER_DATA_COOKIE_NAME, getUserDataCookieOptions } =
+      await import('@/lib/auth/user-cookie.server');
     const userDataValue = createUserDataCookie({
       user_id: user.user_id,
       username: user.username,
@@ -135,19 +133,18 @@ export async function POST(request: NextRequest) {
       banner: user.banner ?? null,
       pex: isAdmin ? 'a' : isSupport ? 's' : 'u',
     });
-    response.cookies.set(USER_DATA_COOKIE_NAME, userDataValue, getUserDataCookieOptions(isLocalhost));
+    response.cookies.set(
+      USER_DATA_COOKIE_NAME,
+      userDataValue,
+      getUserDataCookieOptions(isLocalhost),
+    );
 
     return setCorsHeaders(response);
   } catch (error) {
     logger.error('Login error', {
       error: error instanceof Error ? error.message : 'Unknown error',
-      ip: request.headers.get('x-forwarded-for')
+      ip: request.headers.get('x-forwarded-for'),
     });
-    return setCorsHeaders(
-      NextResponse.json(
-        { error: 'Internal server error' },
-        { status: 500 }
-      )
-    );
+    return setCorsHeaders(NextResponse.json({ error: 'Internal server error' }, { status: 500 }));
   }
 }

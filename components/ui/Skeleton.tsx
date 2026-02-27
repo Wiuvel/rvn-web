@@ -17,7 +17,3 @@ export default function Skeleton() {
     </div>
   );
 }
-
-
-
-

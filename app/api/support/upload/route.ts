@@ -23,46 +23,26 @@ export async function POST(request: NextRequest) {
     // Базовая проверка rate limit по IP
     const generalRateLimitResult = await generalRateLimit.check(request);
     if (!generalRateLimitResult.allowed) {
-      return setCorsHeaders(
-        NextResponse.json(
-          { error: 'TOO_MANY_REQUESTS' },
-          { status: 429 }
-        )
-      );
+      return setCorsHeaders(NextResponse.json({ error: 'TOO_MANY_REQUESTS' }, { status: 429 }));
     }
 
     const authResult = await checkAuth(request);
     if (!authResult.isAuthenticated || !authResult.user) {
-      return setCorsHeaders(
-        NextResponse.json(
-          { error: 'NOT_AUTHENTICATED' },
-          { status: 401 }
-        )
-      );
+      return setCorsHeaders(NextResponse.json({ error: 'NOT_AUTHENTICATED' }, { status: 401 }));
     }
     const user = authResult.user;
 
     // Получаем ticketId из query параметров
     const { searchParams } = new URL(request.url);
     const ticketId = searchParams.get('ticketId');
-    
+
     if (!ticketId) {
-      return setCorsHeaders(
-        NextResponse.json(
-          { error: 'TICKET_ID_REQUIRED' },
-          { status: 400 }
-        )
-      );
+      return setCorsHeaders(NextResponse.json({ error: 'TICKET_ID_REQUIRED' }, { status: 400 }));
     }
 
     // Проверяем, что тикет существует и принадлежит пользователю
     if (!supabaseAdmin) {
-      return setCorsHeaders(
-        NextResponse.json(
-          { error: 'INTERNAL_SERVER_ERROR' },
-          { status: 500 }
-        )
-      );
+      return setCorsHeaders(NextResponse.json({ error: 'INTERNAL_SERVER_ERROR' }, { status: 500 }));
     }
 
     const { data: ticket, error: ticketError } = await supabaseAdmin
@@ -72,31 +52,18 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (ticketError || !ticket) {
-      return setCorsHeaders(
-        NextResponse.json(
-          { error: 'TICKET_NOT_FOUND' },
-          { status: 404 }
-        )
-      );
+      return setCorsHeaders(NextResponse.json({ error: 'TICKET_NOT_FOUND' }, { status: 404 }));
     }
 
     // Проверяем права доступа
     if (ticket.user_id !== user.id) {
-      return setCorsHeaders(
-        NextResponse.json(
-          { error: 'ACCESS_DENIED' },
-          { status: 403 }
-        )
-      );
+      return setCorsHeaders(NextResponse.json({ error: 'ACCESS_DENIED' }, { status: 403 }));
     }
 
     // Проверяем, что тикет не закрыт
     if (ticket.status === 'closed') {
       return setCorsHeaders(
-        NextResponse.json(
-          { error: 'CANNOT_UPLOAD_TO_CLOSED_TICKET' },
-          { status: 400 }
-        )
+        NextResponse.json({ error: 'CANNOT_UPLOAD_TO_CLOSED_TICKET' }, { status: 400 }),
       );
     }
 
@@ -105,26 +72,21 @@ export async function POST(request: NextRequest) {
     const files = formData.getAll('files') as File[];
 
     if (!files || files.length === 0) {
-      return setCorsHeaders(
-        NextResponse.json(
-          { error: 'NO_FILES_PROVIDED' },
-          { status: 400 }
-        )
-      );
+      return setCorsHeaders(NextResponse.json({ error: 'NO_FILES_PROVIDED' }, { status: 400 }));
     }
 
     if (files.length > MAX_FILES_PER_REQUEST) {
       return setCorsHeaders(
         NextResponse.json(
           { error: `MAXIMUM_${MAX_FILES_PER_REQUEST}_FILES_ALLOWED` },
-          { status: 400 }
-        )
+          { status: 400 },
+        ),
       );
     }
 
     // Валидируем и загружаем файлы
     const uploadResults = [];
-    
+
     for (const file of files) {
       // Валидация файла
       const validation = validateFile({
@@ -135,10 +97,7 @@ export async function POST(request: NextRequest) {
 
       if (!validation.valid) {
         return setCorsHeaders(
-          NextResponse.json(
-            { error: validation.error || 'INVALID_FILE' },
-            { status: 400 }
-          )
+          NextResponse.json({ error: validation.error || 'INVALID_FILE' }, { status: 400 }),
         );
       }
 
@@ -185,15 +144,10 @@ export async function POST(request: NextRequest) {
       NextResponse.json({
         success: true,
         files: uploadResults,
-      })
+      }),
     );
   } catch (error) {
     console.error('Error uploading file:', error);
-    return setCorsHeaders(
-      NextResponse.json(
-        { error: 'INTERNAL_SERVER_ERROR' },
-        { status: 500 }
-      )
-    );
+    return setCorsHeaders(NextResponse.json({ error: 'INTERNAL_SERVER_ERROR' }, { status: 500 }));
   }
 }

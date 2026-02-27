@@ -19,9 +19,7 @@ export async function GET(request: NextRequest) {
         ip: request.headers.get('x-forwarded-for'),
         userAgent: request.headers.get('user-agent'),
       });
-      return setCorsHeaders(
-        NextResponse.json({ error: 'Too many requests' }, { status: 429 }),
-      );
+      return setCorsHeaders(NextResponse.json({ error: 'Too many requests' }, { status: 429 }));
     }
 
     if (!supabaseAdmin) {
@@ -36,20 +34,21 @@ export async function GET(request: NextRequest) {
     const token = cookieStore.get('admin_token')?.value;
 
     if (!sessionId) {
-      return setCorsHeaders(
-        NextResponse.json({ error: 'Unauthorized' }, { status: 401 }),
-      );
+      return setCorsHeaders(NextResponse.json({ error: 'Unauthorized' }, { status: 401 }));
     }
 
     const ipAddress = request.headers.get('x-forwarded-for') || 'unknown';
     const userAgent = request.headers.get('user-agent') || 'unknown';
 
-    const validation = await SessionManager.validateSession(sessionId, token || '', ipAddress, userAgent);
+    const validation = await SessionManager.validateSession(
+      sessionId,
+      token || '',
+      ipAddress,
+      userAgent,
+    );
 
     if (!validation.valid) {
-      return setCorsHeaders(
-        NextResponse.json({ error: 'Unauthorized' }, { status: 401 }),
-      );
+      return setCorsHeaders(NextResponse.json({ error: 'Unauthorized' }, { status: 401 }));
     }
 
     const { searchParams } = new URL(request.url);
@@ -80,9 +79,7 @@ export async function GET(request: NextRequest) {
         error: error.message,
         code: error.code,
       });
-      return setCorsHeaders(
-        NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 }),
-      );
+      return setCorsHeaders(NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 }));
     }
 
     // Загружаем роли для каждого пользователя с таймаутом и обработкой ошибок
@@ -94,7 +91,7 @@ export async function GET(request: NextRequest) {
           const timeoutPromise = new Promise<UserRole[]>((_, reject) => {
             setTimeout(() => reject(new Error('Timeout')), 2000);
           });
-          
+
           const roles = await Promise.race([rolesPromise, timeoutPromise]);
           return { ...user, roles };
         } catch {
@@ -102,13 +99,13 @@ export async function GET(request: NextRequest) {
           // чтобы не замедлять загрузку таблицы
           return { ...user, roles: ['user'] as UserRole[] };
         }
-      })
-    ).then(results => 
-      results.map((result, index) => 
-        result.status === 'fulfilled' 
-          ? result.value 
-          : { ...(data ?? [])[index], roles: ['user'] as UserRole[] }
-      )
+      }),
+    ).then((results) =>
+      results.map((result, index) =>
+        result.status === 'fulfilled'
+          ? result.value
+          : { ...(data ?? [])[index], roles: ['user'] as UserRole[] },
+      ),
     );
 
     return setCorsHeaders(
@@ -122,9 +119,6 @@ export async function GET(request: NextRequest) {
       stack: error instanceof Error ? error.stack : undefined,
       ip: request.headers.get('x-forwarded-for'),
     });
-    return setCorsHeaders(
-      NextResponse.json({ error: 'Internal server error' }, { status: 500 }),
-    );
+    return setCorsHeaders(NextResponse.json({ error: 'Internal server error' }, { status: 500 }));
   }
 }
-

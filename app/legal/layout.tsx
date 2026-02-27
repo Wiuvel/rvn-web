@@ -1,13 +1,13 @@
-import type { Metadata, Viewport } from "next";
-import "../globals.css";
-import "./legal.css";
-import { pageMetadata } from "@/lib/utils/seo";
-import ScrollToTop from "@/components/layout/ScrollToTop";
+import type { Metadata, Viewport } from 'next';
+import '../globals.css';
+import './legal.css';
+import { pageMetadata } from '@/lib/utils/seo';
+import ScrollToTop from '@/components/layout/ScrollToTop';
 
 export const metadata: Metadata = pageMetadata.legal;
 
 export const viewport: Viewport = {
-  themeColor: "#0f7fdb",
+  themeColor: '#0f7fdb',
 };
 
 export default function LegalLayout({
@@ -22,4 +22,3 @@ export default function LegalLayout({
     </div>
   );
 }
-

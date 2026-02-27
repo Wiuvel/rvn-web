@@ -1,18 +1,81 @@
 'use client';
 
-import { useState, useEffect, useLayoutEffect } from 'react';
+import { useMemo, useLayoutEffect, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import useSWR from 'swr';
 import { UserData } from '@/types';
-import { AUTH_FETCH_TIMEOUT } from '@/lib/utils/constants';
 import { parseUserDataCookieClient } from '@/lib/auth/user-cookie.client';
+
+/** Response shape from /api/auth/me */
+interface AuthMeResponse {
+  authenticated?: boolean;
+  id?: string;
+  user_id?: string;
+  username?: string;
+  token?: string;
+  created_at?: string;
+  last_login?: string;
+  avatar?: string | null;
+  banner?: string | null;
+  isSupport?: boolean;
+  isAdmin?: boolean;
+}
+
+function toUserData(data: AuthMeResponse | null): UserData | null {
+  if (!data || data.authenticated === false || !data.user_id) return null;
+  const pex = data.isAdmin ? 'a' : data.isSupport ? 's' : 'u';
+  return {
+    id: data.id || data.user_id,
+    user_id: data.user_id,
+    username: data.username || '',
+    created_at: data.created_at || '',
+    last_login: data.last_login,
+    avatar: data.avatar ?? null,
+    banner: data.banner ?? null,
+    token: data.token,
+    isSupport: data.isSupport,
+    isAdmin: data.isAdmin,
+    pex,
+  };
+}
+
+function cookieToFallbackData(): AuthMeResponse | null {
+  const payload = parseUserDataCookieClient();
+  if (!payload) return null;
+  const pex = payload.pex ?? 'u';
+  return {
+    authenticated: true,
+    id: payload.user_id,
+    user_id: payload.user_id,
+    username: payload.username,
+    created_at: '',
+    avatar: payload.avatar ?? null,
+    banner: payload.banner ?? null,
+    isSupport: pex === 's' || pex === 'a',
+    isAdmin: pex === 'a',
+  };
+}
+
+async function authMeFetcher(url: string): Promise<AuthMeResponse> {
+  const res = await fetch(url, { credentials: 'include', cache: 'no-store' });
+  const data = await res.json();
+  if (!res.ok) {
+    const err = new Error(data?.error || `Request failed ${res.status}`) as Error & {
+      status?: number;
+    };
+    err.status = res.status;
+    throw err;
+  }
+  return data;
+}
 
 export interface UseAuthOptions {
   requireAuth?: boolean;
   redirectOnFail?: string;
   redirectOnTimeout?: string;
-  silent?: boolean; // Не выводить ошибки в консоль
-  validateUserId?: string; // Проверять совпадение user_id (для страницы дашборда)
-  lightweight?: boolean; // Использовать только данные из cookie, без запроса к API
+  silent?: boolean;
+  validateUserId?: string;
+  lightweight?: boolean; // При true — только user_data из cookie, без SWR fetch (для Header и т.д.)
   onSuccess?: (data: UserData) => void;
   onError?: (error: Error) => void;
 }
@@ -21,7 +84,11 @@ export interface UseAuthReturn {
   userData: UserData | null;
   loading: boolean;
   error: Error | null;
+  sessionExpired: boolean;
 }
+
+const AUTH_SWR_KEY = '/api/auth/me';
+const DEDUPING_INTERVAL = 5 * 60 * 1000; // 5 минут
 
 export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
   const {
@@ -32,173 +99,78 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
     validateUserId,
     lightweight = false,
     onSuccess,
-    onError
+    onError,
   } = options;
 
-  const [userData, setUserData] = useState<UserData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
   const router = useRouter();
+  const [cookieFallback, setCookieFallback] = useState<AuthMeResponse | null>(null);
 
-  // Мгновенное отображение аватара/username из user_data cookie до первого paint
   useLayoutEffect(() => {
-    const payload = parseUserDataCookieClient();
-    if (payload) {
-      setUserData({ ...payload } as UserData);
-    }
+    setCookieFallback(cookieToFallbackData());
   }, []);
 
+  const fallbackFromCookie = cookieFallback;
+  const shouldFetch = !!fallbackFromCookie && !lightweight;
+
+  const { data, error, isLoading } = useSWR<AuthMeResponse>(
+    shouldFetch ? AUTH_SWR_KEY : null,
+    authMeFetcher,
+    {
+      fallbackData: fallbackFromCookie ?? undefined,
+      revalidateOnMount: true,
+      revalidateOnFocus: false,
+      dedupingInterval: DEDUPING_INTERVAL,
+      onSuccess: (d) => {
+        const user = toUserData(d);
+        if (user && onSuccess) onSuccess(user);
+      },
+      onError: (err) => {
+        if (onError) onError(err);
+        else if (!silent) console.error('Auth fetch error:', err);
+      },
+      onErrorRetry: (err, _key, _config, revalidate, { retryCount }) => {
+        if ((err as Error & { status?: number }).status === 401) return;
+        if (retryCount >= 2) return;
+        setTimeout(() => revalidate({ retryCount }), 2000);
+      },
+    },
+  );
+
+  const userData = useMemo(() => toUserData(data ?? fallbackFromCookie), [data, fallbackFromCookie]);
+
+  const [sessionExpired, setSessionExpired] = useState(false);
+
+  useLayoutEffect(() => {
+    const hadCookie = !!fallbackFromCookie;
+    const apiSaysUnauthenticated = data?.authenticated === false || (error && (error as Error & { status?: number }).status === 401);
+    if (hadCookie && apiSaysUnauthenticated) {
+      setSessionExpired(true);
+    }
+  }, [fallbackFromCookie, data?.authenticated, error]);
+
+  useLayoutEffect(() => {
+    if (!userData || !validateUserId || !redirectOnFail) return;
+    if (userData.user_id !== validateUserId) {
+      router.push(redirectOnFail);
+    }
+  }, [userData, validateUserId, redirectOnFail, router]);
+
   useEffect(() => {
-    let isMounted = true;
-    let controller: AbortController | null = null;
-    let timeoutId: NodeJS.Timeout | null = null;
+    if (!requireAuth || !redirectOnFail) return;
+    const unauth = data?.authenticated === false || (error && (error as Error & { status?: number }).status === 401);
+    if (unauth && !isLoading) {
+      document.cookie = 'user_data=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+      router.push(redirectOnFail);
+    }
+  }, [requireAuth, redirectOnFail, data?.authenticated, error, isLoading, router]);
 
-    const fetchUserData = async () => {
-      // Если включен lightweight режим, используем данные из cookie (уже установлены в useLayoutEffect)
-      // и не делаем запрос к API
-      if (lightweight) {
-        setLoading(false);
-        // Если данные есть, вызываем onSuccess
-        if (userData && onSuccess) {
-          onSuccess(userData);
-        }
-        return;
-      }
+  const loading = lightweight ? false : isLoading;
+  const displayData = lightweight ? toUserData(fallbackFromCookie) : userData;
 
-      try {
-        controller = new AbortController();
-        timeoutId = setTimeout(() => controller!.abort(), AUTH_FETCH_TIMEOUT);
-
-        try {
-          const response = await fetch('/api/auth/me', {
-            signal: controller.signal,
-            cache: 'no-store' // Ensure fresh data
-          });
-
-          if (timeoutId) {
-            clearTimeout(timeoutId);
-            timeoutId = null;
-          }
-
-          if (!isMounted) return;
-
-          if (response.ok) {
-            const data = await response.json();
-
-            // Проверяем, что пользователь авторизован
-            if (data.authenticated === false || !data.user_id) {
-              if (requireAuth && redirectOnFail) {
-                // Clear potentially invalid cookies on client side before redirecting
-                document.cookie = 'user_data=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
-                router.push(redirectOnFail);
-                return;
-              }
-              setUserData(null);
-              return;
-            }
-
-            // Проверяем совпадение user_id, если требуется (для страницы дашборда)
-            if (validateUserId && data.user_id !== validateUserId) {
-              if (redirectOnFail) {
-                router.push(redirectOnFail);
-                return;
-              }
-              setUserData(null);
-              return;
-            }
-
-            setUserData(data);
-            if (onSuccess) {
-              onSuccess(data);
-            }
-          } else {
-            if (requireAuth && redirectOnFail) {
-              router.push(redirectOnFail);
-              return;
-            }
-            setUserData(null);
-          }
-        } catch (fetchError: unknown) {
-          if (timeoutId) {
-            clearTimeout(timeoutId);
-            timeoutId = null;
-          }
-
-          if (!isMounted) return;
-
-          // Обработка таймаута
-          if (fetchError instanceof Error && fetchError.name === 'AbortError') {
-            const timeoutError = new Error('Request timeout');
-            setError(timeoutError);
-            
-            if (redirectOnTimeout) {
-              router.push(redirectOnTimeout);
-              return;
-            }
-            
-            if (onError) {
-              onError(timeoutError);
-            } else if (!silent) {
-              console.error('Auth check timeout');
-            }
-            return;
-          }
-
-          // Обработка других ошибок
-          const err = fetchError instanceof Error ? fetchError : new Error('Unknown error');
-          setError(err);
-          
-          if (onError) {
-            onError(err);
-          } else if (!silent) {
-            console.error('Failed to fetch user data:', err);
-          }
-
-          if (requireAuth && redirectOnFail) {
-            router.push(redirectOnFail);
-            return;
-          }
-          
-          setUserData(null);
-        }
-      } catch (error) {
-        if (!isMounted) return;
-
-        const err = error instanceof Error ? error : new Error('Unknown error');
-        setError(err);
-
-        if (onError) {
-          onError(err);
-        } else if (!silent) {
-          console.error('Failed to check auth:', err);
-        }
-
-        if (requireAuth && redirectOnFail) {
-          router.push(redirectOnFail);
-          return;
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    };
-
-    fetchUserData();
-
-    return () => {
-      isMounted = false;
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
-      if (controller) {
-        controller.abort();
-      }
-    };
-    
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [requireAuth, redirectOnFail, redirectOnTimeout, silent, validateUserId, router]);
-
-  return { userData, loading, error };
+  return {
+    userData: displayData ?? userData ?? null,
+    loading,
+    error: error ?? null,
+    sessionExpired,
+  };
 }
-

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Settings, Save, AlertTriangle, X, Calendar } from 'lucide-react';
+import { Settings, Check as Save, AlertTriangle, X, Calendar } from 'lucide-react';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 
 interface MaintenanceConfig {
@@ -18,33 +18,36 @@ interface MaintenanceModalProps {
   initialConfig?: MaintenanceConfig;
 }
 
-export default function MaintenanceModal({ isOpen, onClose, initialConfig }: MaintenanceModalProps) {
-  const [config, setConfig] = useState<MaintenanceConfig>({
-    isActive: false,
-    scheduledStart: null,
-    scheduledEnd: null,
-    message: '',
-  });
-  const [loading, setLoading] = useState(true);
+export default function MaintenanceModal({
+  isOpen,
+  onClose,
+  initialConfig,
+}: MaintenanceModalProps) {
+  const [config, setConfig] = useState<MaintenanceConfig>(
+    initialConfig || {
+      isActive: false,
+      scheduledStart: null,
+      scheduledEnd: null,
+      message: '',
+    },
+  );
+  const [loading, setLoading] = useState(!initialConfig);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
-const [mounted, setMounted] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  
   useEffect(() => {
-    if (isOpen) {
-      if (initialConfig) {
-        setConfig(initialConfig);
-        setLoading(false);
-      } else {
-        fetchConfig();
-      }
+    if (initialConfig) {
+      setConfig(initialConfig);
+      setLoading(false);
+    } else {
+      fetchConfig();
     }
-  }, [isOpen, initialConfig]);
+  }, [initialConfig]);
 
   const fetchConfig = async () => {
     setLoading(true);
@@ -108,7 +111,7 @@ const [mounted, setMounted] = useState(false);
   const handleToggle = () => {
     const newIsActive = !config.isActive;
     const updates: Partial<MaintenanceConfig> = {
-      isActive: newIsActive
+      isActive: newIsActive,
     };
 
     if (!newIsActive) {
@@ -116,13 +119,13 @@ const [mounted, setMounted] = useState(false);
       updates.scheduledEnd = null;
     }
 
-    setConfig(prev => ({ ...prev, ...updates }));
+    setConfig((prev) => ({ ...prev, ...updates }));
   };
 
   const handleStartDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newStartDate = e.target.value;
     const updates: Partial<MaintenanceConfig> = {
-      scheduledStart: fromInputFormat(newStartDate)
+      scheduledStart: fromInputFormat(newStartDate),
     };
 
     // Если дата окончания не установлена или меньше даты начала,
@@ -131,45 +134,59 @@ const [mounted, setMounted] = useState(false);
       updates.isActive = true; // Автоматически включаем чекбокс
       const start = new Date(newStartDate);
       const currentEnd = config.scheduledEnd ? new Date(config.scheduledEnd) : null;
-      
+
       if (!currentEnd || currentEnd <= start) {
         const autoEnd = new Date(start.getTime() + 60 * 60 * 1000); // +1 час
         updates.scheduledEnd = autoEnd.toISOString();
       }
     }
 
-    setConfig(prev => ({ ...prev, ...updates }));
+    setConfig((prev) => ({ ...prev, ...updates }));
   };
 
   if (!isOpen || !mounted) return null;
 
   return createPortal(
-    <div 
-      className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fadeIn"
+    <div
+      className="fixed inset-0 z-50 flex animate-fadeIn items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
       onClick={onClose}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ') {
+          onClose();
+        }
+      }}
+      aria-label="Close modal"
     >
-      <div 
-        className="bg-neutral-900 border border-neutral-800 rounded-xl w-full max-w-lg shadow-2xl animate-scaleIn overflow-hidden flex flex-col max-h-[90vh]"
+      <div
+        className="animate-scaleIn flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-xl border border-neutral-800 bg-neutral-900 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="maintenance-modal-title"
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-neutral-800 bg-neutral-900/50">
+        <div className="flex items-center justify-between border-b border-neutral-800 bg-neutral-900/50 p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-orange-500/10 rounded-lg">
-              <Settings className="w-5 h-5 text-orange-500" />
+            <div className="rounded-lg bg-orange-500/10 p-2">
+              <Settings className="h-5 w-5 text-orange-500" />
             </div>
-            <h2 className="text-lg font-semibold text-white">Технические работы</h2>
+            <h2 id="maintenance-modal-title" className="text-lg font-semibold text-white">
+              Технические работы
+            </h2>
           </div>
-          <button 
+          <button
             onClick={onClose}
-            className="p-2 text-neutral-400 hover:text-white hover:bg-neutral-800 rounded-lg transition-colors"
+            className="rounded-lg p-2 text-neutral-400 transition-colors hover:bg-neutral-800 hover:text-white"
           >
-            <X className="w-5 h-5" />
+            <X className="h-5 w-5" />
           </button>
         </div>
 
         {/* Content */}
-        <div className="p-6 overflow-y-auto custom-scrollbar space-y-6">
+        <div className="custom-scrollbar space-y-6 overflow-y-auto p-6">
           {loading ? (
             <div className="flex justify-center py-12">
               <LoadingSpinner size="md" />
@@ -177,25 +194,27 @@ const [mounted, setMounted] = useState(false);
           ) : (
             <>
               {message && (
-                <div className={`p-3 rounded-lg text-sm ${message.type === 'success' ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'} animate-fadeIn`}>
+                <div
+                  className={`rounded-lg p-3 text-sm ${message.type === 'success' ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'} animate-fadeIn`}
+                >
                   {message.text}
                 </div>
               )}
 
               {/* Toggle */}
-              <div className="flex items-center justify-between p-4 bg-neutral-800/50 rounded-xl border border-neutral-700/50">
+              <div className="flex items-center justify-between rounded-xl border border-neutral-700/50 bg-neutral-800/50 p-4">
                 <div>
                   <h3 className="font-medium text-white">Режим обслуживания</h3>
                   <p className="text-sm text-neutral-400">Включить заглушку</p>
                 </div>
                 <button
                   onClick={handleToggle}
-                  className={`relative w-12 h-6 rounded-full transition-colors duration-200 focus:outline-none ${
+                  className={`relative h-6 w-12 rounded-full transition-colors duration-200 focus:outline-none ${
                     config.isActive ? 'bg-blue-600' : 'bg-neutral-700'
                   }`}
                 >
                   <span
-                    className={`absolute top-1 left-1 bg-white w-4 h-4 rounded-full transition-transform duration-200 ${
+                    className={`absolute left-1 top-1 h-4 w-4 rounded-full bg-white transition-transform duration-200 ${
                       config.isActive ? 'translate-x-6' : 'translate-x-0'
                     }`}
                   />
@@ -205,73 +224,84 @@ const [mounted, setMounted] = useState(false);
               {/* Schedule */}
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-neutral-300 flex items-center gap-2">
-                    <Calendar className="w-4 h-4 text-blue-400" />
+                  <label
+                    htmlFor="start-date"
+                    className="flex items-center gap-2 text-sm font-medium text-neutral-300"
+                  >
+                    <Calendar className="h-4 w-4 text-blue-400" />
                     Начало работ
                   </label>
                   <input
+                    id="start-date"
                     type="datetime-local"
                     value={toInputFormat(config.scheduledStart)}
                     onChange={handleStartDateChange}
-                    className="w-full px-3 py-2.5 bg-neutral-800 border border-neutral-700 rounded-lg text-white focus:outline-none focus:border-blue-500 transition-colors"
+                    className="w-full rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-2.5 text-white transition-colors focus:border-blue-500 focus:outline-none"
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-neutral-300 flex items-center gap-2">
-                    <Calendar className="w-4 h-4 text-purple-400" />
+                  <label
+                    htmlFor="end-date"
+                    className="flex items-center gap-2 text-sm font-medium text-neutral-300"
+                  >
+                    <Calendar className="h-4 w-4 text-purple-400" />
                     Окончание работ
                   </label>
                   <input
+                    id="end-date"
                     type="datetime-local"
                     value={toInputFormat(config.scheduledEnd)}
-                    onChange={(e) => setConfig({ ...config, scheduledEnd: fromInputFormat(e.target.value) })}
-                    className="w-full px-3 py-2.5 bg-neutral-800 border border-neutral-700 rounded-lg text-white focus:outline-none focus:border-blue-500 transition-colors"
+                    onChange={(e) =>
+                      setConfig({ ...config, scheduledEnd: fromInputFormat(e.target.value) })
+                    }
+                    className="w-full rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-2.5 text-white transition-colors focus:border-blue-500 focus:outline-none"
                   />
                 </div>
               </div>
 
               {/* Message */}
               <div className="space-y-2">
-                <label className="text-sm font-medium text-neutral-300">Сообщение</label>
+                <label htmlFor="message" className="text-sm font-medium text-neutral-300">
+                  Сообщение
+                </label>
                 <textarea
+                  id="message"
                   value={config.message}
                   onChange={(e) => setConfig({ ...config, message: e.target.value })}
                   placeholder="Мы проводим плановое обновление..."
                   rows={3}
-                  className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-white focus:outline-none focus:border-blue-500 resize-none"
+                  className="w-full resize-none rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-2 text-white focus:border-blue-500 focus:outline-none"
                 />
               </div>
 
               {/* Info */}
-              <div className="flex items-start gap-2 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg text-xs text-yellow-200">
-                <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                <p>
-                  Администраторы по-прежнему смогут заходить на сайт.
-                </p>
+              <div className="flex items-start gap-2 rounded-lg border border-yellow-500/20 bg-yellow-500/10 p-3 text-xs text-yellow-200">
+                <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                <p>Администраторы по-прежнему смогут заходить на сайт.</p>
               </div>
             </>
           )}
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-neutral-800 bg-neutral-900/50 flex gap-3">
+        <div className="flex gap-3 border-t border-neutral-800 bg-neutral-900/50 p-4">
           <button
             onClick={onClose}
-            className="flex-1 px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-white rounded-lg transition-colors font-medium text-sm"
+            className="flex-1 rounded-lg bg-neutral-800 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-neutral-700"
           >
             Отмена
           </button>
           <button
             onClick={handleSave}
             disabled={saving || loading}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-600/50 text-white rounded-lg transition-colors font-medium text-sm"
+            className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:bg-blue-600/50"
           >
-            {saving ? <LoadingSpinner size="sm" /> : <Save className="w-4 h-4" />}
+            {saving ? <LoadingSpinner size="sm" /> : <Save className="h-4 w-4" />}
             Сохранить
           </button>
         </div>
       </div>
     </div>,
-    document.body
+    document.body,
   );
 }

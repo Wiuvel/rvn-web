@@ -95,3 +95,35 @@ export interface AdminUsersResponse extends ApiResponse {
   users?: UserData[];
   total?: number;
 }
+
+export interface PanelUser {
+  id: string;
+  user_id: string;
+  username: string;
+  created_at: string;
+  last_login?: string | null;
+  is_active: boolean;
+  token?: string;
+  roles?: string[];
+}
+
+/**
+ * Types for profile comments API
+ */
+export interface CommentAuthor {
+  id: string;
+  username: string;
+  user_id: string;
+  avatar?: string | null;
+}
+
+export interface Comment {
+  id: string;
+  profile_id: string;
+  author_id: string;
+  parent_id?: string | null;
+  content: string;
+  is_pinned: boolean;
+  created_at: string;
+  author: CommentAuthor;
+}

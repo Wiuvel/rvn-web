@@ -22,8 +22,8 @@ export async function POST(request: NextRequest) {
       return setCorsHeaders(
         NextResponse.json(
           { error: 'Too many registration attempts. Please try again later.' },
-          { status: 429 }
-        )
+          { status: 429 },
+        ),
       );
     }
 
@@ -39,12 +39,7 @@ export async function POST(request: NextRequest) {
     const currentSessionId = request.cookies.get('session_id')?.value;
     if (currentSessionId && csrfToken && !(await verifyCSRFToken(csrfToken, currentSessionId))) {
       // Невалидный CSRF токен - не логируем
-      return setCorsHeaders(
-        NextResponse.json(
-          { error: 'Invalid request' },
-          { status: 403 }
-        )
-      );
+      return setCorsHeaders(NextResponse.json({ error: 'Invalid request' }, { status: 403 }));
     }
 
     const result = await createUser(username, password);
@@ -52,10 +47,7 @@ export async function POST(request: NextRequest) {
     if (!result.success) {
       // Неудачная попытка создания - не логируем
       return setCorsHeaders(
-        NextResponse.json(
-          { error: result.error || 'Failed to create account' },
-          { status: 400 }
-        )
+        NextResponse.json({ error: result.error || 'Failed to create account' }, { status: 400 }),
       );
     }
 
@@ -74,14 +66,14 @@ export async function POST(request: NextRequest) {
       ipAddress,
       userAgent,
       token,
-      'user'
+      'user',
     );
 
     await SessionManager.setSessionCookie(sessionId, isLocalhost);
 
     const response = NextResponse.json(
       { message: 'User created successfully', user_id: user.user_id },
-      { status: 201 }
+      { status: 201 },
     );
 
     const { appConfig } = await import('@/lib/utils/config');
@@ -91,33 +83,30 @@ export async function POST(request: NextRequest) {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production' && !isLocalhost,
       sameSite: 'strict',
-      path: '/'
+      path: '/',
     });
 
-    const { createUserDataCookie, USER_DATA_COOKIE_NAME, getUserDataCookieOptions } = await import('@/lib/auth/user-cookie.server');
-    response.cookies.set(USER_DATA_COOKIE_NAME, createUserDataCookie({
-      user_id: user.user_id,
-      username: user.username,
-      avatar: user.avatar ?? null,
-      banner: user.banner ?? null,
-      pex: 'u',
-    }), getUserDataCookieOptions(isLocalhost));
+    const { createUserDataCookie, USER_DATA_COOKIE_NAME, getUserDataCookieOptions } =
+      await import('@/lib/auth/user-cookie.server');
+    response.cookies.set(
+      USER_DATA_COOKIE_NAME,
+      createUserDataCookie({
+        user_id: user.user_id,
+        username: user.username,
+        avatar: user.avatar ?? null,
+        banner: user.banner ?? null,
+        pex: 'u',
+      }),
+      getUserDataCookieOptions(isLocalhost),
+    );
     // Успешная регистрация - не логируем
 
     return setCorsHeaders(response);
   } catch (error) {
     logger.error('Registration error', {
       error: error instanceof Error ? error.message : 'Unknown error',
-      ip: request.headers.get('x-forwarded-for')
+      ip: request.headers.get('x-forwarded-for'),
     });
-    return setCorsHeaders(
-      NextResponse.json(
-        { error: 'Internal server error' },
-        { status: 500 }
-      )
-    );
+    return setCorsHeaders(NextResponse.json({ error: 'Internal server error' }, { status: 500 }));
   }
 }
-
-
-

@@ -35,8 +35,13 @@ export default function MobileNavigation() {
 
   const { userData, loading } = useAuth({ silent: true, lightweight: true });
 
+  // Не показываем MobileMenu для страницы /protection/
+  const shouldRender = !(pathname === '/protection' || pathname?.startsWith('/protection/'));
+
   // ── GSAP: initialize hidden state on mount ──
   useEffect(() => {
+    if (!shouldRender) return;
+
     // Force reset GSAP state on mount to ensure clean state
     if (overlayRef.current) {
       gsap.killTweensOf(overlayRef.current);
@@ -48,11 +53,11 @@ export default function MobileNavigation() {
     }
     // Also ensure body overflow is reset
     document.body.style.overflow = '';
-  }, []);
+  }, [shouldRender]);
 
   // ── GSAP: animate open / close ──
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || !shouldRender) return;
 
     // Kill running tweens before starting new ones
     if (overlayRef.current) gsap.killTweensOf(overlayRef.current);
@@ -84,9 +89,10 @@ export default function MobileNavigation() {
     } else {
       // Skip close animation if never opened (e.g. initial render)
       if (!hasOpened.current) {
-         if (overlayRef.current) gsap.set(overlayRef.current, { display: 'none', xPercent: 100 });
-         if (backdropRef.current) gsap.set(backdropRef.current, { display: 'none', opacity: 0, pointerEvents: 'none' });
-         return;
+        if (overlayRef.current) gsap.set(overlayRef.current, { display: 'none', xPercent: 100 });
+        if (backdropRef.current)
+          gsap.set(backdropRef.current, { display: 'none', opacity: 0, pointerEvents: 'none' });
+        return;
       }
 
       // Overlay: slide out to right
@@ -108,7 +114,8 @@ export default function MobileNavigation() {
           duration: 0.22,
           ease: 'power2.in',
           onComplete() {
-            if (backdropRef.current) gsap.set(backdropRef.current, { display: 'none', pointerEvents: 'none' });
+            if (backdropRef.current)
+              gsap.set(backdropRef.current, { display: 'none', pointerEvents: 'none' });
           },
         });
       }
@@ -118,12 +125,14 @@ export default function MobileNavigation() {
 
     return () => {
       // Clean up overflow only on unmount, NOT on every effect run
-      // document.body.style.overflow = ''; 
+      // document.body.style.overflow = '';
     };
   }, [isOpen]);
 
   // ── Close overlay only when route actually changes (not on mount/hydration) ──
   useEffect(() => {
+    if (!shouldRender) return;
+
     const prev = prevPathnameRef.current;
     if (prev !== null && prev !== pathname) {
       if (isOpen) setIsOpen(false);
@@ -142,33 +151,36 @@ export default function MobileNavigation() {
     } else {
       prevPathnameRef.current = pathname;
     }
-  }, [pathname, isOpen]);
+  }, [pathname, isOpen, shouldRender]);
 
   // ── Close overlay when viewport becomes desktop (DevTools resize) ──
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || !shouldRender) return;
     const mq = window.matchMedia('(min-width: 1024px)');
     const handler = (e: MediaQueryListEvent) => {
       if (e.matches && isOpen) {
         setIsOpen(false);
         hasOpened.current = false;
         if (overlayRef.current) gsap.set(overlayRef.current, { xPercent: 100, display: 'none' });
-        if (backdropRef.current) gsap.set(backdropRef.current, { opacity: 0, display: 'none', pointerEvents: 'none' });
+        if (backdropRef.current)
+          gsap.set(backdropRef.current, { opacity: 0, display: 'none', pointerEvents: 'none' });
         document.body.style.overflow = '';
       }
     };
     mq.addEventListener('change', handler);
     return () => mq.removeEventListener('change', handler);
-  }, [isOpen]);
+  }, [isOpen, shouldRender]);
 
   // ── Cleanup on unmount ──
   useEffect(() => {
+    if (!shouldRender) return;
+
     return () => {
       if (overlayRef.current) gsap.killTweensOf(overlayRef.current);
       if (backdropRef.current) gsap.killTweensOf(backdropRef.current);
       document.body.style.overflow = '';
     };
-  }, []);
+  }, [shouldRender]);
 
   // ── Handlers ──
   const handleLogout = useCallback(async () => {
@@ -185,7 +197,7 @@ export default function MobileNavigation() {
 
   const closeOverlay = useCallback(() => setIsOpen(false), []);
   const toggleOverlay = useCallback(() => {
-    setIsOpen(prev => {
+    setIsOpen((prev) => {
       if (!prev) {
         // Opening: force-clear any stuck overflow from other components
         document.body.style.overflow = '';
@@ -197,13 +209,15 @@ export default function MobileNavigation() {
   const isActive = (path: string) => pathname === path;
   const isActivePrefix = (prefix: string) => pathname.startsWith(prefix);
 
+  if (!shouldRender) return null;
+
   return (
     <>
       {/* ===== Backdrop =====
            z-[1000] — above page content, below overlay & bottom nav */}
       <div
         ref={backdropRef}
-        className="lg:hidden fixed inset-0 z-[1000] bg-black/60 backdrop-blur-sm"
+        className="fixed inset-0 z-[1000] bg-black/60 backdrop-blur-sm lg:hidden"
         style={{ display: 'none', opacity: 0, pointerEvents: 'none' }}
         onClick={closeOverlay}
         aria-hidden="true"
@@ -213,7 +227,7 @@ export default function MobileNavigation() {
            z-[1001] — above backdrop, below bottom nav */}
       <div
         ref={overlayRef}
-        className="lg:hidden fixed top-0 right-0 bottom-0 z-[1001] w-[78%] max-w-[340px] bg-[#0A0A0A]/[0.98] backdrop-blur-2xl border-l border-white/[0.08] flex-col overflow-y-auto overscroll-contain"
+        className="fixed bottom-0 right-0 top-0 z-[1001] w-[78%] max-w-[340px] flex-col overflow-y-auto overscroll-contain border-l border-white/[0.08] bg-[#0A0A0A]/[0.98] backdrop-blur-2xl lg:hidden"
         style={{ display: 'none' }}
         role="dialog"
         aria-modal="true"
@@ -224,68 +238,84 @@ export default function MobileNavigation() {
           <span className="text-lg font-semibold text-white">Меню</span>
           <button
             onClick={closeOverlay}
-            className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-neutral-400 hover:text-white transition-all active:scale-95"
+            className="rounded-xl bg-white/5 p-2 text-neutral-400 transition-all hover:bg-white/10 hover:text-white active:scale-95"
             aria-label="Закрыть меню"
           >
-            <X className="w-5 h-5" />
+            <X className="h-5 w-5" />
           </button>
         </div>
 
         {/* User profile card */}
         <div className="px-4 pb-2">
           {loading && !userData ? (
-            <div className="flex items-center gap-4 p-4 rounded-2xl bg-white/[0.03] border border-white/5">
-              <div className="w-12 h-12 rounded-full bg-gradient-to-r from-neutral-700 via-neutral-600 to-neutral-700 bg-[length:200%_100%] animate-[shimmer_1.5s_ease-in-out_infinite] shrink-0" />
+            <div className="flex items-center gap-4 rounded-2xl border border-white/5 bg-white/[0.03] p-4">
+              <div className="h-12 w-12 shrink-0 animate-[shimmer_1.5s_ease-in-out_infinite] rounded-full bg-gradient-to-r from-neutral-700 via-neutral-600 to-neutral-700 bg-[length:200%_100%]" />
               <div className="flex-1 space-y-2">
-                <div className="h-4 w-24 rounded bg-neutral-800 animate-pulse" />
-                <div className="h-3 w-16 rounded bg-neutral-800/60 animate-pulse" />
+                <div className="h-4 w-24 animate-pulse rounded bg-neutral-800" />
+                <div className="h-3 w-16 animate-pulse rounded bg-neutral-800/60" />
               </div>
             </div>
           ) : userData ? (
             <Link
               href={`/dashboard/${userData.user_id}`}
               onClick={closeOverlay}
-              className="group flex items-center gap-3.5 p-4 rounded-2xl bg-gradient-to-br from-white/[0.04] to-white/[0.01] border border-white/5 hover:border-white/10 transition-all active:scale-[0.98]"
+              className="group flex items-center gap-3.5 rounded-2xl border border-white/5 bg-gradient-to-br from-white/[0.04] to-white/[0.01] p-4 transition-all hover:border-white/10 active:scale-[0.98]"
             >
               <div className="relative shrink-0">
                 {(() => {
                   const avatarUrl = getAvatarUrl(userData.avatar);
                   const gradientClasses = getGradientClasses(userData.avatar);
                   return (
-                    <div className={`w-12 h-12 rounded-full overflow-hidden ${avatarUrl ? '' : gradientClasses} flex items-center justify-center text-white font-bold text-lg ring-2 ring-white/10 shadow-lg`}>
+                    <div
+                      className={`h-12 w-12 overflow-hidden rounded-full ${avatarUrl ? '' : gradientClasses} flex items-center justify-center text-lg font-bold text-white shadow-lg ring-2 ring-white/10`}
+                    >
                       {avatarUrl ? (
-                        <Image src={avatarUrl} alt={userData.username} width={48} height={48} className="w-full h-full object-cover" unoptimized />
+                        <Image
+                          src={avatarUrl}
+                          alt={userData.username}
+                          width={48}
+                          height={48}
+                          className="h-full w-full object-cover"
+                          unoptimized
+                        />
                       ) : (
                         getInitial(userData.username)
                       )}
                     </div>
                   );
                 })()}
-                {(userData.pex === 'a' || userData.pex === 's' || userData.isAdmin || userData.isSupport) && (
-                  <div className="absolute -bottom-0.5 -right-0.5 bg-neutral-950 rounded-full p-0.5 ring-2 ring-neutral-950">
-                    <div className={`p-0.5 rounded-full ${userData.pex === 'a' || userData.isAdmin ? 'bg-orange-500/20 text-orange-500' : 'bg-green-500/20 text-green-500'}`}>
-                      <ShieldCheck className="w-2.5 h-2.5" />
+                {(userData.pex === 'a' ||
+                  userData.pex === 's' ||
+                  userData.isAdmin ||
+                  userData.isSupport) && (
+                  <div className="absolute -bottom-0.5 -right-0.5 rounded-full bg-neutral-950 p-0.5 ring-2 ring-neutral-950">
+                    <div
+                      className={`rounded-full p-0.5 ${userData.pex === 'a' || userData.isAdmin ? 'bg-orange-500/20 text-orange-500' : 'bg-green-500/20 text-green-500'}`}
+                    >
+                      <ShieldCheck className="h-2.5 w-2.5" />
                     </div>
                   </div>
                 )}
               </div>
               <div className="min-w-0 flex-1">
-                <div className={`font-semibold text-[15px] truncate ${userData.pex === 'a' || userData.isAdmin ? 'text-orange-400' : userData.pex === 's' || userData.isSupport ? 'text-green-400' : 'text-white'}`}>
+                <div
+                  className={`truncate text-[15px] font-semibold ${userData.pex === 'a' || userData.isAdmin ? 'text-orange-400' : userData.pex === 's' || userData.isSupport ? 'text-green-400' : 'text-white'}`}
+                >
                   {userData.username}
                 </div>
-                <div className="text-[11px] text-neutral-500 font-mono mt-0.5">
-                  <span className="bg-white/5 px-1.5 py-0.5 rounded">ID: {userData.user_id}</span>
+                <div className="mt-0.5 font-mono text-[11px] text-neutral-500">
+                  <span className="rounded bg-white/5 px-1.5 py-0.5">ID: {userData.user_id}</span>
                 </div>
               </div>
-              <ChevronRight className="w-4 h-4 text-neutral-600 group-hover:text-neutral-400 transition-colors shrink-0" />
+              <ChevronRight className="h-4 w-4 shrink-0 text-neutral-600 transition-colors group-hover:text-neutral-400" />
             </Link>
           ) : (
             <Link
               href="/auth"
               onClick={closeOverlay}
-              className="flex items-center justify-center gap-2.5 w-full py-3.5 rounded-2xl bg-primary-500 hover:bg-primary-400 text-white font-medium transition-all active:scale-[0.98] shadow-glow"
+              className="flex w-full items-center justify-center gap-2.5 rounded-2xl bg-primary-500 py-3.5 font-medium text-white shadow-glow transition-all hover:bg-primary-400 active:scale-[0.98]"
             >
-              <User className="w-5 h-5" />
+              <User className="h-5 w-5" />
               <span>Войти в аккаунт</span>
             </Link>
           )}
@@ -294,40 +324,76 @@ export default function MobileNavigation() {
         {/* Balance */}
         {userData && (
           <div className="px-4 pb-3">
-            <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-emerald-500/[0.06] border border-emerald-500/15">
-              <Wallet className="w-4 h-4 text-emerald-400" />
-              <span className="text-sm font-medium text-emerald-400">{userData.balance || 0} ₽</span>
+            <div className="flex items-center gap-2 rounded-xl border border-emerald-500/15 bg-emerald-500/[0.06] px-3 py-2.5">
+              <Wallet className="h-4 w-4 text-emerald-400" />
+              <span className="text-sm font-medium text-emerald-400">
+                {userData.balance || 0} ₽
+              </span>
             </div>
           </div>
         )}
 
-        <div className="h-px bg-white/5 mx-6 my-1" />
+        <div className="mx-6 my-1 h-px bg-white/5" />
 
         {/* Menu items */}
         <div className="flex-1 px-3 py-2">
           <div className="flex flex-col gap-0.5">
             {userData && (
               <>
-                <OverlayMenuItem href={`/dashboard/${userData.user_id}#subscriptions`} onClick={closeOverlay} icon={CreditCard} label="Мои тарифы" highlight />
-                <OverlayMenuItem href={`/dashboard/${userData.user_id}`} onClick={closeOverlay} icon={Receipt} label="Транзакции" />
-                <OverlayMenuItem href={`/dashboard/${userData.user_id}/settings`} onClick={closeOverlay} icon={Settings} label="Настройки" />
-                <div className="h-px bg-white/5 mx-2 my-2" />
-              </> 
+                <OverlayMenuItem
+                  href={`/dashboard/${userData.user_id}#subscriptions`}
+                  onClick={closeOverlay}
+                  icon={CreditCard}
+                  label="Мои тарифы"
+                  highlight
+                />
+                <OverlayMenuItem
+                  href={`/dashboard/${userData.user_id}`}
+                  onClick={closeOverlay}
+                  icon={Receipt}
+                  label="Транзакции"
+                />
+                <OverlayMenuItem
+                  href="/user/settings"
+                  onClick={closeOverlay}
+                  icon={Settings}
+                  label="Настройки"
+                />
+                <div className="mx-2 my-2 h-px bg-white/5" />
+              </>
             )}
 
-            <OverlayMenuItem href="/" onClick={closeOverlay} icon={Home} label="Главная" active={isActive('/')} />
-            <OverlayMenuItem href="/about" onClick={closeOverlay} icon={Info} label="О проекте" active={isActive('/about')} />
-            <OverlayMenuItem href="/support" onClick={closeOverlay} icon={LifeBuoy} label="Поддержка" active={isActivePrefix('/support')} />
+            <OverlayMenuItem
+              href="/"
+              onClick={closeOverlay}
+              icon={Home}
+              label="Главная"
+              active={isActive('/')}
+            />
+            <OverlayMenuItem
+              href="/about"
+              onClick={closeOverlay}
+              icon={Info}
+              label="О проекте"
+              active={isActive('/about')}
+            />
+            <OverlayMenuItem
+              href="/support"
+              onClick={closeOverlay}
+              icon={LifeBuoy}
+              label="Поддержка"
+              active={isActivePrefix('/support')}
+            />
 
             {userData && (
               <>
-                <div className="h-px bg-white/5 mx-2 my-2" />
+                <div className="mx-2 my-2 h-px bg-white/5" />
                 <button
                   onClick={handleLogout}
-                  className="group w-full flex items-center gap-3 px-3 py-3 rounded-xl text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-all active:scale-[0.98]"
+                  className="group flex w-full items-center gap-3 rounded-xl px-3 py-3 text-red-400 transition-all hover:bg-red-500/10 hover:text-red-300 active:scale-[0.98]"
                 >
-                  <span className="p-2 rounded-xl bg-red-500/10 group-hover:bg-red-500/20 transition-colors">
-                    <LogOut className="w-4 h-4" />
+                  <span className="rounded-xl bg-red-500/10 p-2 transition-colors group-hover:bg-red-500/20">
+                    <LogOut className="h-4 w-4" />
                   </span>
                   <span className="font-medium">Выйти</span>
                 </button>
@@ -342,28 +408,39 @@ export default function MobileNavigation() {
       {/* ===== Bottom Navigation Bar =====
            z-[1002] — HIGHEST layer, always clickable even when overlay is open */}
       <nav
-        className="lg:hidden fixed bottom-0 left-0 right-0 z-[1002] bg-neutral-950/95 backdrop-blur-xl border-t border-white/[0.08]"
+        className="fixed bottom-0 left-0 right-0 z-[1002] border-t border-white/[0.08] bg-neutral-950/95 backdrop-blur-xl lg:hidden"
         style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
         aria-label="Навигация"
       >
-        <div className="flex items-center justify-around h-[60px] px-1 max-w-lg mx-auto">
+        <div className="mx-auto flex h-[60px] max-w-lg items-center justify-around px-1">
           <NavItem href="/" icon={Home} label="Главная" active={isActive('/')} />
           <NavItem href="/about" icon={Info} label="О проекте" active={isActive('/about')} />
 
           {/* Center Logo Button */}
           <Link
             href="/"
-            className="flex items-center justify-center -mt-4 w-[52px] h-[52px] rounded-2xl bg-primary-500 shadow-[0_0_20px_rgba(22,163,255,0.35)] transition-all active:scale-90 hover:shadow-[0_0_28px_rgba(22,163,255,0.55)]"
+            className="-mt-4 flex h-[52px] w-[52px] items-center justify-center rounded-2xl bg-primary-500 shadow-[0_0_20px_rgba(22,163,255,0.35)] transition-all hover:shadow-[0_0_28px_rgba(22,163,255,0.55)] active:scale-90"
           >
-            <Image src={getStaticUrl('/static/logo.svg')} alt="RVN" width={28} height={28} className="w-6 h-6" />
+            <Image
+              src={getStaticUrl('/static/logo.svg')}
+              alt="RVN"
+              width={28}
+              height={28}
+              className="h-6 w-6"
+            />
           </Link>
 
-          <NavItem href="/support" icon={LifeBuoy} label="Помощь" active={isActivePrefix('/support')} />
+          <NavItem
+            href="/support"
+            icon={LifeBuoy}
+            label="Помощь"
+            active={isActivePrefix('/support')}
+          />
 
           {/* Menu toggle — always clickable because nav is z-[70] */}
           <button
             onClick={toggleOverlay}
-            className={`flex flex-col items-center justify-center gap-0.5 min-w-[52px] py-1 transition-colors ${isOpen ? 'text-white' : 'text-neutral-500 active:text-neutral-300'}`}
+            className={`flex min-w-[52px] flex-col items-center justify-center gap-0.5 py-1 transition-colors ${isOpen ? 'text-white' : 'text-neutral-500 active:text-neutral-300'}`}
             aria-label={isOpen ? 'Закрыть меню' : 'Открыть меню'}
             aria-expanded={isOpen}
           >
@@ -372,9 +449,18 @@ export default function MobileNavigation() {
                 const avatarUrl = getAvatarUrl(userData.avatar);
                 const gradientClasses = getGradientClasses(userData.avatar);
                 return (
-                  <div className={`w-6 h-6 rounded-full overflow-hidden ${avatarUrl ? '' : gradientClasses} flex items-center justify-center text-[9px] font-bold ring-[1.5px] ${isOpen ? 'ring-primary-400' : 'ring-white/15'} transition-all`}>
+                  <div
+                    className={`h-6 w-6 overflow-hidden rounded-full ${avatarUrl ? '' : gradientClasses} flex items-center justify-center text-[9px] font-bold ring-[1.5px] ${isOpen ? 'ring-primary-400' : 'ring-white/15'} transition-all`}
+                  >
                     {avatarUrl ? (
-                      <Image src={avatarUrl} alt="" width={24} height={24} className="w-full h-full object-cover" unoptimized />
+                      <Image
+                        src={avatarUrl}
+                        alt=""
+                        width={24}
+                        height={24}
+                        className="h-full w-full object-cover"
+                        unoptimized
+                      />
                     ) : (
                       <span className="text-white">{getInitial(userData.username)}</span>
                     )}
@@ -382,7 +468,7 @@ export default function MobileNavigation() {
                 );
               })()
             ) : (
-              <Menu className="w-5 h-5" />
+              <Menu className="h-5 w-5" />
             )}
             <span className="text-[10px] font-medium leading-tight">Меню</span>
           </button>
@@ -405,9 +491,9 @@ function NavItem({ href, icon: Icon, label, active }: NavItemProps) {
   return (
     <Link
       href={href}
-      className={`flex flex-col items-center justify-center gap-0.5 min-w-[52px] py-1 transition-colors ${active ? 'text-white' : 'text-neutral-500 active:text-neutral-300'}`}
+      className={`flex min-w-[52px] flex-col items-center justify-center gap-0.5 py-1 transition-colors ${active ? 'text-white' : 'text-neutral-500 active:text-neutral-300'}`}
     >
-      <Icon className="w-5 h-5" strokeWidth={active ? 2.2 : 1.8} />
+      <Icon className="h-5 w-5" strokeWidth={active ? 2.2 : 1.8} />
       <span className="text-[10px] font-medium leading-tight">{label}</span>
     </Link>
   );
@@ -422,18 +508,29 @@ interface OverlayMenuItemProps {
   active?: boolean;
 }
 
-function OverlayMenuItem({ href, onClick, icon: Icon, label, highlight, active }: OverlayMenuItemProps) {
+function OverlayMenuItem({
+  href,
+  onClick,
+  icon: Icon,
+  label,
+  highlight,
+  active,
+}: OverlayMenuItemProps) {
   return (
     <Link
       href={href}
       onClick={onClick}
-      className={`group flex items-center gap-3 px-3 py-3 rounded-xl transition-all active:scale-[0.98] ${active ? 'text-white bg-white/5' : 'text-neutral-300 hover:text-white hover:bg-white/5'}`}
+      className={`group flex items-center gap-3 rounded-xl px-3 py-3 transition-all active:scale-[0.98] ${active ? 'bg-white/5 text-white' : 'text-neutral-300 hover:bg-white/5 hover:text-white'}`}
     >
-      <span className={`p-2 rounded-xl transition-colors ${highlight ? 'bg-purple-500/10 text-purple-400 group-hover:bg-purple-500/20' : active ? 'bg-primary-500/10 text-primary-400' : 'bg-white/5 text-neutral-400 group-hover:bg-white/10 group-hover:text-white'}`}>
-        <Icon className="w-4 h-4" />
+      <span
+        className={`rounded-xl p-2 transition-colors ${highlight ? 'bg-purple-500/10 text-purple-400 group-hover:bg-purple-500/20' : active ? 'bg-primary-500/10 text-primary-400' : 'bg-white/5 text-neutral-400 group-hover:bg-white/10 group-hover:text-white'}`}
+      >
+        <Icon className="h-4 w-4" />
       </span>
-      <span className={`font-medium text-[15px] ${highlight ? 'text-purple-100' : ''}`}>{label}</span>
-      <ChevronRight className="w-4 h-4 text-neutral-700 ml-auto opacity-0 group-hover:opacity-100 transition-all" />
+      <span className={`text-[15px] font-medium ${highlight ? 'text-purple-100' : ''}`}>
+        {label}
+      </span>
+      <ChevronRight className="ml-auto h-4 w-4 text-neutral-700 opacity-0 transition-all group-hover:opacity-100" />
     </Link>
   );
 }

@@ -17,18 +17,13 @@ export async function OPTIONS() {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ path: string[] }> }
+  { params }: { params: Promise<{ path: string[] }> },
 ) {
   try {
     const { path } = await params;
-    
+
     if (!path || path.length === 0) {
-      return setCorsHeaders(
-        NextResponse.json(
-          { error: 'Invalid path' },
-          { status: 400 }
-        )
-      );
+      return setCorsHeaders(NextResponse.json({ error: 'Invalid path' }, { status: 400 }));
     }
 
     // Определяем тип ресурса (avatars или banners) и формируем путь к файлу в S3
@@ -36,7 +31,7 @@ export async function GET(
     // Для banners: path = ['banners', 'userId', 'timestamp.ext'] -> banners/userId/timestamp.ext
     let s3Key: string;
     let resourceType: 'avatar' | 'banner';
-    
+
     if (path[0] === 'banners' && path.length >= 3) {
       // Баннер: path = ['banners', 'userId', 'timestamp.ext']
       resourceType = 'banner';
@@ -46,24 +41,16 @@ export async function GET(
       resourceType = 'avatar';
       s3Key = `avatars/${path.join('/')}`;
     } else {
-      return setCorsHeaders(
-        NextResponse.json(
-          { error: 'Invalid image path' },
-          { status: 400 }
-        )
-      );
+      return setCorsHeaders(NextResponse.json({ error: 'Invalid image path' }, { status: 400 }));
     }
 
     // Валидация: путь должен начинаться с avatars/ или banners/ и содержать userId и filename
-    if ((!s3Key.startsWith('avatars/') && !s3Key.startsWith('banners/')) || 
-        (resourceType === 'avatar' && path.length < 2) ||
-        (resourceType === 'banner' && path.length < 3)) {
-      return setCorsHeaders(
-        NextResponse.json(
-          { error: 'Invalid image path' },
-          { status: 400 }
-        )
-      );
+    if (
+      (!s3Key.startsWith('avatars/') && !s3Key.startsWith('banners/')) ||
+      (resourceType === 'avatar' && path.length < 2) ||
+      (resourceType === 'banner' && path.length < 3)
+    ) {
+      return setCorsHeaders(NextResponse.json({ error: 'Invalid image path' }, { status: 400 }));
     }
 
     // Валидация: userId должен быть UUID
@@ -71,26 +58,18 @@ export async function GET(
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (!uuidRegex.test(userId)) {
       return setCorsHeaders(
-        NextResponse.json(
-          { error: 'Invalid user ID format' },
-          { status: 400 }
-        )
+        NextResponse.json({ error: 'Invalid user ID format' }, { status: 400 }),
       );
     }
 
     // Валидация: filename должен иметь допустимое расширение
     const filename = path[path.length - 1];
     const allowedExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
-    const hasValidExtension = allowedExtensions.some(ext => 
-      filename.toLowerCase().endsWith(ext)
-    );
-    
+    const hasValidExtension = allowedExtensions.some((ext) => filename.toLowerCase().endsWith(ext));
+
     if (!hasValidExtension) {
       return setCorsHeaders(
-        NextResponse.json(
-          { error: 'Invalid file extension' },
-          { status: 400 }
-        )
+        NextResponse.json({ error: 'Invalid file extension' }, { status: 400 }),
       );
     }
 
@@ -103,7 +82,7 @@ export async function GET(
       headers.set('Content-Length', cached.body.length.toString());
       headers.set('X-Cache', 'HIT');
       return setCorsHeaders(
-        new NextResponse(new Uint8Array(cached.body), { status: 200, headers })
+        new NextResponse(new Uint8Array(cached.body), { status: 200, headers }),
       );
     }
 
@@ -111,23 +90,13 @@ export async function GET(
     const client = getS3Client();
     if (!client) {
       logger.error('S3 storage is not configured');
-      return setCorsHeaders(
-        NextResponse.json(
-          { error: 'Storage not available' },
-          { status: 503 }
-        )
-      );
+      return setCorsHeaders(NextResponse.json({ error: 'Storage not available' }, { status: 503 }));
     }
 
     try {
       const s3Result = await getObjectAsBuffer(s3Key);
       if (!s3Result) {
-        return setCorsHeaders(
-          NextResponse.json(
-            { error: 'Image not found' },
-            { status: 404 }
-          )
-        );
+        return setCorsHeaders(NextResponse.json({ error: 'Image not found' }, { status: 404 }));
       }
 
       let { body, contentType } = s3Result;
@@ -140,18 +109,11 @@ export async function GET(
       headers.set('Content-Length', body.length.toString());
       headers.set('X-Cache', 'MISS');
 
-      return setCorsHeaders(
-        new NextResponse(new Uint8Array(body), { status: 200, headers })
-      );
+      return setCorsHeaders(new NextResponse(new Uint8Array(body), { status: 200, headers }));
     } catch (s3Error: unknown) {
       const err = s3Error as { name?: string; $metadata?: { httpStatusCode?: number } };
       if (err.name === 'NoSuchKey' || err.$metadata?.httpStatusCode === 404) {
-        return setCorsHeaders(
-          NextResponse.json(
-            { error: 'Image not found' },
-            { status: 404 }
-          )
-        );
+        return setCorsHeaders(NextResponse.json({ error: 'Image not found' }, { status: 404 }));
       }
       throw err;
     }
@@ -159,24 +121,17 @@ export async function GET(
     const resolvedParams = await params;
     logger.error('Error getting avatar from S3', {
       error: error instanceof Error ? error.message : 'Unknown error',
-      path: resolvedParams.path
+      path: resolvedParams.path,
     });
-    
+
     // Если файл не найден, возвращаем 404
-    if (error instanceof Error && (error.message.includes('NoSuchKey') || error.message.includes('does not exist'))) {
-      return setCorsHeaders(
-        NextResponse.json(
-          { error: 'Image not found' },
-          { status: 404 }
-        )
-      );
+    if (
+      error instanceof Error &&
+      (error.message.includes('NoSuchKey') || error.message.includes('does not exist'))
+    ) {
+      return setCorsHeaders(NextResponse.json({ error: 'Image not found' }, { status: 404 }));
     }
 
-    return setCorsHeaders(
-      NextResponse.json(
-        { error: 'Internal server error' },
-        { status: 500 }
-      )
-    );
+    return setCorsHeaders(NextResponse.json({ error: 'Internal server error' }, { status: 500 }));
   }
 }

@@ -8,14 +8,7 @@ export default function robots(): MetadataRoute.Robots {
     rules: [
       {
         userAgent: '*',
-        allow: [
-          '/',
-          '/auth',
-          '/legal/',
-          '/support',
-          '/sitemap.xml',
-          '/robots.txt'
-        ],
+        allow: ['/', '/auth', '/legal/', '/support', '/sitemap.xml', '/robots.txt'],
         disallow: [
           '/api/',
           '/dashboard/',
@@ -27,18 +20,12 @@ export default function robots(): MetadataRoute.Robots {
           '/support/help',
           '/ui/panel/',
           '/auth/oauth-handler',
-          '/ui/panel/admin/oauth-handler'
+          '/ui/panel/admin/oauth-handler',
         ],
       },
       {
         userAgent: 'Googlebot',
-        allow: [
-          '/',
-          '/auth',
-          '/legal/',
-          '/support',
-          '/sitemap.xml'
-        ],
+        allow: ['/', '/auth', '/legal/', '/support', '/sitemap.xml'],
         disallow: [
           '/api/',
           '/dashboard/',
@@ -47,18 +34,12 @@ export default function robots(): MetadataRoute.Robots {
           '/ui/',
           '/error/',
           '/auth/oauth-handler',
-          '/ui/panel/admin/oauth-handler'
+          '/ui/panel/admin/oauth-handler',
         ],
       },
       {
         userAgent: 'Bingbot',
-        allow: [
-          '/',
-          '/auth',
-          '/legal/',
-          '/support',
-          '/sitemap.xml'
-        ],
+        allow: ['/', '/auth', '/legal/', '/support', '/sitemap.xml'],
         disallow: [
           '/api/',
           '/dashboard/',
@@ -67,7 +48,7 @@ export default function robots(): MetadataRoute.Robots {
           '/ui/',
           '/error/',
           '/auth/oauth-handler',
-          '/ui/panel/admin/oauth-handler'
+          '/ui/panel/admin/oauth-handler',
         ],
       },
     ],

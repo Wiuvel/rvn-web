@@ -17,9 +17,7 @@ export async function OPTIONS() {
 export async function GET(request: NextRequest) {
   try {
     const env = getEnv();
-    const origin = domains.mainUrl.endsWith('/') 
-      ? domains.mainUrl.slice(0, -1) 
-      : domains.mainUrl;
+    const origin = domains.mainUrl.endsWith('/') ? domains.mainUrl.slice(0, -1) : domains.mainUrl;
 
     // Get state early to determine if this is a popup request
     const { searchParams } = request.nextUrl;
@@ -79,14 +77,16 @@ export async function GET(request: NextRequest) {
     // Verify CSRF state token
     // storedState already retrieved above for isPopup determination
     const cleanState = isPopup ? state.split(':')[0] : state;
-    const cleanStoredState = storedState?.includes(':popup') ? storedState.split(':')[0] : storedState;
-    
+    const cleanStoredState = storedState?.includes(':popup')
+      ? storedState.split(':')[0]
+      : storedState;
+
     if (!cleanStoredState || cleanStoredState !== cleanState) {
       // Несоответствие state - не логируем (валидация)
       const errorUrl = getErrorRedirectUrl('invalid_state', origin, isPopup);
       return setCorsHeaders(NextResponse.redirect(errorUrl));
     }
-    
+
     const redirectUri = `${origin}/api/auth/oauth/google/callback`;
 
     // Exchange authorization code for access token
@@ -106,7 +106,7 @@ export async function GET(request: NextRequest) {
 
     if (!tokenResponse.ok) {
       logger.error('Failed to exchange OAuth code', {
-        status: tokenResponse.status
+        status: tokenResponse.status,
       });
       const errorUrl = getErrorRedirectUrl('token_exchange_failed', origin, isPopup);
       return setCorsHeaders(NextResponse.redirect(errorUrl));
@@ -122,14 +122,11 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch user info from Google
-    const userInfoResponse = await fetch(
-      'https://www.googleapis.com/oauth2/v2/userinfo',
-      {
-        headers: {
-          Authorization: `Bearer ${access_token}`,
-        },
-      }
-    );
+    const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+      headers: {
+        Authorization: `Bearer ${access_token}`,
+      },
+    });
 
     if (!userInfoResponse.ok) {
       logger.error('Failed to fetch user info', { status: userInfoResponse.status });
@@ -157,8 +154,9 @@ export async function GET(request: NextRequest) {
 
     if (!user) {
       // Передаем URL аватара из Google (поле picture)
-      const createResult = await createUserFromOAuth(email, undefined, picture);
-      
+      // ВАЖНО: Мы больше не сохраняем аватарки из соцсетей, используем градиенты
+      const createResult = await createUserFromOAuth(email, undefined, undefined);
+
       if (!createResult.success || !createResult.user) {
         logger.error('Failed to create user', { error: createResult.error });
         const errorUrl = getErrorRedirectUrl('user_creation_failed', origin, isPopup);
@@ -179,13 +177,13 @@ export async function GET(request: NextRequest) {
     const userAgent = request.headers.get('user-agent') || 'unknown';
     const hostname = request.nextUrl.hostname;
     const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
-    
+
     // Destroy old session if exists
     const oldSessionId = request.cookies.get('session_id')?.value;
     if (oldSessionId) {
       await SessionManager.destroySession(oldSessionId);
     }
-    
+
     // Register device and get new token
     const token = await SessionManager.registerDevice(user.id, userAgent, ipAddress);
 
@@ -195,13 +193,16 @@ export async function GET(request: NextRequest) {
       ipAddress,
       userAgent,
       token,
-      'user'
+      'user',
     );
 
     await SessionManager.setSessionCookie(sessionId, isLocalhost);
 
-    const redirectUrl = isPopup 
-      ? new URL(`/auth/oauth-handler?provider=google&success=true&user_id=${user.user_id}&popup=true`, origin)
+    const redirectUrl = isPopup
+      ? new URL(
+          `/auth/oauth-handler?provider=google&success=true&user_id=${user.user_id}&popup=true`,
+          origin,
+        )
       : new URL(`/dashboard/${user.user_id}`, origin);
     const response = NextResponse.redirect(redirectUrl);
 
@@ -225,7 +226,7 @@ export async function GET(request: NextRequest) {
         secure: process.env.NODE_ENV === 'production' && !isLocalhost,
         sameSite: 'lax', // Changed from 'strict' to 'lax' for OAuth redirects
         path: '/',
-        ...(cookieDomain && { domain: cookieDomain })
+        ...(cookieDomain && { domain: cookieDomain }),
       });
 
       response.cookies.set('access_hash', accessHash, {
@@ -234,7 +235,7 @@ export async function GET(request: NextRequest) {
         secure: process.env.NODE_ENV === 'production' && !isLocalhost,
         sameSite: 'lax', // Changed from 'strict' to 'lax' for OAuth redirects
         path: '/',
-        ...(cookieDomain && { domain: cookieDomain })
+        ...(cookieDomain && { domain: cookieDomain }),
       });
 
       if (accessTime) {
@@ -244,7 +245,7 @@ export async function GET(request: NextRequest) {
           secure: process.env.NODE_ENV === 'production' && !isLocalhost,
           sameSite: 'lax', // Changed from 'strict' to 'lax' for OAuth redirects
           path: '/',
-          ...(cookieDomain && { domain: cookieDomain })
+          ...(cookieDomain && { domain: cookieDomain }),
         });
       }
     } else {
@@ -255,7 +256,7 @@ export async function GET(request: NextRequest) {
       const tempHash = createHash('sha256')
         .update(`${user.id}-${Date.now()}-oauth-temp`)
         .digest('hex');
-      
+
       // Set cookies with sameSite: 'lax' to ensure they're sent on redirect
       response.cookies.set('access_granted', 'true', {
         maxAge: 60 * 60 * 2, // 2 hours
@@ -263,7 +264,7 @@ export async function GET(request: NextRequest) {
         secure: process.env.NODE_ENV === 'production' && !isLocalhost,
         sameSite: 'lax', // Changed from 'strict' to 'lax' for OAuth redirects
         path: '/',
-        ...(cookieDomain && { domain: cookieDomain })
+        ...(cookieDomain && { domain: cookieDomain }),
       });
 
       response.cookies.set('access_hash', tempHash, {
@@ -272,7 +273,7 @@ export async function GET(request: NextRequest) {
         secure: process.env.NODE_ENV === 'production' && !isLocalhost,
         sameSite: 'lax', // Changed from 'strict' to 'lax' for OAuth redirects
         path: '/',
-        ...(cookieDomain && { domain: cookieDomain })
+        ...(cookieDomain && { domain: cookieDomain }),
       });
 
       response.cookies.set('access_time', Date.now().toString(), {
@@ -281,28 +282,33 @@ export async function GET(request: NextRequest) {
         secure: process.env.NODE_ENV === 'production' && !isLocalhost,
         sameSite: 'lax', // Changed from 'strict' to 'lax' for OAuth redirects
         path: '/',
-        ...(cookieDomain && { domain: cookieDomain })
+        ...(cookieDomain && { domain: cookieDomain }),
       });
     }
 
     const { appConfig } = await import('@/lib/utils/config');
-    const { createUserDataCookie, USER_DATA_COOKIE_NAME, getUserDataCookieOptions } = await import('@/lib/auth/user-cookie.server');
+    const { createUserDataCookie, USER_DATA_COOKIE_NAME, getUserDataCookieOptions } =
+      await import('@/lib/auth/user-cookie.server');
 
     response.cookies.set('token', token, {
       maxAge: appConfig.token.maxAge,
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production' && !isLocalhost,
       sameSite: 'lax',
-      path: '/'
+      path: '/',
     });
 
-    response.cookies.set(USER_DATA_COOKIE_NAME, createUserDataCookie({
-      user_id: user.user_id,
-      username: user.username,
-      avatar: user.avatar ?? null,
-      banner: user.banner ?? null,
-      pex: 'u',
-    }), getUserDataCookieOptions(isLocalhost));
+    response.cookies.set(
+      USER_DATA_COOKIE_NAME,
+      createUserDataCookie({
+        user_id: user.user_id,
+        username: user.username,
+        avatar: user.avatar ?? null,
+        banner: user.banner ?? null,
+        pex: 'u',
+      }),
+      getUserDataCookieOptions(isLocalhost),
+    );
 
     response.cookies.delete('oauth_state');
 
@@ -311,15 +317,15 @@ export async function GET(request: NextRequest) {
     return setCorsHeaders(response);
   } catch (error) {
     logger.error('OAuth callback error', {
-      error: error instanceof Error ? error.message : 'unknown error'
+      error: error instanceof Error ? error.message : 'unknown error',
     });
-    
+
     // Get origin for error redirect
     try {
       const env = getEnv();
       {
-        const origin = domains.mainUrl.endsWith('/') 
-          ? domains.mainUrl.slice(0, -1) 
+        const origin = domains.mainUrl.endsWith('/')
+          ? domains.mainUrl.slice(0, -1)
           : domains.mainUrl;
         const errorUrl = getErrorRedirectUrl('internal_error', origin, false);
         return setCorsHeaders(NextResponse.redirect(errorUrl));
@@ -327,12 +333,7 @@ export async function GET(request: NextRequest) {
     } catch {
       // Fallback to JSON error if env unavailable
     }
-    
-    return setCorsHeaders(
-      NextResponse.json(
-        { error: 'Internal server error' },
-        { status: 500 }
-      )
-    );
+
+    return setCorsHeaders(NextResponse.json({ error: 'Internal server error' }, { status: 500 }));
   }
 }

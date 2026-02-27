@@ -8,11 +8,7 @@ interface LoadingSpinnerProps {
   fullScreen?: boolean;
 }
 
-export default function LoadingSpinner({ 
-  className = '', 
-  size, 
-  fullScreen 
-}: LoadingSpinnerProps) {
+export default function LoadingSpinner({ className = '', size, fullScreen }: LoadingSpinnerProps) {
   // If fullScreen is explicitly provided, use it.
   // Otherwise: if size is provided, assume inline (fullScreen=false); else assume fullScreen=true (backward compatibility).
   const isFullScreen = fullScreen ?? (size ? false : true);
@@ -29,9 +25,7 @@ export default function LoadingSpinner({
 
   if (isFullScreen) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-neutral-950">
-        {spinner}
-      </div>
+      <div className="flex min-h-screen items-center justify-center bg-neutral-950">{spinner}</div>
     );
   }
 

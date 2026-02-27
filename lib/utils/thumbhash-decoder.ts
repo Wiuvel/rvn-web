@@ -8,10 +8,10 @@ import { thumbHashToDataURL } from 'thumbhash';
 /**
  * Decodes a base64-encoded ThumbHash string to a data URL.
  * Can be used directly as an image src for blur placeholder.
- * 
+ *
  * @param base64Hash - The base64-encoded ThumbHash string from the server
  * @returns A data URL string that can be used as an image src, or null if decoding fails
- * 
+ *
  * @example
  * const blurDataUrl = decodeThumbHash('1QcSHQRnh493V4dIh4eXh1h4kJUI');
  * // Use as: <img src={blurDataUrl} />
@@ -24,13 +24,13 @@ export function decodeThumbHash(base64Hash: string): string | null {
   try {
     // Decode base64 to binary string
     const binary = atob(base64Hash);
-    
+
     // Convert binary string to Uint8Array
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) {
       bytes[i] = binary.charCodeAt(i);
     }
-    
+
     // Generate data URL from ThumbHash bytes
     return thumbHashToDataURL(bytes);
   } catch (error) {
@@ -44,7 +44,7 @@ export function decodeThumbHash(base64Hash: string): string | null {
 
 /**
  * Checks if a string is a valid base64-encoded ThumbHash.
- * 
+ *
  * @param hash - The string to validate
  * @returns true if the string appears to be a valid base64 ThumbHash
  */
@@ -52,7 +52,7 @@ export function isValidThumbHash(hash: string | undefined | null): hash is strin
   if (!hash || typeof hash !== 'string') {
     return false;
   }
-  
+
   // ThumbHash is typically 20-30 bytes, so base64 would be ~27-40 characters
   // Also check for valid base64 characters
   const base64Regex = /^[A-Za-z0-9+/]+=*$/;

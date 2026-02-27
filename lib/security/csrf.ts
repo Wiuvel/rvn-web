@@ -24,9 +24,7 @@ export async function generateCSRFToken(sessionId: string): Promise<string> {
   const timestamp = Date.now().toString();
   const nonce = randomBytes(16).toString('hex');
   const data = `${sessionId}-${timestamp}-${nonce}`;
-  const signature = createHmac('sha256', getCSRFSecret())
-    .update(data)
-    .digest('hex');
+  const signature = createHmac('sha256', getCSRFSecret()).update(data).digest('hex');
 
   const token = `${data}-${signature}`;
   const createdAt = Date.now();
@@ -38,7 +36,9 @@ export async function generateCSRFToken(sessionId: string): Promise<string> {
 }
 
 // Функция для получения информации о токене (для отладки)
-export async function getCSRFTokenInfo(sessionId: string): Promise<{ exists: boolean; token?: string; createdAt?: number }> {
+export async function getCSRFTokenInfo(
+  sessionId: string,
+): Promise<{ exists: boolean; token?: string; createdAt?: number }> {
   const store = getCsrfStore();
   const stored = await store.get(sessionId);
   if (!stored) {
@@ -47,7 +47,7 @@ export async function getCSRFTokenInfo(sessionId: string): Promise<{ exists: boo
   return {
     exists: true,
     token: stored.token,
-    createdAt: stored.createdAt
+    createdAt: stored.createdAt,
   };
 }
 
@@ -55,17 +55,17 @@ export async function getCSRFTokenInfo(sessionId: string): Promise<{ exists: boo
 export async function verifyCSRFToken(
   token: string,
   sessionId: string,
-  detailed?: false
+  detailed?: false,
 ): Promise<boolean>;
 export async function verifyCSRFToken(
   token: string,
   sessionId: string,
-  detailed: true
+  detailed: true,
 ): Promise<{ valid: boolean; reason?: string }>;
 export async function verifyCSRFToken(
   token: string,
   sessionId: string,
-  detailed?: boolean
+  detailed?: boolean,
 ): Promise<boolean | { valid: boolean; reason?: string }> {
   try {
     if (!token || !sessionId) {
@@ -102,9 +102,7 @@ export async function verifyCSRFToken(
     }
 
     const data = `${tokenSessionId}-${timestamp}-${nonce}`;
-    const expectedSignature = createHmac('sha256', getCSRFSecret())
-      .update(data)
-      .digest('hex');
+    const expectedSignature = createHmac('sha256', getCSRFSecret()).update(data).digest('hex');
 
     const signatureBuffer = Buffer.from(signature || '', 'hex');
     const expectedBuffer = Buffer.from(expectedSignature, 'hex');
@@ -134,7 +132,10 @@ export async function verifyCSRFToken(
     return isValid;
   } catch (error) {
     if (detailed) {
-      return { valid: false, reason: `Error: ${error instanceof Error ? error.message : 'Unknown'}` };
+      return {
+        valid: false,
+        reason: `Error: ${error instanceof Error ? error.message : 'Unknown'}`,
+      };
     }
     return false;
   }

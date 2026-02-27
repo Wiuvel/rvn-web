@@ -2,23 +2,19 @@ import { headers } from 'next/headers';
 import { isMaintenanceActive, getMaintenanceConfig } from '@/lib/utils/maintenance';
 import MaintenancePage from '@/components/layout/MaintenancePage';
 
-export default async function MaintenanceGuard({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default async function MaintenanceGuard({ children }: { children: React.ReactNode }) {
   const headersList = await headers();
   const pathname = headersList.get('x-pathname') || '';
 
   try {
     // Исключаем админ-панель, API и статику
-    const isExempt = 
-      pathname.startsWith('/ui/panel') || 
-      pathname.startsWith('/api/admin') || 
-      pathname.startsWith('/api/auth') || 
-      pathname.startsWith('/auth') || 
-      pathname.startsWith('/_next') || 
-      pathname.startsWith('/static') || 
+    const isExempt =
+      pathname.startsWith('/ui/panel') ||
+      pathname.startsWith('/api/admin') ||
+      pathname.startsWith('/api/auth') ||
+      pathname.startsWith('/auth') ||
+      pathname.startsWith('/_next') ||
+      pathname.startsWith('/static') ||
       pathname.includes('favicon') ||
       pathname.startsWith('/maintenance');
 

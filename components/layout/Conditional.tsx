@@ -1,6 +1,7 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
+import { useState, useEffect } from 'react';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 import MobileNavigation from '@/components/navigation/MobileNavigation';
@@ -11,13 +12,13 @@ interface ConditionalLayoutProps {
 
 export default function ConditionalLayout({ children }: ConditionalLayoutProps) {
   const pathname = usePathname();
-  
+
   // Страницы с header и footer
   const pagesWithHeaderFooter = ['/'];
-  
+
   // Страницы только с header (без footer)
   const pagesWithHeaderOnly = ['/about'];
-  
+
   // Legal страницы
   const legalPages = [
     '/legal/privacy',
@@ -29,12 +30,20 @@ export default function ConditionalLayout({ children }: ConditionalLayoutProps) 
 
   // Страницы где мобильная навигация НЕ нужна
   const noMobileNavPages = ['/auth'];
-  
-  const isLegalPage = legalPages.some(page => pathname.startsWith(page));
+
+  const isLegalPage = legalPages.some((page) => pathname.startsWith(page));
   const isHeaderOnlyPage = pagesWithHeaderOnly.includes(pathname);
-  const shouldShowHeader = pagesWithHeaderFooter.includes(pathname) || isLegalPage || isHeaderOnlyPage;
+  const shouldShowHeader =
+    pagesWithHeaderFooter.includes(pathname) || isLegalPage || isHeaderOnlyPage;
   const shouldShowFooter = shouldShowHeader && !isLegalPage && !isHeaderOnlyPage;
-  const shouldShowMobileNav = !noMobileNavPages.some(page => pathname.startsWith(page));
+  const shouldShowMobileNav = !noMobileNavPages.some((page) => pathname.startsWith(page));
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) return null;
 
   // ─── CRITICAL: MobileNavigation is ALWAYS at the same position in the React tree
   // (last child of the root Fragment). This prevents React from remounting it
@@ -43,7 +52,7 @@ export default function ConditionalLayout({ children }: ConditionalLayoutProps) 
     <>
       {shouldShowHeader ? (
         <>
-          <Header variant="main" />
+          <Header key={pathname} variant="main" />
           <main>{children}</main>
           {shouldShowFooter && <Footer />}
         </>

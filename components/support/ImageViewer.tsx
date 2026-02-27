@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import Image from 'next/image';
 import { X, ZoomIn, ZoomOut } from 'lucide-react';
 import { gsap } from 'gsap';
 
@@ -18,7 +19,7 @@ export default function ImageViewer({ isOpen, onClose, imageUrl, alt }: ImageVie
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const modalRef = useRef<HTMLDivElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
-  const imageRef = useRef<HTMLImageElement>(null);
+  const imageRef = useRef<HTMLImageElement | null>(null);
 
   useEffect(() => {
     if (typeof window === 'undefined' || !modalRef.current || !backdropRef.current) return;
@@ -48,11 +49,11 @@ export default function ImageViewer({ isOpen, onClose, imageUrl, alt }: ImageVie
   }, [isOpen]);
 
   const handleZoomIn = () => {
-    setScale(prev => Math.min(prev + 0.25, 3));
+    setScale((prev) => Math.min(prev + 0.25, 3));
   };
 
   const handleZoomOut = () => {
-    setScale(prev => Math.max(prev - 0.25, 0.5));
+    setScale((prev) => Math.max(prev - 0.25, 0.5));
   };
 
   const handleReset = () => {
@@ -90,10 +91,12 @@ export default function ImageViewer({ isOpen, onClose, imageUrl, alt }: ImageVie
     const handleWheel = (e: WheelEvent) => {
       e.preventDefault();
       const delta = e.deltaY > 0 ? -0.1 : 0.1;
-      setScale(prev => Math.max(0.5, Math.min(3, prev + delta)));
+      setScale((prev) => Math.max(0.5, Math.min(3, prev + delta)));
     };
 
     const element = modalRef.current;
+    // passive: false required for preventDefault() to block page scroll while zooming image
+    // eslint-disable-next-line react-doctor/client-passive-event-listeners -- zoom requires preventDefault()
     element.addEventListener('wheel', handleWheel, { passive: false });
 
     return () => {
@@ -107,63 +110,80 @@ export default function ImageViewer({ isOpen, onClose, imageUrl, alt }: ImageVie
     <>
       <div
         ref={backdropRef}
-        className="fixed inset-0 bg-black/90 backdrop-blur-sm z-[2000]"
+        className="fixed inset-0 z-[2000] bg-black/90 backdrop-blur-sm"
         onClick={onClose}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            onClose();
+          }
+        }}
+        aria-label="Close image viewer"
       />
 
       <div
         ref={modalRef}
-        className="fixed inset-0 z-[2001] flex items-center justify-center p-4 pointer-events-none"
+        className="pointer-events-none fixed inset-0 z-[2001] flex items-center justify-center p-4"
       >
         <div
-          className="relative max-w-[95vw] max-h-[95vh] pointer-events-auto"
+          className="pointer-events-auto relative max-h-[95vh] max-w-[95vw]"
           onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') e.stopPropagation();
+          }}
+          role="presentation"
         >
           {/* Панель управления */}
-          <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
+          <div className="absolute right-4 top-4 z-10 flex items-center gap-2">
             <button
               onClick={handleZoomOut}
               disabled={scale <= 0.5}
-              className="p-2 bg-black/60 hover:bg-black/80 rounded-lg transition-colors disabled:opacity-50"
+              className="rounded-lg bg-black/60 p-2 transition-colors hover:bg-black/80 disabled:opacity-50"
               aria-label="Уменьшить"
             >
-              <ZoomOut className="w-5 h-5 text-white" />
+              <ZoomOut className="h-5 w-5 text-white" />
             </button>
             <button
               onClick={handleZoomIn}
               disabled={scale >= 3}
-              className="p-2 bg-black/60 hover:bg-black/80 rounded-lg transition-colors"
+              className="rounded-lg bg-black/60 p-2 transition-colors hover:bg-black/80"
               aria-label="Увеличить"
             >
-              <ZoomIn className="w-5 h-5 text-white" />
+              <ZoomIn className="h-5 w-5 text-white" />
             </button>
             <button
               onClick={onClose}
-              className="p-2 bg-black/60 hover:bg-black/80 rounded-lg transition-colors"
+              className="rounded-lg bg-black/60 p-2 transition-colors hover:bg-black/80"
               aria-label="Закрыть"
             >
-              <X className="w-5 h-5 text-white" />
+              <X className="h-5 w-5 text-white" />
             </button>
           </div>
 
           {/* Изображение */}
           <div
-            className="relative overflow-hidden cursor-move"
+            className="relative cursor-move overflow-hidden"
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseUp}
+            role="presentation"
           >
-            <img
+            <Image
               ref={imageRef}
               src={imageUrl}
               alt={alt}
-              className="max-w-full max-h-[95vh] object-contain select-none"
+              width={1920}
+              height={1080}
+              sizes="95vw"
+              className="max-h-[95vh] max-w-full select-none object-contain"
               style={{
                 transform: `scale(${scale}) translate(${position.x / scale}px, ${position.y / scale}px)`,
                 transition: isDragging ? 'none' : 'transform 0.2s ease-out',
               }}
               draggable={false}
+              unoptimized
               onError={() => {
                 // Обработка ошибки загрузки изображения
               }}
@@ -172,8 +192,8 @@ export default function ImageViewer({ isOpen, onClose, imageUrl, alt }: ImageVie
 
           {/* Информация */}
           {scale !== 1 && (
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 px-3 py-1.5 bg-black/60 rounded-lg">
-              <p className="text-white text-sm">{Math.round(scale * 100)}%</p>
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-lg bg-black/60 px-3 py-1.5">
+              <p className="text-sm text-white">{Math.round(scale * 100)}%</p>
             </div>
           )}
         </div>

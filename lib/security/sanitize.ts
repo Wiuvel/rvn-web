@@ -17,4 +17,3 @@ export function sanitizeInput(input: string): string {
     .replace(/[<>'"&]/g, '')
     .slice(0, 1000);
 }
-

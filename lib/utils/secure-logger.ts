@@ -10,7 +10,7 @@ const LOG_LEVELS: LogLevel = {
   ERROR: 'error',
   WARN: 'warn',
   INFO: 'info',
-  DEBUG: 'debug'
+  DEBUG: 'debug',
 };
 
 // Log entry structure
@@ -33,16 +33,23 @@ class SecureLogger {
     }
 
     const sensitiveFields = [
-      'password', 'password_hash', 'token', 'secret', 'key', 'auth',
-      'session', 'cookie', 'authorization', 'x-api-key', 'csrf'
+      'password',
+      'password_hash',
+      'token',
+      'secret',
+      'key',
+      'auth',
+      'session',
+      'cookie',
+      'authorization',
+      'x-api-key',
+      'csrf',
     ];
 
     const sanitized = { ...(data as Record<string, unknown>) };
-    
+
     for (const key in sanitized) {
-      if (sensitiveFields.some(field => 
-        key.toLowerCase().includes(field.toLowerCase())
-      )) {
+      if (sensitiveFields.some((field) => key.toLowerCase().includes(field.toLowerCase()))) {
         sanitized[key] = '[REDACTED]';
       } else if (key.toLowerCase().includes('ip')) {
         sanitized[key] = this.anonymizeIP(String(sanitized[key]));
@@ -57,21 +64,21 @@ class SecureLogger {
   // Anonymize IP addresses
   private anonymizeIP(ip: string): string {
     if (!ip || ip === 'unknown') return 'unknown';
-    
+
     if (ip.includes('.')) {
       const parts = ip.split('.');
       if (parts.length === 4) {
         return `${parts[0]}.${parts[1]}.${parts[2]}.xxx`;
       }
     }
-    
+
     if (ip.includes(':')) {
       const parts = ip.split(':');
       if (parts.length >= 4) {
         return `${parts[0]}:${parts[1]}:${parts[2]}:xxxx:xxxx:xxxx:xxxx:xxxx`;
       }
     }
-    
+
     return 'xxx.xxx.xxx.xxx';
   }
 
@@ -81,22 +88,26 @@ class SecureLogger {
       level,
       message,
       timestamp: new Date().toISOString(),
-      context: context ? (this.sanitizeData(context) as Record<string, unknown>) : undefined
+      context: context ? (this.sanitizeData(context) as Record<string, unknown>) : undefined,
     };
   }
 
   // Write log entry (formatted in dev, JSON in production)
   private writeLog(entry: LogEntry): void {
     if (process.env.NODE_ENV === 'development') {
-      const logMethod = entry.level === 'error' ? console.error :
-                       entry.level === 'warn' ? console.warn :
-                       entry.level === 'info' ? console.info :
-                       console.log;
-      
+      const logMethod =
+        entry.level === 'error'
+          ? console.error
+          : entry.level === 'warn'
+            ? console.warn
+            : entry.level === 'info'
+              ? console.info
+              : console.log;
+
       const levelLabel = entry.level.charAt(0).toUpperCase() + entry.level.slice(1);
       logMethod(
         `[${entry.timestamp}] ${levelLabel}: ${entry.message}`,
-        entry.context ? entry.context : ''
+        entry.context ? entry.context : '',
       );
     } else {
       console.log(JSON.stringify(entry));
@@ -131,4 +142,3 @@ class SecureLogger {
 }
 
 export const logger = new SecureLogger();
-

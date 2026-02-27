@@ -118,10 +118,16 @@ interface AuroraBackgroundProps {
 }
 
 export default function AuroraBackground(props: AuroraBackgroundProps) {
-  const { colorStops = ['#5227FF', '#7cff67', '#5227FF'], amplitude = 1.0, blend = 0.5, time, speed = 1.0 } = props;
-  
+  const {
+    colorStops = ['#5227FF', '#7cff67', '#5227FF'],
+    amplitude = 1.0,
+    blend = 0.5,
+    time,
+    speed = 1.0,
+  } = props;
+
   const ctnDom = useRef<HTMLDivElement>(null);
-  
+
   // Memoize converted colors to avoid recalculation on every frame
   const colorStopsArray = useMemo(() => {
     return colorStops.map((hex: string) => {
@@ -153,7 +159,7 @@ export default function AuroraBackground(props: AuroraBackgroundProps) {
     const renderer = new Renderer({
       alpha: true,
       premultipliedAlpha: true,
-      antialias: true
+      antialias: true,
     });
     const gl = renderer.gl;
     gl.clearColor(0, 0, 0, 0);
@@ -188,8 +194,8 @@ export default function AuroraBackground(props: AuroraBackgroundProps) {
         uAmplitude: { value: amplitudeRef.current },
         uColorStops: { value: colorStopsRef.current },
         uResolution: { value: [ctn.offsetWidth, ctn.offsetHeight] },
-        uBlend: { value: blendRef.current }
-      }
+        uBlend: { value: blendRef.current },
+      },
     });
 
     const mesh = new Mesh(gl, { geometry, program });
@@ -198,15 +204,15 @@ export default function AuroraBackground(props: AuroraBackgroundProps) {
     let animateId = 0;
     const update = (t: number) => {
       animateId = requestAnimationFrame(update);
-      
+
       const currentTime = timeRef.current !== undefined ? timeRef.current : t * 0.01;
       const currentSpeed = speedRef.current;
-      
+
       program.uniforms.uTime.value = currentTime * currentSpeed * 0.1;
       program.uniforms.uAmplitude.value = amplitudeRef.current;
       program.uniforms.uBlend.value = blendRef.current;
       program.uniforms.uColorStops.value = colorStopsRef.current;
-      
+
       renderer.render({ scene: mesh });
     };
     animateId = requestAnimationFrame(update);
@@ -225,8 +231,8 @@ export default function AuroraBackground(props: AuroraBackgroundProps) {
   }, []); // Run once on mount
 
   return (
-    <div className="fixed inset-0 overflow-hidden pointer-events-none">
-      <div ref={ctnDom} className="w-full h-full" />
+    <div className="pointer-events-none fixed inset-0 overflow-hidden">
+      <div ref={ctnDom} className="h-full w-full" />
     </div>
   );
 }

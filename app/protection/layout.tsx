@@ -7,17 +7,16 @@ export const metadata: Metadata = {
   ...pageMetadata.protection,
   robots: 'noindex, nofollow, noarchive',
   other: {
-    'googlebot': 'noindex, nofollow',
+    googlebot: 'noindex, nofollow',
   },
 };
 
-export default function ProtectionLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function ProtectionLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className={exo2.className} style={{ backgroundColor: '#0a0a0a', minHeight: '100vh', color: '#ffffff' }}>
+    <div
+      className={exo2.className}
+      style={{ backgroundColor: '#0a0a0a', minHeight: '100vh', color: '#ffffff' }}
+    >
       {children}
     </div>
   );

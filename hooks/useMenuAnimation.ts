@@ -12,7 +12,7 @@ export interface UseMenuAnimationOptions {
 
 export function useMenuAnimation(
   isOpen: boolean,
-  options: UseMenuAnimationOptions = {}
+  options: UseMenuAnimationOptions = {},
 ): {
   shouldRender: boolean;
   menuRef: React.RefObject<HTMLDivElement | null>;
@@ -34,18 +34,17 @@ export function useMenuAnimation(
       if (!shouldRender) {
         setShouldRender(true);
       }
-      
+
       requestAnimationFrame(() => {
         if (menuRef.current) {
-
           gsap.killTweensOf(menuRef.current);
-          
+
           gsap.set(menuRef.current, {
             opacity: 0,
             y: -10,
             scale: 0.95,
             pointerEvents: 'auto',
-            display: 'block'
+            display: 'block',
           });
           animationRef.current = gsap.to(menuRef.current, {
             opacity: 1,
@@ -55,23 +54,21 @@ export function useMenuAnimation(
             ease: GSAP_DEFAULT_EASE,
             onComplete: () => {
               animationRef.current = null;
-            }
+            },
           });
         }
       });
     } else {
-
       if (shouldRender || (persist && menuRef.current)) {
         if (menuRef.current) {
-
           gsap.killTweensOf(menuRef.current);
-          
+
           animationRef.current = gsap.to(menuRef.current, {
             opacity: 0,
             y: -10,
             scale: 0.95,
             duration: 0.15,
-            ease: "power2.in",
+            ease: 'power2.in',
             onComplete: () => {
               if (!persist) {
                 setShouldRender(false);
@@ -80,7 +77,7 @@ export function useMenuAnimation(
               }
               animationRef.current = null;
               if (onClose) onClose();
-            }
+            },
           });
         } else if (!persist) {
           setShouldRender(false);
@@ -118,4 +115,3 @@ export function useMenuAnimation(
 
   return { shouldRender, menuRef };
 }
-

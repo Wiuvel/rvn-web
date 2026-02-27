@@ -26,8 +26,8 @@ export function calculatePasswordStrength(password: string): PasswordStrength {
         hasUpperCase: false,
         hasLowerCase: false,
         hasNumber: false,
-        hasSpecialChar: false
-      }
+        hasSpecialChar: false,
+      },
     };
   }
 
@@ -36,7 +36,7 @@ export function calculatePasswordStrength(password: string): PasswordStrength {
     hasUpperCase: /[A-Z]/.test(password),
     hasLowerCase: /[a-z]/.test(password),
     hasNumber: /[0-9]/.test(password),
-    hasSpecialChar: /[!@#$%^&*()_+.\-=\[\]{};':"\\|,<>\/?]/.test(password)
+    hasSpecialChar: /[!@#$%^&*()_+.\-=\[\]{};':"\\|,<>\/?]/.test(password),
   };
 
   let score = 0;
@@ -77,6 +77,6 @@ export function calculatePasswordStrength(password: string): PasswordStrength {
     score: normalizedScore,
     label,
     color,
-    requirements
+    requirements,
   };
 }

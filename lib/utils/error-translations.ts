@@ -33,7 +33,7 @@ import {
   ERROR_INVALID_STATUS_TRANSITION,
   ERROR_TICKET_NOT_ASSIGNED,
   ERROR_NETWORK,
-  ERROR_POPUP_BLOCKED
+  ERROR_POPUP_BLOCKED,
 } from './constants';
 
 const errorTranslations: Record<string, string> = {
@@ -60,7 +60,7 @@ const errorTranslations: Record<string, string> = {
   [ERROR_UNEXPECTED]: 'Неожиданная ошибка',
   [ERROR_NETWORK]: 'Ошибка сети. Попробуйте позже.',
   [ERROR_POPUP_BLOCKED]: 'Всплывающие окна заблокированы. Разрешите их.',
-  
+
   // Support API Errors
   [ERROR_TICKET_NOT_FOUND]: 'Тикет не найден',
   [ERROR_ACCESS_DENIED]: 'Доступ запрещен',
@@ -70,48 +70,52 @@ const errorTranslations: Record<string, string> = {
   [ERROR_MAXIMUM_TICKET_LIMIT_REACHED]: 'Достигнут лимит тикетов',
   [ERROR_INVALID_STATUS_TRANSITION]: 'Недопустимый переход статуса',
   [ERROR_TICKET_NOT_ASSIGNED]: 'Тикет должен быть назначен вам для изменения статуса',
-  
+
   // Ошибки валидации (из Zod схем)
   'Username is required': 'Логин обязателен',
   'Username must be a string': 'Логин должен быть строкой',
   'Username must be at least 3 characters long': 'Логин должен содержать минимум 3 символа',
   'Username must be no more than 20 characters long': 'Логин должен содержать максимум 20 символов',
-  'Username can only contain English letters and numbers': 'Логин может содержать только английские буквы и цифры',
+  'Username can only contain English letters and numbers':
+    'Логин может содержать только английские буквы и цифры',
   'Username contains invalid characters': 'Логин содержит недопустимые символы',
   'Password is required': 'Пароль обязателен',
   'Password must be a string': 'Пароль должен быть строкой',
   'Password must be at least 6 characters long': 'Пароль должен содержать минимум 6 символов',
-  'Password must be no more than 50 characters long': 'Пароль должен содержать максимум 50 символов',
+  'Password must be no more than 50 characters long':
+    'Пароль должен содержать максимум 50 символов',
   'Password cannot contain spaces': 'Пароль не может содержать пробелы',
-  'Password can only contain English letters, numbers and special characters': 'Пароль может содержать только английские буквы, цифры и специальные символы',
+  'Password can only contain English letters, numbers and special characters':
+    'Пароль может содержать только английские буквы, цифры и специальные символы',
   // Примечание: 'Passwords do not match' уже переведен через ERROR_PASSWORDS_DO_NOT_MATCH выше
-  
+
   // Ошибки из lib/auth.ts (уже на русском, но для полноты)
   'Пользователь с таким именем уже существует': 'Пользователь с таким именем уже существует',
   'Не удалось создать аккаунт': 'Не удалось создать аккаунт',
   'Непредвиденная ошибка': 'Непредвиденная ошибка',
-  
+
   // English errors from lib/auth/index.ts
   'User with this username already exists': 'Пользователь с таким именем уже существует',
-  'This account uses OAuth authentication. Please sign in with your OAuth provider.': 'Этот аккаунт использует вход через OAuth. Пожалуйста, войдите через социальную сеть.',
-  
+  'This account uses OAuth authentication. Please sign in with your OAuth provider.':
+    'Этот аккаунт использует вход через OAuth. Пожалуйста, войдите через социальную сеть.',
+
   // OAuth errors
-  'rate_limit': 'Слишком много попыток. Попробуйте позже.',
-  'oauth_not_configured': 'OAuth сервис не настроен',
-  'oauth_init_error': 'Ошибка инициализации OAuth',
-  'oauth_denied': 'Авторизация была отклонена',
-  'oauth_error': 'Ошибка авторизации',
-  'invalid_request': 'Неверный запрос',
-  'invalid_state': 'Неверный токен безопасности. Попробуйте снова.',
-  'token_exchange_failed': 'Ошибка обмена токена',
-  'no_access_token': 'Не удалось получить токен доступа',
-  'user_info_failed': 'Не удалось получить информацию о пользователе',
-  'no_email': 'Email не найден в данных Google',
-  'email_not_verified': 'Email не подтвержден в Google',
-  'user_creation_failed': 'Не удалось создать аккаунт',
-  'account_disabled': 'Аккаунт заблокирован',
-  'internal_error': 'Внутренняя ошибка сервера',
-  
+  rate_limit: 'Слишком много попыток. Попробуйте позже.',
+  oauth_not_configured: 'OAuth сервис не настроен',
+  oauth_init_error: 'Ошибка инициализации OAuth',
+  oauth_denied: 'Авторизация была отклонена',
+  oauth_error: 'Ошибка авторизации',
+  invalid_request: 'Неверный запрос',
+  invalid_state: 'Неверный токен безопасности. Попробуйте снова.',
+  token_exchange_failed: 'Ошибка обмена токена',
+  no_access_token: 'Не удалось получить токен доступа',
+  user_info_failed: 'Не удалось получить информацию о пользователе',
+  no_email: 'Email не найден в данных Google',
+  email_not_verified: 'Email не подтвержден в Google',
+  user_creation_failed: 'Не удалось создать аккаунт',
+  account_disabled: 'Аккаунт заблокирован',
+  internal_error: 'Внутренняя ошибка сервера',
+
   // Общие сообщения об ошибках
   'Ошибка загрузки тикетов': 'Ошибка загрузки тикетов',
   'Ошибка загрузки сообщений': 'Ошибка загрузки сообщений',
@@ -134,7 +138,7 @@ export function translateError(errorMessage: string | undefined | null): string 
 
   // Убираем лишние пробелы
   const normalizedError = errorMessage.trim();
-  
+
   // Прямой поиск
   if (errorTranslations[normalizedError]) {
     return errorTranslations[normalizedError];
@@ -161,4 +165,3 @@ export function translateError(errorMessage: string | undefined | null): string 
 export function translateValidationError(error: string): string {
   return translateError(error);
 }
-

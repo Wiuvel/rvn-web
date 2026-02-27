@@ -9,10 +9,7 @@ export const usernameSchema = z
   .string()
   .min(3, 'Логин должен быть не короче 3 символов')
   .max(20, 'Логин должен содержать максимум 20 символов')
-  .regex(
-    /^[a-zA-Z0-9_]+$/,
-    'Логин может содержать только латиницу, цифры и подчеркивание'
-  );
+  .regex(/^[a-zA-Z0-9_]+$/, 'Логин может содержать только латиницу, цифры и подчеркивание');
 
 // Password validation schema
 export const passwordSchema = z
@@ -21,7 +18,7 @@ export const passwordSchema = z
   .max(50, 'Пароль должен содержать максимум 50 символов')
   .regex(
     /^[a-zA-Z0-9!@#$%^&*()_+.\-=\[\]{};':"\\|,<>\/?]+$/,
-    'Пароль может содержать только латиницу, цифры и спецсимволы'
+    'Пароль может содержать только латиницу, цифры и спецсимволы',
   );
 
 // Login form schema
@@ -51,7 +48,7 @@ export const adminPasswordSchema = z
   .max(50, 'Пароль должен содержать максимум 50 символов')
   .regex(
     /^[a-zA-Z0-9!@#$%^&*()_+.\-=\[\]{};':"\\|,<>\/?]+$/,
-    'Пароль может содержать только латиницу, цифры и спецсимволы'
+    'Пароль может содержать только латиницу, цифры и спецсимволы',
   )
   .refine((password) => !/\s/.test(password), {
     message: 'Пароль не должен содержать пробелы',
@@ -66,12 +63,14 @@ export const adminAuthSchema = z.object({
 });
 
 // Admin registration schema (with confirmPassword required)
-export const adminRegisterSchema = adminAuthSchema.extend({
-  confirmPassword: z.string().min(1, 'Подтверждение пароля обязательно'),
-}).refine((data) => data.password === data.confirmPassword, {
-  message: 'Пароли не совпадают',
-  path: ['confirmPassword'],
-});
+export const adminRegisterSchema = adminAuthSchema
+  .extend({
+    confirmPassword: z.string().min(1, 'Подтверждение пароля обязательно'),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: 'Пароли не совпадают',
+    path: ['confirmPassword'],
+  });
 
 // Password change schema
 export const passwordChangeSchema = z
@@ -91,4 +90,3 @@ export type RegisterFormData = z.infer<typeof registerSchema>;
 export type AdminAuthFormData = z.infer<typeof adminAuthSchema>;
 export type AdminRegisterFormData = z.infer<typeof adminRegisterSchema>;
 export type PasswordChangeFormData = z.infer<typeof passwordChangeSchema>;
-

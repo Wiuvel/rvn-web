@@ -92,5 +92,3 @@ export interface SupportWebSocketEvents {
 }
 
 export type SupportEventName = keyof SupportWebSocketEvents;
-
-

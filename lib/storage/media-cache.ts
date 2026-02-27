@@ -30,12 +30,18 @@ export interface MediaCacheConfig {
 export function getMediaCacheConfig(): MediaCacheConfig {
   const redisUrl = process.env.REDIS_URL;
   const enabledEnv = process.env.MEDIA_CACHE_ENABLED;
-  const enabled = enabledEnv === undefined || enabledEnv === '' ? !!redisUrl : enabledEnv === 'true' || enabledEnv === '1';
+  const enabled =
+    enabledEnv === undefined || enabledEnv === ''
+      ? !!redisUrl
+      : enabledEnv === 'true' || enabledEnv === '1';
   const maxMb = Number(process.env.MEDIA_CACHE_MAX_OBJECT_MB) || 2;
-  const ttlSupport = Number(process.env.MEDIA_CACHE_TTL_SEC_SUPPORT) || 3600;   // 1 ч для вложений
+  const ttlSupport = Number(process.env.MEDIA_CACHE_TTL_SEC_SUPPORT) || 3600; // 1 ч для вложений
   const ttlAvatars = Number(process.env.MEDIA_CACHE_TTL_SEC_AVATARS) || 86400; // 24 ч для аватаров
   const compressEnv = process.env.MEDIA_CACHE_COMPRESS;
-  const compress = compressEnv === undefined || compressEnv === '' ? true : compressEnv === 'true' || compressEnv === '1';
+  const compress =
+    compressEnv === undefined || compressEnv === ''
+      ? true
+      : compressEnv === 'true' || compressEnv === '1';
   return {
     enabled: !!redisUrl && enabled,
     maxObjectBytes: Math.max(0, maxMb) * 1024 * 1024,
@@ -70,7 +76,9 @@ function decompressIfNeeded(body: Buffer, meta: CacheMeta): Buffer {
  * Получить медиа из кэша Redis.
  * @returns { body: Buffer, contentType: string } или null при промахе/ошибке.
  */
-export async function getMediaFromCache(s3Key: string): Promise<{ body: Buffer; contentType: string } | null> {
+export async function getMediaFromCache(
+  s3Key: string,
+): Promise<{ body: Buffer; contentType: string } | null> {
   const config = getMediaCacheConfig();
   if (!config.enabled || !isAllowedKey(s3Key)) {
     return null;
@@ -89,7 +97,10 @@ export async function getMediaFromCache(s3Key: string): Promise<{ body: Buffer; 
     const meta = JSON.parse(metaJson) as CacheMeta;
     let body = Buffer.from(bodyBase64, 'base64');
     const decompressed = decompressIfNeeded(body, meta);
-    return { body: Buffer.from(decompressed), contentType: meta.content_type || 'application/octet-stream' };
+    return {
+      body: Buffer.from(decompressed),
+      contentType: meta.content_type || 'application/octet-stream',
+    };
   } catch {
     return null;
   }
@@ -104,7 +115,7 @@ export async function setMediaCache(
   s3Key: string,
   body: Buffer,
   contentType: string,
-  options: { ttlSec?: number; isAvatarOrBanner?: boolean } = {}
+  options: { ttlSec?: number; isAvatarOrBanner?: boolean } = {},
 ): Promise<void> {
   const config = getMediaCacheConfig();
   if (!config.enabled || !isAllowedKey(s3Key)) {
@@ -117,7 +128,8 @@ export async function setMediaCache(
   if (!redis) {
     return;
   }
-  const ttlSec = options.ttlSec ?? (options.isAvatarOrBanner ? config.ttlSecAvatars : config.ttlSecSupport);
+  const ttlSec =
+    options.ttlSec ?? (options.isAvatarOrBanner ? config.ttlSecAvatars : config.ttlSecSupport);
   let payload = body;
   let compressed = false;
   if (config.compress && body.length >= MIN_BODY_SIZE_TO_COMPRESS) {

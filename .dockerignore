@@ -1,0 +1,12 @@
+node_modules
+.next
+.git
+.github
+.gitlab
+.gitignore
+.env.*
+__tests__
+*.test.ts
+*.test.tsx
+docs
+*.md

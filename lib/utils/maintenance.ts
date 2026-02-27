@@ -3,7 +3,7 @@ import { getRedisClient } from '@/lib/database/redis';
 export interface MaintenanceConfig {
   isActive: boolean;
   scheduledStart: string | null; // ISO date string
-  scheduledEnd: string | null;   // ISO date string
+  scheduledEnd: string | null; // ISO date string
   message: string;
 }
 

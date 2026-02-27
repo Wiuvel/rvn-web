@@ -10,11 +10,16 @@ import {
   LAST_MESSAGE_LABEL_ATTACHMENTS,
 } from './constants';
 
-const PLACEHOLDER_PATTERN = /^\d+\s+(фотографий|файлов|вложений|изображений?|документов?)/i;
-const EMOJI_PREFIX = /^[📷📎]\s*/;
+const PLACEHOLDER_PATTERN =
+  /^\d+\s+(?:фотографи(?:й|я|и)|файл(?:ов|а)?|вложени(?:й|е|я)|изображени(?:й|е|я)|документ(?:ов|а)?)/i;
+const EMOJI_PREFIX = /^(?:\uD83D\uDCF7|\uD83D\uDCCE)\s*/;
 
 function isPlaceholderOnly(t: string): boolean {
-  return t === LAST_MESSAGE_LABEL_PHOTO || t === LAST_MESSAGE_LABEL_FILE || t === LAST_MESSAGE_LABEL_ATTACHMENTS;
+  return (
+    t === LAST_MESSAGE_LABEL_PHOTO ||
+    t === LAST_MESSAGE_LABEL_FILE ||
+    t === LAST_MESSAGE_LABEL_ATTACHMENTS
+  );
 }
 
 function isImage(item: { file_type?: string; fileType?: string }): boolean {
@@ -26,7 +31,7 @@ function isImage(item: { file_type?: string; fileType?: string }): boolean {
  * Возвращает подпись для last_message по типу вложений (только для списка тикетов).
  */
 export function getLastMessageLabelForAttachments(
-  attachments: Array<{ file_type?: string; fileType?: string }>
+  attachments: Array<{ file_type?: string; fileType?: string }>,
 ): string {
   if (attachments.length === 0) return '';
   const images = attachments.filter(isImage);
@@ -54,11 +59,13 @@ export function messageTextForBubble(text: string, hasAttachments: boolean): str
 export function normalizeLastMessageDisplayText(text: string): string {
   let out = text.replace(EMOJI_PREFIX, '');
   out = out.replace(PLACEHOLDER_PATTERN, (m) => {
-    if (/фотографий|изображений/i.test(m)) return LAST_MESSAGE_LABEL_PHOTO;
-    if (/файлов|документов/i.test(m)) return LAST_MESSAGE_LABEL_FILE;
+    if (/фотографи|изображени/i.test(m)) return LAST_MESSAGE_LABEL_PHOTO;
+    if (/файл|документ/i.test(m)) return LAST_MESSAGE_LABEL_FILE;
     return LAST_MESSAGE_LABEL_ATTACHMENTS;
   });
-  const oneLabelPattern = new RegExp(`^1\\s+(${LAST_MESSAGE_LABEL_PHOTO}|${LAST_MESSAGE_LABEL_FILE})$`);
+  const oneLabelPattern = new RegExp(
+    `^1\\s+(${LAST_MESSAGE_LABEL_PHOTO}|${LAST_MESSAGE_LABEL_FILE})$`,
+  );
   out = out.replace(oneLabelPattern, '$1').trim();
   return out;
 }

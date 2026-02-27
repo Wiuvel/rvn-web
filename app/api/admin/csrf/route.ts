@@ -17,9 +17,7 @@ export async function GET(request: Request) {
     const rateLimitResult = await generalRateLimit.check(request);
     if (!rateLimitResult.allowed) {
       // Rate limit - не логируем
-      return setCorsHeaders(
-        NextResponse.json({ error: 'Too many requests' }, { status: 429 }),
-      );
+      return setCorsHeaders(NextResponse.json({ error: 'Too many requests' }, { status: 429 }));
     }
 
     const cookieStore = await cookies();
@@ -51,10 +49,6 @@ export async function GET(request: Request) {
       error: error instanceof Error ? error.message : 'Unknown error',
       ip: request.headers.get('x-forwarded-for'),
     });
-    return setCorsHeaders(
-      NextResponse.json({ error: 'Internal server error' }, { status: 500 }),
-    );
+    return setCorsHeaders(NextResponse.json({ error: 'Internal server error' }, { status: 500 }));
   }
 }
-
-

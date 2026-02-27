@@ -12,21 +12,15 @@ export const metadata: Metadata = {
     noimageindex: true,
   },
   other: {
-    'googlebot': 'noindex, nofollow, noarchive, nosnippet, noimageindex',
-    'bingbot': 'noindex, nofollow, noarchive, nosnippet, noimageindex',
+    googlebot: 'noindex, nofollow, noarchive, nosnippet, noimageindex',
+    bingbot: 'noindex, nofollow, noarchive, nosnippet, noimageindex',
   },
 };
 
-export default function AdminPanelLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function AdminPanelLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="fixed inset-0 bg-neutral-950 text-neutral-100 overflow-hidden">
-      <div className="admin-panel-layout h-full">
-        {children}
-      </div>
+    <div className="fixed inset-0 overflow-hidden bg-neutral-950 text-neutral-100">
+      <div className="admin-panel-layout h-full">{children}</div>
     </div>
   );
 }

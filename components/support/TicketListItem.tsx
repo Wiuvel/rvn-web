@@ -11,7 +11,8 @@ interface TicketListItemProps {
   formatTime: (date: Date) => string;
 }
 
-const SYSTEM_MESSAGE_TEXT = 'Спасибо за ваше обращение. Мы получили ваш запрос и ответим в ближайшее время.';
+const SYSTEM_MESSAGE_TEXT =
+  'Спасибо за ваше обращение. Мы получили ваш запрос и ответим в ближайшее время.';
 
 /**
  * Individual ticket item in the ticket list sidebar.
@@ -29,17 +30,17 @@ export default function TicketListItem({
       case 'open':
         return {
           className: 'bg-green-500/20 text-green-400',
-          text: 'Открыт'
+          text: 'Открыт',
         };
       case 'pending':
         return {
           className: 'bg-yellow-500/20 text-yellow-400',
-          text: 'В работе'
+          text: 'В работе',
         };
       default:
         return {
           className: 'bg-neutral-700 text-neutral-400',
-          text: 'Закрыт'
+          text: 'Закрыт',
         };
     }
   };
@@ -63,17 +64,19 @@ export default function TicketListItem({
   // Определяем тип последнего сообщения
   const lastMessage = ticket.last_message;
   const showLastMessage = lastMessage && ticket.status !== 'closed';
-  
+
   let senderLabel = '';
   let isSystemMessage = false;
-  
+
   if (showLastMessage && lastMessage) {
     const lastMessageText = lastMessage.message_text || '';
-    const isStatusChangeMessage = lastMessageText.includes('Статус тикета изменен') ||
+    const isStatusChangeMessage =
+      lastMessageText.includes('Статус тикета изменен') ||
       lastMessageText.includes('Ваше обращение приняли в обработку') ||
       lastMessageText.includes('Ваше обращение было закрыто');
-    isSystemMessage = lastMessageText.trim() === SYSTEM_MESSAGE_TEXT.trim() || isStatusChangeMessage;
-    
+    isSystemMessage =
+      lastMessageText.trim() === SYSTEM_MESSAGE_TEXT.trim() || isStatusChangeMessage;
+
     if (isSystemMessage) {
       senderLabel = 'Система:';
     } else if (lastMessage.sender_type === 'user') {
@@ -87,35 +90,33 @@ export default function TicketListItem({
     <button
       onClick={onClick}
       disabled={isActive}
-      className={`w-full text-left p-3 rounded-xl transition-colors ${getButtonClassName()}`}
+      className={`w-full rounded-xl p-3 text-left transition-colors ${getButtonClassName()}`}
     >
-      <div className="flex items-start justify-between mb-1">
-        <span className="text-sm font-medium text-white truncate flex-1">
-          {ticket.subject}
-        </span>
-        <span className={`ml-2 px-2 py-0.5 text-xs rounded ${statusBadge.className}`}>
+      <div className="mb-1 flex items-start justify-between">
+        <span className="flex-1 truncate text-sm font-medium text-white">{ticket.subject}</span>
+        <span className={`ml-2 rounded px-2 py-0.5 text-xs ${statusBadge.className}`}>
           {statusBadge.text}
         </span>
       </div>
-      
-      <div className="flex items-center justify-between mt-1">
-        <div className="text-xs text-neutral-400 flex-1 min-w-0">
+
+      <div className="mt-1 flex items-center justify-between">
+        <div className="min-w-0 flex-1 text-xs text-neutral-400">
           {formatDate(ticket.createdAt)}, {formatTime(ticket.createdAt)}
         </div>
       </div>
-      
+
       {showLastMessage && lastMessage && (
-        <div className="text-xs text-neutral-500 mt-1.5">
-          <div className="truncate flex items-center gap-2">
-            <span className="flex-shrink-0 text-neutral-600">
-              {senderLabel}
-            </span>
-            <span className="truncate flex-1 min-w-0">
+        <div className="mt-1.5 text-xs text-neutral-500">
+          <div className="flex items-center gap-2 truncate">
+            <span className="flex-shrink-0 text-neutral-600">{senderLabel}</span>
+            <span className="min-w-0 flex-1 truncate">
               {normalizeLastMessageDisplayText(lastMessage.message_text || '') || '—'}
             </span>
-            {lastMessage.is_read === false && lastMessage.sender_type === 'support' && !isSystemMessage && (
-              <span className="flex-shrink-0 w-2 h-2 bg-blue-500 rounded-full"></span>
-            )}
+            {lastMessage.is_read === false &&
+              lastMessage.sender_type === 'support' &&
+              !isSystemMessage && (
+                <span className="h-2 w-2 flex-shrink-0 rounded-full bg-blue-500"></span>
+              )}
           </div>
         </div>
       )}
