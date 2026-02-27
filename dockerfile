@@ -1,4 +1,4 @@
-# ---- Stage 1: WASM Builder (cargo) ----
+# ---- Stage 1: WASM Builder ----
 FROM rust:1-slim-bookworm AS wasm
 WORKDIR /app
 RUN apt-get update -qq && apt-get install -y --no-install-recommends \

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "dockerfilePath": "./Dockerfile",
+  "dockerfilePath": "./dockerfile",
   "preDeployFunctions": [
     {
       "name": "docker_login",

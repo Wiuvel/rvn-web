@@ -1,4 +1,4 @@
-name: CodSpeed Performance Analysis
+name: CodSpeed Test Performance
 
 on:
   push:
