@@ -2,13 +2,13 @@
 
 import { useMemo, useLayoutEffect, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import useSWR from 'swr';
+import { trpc } from '@/lib/trpc/client';
 import { UserData } from '@/types';
 import { parseUserDataCookieClient } from '@/lib/auth/user-cookie.client';
 
-/** Response shape from /api/auth/me */
-interface AuthMeResponse {
-  authenticated?: boolean;
+/** Response shape from auth.me tRPC query */
+type AuthMeResponse = {
+  authenticated: boolean;
   id?: string;
   user_id?: string;
   username?: string;
@@ -19,7 +19,7 @@ interface AuthMeResponse {
   banner?: string | null;
   isSupport?: boolean;
   isAdmin?: boolean;
-}
+};
 
 function toUserData(data: AuthMeResponse | null): UserData | null {
   if (!data || data.authenticated === false || !data.user_id) return null;
@@ -56,26 +56,13 @@ function cookieToFallbackData(): AuthMeResponse | null {
   };
 }
 
-async function authMeFetcher(url: string): Promise<AuthMeResponse> {
-  const res = await fetch(url, { credentials: 'include', cache: 'no-store' });
-  const data = await res.json();
-  if (!res.ok) {
-    const err = new Error(data?.error || `Request failed ${res.status}`) as Error & {
-      status?: number;
-    };
-    err.status = res.status;
-    throw err;
-  }
-  return data;
-}
-
 export interface UseAuthOptions {
   requireAuth?: boolean;
   redirectOnFail?: string;
   redirectOnTimeout?: string;
   silent?: boolean;
   validateUserId?: string;
-  lightweight?: boolean; // При true — только user_data из cookie, без SWR fetch (для Header и т.д.)
+  lightweight?: boolean; // При true — только user_data из cookie, без fetch (для Header и т.д.)
   onSuccess?: (data: UserData) => void;
   onError?: (error: Error) => void;
 }
@@ -87,14 +74,13 @@ export interface UseAuthReturn {
   sessionExpired: boolean;
 }
 
-const AUTH_SWR_KEY = '/api/auth/me';
-const DEDUPING_INTERVAL = 5 * 60 * 1000; // 5 минут
+const STALE_TIME = 5 * 60 * 1000; // 5 minutes
 
 export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
   const {
     requireAuth = false,
     redirectOnFail,
-    redirectOnTimeout,
+    redirectOnTimeout: _redirectOnTimeout,
     silent = false,
     validateUserId,
     lightweight = false,
@@ -112,41 +98,58 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
   const fallbackFromCookie = cookieFallback;
   const shouldFetch = !!fallbackFromCookie && !lightweight;
 
-  const { data, error, isLoading } = useSWR<AuthMeResponse>(
-    shouldFetch ? AUTH_SWR_KEY : null,
-    authMeFetcher,
-    {
-      fallbackData: fallbackFromCookie ?? undefined,
-      revalidateOnMount: true,
-      revalidateOnFocus: false,
-      dedupingInterval: DEDUPING_INTERVAL,
-      onSuccess: (d) => {
-        const user = toUserData(d);
-        if (user && onSuccess) onSuccess(user);
-      },
-      onError: (err) => {
-        if (onError) onError(err);
-        else if (!silent) console.error('Auth fetch error:', err);
-      },
-      onErrorRetry: (err, _key, _config, revalidate, { retryCount }) => {
-        if ((err as Error & { status?: number }).status === 401) return;
-        if (retryCount >= 2) return;
-        setTimeout(() => revalidate({ retryCount }), 2000);
-      },
+  const {
+    data,
+    error: trpcError,
+    isLoading,
+  } = trpc.auth.me.useQuery(undefined, {
+    enabled: shouldFetch,
+    staleTime: STALE_TIME,
+    placeholderData: (fallbackFromCookie ?? undefined) as any,
+    refetchOnWindowFocus: false,
+    retry: (failureCount, error) => {
+      if ((error as any)?.data?.httpStatus === 401) return false;
+      return failureCount < 2;
     },
-  );
+  });
 
-  const userData = useMemo(() => toUserData(data ?? fallbackFromCookie), [data, fallbackFromCookie]);
+  // Callbacks
+  useEffect(() => {
+    if (data && (data as AuthMeResponse).authenticated !== false) {
+      const user = toUserData(data as AuthMeResponse);
+      if (user && onSuccess) onSuccess(user);
+    }
+  }, [data, onSuccess]);
+
+  useEffect(() => {
+    if (trpcError) {
+      const err = new Error(trpcError.message);
+      (err as any).status = (trpcError as any)?.data?.httpStatus;
+      if (onError) onError(err);
+      else if (!silent) console.error('Auth fetch error:', trpcError);
+    }
+  }, [trpcError, onError, silent]);
+
+  const error: Error | null = trpcError
+    ? Object.assign(new Error(trpcError.message), { data: (trpcError as any).data })
+    : null;
+
+  const userData = useMemo(
+    () => toUserData((data as AuthMeResponse | undefined) ?? fallbackFromCookie),
+    [data, fallbackFromCookie],
+  );
 
   const [sessionExpired, setSessionExpired] = useState(false);
 
   useLayoutEffect(() => {
     const hadCookie = !!fallbackFromCookie;
-    const apiSaysUnauthenticated = data?.authenticated === false || (error && (error as Error & { status?: number }).status === 401);
+    const apiSaysUnauthenticated =
+      (data as AuthMeResponse | undefined)?.authenticated === false ||
+      (trpcError && (trpcError as any)?.data?.httpStatus === 401);
     if (hadCookie && apiSaysUnauthenticated) {
       setSessionExpired(true);
     }
-  }, [fallbackFromCookie, data?.authenticated, error]);
+  }, [fallbackFromCookie, data, trpcError]);
 
   useLayoutEffect(() => {
     if (!userData || !validateUserId || !redirectOnFail) return;
@@ -157,12 +160,14 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
 
   useEffect(() => {
     if (!requireAuth || !redirectOnFail) return;
-    const unauth = data?.authenticated === false || (error && (error as Error & { status?: number }).status === 401);
+    const unauth =
+      (data as AuthMeResponse | undefined)?.authenticated === false ||
+      (trpcError && (trpcError as any)?.data?.httpStatus === 401);
     if (unauth && !isLoading) {
       document.cookie = 'user_data=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
       router.push(redirectOnFail);
     }
-  }, [requireAuth, redirectOnFail, data?.authenticated, error, isLoading, router]);
+  }, [requireAuth, redirectOnFail, data, trpcError, isLoading, router]);
 
   const loading = lightweight ? false : isLoading;
   const displayData = lightweight ? toUserData(fallbackFromCookie) : userData;
@@ -170,7 +175,7 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
   return {
     userData: displayData ?? userData ?? null,
     loading,
-    error: error ?? null,
+    error,
     sessionExpired,
   };
 }

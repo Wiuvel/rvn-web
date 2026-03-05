@@ -17,7 +17,7 @@ export const passwordSchema = z
   .min(6, 'Пароль должен быть не менее 6 символов')
   .max(50, 'Пароль должен содержать максимум 50 символов')
   .regex(
-    /^[a-zA-Z0-9!@#$%^&*()_+.\-=\[\]{};':"\\|,<>\/?]+$/,
+    /^[a-zA-Z0-9!@#$%^&*()_+.\-=[\]{};':"\\|,<>/?]+$/,
     'Пароль может содержать только латиницу, цифры и спецсимволы',
   );
 
@@ -26,6 +26,7 @@ export const loginSchema = z.object({
   username: usernameSchema,
   password: passwordSchema,
   csrfToken: z.string().optional(),
+  fpid: z.string().optional(),
 });
 
 // Registration form schema
@@ -35,6 +36,7 @@ export const registerSchema = z
     password: passwordSchema,
     confirmPassword: z.string(),
     csrfToken: z.string().optional(),
+    fpid: z.string().optional(),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: 'Пароли не совпадают',
@@ -47,7 +49,7 @@ export const adminPasswordSchema = z
   .min(6, 'Пароль должен быть не менее 6 символов')
   .max(50, 'Пароль должен содержать максимум 50 символов')
   .regex(
-    /^[a-zA-Z0-9!@#$%^&*()_+.\-=\[\]{};':"\\|,<>\/?]+$/,
+    /^[a-zA-Z0-9!@#$%^&*()_+.\-=[\]{};':"\\|,<>/?]+$/,
     'Пароль может содержать только латиницу, цифры и спецсимволы',
   )
   .refine((password) => !/\s/.test(password), {

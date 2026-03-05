@@ -36,7 +36,7 @@ export function generateCSPHeader(isDev: boolean): string {
       const url = new URL(supabaseUrl);
       supabaseDomain = url.hostname;
     }
-  } catch (e) {
+  } catch {
     supabaseDomain = 'supabase.co';
   }
 

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { trpc } from '@/lib/trpc/client';
 import { PanelUser } from '@/types';
 
 export function useAdminRoles(
@@ -13,20 +14,17 @@ export function useAdminRoles(
   const [showAddRoleMenu, setShowAddRoleMenu] = useState(false);
   const [selectedUser, setSelectedUser] = useState<PanelUser | null>(null);
 
+  const utils = trpc.useUtils();
+  const grantMutation = trpc.admin.users.roles.grant.useMutation();
+  const revokeMutation = trpc.admin.users.roles.revoke.useMutation();
+
   const handleManageRoles = async (user: PanelUser) => {
     if (!user || !user.id) return;
     setSelectedUser(user);
     setRolesLoading(true);
     try {
-      const response = await fetch(`/api/admin/users/roles?userId=${user.id}`, {
-        credentials: 'include',
-      });
-      if (!response.ok) {
-        setUserRoles([]);
-        return;
-      }
-      const data = await response.json();
-      setUserRoles(data.roles || []);
+      const data = await utils.admin.users.roles.get.fetch({ userId: user.id });
+      setUserRoles((data as any).roles || []);
     } catch {
       setUserRoles([]);
     } finally {
@@ -37,13 +35,8 @@ export function useAdminRoles(
   const refreshUserRoles = async (user: PanelUser) => {
     if (!user || !user.id) return;
     try {
-      const response = await fetch(`/api/admin/users/roles?userId=${user.id}`, {
-        credentials: 'include',
-      });
-      if (!response.ok) return;
-      const data = await response.json();
-      const updatedRoles = data.roles || [];
-
+      const data = await utils.admin.users.roles.get.fetch({ userId: user.id });
+      const updatedRoles = (data as any).roles || [];
       setUserRoles(updatedRoles);
       setUsers((prev) => {
         const updated = prev.map((u) => (u.id === user.id ? { ...u, roles: updatedRoles } : u));
@@ -61,32 +54,20 @@ export function useAdminRoles(
     setRoleActionLoading(actionKey);
 
     try {
-      const response = await fetch('/api/admin/users/roles', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ userId: selectedUser.id, role }),
+      await grantMutation.mutateAsync({ userId: selectedUser.id, role });
+      setUserRoles((prev) => [...prev, role]);
+      setUsers((prev) => {
+        const updated = prev.map((user) =>
+          user.id === selectedUser.id ? { ...user, roles: [...(user.roles || []), role] } : user,
+        );
+        return sortUsersByRole(updated, sortDirection);
       });
-      const data = await response.json();
-      if (response.ok) {
-        setUserRoles((prev) => [...prev, role]);
-        setUsers((prev) => {
-          const updated = prev.map((user) =>
-            user.id === selectedUser.id ? { ...user, roles: [...(user.roles || []), role] } : user,
-          );
-          return sortUsersByRole(updated, sortDirection);
-        });
-        setUserActionMessage(`Роль выдана ${selectedUser.username.toUpperCase()}`);
-        setTimeout(() => setUserActionMessage(''), 2500);
-        refreshUserRoles(selectedUser);
-      } else {
-        setUserActionMessage(data.error || 'Ошибка выдачи роли');
-        setTimeout(() => setUserActionMessage(''), 2500);
-        refreshUserRoles(selectedUser);
-      }
+      setUserActionMessage(`Роль выдана ${selectedUser.username.toUpperCase()}`);
+      setTimeout(() => setUserActionMessage(''), 2500);
+      refreshUserRoles(selectedUser);
     } catch (error) {
-      console.error('Error granting role:', error);
-      setUserActionMessage('Ошибка выдачи роли');
+      const msg = error instanceof Error ? error.message : 'Ошибка выдачи роли';
+      setUserActionMessage(msg);
       setTimeout(() => setUserActionMessage(''), 2500);
       refreshUserRoles(selectedUser);
     } finally {
@@ -101,37 +82,24 @@ export function useAdminRoles(
     setRoleActionLoading(actionKey);
 
     try {
-      const response = await fetch(
-        `/api/admin/users/roles?userId=${selectedUser.id}&role=${role}`,
-        {
-          method: 'DELETE',
-          credentials: 'include',
-        },
-      );
-      const data = await response.json();
-      if (response.ok) {
-        setUserRoles((prev) => prev.filter((r) => r !== role));
-        setUsers((prev) => {
-          const updated = prev.map((user) =>
-            user.id === selectedUser.id
-              ? { ...user, roles: (user.roles || []).filter((r) => r !== role) }
-              : user,
-          );
-          return sortUsersByRole(updated, sortDirection);
-        });
-        setUserActionMessage(
-          `Роль "${role}" отозвана у пользователя ${selectedUser.username.toUpperCase()}`,
+      await revokeMutation.mutateAsync({ userId: selectedUser.id, role });
+      setUserRoles((prev) => prev.filter((r) => r !== role));
+      setUsers((prev) => {
+        const updated = prev.map((user) =>
+          user.id === selectedUser.id
+            ? { ...user, roles: (user.roles || []).filter((r) => r !== role) }
+            : user,
         );
-        setTimeout(() => setUserActionMessage(''), 2500);
-        refreshUserRoles(selectedUser);
-      } else {
-        setUserActionMessage(data.error || 'Ошибка отзыва роли');
-        setTimeout(() => setUserActionMessage(''), 2500);
-        refreshUserRoles(selectedUser);
-      }
+        return sortUsersByRole(updated, sortDirection);
+      });
+      setUserActionMessage(
+        `Роль "${role}" отозвана у пользователя ${selectedUser.username.toUpperCase()}`,
+      );
+      setTimeout(() => setUserActionMessage(''), 2500);
+      refreshUserRoles(selectedUser);
     } catch (error) {
-      console.error('Error revoking role:', error);
-      setUserActionMessage('Ошибка отзыва роли');
+      const msg = error instanceof Error ? error.message : 'Ошибка отзыва роли';
+      setUserActionMessage(msg);
       setTimeout(() => setUserActionMessage(''), 2500);
       refreshUserRoles(selectedUser);
     } finally {

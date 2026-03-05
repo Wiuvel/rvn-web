@@ -9,7 +9,6 @@ import { useAuth } from '@/hooks/useAuth';
 import { UserMenu } from '@/components/navigation/UserMenu';
 import { NotificationsWidget } from '@/components/navigation/Notifications';
 import { GSAP_DEFAULT_DURATION, GSAP_DEFAULT_EASE } from '@/lib/utils/constants';
-import { getGradientClasses, getAvatarUrl } from '@/lib/utils/avatar-gradients';
 import { getStaticUrl } from '@/lib/utils';
 import HeaderAvatar from './HeaderAvatar';
 import { LogIn as EnterIcon } from 'lucide-react';
@@ -95,7 +94,6 @@ export default function Header({ variant = 'main' }: HeaderProps = {}) {
   // Инициализация уведомлений и загрузка из localStorage
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const storedRead = localStorage.getItem('readNotifications');
   }, []);
 
   // Закрытие меню при навигации
@@ -130,10 +128,6 @@ export default function Header({ variant = 'main' }: HeaderProps = {}) {
   // Stable reference — prevents useMenuAnimation effect from re-running on every render
   const closeUserMenu = useCallback(() => setUserMenuOpen(false), []);
 
-  const getInitial = (username: string) => {
-    return username.charAt(0).toUpperCase();
-  };
-
   // Навигация для десктопа
   const getNavigation = () => {
     if (variant === 'main') {
@@ -141,6 +135,7 @@ export default function Header({ variant = 'main' }: HeaderProps = {}) {
         <>
           <Link
             href="/about"
+            prefetch={false}
             className="transition hover:text-white"
             aria-current={pathname === '/about' ? 'page' : undefined}
           >
@@ -148,6 +143,7 @@ export default function Header({ variant = 'main' }: HeaderProps = {}) {
           </Link>
           <Link
             href="/support"
+            prefetch={false}
             className="transition hover:text-white"
             aria-current={pathname === '/support' ? 'page' : undefined}
           >
@@ -228,6 +224,7 @@ export default function Header({ variant = 'main' }: HeaderProps = {}) {
               ) : (
                 <Link
                   href="/auth"
+                  prefetch={false}
                   className="flex h-10 min-w-[110px] flex-shrink-0 items-center justify-center gap-2 rounded-xl bg-primary-500 px-4 py-2 text-sm font-medium text-white shadow-glow transition hover:bg-primary-400"
                 >
                   <EnterIcon className="h-5 w-5" />

@@ -23,10 +23,8 @@ const config: Config = {
     'from-cyan-600',
     'to-teal-600',
     'from-emerald-500',
-    'to-teal-600',
     'from-green-500',
     'to-emerald-600',
-    'from-green-600',
   ],
   theme: {
     extend: {

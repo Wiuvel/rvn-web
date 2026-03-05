@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import Script from 'next/script';
+import { trpc } from '@/lib/trpc/client';
 
 interface ProtectionClientProps {
   initialIp: string | null;
@@ -11,8 +12,23 @@ interface ProtectionClientProps {
 export default function ProtectionClient({ initialIp }: ProtectionClientProps) {
   const [isIpRevealed, setIsIpRevealed] = useState(false);
   const ipAddress = initialIp;
+  const verifyMutation = trpc.protection.verify.useMutation();
 
   useEffect(() => {
+    (
+      window as Window & {
+        __protectionVerify?: (token: string) => Promise<{ success: boolean; error?: string }>;
+      }
+    ).__protectionVerify = async (token: string) => {
+      try {
+        const result = await verifyMutation.mutateAsync({ captchaToken: token });
+        return { success: result.success, error: undefined };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Unknown error';
+        return { success: false, error: message };
+      }
+    };
+
     import('@/lib/scripts/protection')
       .then(() => {
         const initTurnstile = () => {
@@ -85,7 +101,7 @@ export default function ProtectionClient({ initialIp }: ProtectionClientProps) {
       .catch((error) => {
         console.error('Failed to load protection script:', error);
       });
-  }, []);
+  }, [verifyMutation]);
 
   const canReveal = Boolean(ipAddress) && !isIpRevealed;
   const isIpLoading = !ipAddress;

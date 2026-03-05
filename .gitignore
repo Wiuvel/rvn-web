@@ -11,10 +11,9 @@
 /build
 /temp
 wasm/target/
+lib/wasm/pkg/
 .DS_Store
 *.pem
-*.md
-*.sql
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

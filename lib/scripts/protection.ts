@@ -15,10 +15,6 @@ interface VerifyResponse {
   error?: string;
 }
 
-interface NavigatorWithDeviceMemory extends Navigator {
-  deviceMemory?: number;
-}
-
 interface WindowWithTurnstile extends Window {
   turnstile?: {
     render: (container: string | HTMLElement, options: unknown) => string;
@@ -63,39 +59,6 @@ function getTimeouts(): Timeouts {
 }
 
 const timeouts = getTimeouts();
-
-/**
- * Generates a secure hash from browser fingerprint
- */
-async function generateSecureHash(): Promise<string> {
-  try {
-    const data =
-      navigator.userAgent +
-      navigator.language +
-      screen.width +
-      'x' +
-      screen.height +
-      (navigator.hardwareConcurrency || '') +
-      ((navigator as NavigatorWithDeviceMemory).deviceMemory || '');
-
-    const encoder = new TextEncoder();
-    const dataBuffer = encoder.encode(data);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', dataBuffer);
-
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    const hashHex = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
-
-    return hashHex;
-  } catch {
-    // Fallback hash generation on error
-    return (
-      'fallback_' +
-      btoa(navigator.userAgent + Date.now())
-        .substring(0, 64)
-        .replace(/[^a-f0-9]/g, '0')
-    );
-  }
-}
 
 /**
  * Safely redirects to a URL with validation
@@ -370,23 +333,24 @@ async function onSuccessCallback(token: string): Promise<void> {
     return;
   }
 
-  // Проверяем токен на сервере перед установкой cookie
+  // Проверяем токен на сервере (tRPC или REST fallback)
   currentState = captchaStates.VERIFYING;
   updateStatusText();
 
   try {
-    const verifyResponse = await fetch('/api/protection/verify', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      credentials: 'include',
-      body: JSON.stringify({ captchaToken: token }),
-    });
+    const win = window as Window & {
+      __protectionVerify?: (token: string) => Promise<VerifyResponse>;
+    };
+    if (typeof win.__protectionVerify !== 'function') {
+      console.error('%c[PROTECT] __protectionVerify not set', 'color: #a855f7; font-weight: bold;');
+      currentState = captchaStates.ERROR;
+      updateStatusText();
+      return;
+    }
 
-    const verifyData: VerifyResponse = await verifyResponse.json();
+    const verifyData = await win.__protectionVerify(token);
 
-    if (!verifyResponse.ok || !verifyData.success) {
+    if (!verifyData.success) {
       console.error(
         '%c[PROTECT] Critical: Token verification failed',
         'color: #a855f7; font-weight: bold;',

@@ -42,6 +42,8 @@ export interface Message {
   isPending?: boolean;
   senderData?: MessageSender;
   attachments?: MessageAttachment[];
+  /** Stable key for list item; avoids remount when replacing temp id with server id (no repeat animation) */
+  _renderKey?: string;
 }
 
 /**

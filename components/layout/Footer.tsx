@@ -132,6 +132,7 @@ export default function Footer() {
               <li>
                 <Link
                   href="/support/"
+                  prefetch={false}
                   className="block py-1 transition-colors duration-200 hover:text-neutral-200"
                 >
                   Служба поддержки

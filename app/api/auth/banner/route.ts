@@ -14,7 +14,13 @@ import {
   ERROR_TOO_MANY_REQUESTS,
 } from '@/lib/utils/constants';
 import { supabaseAdmin } from '@/lib/database/supabase';
-import { uploadAvatarToS3, deleteFileFromS3, validateFile } from '@/lib/storage/s3-client';
+import {
+  uploadAvatarToS3,
+  deleteFileFromS3,
+  validateFile,
+  validateFileWithContent,
+} from '@/lib/storage/s3-client';
+import { getExtensionFromMime } from '@/lib/validation/magic-bytes';
 import { setMediaCache } from '@/lib/storage/media-cache';
 import { isValidUUID } from '@/lib/utils/uuid-validation';
 import { BANNER_MAX_BYTES } from '@/lib/utils/constants';
@@ -88,6 +94,31 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Читаем файл в Buffer и валидируем содержимое до обращения к БД
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    // Валидация содержимого по magic bytes
+    const contentCheck = validateFileWithContent(
+      { size: file.size, type: file.type, name: file.name },
+      buffer,
+    );
+
+    if (!contentCheck.valid) {
+      return setCorsHeaders(
+        NextResponse.json({ error: contentCheck.error || 'File content invalid' }, { status: 400 }),
+      );
+    }
+
+    const verifiedType = contentCheck.detectedType || file.type;
+
+    // Проверяем что реальный тип — изображение (не GIF)
+    if (verifiedType === 'image/gif') {
+      return setCorsHeaders(
+        NextResponse.json({ error: 'GIF files are not allowed for banners' }, { status: 400 }),
+      );
+    }
+
     // Получаем текущий баннер пользователя для удаления
     if (!supabaseAdmin) {
       logger.error('Supabase admin client not available');
@@ -112,31 +143,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Определяем расширение файла (GIF исключен)
-    let extension = 'jpg';
-    if (file.type.includes('png')) {
-      extension = 'png';
-    } else if (file.type.includes('webp')) {
-      extension = 'webp';
-    } else {
-      const fileName = file.name.toLowerCase();
-      if (fileName.endsWith('.png')) extension = 'png';
-      else if (fileName.endsWith('.webp')) extension = 'webp';
-    }
+    // Определяем расширение из реального типа файла
+    const extension = getExtensionFromMime(verifiedType);
 
     // Генерируем путь для хранения нового баннера
     const timestamp = Date.now();
     const storagePath = `banners/${user.id}/${timestamp}.${extension}`;
 
-    // Читаем файл в Buffer
-    const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-
-    // Загружаем новый баннер в S3 с публичным доступом
+    // Загружаем новый баннер в S3 с публичным доступом (verified type)
     try {
-      await uploadAvatarToS3(buffer, storagePath, file.type);
+      await uploadAvatarToS3(buffer, storagePath, verifiedType);
       // Прогрев кэша: первый запрос изображения будет HIT
-      await setMediaCache(storagePath, buffer, file.type, { isAvatarOrBanner: true });
+      await setMediaCache(storagePath, buffer, verifiedType, { isAvatarOrBanner: true });
     } catch (error) {
       logger.error('Error uploading banner to S3', {
         error: error instanceof Error ? error.message : 'Unknown error',

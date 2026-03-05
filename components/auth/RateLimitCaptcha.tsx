@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { trpc } from '@/lib/trpc/client';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import Script from 'next/script';
 
 interface TurnstileInstance {
@@ -34,6 +35,7 @@ const SCRIPT_CHECK_TIMEOUT = 5000;
 const RETRY_DELAY = 5000;
 
 export default function RateLimitCaptcha({ isOpen, onSuccess, onClose }: RateLimitCaptchaProps) {
+  const clearMutation = trpc.rateLimit.clear.useMutation();
   const [isScriptLoaded, setIsScriptLoaded] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -41,6 +43,19 @@ export default function RateLimitCaptcha({ isOpen, onSuccess, onClose }: RateLim
   const containerRef = useRef<HTMLDivElement>(null);
   const isProcessingRef = useRef(false);
   const tokenSentRef = useRef(false);
+  const isOpenRef = useRef(isOpen);
+  const onSuccessRef = useRef(onSuccess);
+  const isScriptLoadedRef = useRef(isScriptLoaded);
+
+  useEffect(() => {
+    isOpenRef.current = isOpen;
+  }, [isOpen]);
+  useEffect(() => {
+    onSuccessRef.current = onSuccess;
+  }, [onSuccess]);
+  useEffect(() => {
+    isScriptLoadedRef.current = isScriptLoaded;
+  }, [isScriptLoaded]);
 
   // Check if Turnstile is already loaded (from layout) or wait for it
   useEffect(() => {
@@ -69,7 +84,7 @@ export default function RateLimitCaptcha({ isOpen, onSuccess, onClose }: RateLim
   // Reset state when modal opens - Removed as component is conditionally rendered
 
   // Remove widget on cleanup
-  const removeWidget = () => {
+  const removeWidget = useCallback(() => {
     if (widgetIdRef.current && window.turnstile) {
       try {
         window.turnstile.remove(widgetIdRef.current);
@@ -78,20 +93,22 @@ export default function RateLimitCaptcha({ isOpen, onSuccess, onClose }: RateLim
       }
       widgetIdRef.current = null;
     }
-  };
+  }, []);
+
+  const loadCaptchaRef = useRef<() => void>(() => {});
 
   // Reload captcha after error
-  const reloadCaptcha = () => {
+  const reloadCaptcha = useCallback(() => {
     removeWidget();
     setTimeout(() => {
-      if (isOpen && isScriptLoaded && !isProcessingRef.current) {
-        loadCaptcha();
+      if (isOpenRef.current && isScriptLoadedRef.current && !isProcessingRef.current) {
+        loadCaptchaRef.current();
       }
     }, RETRY_DELAY);
-  };
+  }, [removeWidget]);
 
   // Load and render captcha
-  const loadCaptcha = () => {
+  const loadCaptcha = useCallback(() => {
     if (!containerRef.current || !window.turnstile || isProcessingRef.current) return;
 
     removeWidget();
@@ -104,49 +121,37 @@ export default function RateLimitCaptcha({ isOpen, onSuccess, onClose }: RateLim
         sitekey: TURNSTILE_SITEKEY,
         theme: 'dark',
         callback: async (token: string) => {
-          if (!isOpen || tokenSentRef.current) return;
+          if (!isOpenRef.current || tokenSentRef.current) return;
 
           tokenSentRef.current = true;
           setIsVerifying(true);
           setError(null);
 
           try {
-            const response = await fetch('/api/rate-limit/clear', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              credentials: 'include',
-              body: JSON.stringify({ captchaToken: token }),
-            });
+            const data = await clearMutation.mutateAsync({ captchaToken: token });
 
-            const data = await response.json();
-
-            if (response.ok && data.success) {
+            if (data.success) {
               setIsVerifying(false);
               isProcessingRef.current = false;
-              onSuccess();
+              onSuccessRef.current();
             } else {
               setIsVerifying(false);
               isProcessingRef.current = false;
               tokenSentRef.current = false;
-
-              const errorMessage =
-                response.status === 400 && data.error === 'CAPTCHA verification failed'
-                  ? 'Ошибка проверки капчи. Попробуйте еще раз.'
-                  : data.error || 'Ошибка очистки лимитов';
-
-              setError(errorMessage);
+              setError('Ошибка очистки лимитов');
               reloadCaptcha();
             }
-          } catch {
+          } catch (err) {
             setIsVerifying(false);
             isProcessingRef.current = false;
             tokenSentRef.current = false;
-            setError('Ошибка соединения с сервером');
+            const message = err instanceof Error ? err.message : 'Ошибка соединения с сервером';
+            setError(message);
             reloadCaptcha();
           }
         },
         'error-callback': () => {
-          if (!isOpen) return;
+          if (!isOpenRef.current) return;
           setError('Ошибка загрузки капчи');
           setIsVerifying(false);
           isProcessingRef.current = false;
@@ -160,7 +165,11 @@ export default function RateLimitCaptcha({ isOpen, onSuccess, onClose }: RateLim
       setError('Ошибка инициализации капчи');
       isProcessingRef.current = false;
     }
-  };
+  }, [removeWidget, reloadCaptcha, clearMutation]);
+
+  useEffect(() => {
+    loadCaptchaRef.current = loadCaptcha;
+  }, [loadCaptcha]);
 
   // Load captcha when ready
   useEffect(() => {
@@ -175,8 +184,7 @@ export default function RateLimitCaptcha({ isOpen, onSuccess, onClose }: RateLim
     }
 
     return removeWidget;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, isScriptLoaded]);
+  }, [isOpen, isScriptLoaded, loadCaptcha, removeWidget]);
 
   if (!isOpen) return null;
 

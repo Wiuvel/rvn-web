@@ -6,28 +6,11 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { Area, AreaChart as RechartsAreaChart, XAxis, YAxis } from 'recharts';
-import { useApiSWR } from '@/lib/swr';
+import { trpc } from '@/lib/trpc/client';
 const Skeleton = ({ className }: { className?: string }) => (
   <div className={`animate-pulse rounded bg-neutral-800 ${className || ''}`} />
 );
 import type { AnalyticsPeriod } from '@/lib/analytics/support-analytics';
-
-interface SupportAnalyticsData {
-  totalTicketsCreated: number;
-  totalTicketsClosed: number;
-  totalMessagesSent: number;
-  ticketsByStatus: Record<string, number>;
-  avgResponseTime: number;
-  avgResolutionTime: number;
-  ticketsCreatedDaily: Array<{ date: string; count: number }>;
-  ticketsClosedDaily: Array<{ date: string; count: number }>;
-  messagesSentDaily: Array<{ date: string; count: number }>;
-  ticketsCreatedHourly: Array<{ hour: number; count: number }>;
-  messagesSentHourly: Array<{ hour: number; count: number }>;
-  websocketConnections: number;
-  websocketMessages: number;
-  period: AnalyticsPeriod;
-}
 
 const PERIODS: Array<{ value: AnalyticsPeriod; label: string }> = [
   { value: 'hour', label: '1 час' },
@@ -41,15 +24,15 @@ export default function SupportAnalytics() {
 
   const {
     data: rawData,
-    error: swrError,
+    error: trpcError,
     isLoading: loading,
-  } = useApiSWR<{ analytics: SupportAnalyticsData }>(
-    `/api/admin/support/analytics?period=${period}`,
-    { revalidateOnFocus: false, dedupingInterval: 10000 },
+  } = trpc.admin.supportAnalytics.useQuery(
+    { period },
+    { staleTime: 10_000, refetchOnWindowFocus: false },
   );
 
   const analytics = rawData?.analytics ?? null;
-  const error = swrError?.message ?? '';
+  const error = trpcError?.message ?? '';
 
   const formatTime = (minutes: number) => {
     if (minutes < 60) {

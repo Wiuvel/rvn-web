@@ -77,8 +77,6 @@ export async function GET(request: NextRequest) {
       return setCorsHeaders(NextResponse.redirect(errorUrl));
     }
 
-    const redirectUri = `${origin}/api/auth/oauth/yandex/callback`;
-
     // Exchange authorization code for access token
     const tokenResponse = await fetch('https://oauth.yandex.ru/token', {
       method: 'POST',
@@ -126,7 +124,7 @@ export async function GET(request: NextRequest) {
     }
 
     const userInfo = await userInfoResponse.json();
-    const { default_email, emails, default_avatar_id } = userInfo;
+    const { default_email, emails } = userInfo;
 
     // Yandex может вернуть email в default_email или в массиве emails
     const email =
@@ -136,14 +134,6 @@ export async function GET(request: NextRequest) {
       logger.error('OAuth: No email in Yandex user info.');
       const errorUrl = getErrorRedirectUrl('no_email', origin, isPopup);
       return setCorsHeaders(NextResponse.redirect(errorUrl));
-    }
-
-    // Формируем URL аватара из Yandex (если есть default_avatar_id)
-    let avatarUrl: string | undefined;
-    if (default_avatar_id) {
-      // Yandex возвращает ID аватара, URL формируется как:
-      // https://avatars.yandex.net/get-yapic/{default_avatar_id}/islands-200
-      avatarUrl = `https://avatars.yandex.net/get-yapic/${default_avatar_id}/islands-200`;
     }
 
     // Get or create user
@@ -180,8 +170,9 @@ export async function GET(request: NextRequest) {
       await SessionManager.destroySession(oldSessionId);
     }
 
-    // Register device and get new token
-    const token = await SessionManager.registerDevice(user.id, userAgent, ipAddress);
+    // Register device and get new token (fpid for Layer 2 grouping)
+    const fpid = request.cookies.get('rvn_fpid')?.value ?? null;
+    const token = await SessionManager.registerDevice(user.id, userAgent, ipAddress, fpid);
 
     const sessionId = await SessionManager.createSession(
       user.id,
@@ -201,6 +192,9 @@ export async function GET(request: NextRequest) {
         )
       : new URL(`/dashboard/${user.user_id}`, origin);
     const response = NextResponse.redirect(redirectUrl);
+
+    // Clear FPID cookie after use (OAuth only)
+    response.cookies.set('rvn_fpid', '', { maxAge: 0, path: '/' });
 
     // Copy protection cookies from request if they exist, or set temporary ones
     const accessGranted = request.cookies.get('access_granted')?.value;
@@ -305,7 +299,6 @@ export async function GET(request: NextRequest) {
     });
 
     try {
-      const env = getEnv();
       {
         const origin = domains.mainUrl.endsWith('/')
           ? domains.mainUrl.slice(0, -1)

@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
-import { useApiSWR } from '@/lib/swr';
+import { trpc } from '@/lib/trpc/client';
 import { PanelUser } from '@/types';
 
 export function useAdminUsers(isAuthenticated: boolean) {
@@ -14,23 +14,22 @@ export function useAdminUsers(isAuthenticated: boolean) {
     return () => clearTimeout(timeoutId);
   }, [userSearch]);
 
-  const swrKey = useMemo(() => {
-    if (!isAuthenticated) return null;
-    const params = new URLSearchParams();
-    if (debouncedSearch) params.set('q', debouncedSearch);
-    params.set('order', sortDirection);
-    return `/api/admin/users?${params.toString()}`;
-  }, [isAuthenticated, debouncedSearch, sortDirection]);
+  const queryInput = useMemo(
+    () => ({ q: debouncedSearch || undefined, order: sortDirection }),
+    [debouncedSearch, sortDirection],
+  );
 
   const {
     data: rawData,
-    error: swrError,
+    error: trpcError,
     isLoading: usersLoading,
-    mutate,
-  } = useApiSWR<{ users: PanelUser[] }>(swrKey, {
-    revalidateOnFocus: false,
-    dedupingInterval: 5000,
+  } = trpc.admin.users.list.useQuery(queryInput, {
+    enabled: isAuthenticated,
+    staleTime: 5_000,
+    refetchOnWindowFocus: false,
   });
+
+  const utils = trpc.useUtils();
 
   const sortUsersByRole = useCallback(
     (usersList: PanelUser[], sort: 'asc' | 'desc'): PanelUser[] => {
@@ -61,7 +60,7 @@ export function useAdminUsers(isAuthenticated: boolean) {
   );
 
   const users = useMemo(() => {
-    const raw = Array.isArray(rawData?.users) ? rawData.users : [];
+    const raw = Array.isArray(rawData?.users) ? (rawData.users as PanelUser[]) : [];
     const sorted = sortUsersByRole(raw, sortDirection);
     if (typeof window !== 'undefined') {
       localStorage.setItem('admin_panel_users_count', sorted.length.toString());
@@ -69,27 +68,25 @@ export function useAdminUsers(isAuthenticated: boolean) {
     return sorted;
   }, [rawData, sortDirection, sortUsersByRole]);
 
-  const usersError = swrError?.message ?? '';
+  const usersError = trpcError?.message ?? '';
 
   const setUsers = useCallback(
     (updater: PanelUser[] | ((prev: PanelUser[]) => PanelUser[])) => {
-      mutate(
-        (prev) => {
-          const current = prev?.users ?? [];
-          const next = typeof updater === 'function' ? updater(current) : updater;
-          return { users: next };
-        },
-        { revalidate: false },
-      );
+      utils.admin.users.list.setData(queryInput, (prev: any) => {
+        if (!prev) return prev;
+        const current = (prev.users ?? []) as PanelUser[];
+        const next = typeof updater === 'function' ? updater(current) : updater;
+        return { users: next };
+      });
     },
-    [mutate],
+    [utils, queryInput],
   );
 
   const fetchUsers = useCallback(
     async (_query?: string, _sort?: 'asc' | 'desc') => {
-      await mutate();
+      await utils.admin.users.list.invalidate();
     },
-    [mutate],
+    [utils],
   );
 
   return {

@@ -141,9 +141,11 @@ export const useStaggeredFadeIn = (delay: number = 0, stagger: number = 0.05) =>
       (containerRef.current as any).__gsapAnimation = animation;
     }, 150);
 
+    const container = containerRef.current;
+
     return () => {
       clearTimeout(timeout);
-      const animation = (containerRef.current as any)?.__gsapAnimation;
+      const animation = (container as any)?.__gsapAnimation;
       if (animation) {
         animation.kill();
       }

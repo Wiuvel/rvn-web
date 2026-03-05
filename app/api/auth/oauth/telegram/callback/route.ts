@@ -195,8 +195,9 @@ export async function GET(request: NextRequest) {
       await SessionManager.destroySession(oldSessionId);
     }
 
-    // Register device and get new token
-    const token = await SessionManager.registerDevice(user.id, userAgent, ipAddress);
+    // Register device and get new token (fpid for Layer 2 grouping)
+    const fpid = request.cookies.get('rvn_fpid')?.value ?? null;
+    const token = await SessionManager.registerDevice(user.id, userAgent, ipAddress, fpid);
 
     const sessionId = await SessionManager.createSession(
       user.id,
@@ -216,6 +217,9 @@ export async function GET(request: NextRequest) {
         )
       : new URL(`/dashboard/${user.user_id}`, origin);
     const response = NextResponse.redirect(redirectUrl);
+
+    // Clear FPID cookie after use (OAuth only)
+    response.cookies.set('rvn_fpid', '', { maxAge: 0, path: '/' });
 
     // Copy protection cookies from request if they exist, or set temporary ones
     // If they don't exist, we set temporary ones to avoid redirect to /protection/
@@ -332,7 +336,6 @@ export async function GET(request: NextRequest) {
     });
 
     try {
-      const env = getEnv();
       {
         const origin = domains.mainUrl.endsWith('/')
           ? domains.mainUrl.slice(0, -1)

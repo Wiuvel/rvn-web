@@ -9,11 +9,6 @@ export default function StructuredData({ data, id = 'structured-data' }: Structu
   const jsonString = JSON.stringify(data).replace(/</g, '\\u003c');
 
   return (
-    <script
-      type="application/ld+json"
-      id={id}
-      /* eslint-disable-next-line react/no-danger -- JSON-LD: server-only data, escaped (no user HTML). */
-      dangerouslySetInnerHTML={{ __html: jsonString }}
-    />
+    <script type="application/ld+json" id={id} dangerouslySetInnerHTML={{ __html: jsonString }} />
   );
 }

@@ -15,7 +15,7 @@ interface CropArea {
 }
 
 const MIN_CROP = 100;
-const ASPECT_RATIO = 1; // 1:1 для аватара
+// 1:1 для аватара (aspect ratio enforced by MIN_CROP)
 
 interface AvatarUploadModalProps {
   isOpen: boolean;
@@ -588,6 +588,14 @@ export default function AvatarUploadModal({
                   onDrop={handleDrop}
                   className={`w-full cursor-pointer rounded-lg border-2 border-dashed p-3 text-center text-sm text-neutral-400 hover:border-white/40 ${uploading ? 'opacity-50' : ''}`}
                   onClick={() => !uploading && fileInputRef.current?.click()}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      if (!uploading) fileInputRef.current?.click();
+                    }
+                  }}
+                  role="button"
+                  tabIndex={0}
                 >
                   Выберите другой файл
                 </div>
@@ -608,7 +616,6 @@ export default function AvatarUploadModal({
                   className="relative w-full overflow-hidden rounded-lg border border-neutral-800 bg-neutral-950"
                   style={{ minHeight: '200px', maxHeight: '400px' }}
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     ref={imageRef}
                     src={preview}
@@ -628,6 +635,8 @@ export default function AvatarUploadModal({
                           height: `${cropArea.height}px`,
                         }}
                         onMouseDown={handleCropMouseDown}
+                        role="application"
+                        aria-label="Область обрезки"
                       />
                       {['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'].map((handle) => (
                         <div
@@ -654,6 +663,8 @@ export default function AvatarUploadModal({
                                     : 'ew-resize',
                           }}
                           onMouseDown={(e) => handleResizeMouseDown(e, handle)}
+                          role="application"
+                          aria-label={`Resize ${handle}`}
                         />
                       ))}
                     </>

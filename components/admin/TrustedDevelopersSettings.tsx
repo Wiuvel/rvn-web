@@ -1,8 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { gsap } from 'gsap';
-import { GSAP_DEFAULT_DURATION, GSAP_DEFAULT_EASE } from '@/lib/utils/constants';
+import { useState } from 'react';
+import { trpc } from '@/lib/trpc/client';
 
 interface TrustedDeveloper {
   id: string;
@@ -13,60 +12,41 @@ interface TrustedDeveloper {
 }
 
 export default function TrustedDevelopersSettings() {
-  const [developers, setDevelopers] = useState<TrustedDeveloper[]>([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [formData, setFormData] = useState({ email: '', github_username: '' });
-  const [submitting, setSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [isRootAdmin, setIsRootAdmin] = useState(false);
-  const [checkingRoot, setCheckingRoot] = useState(true);
 
-  useEffect(() => {
-    checkRootAccess();
-    fetchDevelopers();
-  }, []);
+  const utils = trpc.useUtils();
 
-  const checkRootAccess = async () => {
-    setCheckingRoot(true);
-    try {
-      const response = await fetch('/api/admin/check-root', {
-        credentials: 'include',
-      });
-      const data = await response.json();
-      if (response.ok && data.isRoot) {
-        setIsRootAdmin(true);
-      }
-    } catch (err) {
-      console.error('Error checking root access:', err);
-    } finally {
-      setCheckingRoot(false);
-    }
-  };
+  const { data: rootData, isLoading: checkingRoot } = trpc.admin.checkRoot.useQuery();
+  const isRootAdmin = rootData?.isRoot ?? false;
 
-  const fetchDevelopers = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const response = await fetch('/api/admin/trusted-developers', {
-        credentials: 'include',
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        setError(data.error || 'Не удалось загрузить список разработчиков');
-        return;
-      }
-      setDevelopers(data.developers || []);
-    } catch (err) {
-      console.error('Error fetching developers:', err);
-      setError('Ошибка загрузки списка разработчиков');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data: devsData, isLoading: loading } = trpc.admin.trustedDevs.list.useQuery();
+  const developers: TrustedDeveloper[] = (devsData?.developers as TrustedDeveloper[]) ?? [];
+
+  const addMutation = trpc.admin.trustedDevs.add.useMutation({
+    onSuccess: () => {
+      showSuccess('Разработчик успешно добавлен');
+      setFormData({ email: '', github_username: '' });
+      setShowAddForm(false);
+      utils.admin.trustedDevs.list.invalidate();
+    },
+    onError: (err) => setError(err.message || 'Ошибка при добавлении разработчика'),
+  });
+
+  const removeMutation = trpc.admin.trustedDevs.remove.useMutation({
+    onSuccess: () => {
+      showSuccess('Разработчик успешно удален');
+      utils.admin.trustedDevs.list.invalidate();
+    },
+    onError: (err) => setError(err.message || 'Ошибка при удалении разработчика'),
+    onSettled: () => setDeletingId(null),
+  });
+
+  const submitting = addMutation.isPending;
 
   const showSuccess = (message: string) => {
     setSuccessMessage(message);
@@ -75,7 +55,6 @@ export default function TrustedDevelopersSettings() {
 
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Validate form before showing confirmation
     if (!formData.github_username.trim()) {
       setError('GitHub username обязателен для заполнения');
       return;
@@ -84,64 +63,18 @@ export default function TrustedDevelopersSettings() {
   };
 
   const handleConfirmAdd = async () => {
-    setSubmitting(true);
     setError('');
     setShowConfirmModal(false);
-
-    try {
-      const response = await fetch('/api/admin/trusted-developers', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          github_username: formData.github_username,
-          email: formData.email || null,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError(data.error || 'Ошибка при добавлении разработчика');
-      } else {
-        showSuccess('Разработчик успешно добавлен');
-        setFormData({ email: '', github_username: '' });
-        setShowAddForm(false);
-        fetchDevelopers();
-      }
-    } catch (err) {
-      console.error('Error adding developer:', err);
-      setError('Ошибка при добавлении разработчика');
-    } finally {
-      setSubmitting(false);
-    }
+    addMutation.mutate({
+      github_username: formData.github_username,
+      email: formData.email || '',
+    });
   };
 
   const handleDelete = async (id: string) => {
     setDeletingId(id);
     setError('');
-    try {
-      const response = await fetch(`/api/admin/trusted-developers?id=${id}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError(data.error || 'Ошибка при удалении разработчика');
-      } else {
-        showSuccess('Разработчик успешно удален');
-        fetchDevelopers();
-      }
-    } catch (err) {
-      console.error('Error deleting developer:', err);
-      setError('Ошибка при удалении разработчика');
-    } finally {
-      setDeletingId(null);
-    }
+    removeMutation.mutate({ id });
   };
 
   const formatDate = (dateString: string) => {

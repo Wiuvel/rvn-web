@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useFadeIn } from '@/hooks/useGSAP';
 import { useState, useEffect } from 'react';
 import LegalNavigation from '@/components/navigation/Legal';

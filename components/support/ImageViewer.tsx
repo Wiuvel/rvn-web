@@ -56,11 +56,6 @@ export default function ImageViewer({ isOpen, onClose, imageUrl, alt }: ImageVie
     setScale((prev) => Math.max(prev - 0.25, 0.5));
   };
 
-  const handleReset = () => {
-    setScale(1);
-    setPosition({ x: 0, y: 0 });
-  };
-
   const handleMouseDown = (e: React.MouseEvent) => {
     if (scale > 1) {
       setIsDragging(true);
@@ -96,7 +91,6 @@ export default function ImageViewer({ isOpen, onClose, imageUrl, alt }: ImageVie
 
     const element = modalRef.current;
     // passive: false required for preventDefault() to block page scroll while zooming image
-    // eslint-disable-next-line react-doctor/client-passive-event-listeners -- zoom requires preventDefault()
     element.addEventListener('wheel', handleWheel, { passive: false });
 
     return () => {

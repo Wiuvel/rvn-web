@@ -110,10 +110,28 @@ function AuthIsolatedClientContent() {
         <div className="z-10 grid w-full max-w-5xl grid-cols-1 items-center gap-12 md:grid-cols-2">
           {sessionExpiredParam && (
             <div
-              className="col-span-full rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-center text-amber-200"
+              className="col-span-full flex items-center gap-4 rounded-xl border border-amber-500/40 bg-amber-950/90 px-4 py-4 text-amber-100 shadow-lg backdrop-blur-sm"
               role="alert"
             >
-              Сессия истекла или токен недействителен. Пожалуйста, войдите снова.
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-red-500/25 text-red-400">
+                <svg
+                  className="h-6 w-6"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  aria-hidden
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                  />
+                </svg>
+              </div>
+              <p className="text-left text-sm font-medium sm:text-base">
+                Сессия истекла или токен недействителен. Пожалуйста, войдите снова.
+              </p>
             </div>
           )}
           <AuthForm retpatch={retpatch} initialError={errorParam || undefined} />

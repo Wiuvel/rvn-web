@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import Image from 'next/image';
 import { gsap } from 'gsap';
-import { X, Upload, FileText, Image as ImageIcon } from 'lucide-react';
+import { X, Upload, FileText } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import {
   SUPPORT_ATTACHMENT_MAX_BYTES,

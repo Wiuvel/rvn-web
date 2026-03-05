@@ -198,7 +198,11 @@ export default function AppsSection() {
                 variant="ghost"
                 className="!transform border border-neutral-700/50 bg-neutral-900/30 backdrop-blur-sm !transition-all hover:scale-105 hover:border-neutral-600 hover:bg-neutral-800/50"
               >
-                <Link href="">
+                <Link
+                  href="https://github.com/Happ-proxy/happ-desktop/releases/latest/download/setup-Happ.x64.exe"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     className="h-4 w-4 flex-shrink-0"

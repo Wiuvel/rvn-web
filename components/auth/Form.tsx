@@ -1,13 +1,11 @@
 'use client';
 
-import { useEffect, useCallback } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import dynamic from 'next/dynamic';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { translateError } from '@/lib/utils/error-translations';
-import { ERROR_NETWORK } from '@/lib/utils/constants';
 import { getOAuthErrorMessage } from '@/lib/utils/oauth-errors';
 import {
   loginSchema,
@@ -16,8 +14,14 @@ import {
   type RegisterFormData,
 } from '@/lib/validation/schemas';
 import { calculatePasswordStrength } from '@/lib/utils/password';
-import { useRateLimitedFetch } from '@/hooks/useRateLimitedFetch';
+import { trpc } from '@/lib/trpc/client';
+import { onRateLimited } from '@/lib/trpc/rate-limit-link';
 import { useAuthForm } from '@/hooks/useAuthForm';
+import {
+  getOrCreateFpid,
+  markFpidSent,
+  setFpidCookieForOAuth,
+} from '@/lib/auth/device-fingerprint.client';
 import { OAuthButtons } from './OAuthButtons';
 import { PasswordStrengthIndicator } from './PasswordStrengthIndicator';
 import { EyeOff as EyeNoneIcon, Eye as EyeOpenIcon } from 'lucide-react';
@@ -51,8 +55,26 @@ interface AuthFormProps {
 export default function AuthForm({ retpatch = '/dashboard/', initialError }: AuthFormProps) {
   const { state, dispatch } = useAuthForm();
 
-  const { showRateLimitCaptcha, fetchWithRateLimit, handleRateLimitSuccess, handleRateLimitClose } =
-    useRateLimitedFetch();
+  const [showRateLimitCaptcha, setShowRateLimitCaptcha] = useState(false);
+  const rateLimitRetryRef = useRef<(() => void) | null>(null);
+
+  const csrfQuery = trpc.auth.csrf.useQuery({ scope: 'user' });
+  const csrfToken = csrfQuery.data?.csrfToken ?? '';
+
+  const loginMutation = trpc.auth.login.useMutation();
+  const registerMutation = trpc.auth.register.useMutation();
+
+  const handleRateLimitSuccess = () => {
+    setShowRateLimitCaptcha(false);
+    rateLimitRetryRef.current?.();
+    rateLimitRetryRef.current = null;
+  };
+
+  const handleRateLimitClose = () => {
+    setShowRateLimitCaptcha(false);
+    rateLimitRetryRef.current = null;
+    dispatch({ type: 'SET_LOADING', payload: false });
+  };
 
   const loginForm = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -104,123 +126,73 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
 
   const registerPassword = registerForm.watch('password');
 
-  const fetchCsrfToken = useCallback(async (): Promise<string | null> => {
-    try {
-      const response = await fetch('/api/auth/csrf', {
-        method: 'GET',
-        credentials: 'include',
-        cache: 'no-store',
-      });
-      if (!response.ok) throw new Error('Failed to fetch CSRF token');
-      const data = await response.json();
-      const token = data?.csrfToken || '';
-      dispatch({ type: 'SET_CSRF_TOKEN', payload: token });
-      return token;
-    } catch (error) {
-      console.error('CSRF token fetch error:', error);
-      dispatch({ type: 'SET_CSRF_TOKEN', payload: '' });
-      dispatch({ type: 'SET_GLOBAL_ERROR', payload: 'Не удалось получить токен безопасности.' });
-      return null;
-    }
-  }, [dispatch]);
-
   const handleRegister = async (data: RegisterFormData) => {
-    const tokenToUse = state.csrfToken || (await fetchCsrfToken());
-    if (!tokenToUse) return;
+    if (!csrfToken) {
+      dispatch({ type: 'SET_GLOBAL_ERROR', payload: 'Не удалось получить токен безопасности.' });
+      csrfQuery.refetch();
+      return;
+    }
 
     dispatch({ type: 'SET_LOADING', payload: true });
     dispatch({ type: 'SET_GLOBAL_ERROR', payload: '' });
 
-    const performRegister = async () => {
-      try {
-        const response = await fetchWithRateLimit(
-          '/api/auth/register',
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              username: escapeHtml(data.username),
-              password: data.password,
-              confirmPassword: data.confirmPassword,
-              csrfToken: tokenToUse,
-            }),
-          },
-          performRegister,
-        );
+    try {
+      const fpidRecord = await getOrCreateFpid();
+      const fpid = fpidRecord?.fpid ?? undefined;
 
-        const responseData = await response.json();
-        if (response.ok) {
-          window.location.href = `/dashboard/${responseData.user_id}`;
-        } else {
-          const translatedError = translateError(responseData.error || 'Ошибка регистрации');
-          dispatch({ type: 'SET_GLOBAL_ERROR', payload: escapeHtml(translatedError) });
-          if (response.status === 403) fetchCsrfToken();
-          dispatch({ type: 'SET_LOADING', payload: false });
-        }
-      } catch (error) {
-        if (error instanceof Error && error.message === 'RATE_LIMIT_EXCEEDED') {
-          dispatch({ type: 'SET_LOADING', payload: false });
-        } else {
-          dispatch({ type: 'SET_GLOBAL_ERROR', payload: translateError(ERROR_NETWORK) });
-          fetchCsrfToken();
-          dispatch({ type: 'SET_LOADING', payload: false });
-        }
-      }
-    };
+      const result = await registerMutation.mutateAsync({
+        scope: 'user',
+        username: escapeHtml(data.username),
+        password: data.password,
+        confirmPassword: data.confirmPassword,
+        csrfToken,
+        fpid,
+      });
 
-    await performRegister();
+      markFpidSent();
+      window.location.href = `/dashboard/${'user_id' in result ? result.user_id : ''}`;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Ошибка регистрации';
+      dispatch({ type: 'SET_GLOBAL_ERROR', payload: escapeHtml(translateError(message)) });
+      csrfQuery.refetch();
+      dispatch({ type: 'SET_LOADING', payload: false });
+    }
   };
 
   const handleLogin = async (data: LoginFormData) => {
-    const tokenToUse = state.csrfToken || (await fetchCsrfToken());
-    if (!tokenToUse) return;
+    if (!csrfToken) {
+      dispatch({ type: 'SET_GLOBAL_ERROR', payload: 'Не удалось получить токен безопасности.' });
+      csrfQuery.refetch();
+      return;
+    }
 
     dispatch({ type: 'SET_LOADING', payload: true });
     dispatch({ type: 'SET_LOGIN_ATTEMPT_STATE', payload: 'idle' });
     dispatch({ type: 'SET_GLOBAL_ERROR', payload: '' });
 
-    const performLogin = async () => {
-      try {
-        const response = await fetchWithRateLimit(
-          '/api/auth/login',
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              username: escapeHtml(data.username),
-              password: data.password,
-              csrfToken: tokenToUse,
-            }),
-          },
-          performLogin,
-        );
+    try {
+      const fpidRecord = await getOrCreateFpid();
+      const fpid = fpidRecord?.fpid ?? undefined;
 
-        const responseData = await response.json();
-        if (response.ok) {
-          window.location.href =
-            retpatch && retpatch !== '/dashboard/'
-              ? retpatch
-              : `/dashboard/${responseData.user_id}`;
-        } else {
-          dispatch({ type: 'SET_LOGIN_ATTEMPT_STATE', payload: 'error' });
-          const translatedError = translateError(responseData.error || 'Ошибка входа');
-          dispatch({ type: 'SET_GLOBAL_ERROR', payload: escapeHtml(translatedError) });
-          if (response.status === 403) fetchCsrfToken();
-          dispatch({ type: 'SET_LOADING', payload: false });
-        }
-      } catch (error) {
-        if (error instanceof Error && error.message === 'RATE_LIMIT_EXCEEDED') {
-          dispatch({ type: 'SET_LOADING', payload: false });
-        } else {
-          dispatch({ type: 'SET_LOGIN_ATTEMPT_STATE', payload: 'error' });
-          dispatch({ type: 'SET_GLOBAL_ERROR', payload: translateError(ERROR_NETWORK) });
-          fetchCsrfToken();
-          dispatch({ type: 'SET_LOADING', payload: false });
-        }
-      }
-    };
+      const result = await loginMutation.mutateAsync({
+        scope: 'user',
+        username: escapeHtml(data.username),
+        password: data.password,
+        csrfToken,
+        fpid,
+      });
 
-    await performLogin();
+      markFpidSent();
+      const userId = 'user_id' in result ? result.user_id : '';
+      window.location.href =
+        retpatch && retpatch !== '/dashboard/' ? retpatch : `/dashboard/${userId}`;
+    } catch (error) {
+      dispatch({ type: 'SET_LOGIN_ATTEMPT_STATE', payload: 'error' });
+      const message = error instanceof Error ? error.message : 'Ошибка входа';
+      dispatch({ type: 'SET_GLOBAL_ERROR', payload: escapeHtml(translateError(message)) });
+      csrfQuery.refetch();
+      dispatch({ type: 'SET_LOADING', payload: false });
+    }
   };
 
   const oauthLogin = async (provider: string) => {
@@ -269,6 +241,9 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
     window.addEventListener('message', handleMessage);
 
     try {
+      const fpidRecord = await getOrCreateFpid();
+      if (fpidRecord?.fpid) setFpidCookieForOAuth(fpidRecord.fpid);
+
       const width = 500;
       const height = 600;
       const left = (window.screen.width - width) / 2;
@@ -353,8 +328,11 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
   };
 
   useEffect(() => {
-    fetchCsrfToken();
-  }, [fetchCsrfToken]);
+    return onRateLimited((retry) => {
+      rateLimitRetryRef.current = retry;
+      setShowRateLimitCaptcha(true);
+    });
+  }, []);
 
   useEffect(() => {
     if (initialError) {

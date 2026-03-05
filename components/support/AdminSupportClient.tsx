@@ -1,10 +1,10 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import useSWR, { useSWRConfig } from 'swr';
+import { trpc } from '@/lib/trpc/client';
+import { onRateLimited } from '@/lib/trpc/rate-limit-link';
 import { gsap } from 'gsap';
 import { translateError } from '@/lib/utils/error-translations';
 import RateLimitCaptcha from '@/components/auth/RateLimitCaptcha';
@@ -18,7 +18,7 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { getGradientClasses, getAvatarUrl } from '@/lib/utils/avatar-gradients';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import TicketSkeleton from '@/components/ui/TicketSkeleton';
-import { FileText, AlertCircle, Image as ImageIcon } from 'lucide-react';
+import { FileText } from 'lucide-react';
 import ImageViewer from '@/components/support/ImageViewer';
 import ImageWithBlur from '@/components/support/ImageWithBlur';
 import { debugPerformanceAsync, debugStart, debugEnd, debugError } from '@/lib/utils/debug';
@@ -403,6 +403,8 @@ interface AdminSupportClientProps {
 
 const EMPTY_RAW_TICKETS: RawTicketApi[] = [];
 const EMPTY_RAW_MESSAGES: RawMessageApi[] = [];
+const CACHE_PREFIX = 'support_panel_messages_';
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 минут
 
 export default function AdminSupportClient({
   initialAuthState,
@@ -411,9 +413,8 @@ export default function AdminSupportClient({
   initialActiveTicket = null,
   initialMessages = EMPTY_RAW_MESSAGES,
 }: AdminSupportClientProps) {
-  const router = useRouter();
-  const [authState, setAuthState] = useState<AuthState>(initialAuthState);
-  const [loading, setLoading] = useState(false);
+  const [authState] = useState<AuthState>(initialAuthState);
+  const [loading] = useState(false);
   const [tickets, setTickets] = useState<Ticket[]>(() => {
     return initialTickets.map((t) => {
       const lm = t.last_message;
@@ -481,12 +482,7 @@ export default function AdminSupportClient({
     if (!initialMessages || initialMessages.length === 0) return [];
     return initialMessages.map((m) => {
       const s = m.sender;
-      const sender =
-        s == null
-          ? undefined
-          : Array.isArray(s)
-            ? s[0]
-            : s;
+      const sender = s == null ? undefined : Array.isArray(s) ? s[0] : s;
       return {
         id: m.id,
         ticket_id: m.ticket_id,
@@ -576,7 +572,7 @@ export default function AdminSupportClient({
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    if (mobileActionsOpen && activeTicket) {
+    if (mobileActionsOpen && activeTicket?.id) {
       // Если меню должно быть открыто, начинаем рендеринг
       if (!shouldRenderMobileActions) {
         setShouldRenderMobileActions(true);
@@ -626,9 +622,7 @@ export default function AdminSupportClient({
     }
   }, [mobileActionsOpen, activeTicket?.id, shouldRenderMobileActions]);
 
-  // Очередь запросов вместо одного callback - исправляет race condition
-  const pendingRequestsQueueRef = useRef<Array<() => Promise<void>>>([]);
-  const isProcessingCaptchaRef = useRef(false); // Флаг обработки капчи - предотвращает повторные открытия
+  const rateLimitRetryRef = useRef<(() => void) | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const markReadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -654,9 +648,6 @@ export default function AdminSupportClient({
   };
 
   // Функции кэширования сообщений
-  const CACHE_PREFIX = 'support_panel_messages_';
-  const CACHE_TTL_MS = 5 * 60 * 1000; // 5 минут
-
   const getCacheKey = (ticketId: string) => `${CACHE_PREFIX}${ticketId}`;
 
   const saveMessagesToCache = useCallback((ticketId: string, messages: Message[]) => {
@@ -697,16 +688,11 @@ export default function AdminSupportClient({
       }));
 
       return messages;
-    } catch (error) {
+    } catch {
       // Игнорируем ошибки парсинга
       localStorage.removeItem(getCacheKey(ticketId));
       return null;
     }
-  }, []);
-
-  const clearMessagesCache = useCallback((ticketId: string) => {
-    if (typeof window === 'undefined') return;
-    localStorage.removeItem(getCacheKey(ticketId));
   }, []);
 
   // Сохранение позиции скролла
@@ -882,94 +868,43 @@ export default function AdminSupportClient({
     };
   }, [messages, activeTicket?.id]);
 
-  // Обертка для fetch с обработкой rate limit
-  const fetchWithRateLimit = async (
-    url: string,
-    options: RequestInit = {},
-    retryCallback?: () => Promise<void>,
-  ): Promise<Response> => {
-    const response = await fetch(url, options);
+  // tRPC utils for imperative fetching & cache invalidation
+  const utils = trpc.useUtils();
 
-    if (response.status === 429) {
-      // Добавляем callback в очередь вместо перезаписи - исправляет race condition
-      if (retryCallback) {
-        pendingRequestsQueueRef.current.push(retryCallback);
-      }
+  const csrfQuery = trpc.auth.csrf.useQuery({ scope: 'admin' });
+  const updateTicketMutation = trpc.support.tickets.update.useMutation();
+  const sendMessageMutation = trpc.support.tickets.sendMessage.useMutation();
+  const markAsReadMutation = trpc.support.tickets.markAsRead.useMutation();
 
-      // Открываем модальное окно только если:
-      // 1. Оно еще не открыто
-      // 2. Капча не обрабатывается (предотвращает повторные открытия)
-      if (!isCaptchaOpenRef.current && !isProcessingCaptchaRef.current) {
+  // Subscribe to tRPC rate-limit link events → open captcha
+  useEffect(() => {
+    return onRateLimited((retry) => {
+      rateLimitRetryRef.current = retry;
+      if (!isCaptchaOpenRef.current) {
         isCaptchaOpenRef.current = true;
         setShowRateLimitCaptcha(true);
       }
-      throw new Error('RATE_LIMIT_EXCEEDED');
-    }
+    });
+  }, []);
 
-    return response;
-  };
-
-  const handleRateLimitSuccess = async () => {
-    // Устанавливаем флаг обработки капчи - предотвращает повторные открытия
-    isProcessingCaptchaRef.current = true;
-
-    // Закрываем модальное окно
+  const handleRateLimitSuccess = () => {
     isCaptchaOpenRef.current = false;
     setShowRateLimitCaptcha(false);
-
-    // Увеличиваем задержку для гарантированного применения иммунитета на сервере
-    // Cookie устанавливается сразу, но store может обновиться с небольшой задержкой
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-
-    // Обрабатываем ВСЕ запросы из очереди последовательно
-    const queue = [...pendingRequestsQueueRef.current];
-    pendingRequestsQueueRef.current = []; // Очищаем очередь сразу
-
-    for (const requestCallback of queue) {
-      try {
-        await requestCallback();
-      } catch (error) {
-        // Если запрос снова получил rate limit после иммунитета - это критическая ошибка
-        // НЕ добавляем обратно в очередь и НЕ показываем капчу снова
-        if (error instanceof Error && error.message === 'RATE_LIMIT_EXCEEDED') {
-          // Rate limit все еще активен - не логируем
-        } else {
-          // Ошибка при повторном запросе - не логируем
-        }
-      }
-    }
-
-    // Сбрасываем флаг обработки только после обработки всех запросов
-    isProcessingCaptchaRef.current = false;
+    rateLimitRetryRef.current?.();
+    rateLimitRetryRef.current = null;
   };
 
-  const ARCHIVE_TICKETS_SWR_KEY = '/api/support/tickets?status=closed';
-  const { mutate: globalMutate } = useSWRConfig();
-  const archiveFetcher = useCallback(
-    async (url: string) => {
-      const res = await fetchWithRateLimit(url, { credentials: 'include' }, () =>
-        globalMutate(ARCHIVE_TICKETS_SWR_KEY),
-      );
-      const data = await res.json();
-      if (!res.ok) throw new Error((data as { error?: string }).error || 'Request failed');
-      return data as { tickets: any[] };
+  const archiveQuery = trpc.support.tickets.list.useQuery(
+    { status: 'closed' },
+    {
+      enabled: authState.hasSupportAccess && statusFilter === 'archive',
     },
-    [fetchWithRateLimit, globalMutate],
-  );
-  const {
-    data: archiveSwrData,
-    isLoading: archiveSwrLoading,
-    mutate: mutateArchiveTickets,
-  } = useSWR<{ tickets: any[] }>(
-    authState.hasSupportAccess && statusFilter === 'archive' ? ARCHIVE_TICKETS_SWR_KEY : null,
-    archiveFetcher,
-    { revalidateOnFocus: true },
   );
 
   useEffect(() => {
-    if (statusFilter !== 'archive' || !archiveSwrData?.tickets) return;
-    setTicketsLoading(archiveSwrLoading);
-    let list = (archiveSwrData.tickets || []).map((t: any) => ({
+    if (statusFilter !== 'archive' || !archiveQuery.data?.tickets) return;
+    setTicketsLoading(archiveQuery.isLoading);
+    let list = (archiveQuery.data.tickets || []).map((t: any) => ({
       id: t.id,
       subject: t.subject,
       status: t.status,
@@ -1008,32 +943,23 @@ export default function AdminSupportClient({
         }
       }
     }
-  }, [statusFilter, archiveSwrData, archiveSwrLoading]);
+    // oxlint-disable-next-line
+  }, [statusFilter, archiveQuery.data, archiveQuery.isLoading]);
 
   // Получаем токен из ответа API для WebSocket
   // ВАЖНО: token установлен как httpOnly cookie, поэтому JavaScript не может его прочитать из cookies
   // Токен получается из API ответа и хранится только в памяти компонента (React state)
   // НЕ сохраняем токен в localStorage/sessionStorage для безопасности
-  const [wsToken, setWsToken] = useState<string | undefined>(initialWsToken);
-  const wsTokenRef = useRef<string | undefined>(initialWsToken); // Ref для предотвращения лишних обновлений
+  const [wsToken] = useState<string | undefined>(initialWsToken);
 
   // Инициализация WebSocket
-  const { socket, isConnected, joinTicket, leaveTicket } = useWebSocket({
+  const { socket, isConnected } = useWebSocket({
     enabled: authState.hasSupportAccess && !!wsToken,
     userId: authState.userId || undefined,
     ticketId: activeTicket?.id,
     isSupport: true,
     token: wsToken,
   });
-
-  // Инициализация CSRF токена
-  useEffect(() => {
-    if (authState.isAuthenticated && typeof window !== 'undefined') {
-      import('@/lib/utils/csrf-client').then(({ getCSRFToken }) => {
-        getCSRFToken().catch(() => {});
-      });
-    }
-  }, [authState.isAuthenticated]);
 
   const isInitialMount = useRef(true);
 
@@ -1066,7 +992,7 @@ export default function AdminSupportClient({
         fetchTickets();
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line
   }, [authState.hasSupportAccess, statusFilter]);
 
   // Восстанавливаем последний открытый тикет после загрузки тикетов
@@ -1083,39 +1009,27 @@ export default function AdminSupportClient({
         }
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [tickets.length, authState.hasSupportAccess]);
 
   // Отметка сообщений как прочитанных с debounce
   const markMessagesAsRead = useCallback(async (ticketId: string) => {
-    // Очищаем предыдущий таймер
     if (markReadTimeoutRef.current) {
       clearTimeout(markReadTimeoutRef.current);
     }
 
-    // Устанавливаем новый таймер (debounce 2 секунды)
     markReadTimeoutRef.current = setTimeout(async () => {
-      // Проверяем, что тикет не изменился
       if (currentTicketIdRef.current !== ticketId) {
         return;
       }
 
       try {
-        await fetchWithRateLimit(
-          `/api/support/tickets/${ticketId}/messages/read`,
-          {
-            method: 'POST',
-            credentials: 'include',
-          },
-          () => markMessagesAsRead(ticketId), // Retry callback
-        );
-      } catch (error) {
-        // Не логируем RATE_LIMIT_EXCEEDED, так как это обрабатывается через капчу
-        if (error instanceof Error && error.message !== 'RATE_LIMIT_EXCEEDED') {
-          // Ошибка отметки сообщений - не логируем
-        }
+        await markAsReadMutation.mutateAsync({ ticketId });
+      } catch {
+        // Errors (including rate-limit) handled by tRPC link / captcha
       }
     }, 2000);
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // WebSocket: присоединение/отсоединение от тикета теперь обрабатывается автоматически в useWebSocket
@@ -1271,6 +1185,7 @@ export default function AdminSupportClient({
       socket.off('support:ticket:assigned', handleTicketAssignment);
       socket.off('support:message:read', handleMessageRead);
     };
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [socket, activeTicket?.id, authState.hasSupportAccess, markMessagesAsRead]);
 
   // Простая функция хэширования для сравнения сообщений
@@ -1278,34 +1193,25 @@ export default function AdminSupportClient({
     return msgs.map((m) => `${m.id}-${m.created_at}`).join('|');
   }, []);
 
-  // SWR Fetcher с поддержкой rate limit retry
-  const swrFetcher = useCallback(
-    async (url: string) => {
-      return fetchWithRateLimit(url, { credentials: 'include' }, async () => {
-        await globalMutate(url);
-      }).then((res) => res.json());
-    },
-    [fetchWithRateLimit, globalMutate],
-  );
-
   // Умное обновление сообщений: polling как fallback когда WebSocket недоступен
   const shouldPoll =
     activeTicket &&
     authState.hasSupportAccess &&
     (!isConnected || !socket?.connected) &&
     !document.hidden;
-  const pollKey = shouldPoll ? `/api/support/tickets/${activeTicket.id}` : null;
 
-  const { data: polledData } = useSWR(pollKey, swrFetcher, {
-    refreshInterval: 30000,
-    revalidateOnFocus: true,
-    dedupingInterval: 5000,
-  });
+  const pollingQuery = trpc.support.tickets.get.useQuery(
+    { ticketId: activeTicket?.id ?? '', limit: 100, offset: 0 },
+    {
+      enabled: !!shouldPoll && !!activeTicket?.id,
+      refetchInterval: 30000,
+    },
+  );
+  const polledData = pollingQuery.data;
 
-  // Эффект для обработки данных от SWR
+  // Эффект для обработки данных от tRPC polling
   useEffect(() => {
     if (!polledData || !polledData.ticket || !polledData.messages || !activeTicket) return;
-    // Проверяем, что тикет не изменился (хотя SWR key должен это гарантировать, но на всякий случай)
     if (currentTicketIdRef.current !== activeTicket.id) return;
 
     const currentMessages = messagesRef.current;
@@ -1363,6 +1269,7 @@ export default function AdminSupportClient({
       // Отмечаем сообщения как прочитанные (debounced)
       markMessagesAsRead(activeTicket.id);
     }
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [polledData, activeTicket, hashMessages, markMessagesAsRead]); // updateTicketInList и fetchTickets исключены из deps
 
   // Эффект для инициализации и очистки при смене тикета
@@ -1385,6 +1292,7 @@ export default function AdminSupportClient({
         fetchTicketsAbortControllerRef.current.abort();
       }
     };
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTicket?.id, authState.hasSupportAccess, markMessagesAsRead]);
 
   // useEffect(() => {
@@ -1393,7 +1301,7 @@ export default function AdminSupportClient({
   //     isInitialMessagesLoadRef.current = true;
   //     fetchMessages(activeTicket.id);
   //   }
-  //   // eslint-disable-next-line react-hooks/exhaustive-deps
+  //
   // }, [activeTicket?.id]);
 
   const showNotification = (message: string, type: 'error' = 'error') => {
@@ -1434,160 +1342,34 @@ export default function AdminSupportClient({
     }
   }, [notification.show]);
 
-  const checkAuthStatus = async () => {
-    try {
-      const response = await fetchWithRateLimit(
-        '/api/support/check',
-        {},
-        checkAuthStatus, // Retry callback
-      );
-      const data = await response.json();
-
-      if (!data.isAuthenticated) {
-        router.push('/auth');
-        return;
-      }
-
-      // Инициализируем CSRF токен при успешной авторизации
-      // Это обеспечит автоматическое обновление токена
-      if (data.isAuthenticated && typeof window !== 'undefined') {
-        import('@/lib/utils/csrf-client').then(({ getCSRFToken }) => {
-          getCSRFToken().catch(() => {
-            // Игнорируем ошибки при инициализации - токен будет получен при первой отправке
-          });
-        });
-      }
-
-      // Проверка на ошибку БД (500 или отсутствие данных)
-      // НЕ показываем ошибку БД если это RATE_LIMIT_EXCEEDED
-      if (response.status === 500 || (data.error && data.error.includes('Database'))) {
-        setAuthState({
-          isAuthenticated: true,
-          hasSupportAccess: false,
-          username: data.username || null,
-          userId: data.userId || null,
-          user_id: data.user_id || null,
-        });
-        // Сохраняем токен для WebSocket (если он есть в ответе)
-        // ВАЖНО: Токен хранится только в памяти компонента, не в localStorage/sessionStorage
-        // ОПТИМИЗАЦИЯ: Обновляем токен только если он изменился, чтобы избежать лишних переподключений WebSocket
-        const newToken = data.token || undefined;
-        if (wsTokenRef.current !== newToken) {
-          wsTokenRef.current = newToken;
-          setWsToken(newToken);
-        }
-        setLoading(false);
-        return; // Не редиректим, показываем сообщение на странице
-      }
-
-      if (!data.hasSupportAccess) {
-        setAuthState({
-          isAuthenticated: true,
-          hasSupportAccess: false,
-          username: data.username || null,
-          userId: data.userId || null,
-          user_id: data.user_id || null,
-        });
-        // Сохраняем токен для WebSocket (если он есть в ответе)
-        // ВАЖНО: Токен хранится только в памяти компонента, не в localStorage/sessionStorage
-        // ОПТИМИЗАЦИЯ: Обновляем токен только если он изменился, чтобы избежать лишних переподключений WebSocket
-        const newToken = data.token || undefined;
-        if (wsTokenRef.current !== newToken) {
-          wsTokenRef.current = newToken;
-          setWsToken(newToken);
-        }
-        setLoading(false);
-        return; // Не редиректим, показываем сообщение на странице
-      }
-
-      setAuthState({
-        isAuthenticated: true,
-        hasSupportAccess: true,
-        username: data.username,
-        userId: data.userId,
-        user_id: data.user_id || null,
-      });
-
-      // Сохраняем токен для WebSocket (если он есть в ответе)
-      // ВАЖНО: Токен хранится только в памяти компонента, не в localStorage/sessionStorage
-      // ОПТИМИЗАЦИЯ: Обновляем токен только если он изменился, чтобы избежать лишних переподключений WebSocket
-      const newToken = data.token || undefined;
-      if (wsTokenRef.current !== newToken) {
-        wsTokenRef.current = newToken;
-        setWsToken(newToken);
-      }
-
-      setLoading(false);
-    } catch (error) {
-      if (error instanceof Error && error.message === 'RATE_LIMIT_EXCEEDED') {
-        // Rate limit обрабатывается через капчу, не показываем ошибку БД
-        setLoading(false);
-        return;
-      }
-      // Ошибка проверки авторизации - не логируем
-      // При ошибке сети тоже показываем сообщение, а не редиректим
-      setAuthState({
-        isAuthenticated: true,
-        hasSupportAccess: false,
-        username: null,
-        userId: null,
-        user_id: null,
-      });
-      setLoading(false);
-    }
-  };
-
   const fetchTickets = async () => {
     if (statusFilter === 'archive') {
-      await mutateArchiveTickets();
+      await archiveQuery.refetch();
       return;
     }
     return debugPerformanceAsync('fetchTickets', async () => {
-      // Отменяем предыдущий запрос, если он еще выполняется
       if (fetchTicketsAbortControllerRef.current) {
         fetchTicketsAbortControllerRef.current.abort();
       }
 
-      // Создаем новый AbortController для этого запроса
       const abortController = new AbortController();
       fetchTicketsAbortControllerRef.current = abortController;
 
-      // Проверяем, что фильтр не изменился во время запроса
       const filterAtStart = currentFilterRef.current;
 
       setTicketsLoading(true);
       try {
         debugStart('fetchTickets', { statusFilter, filterAtStart });
-        // Проверяем актуальность фильтра перед запросом
         if (currentFilterRef.current !== filterAtStart) {
           setTicketsLoading(false);
-          return; // Фильтр изменился, отменяем запрос
+          return;
         }
 
-        // Для активных получаем открытые и в ожидании
-        const [openRes, pendingRes] = await Promise.all([
-          fetchWithRateLimit(
-            '/api/support/tickets?status=open',
-            { credentials: 'include' },
-            fetchTickets,
-          ),
-          fetchWithRateLimit(
-            '/api/support/tickets?status=pending',
-            { credentials: 'include' },
-            fetchTickets,
-          ),
+        const [openData, pendingData] = await Promise.all([
+          utils.support.tickets.list.fetch({ status: 'open' }),
+          utils.support.tickets.list.fetch({ status: 'pending' }),
         ]);
 
-        // Проверяем актуальность фильтра после запросов
-        if (currentFilterRef.current !== 'active' || abortController.signal.aborted) {
-          setTicketsLoading(false);
-          return; // Фильтр изменился или запрос отменен
-        }
-
-        const openData = await openRes.json();
-        const pendingData = await pendingRes.json();
-
-        // Еще раз проверяем актуальность перед обработкой данных
         if (currentFilterRef.current !== 'active' || abortController.signal.aborted) {
           setTicketsLoading(false);
           return;
@@ -1683,24 +1465,16 @@ export default function AdminSupportClient({
         setTicketsLoading(false);
         return;
       } catch (error) {
-        // Игнорируем ошибки отмененных запросов
         if (error instanceof Error && error.name === 'AbortError') {
           setTicketsLoading(false);
           return;
         }
-        // Rate limit обрабатывается через капчу, не сбрасываем loading и не показываем ошибку
-        if (error instanceof Error && error.message === 'RATE_LIMIT_EXCEEDED') {
-          return;
-        }
-        // Проверяем актуальность фильтра перед показом ошибки
         if (currentFilterRef.current !== filterAtStart) {
           setTicketsLoading(false);
           return;
         }
         debugError('fetchTickets', { statusFilter, error });
-        // Ошибка получения тикетов
         setTicketsLoading(false);
-        // Устанавливаем пустой список и сбрасываем скелетон
         setTickets([]);
         setSkeletonCount(null);
         showNotification(translateError('Ошибка загрузки тикетов'), 'error');
@@ -1732,135 +1506,98 @@ export default function AdminSupportClient({
       setMessagesLoading(true);
       try {
         debugStart('fetchMessages', { ticketId });
-        const response = await fetchWithRateLimit(
-          `/api/support/tickets/${ticketId}`,
-          {
-            credentials: 'include',
-          },
-          async () => {
-            // Retry callback - проверяем, что тикет не изменился
-            if (currentTicketIdRef.current === ticketId) {
-              await fetchMessages(ticketId);
-            }
-          },
-        );
-        const data = await response.json();
+        const data = await utils.support.tickets.get.fetch({
+          ticketId,
+          limit: 100,
+          offset: 0,
+        });
 
-        // Проверяем, что тикет не изменился во время запроса
         if (currentTicketIdRef.current !== ticketId) {
           setMessagesLoading(false);
           return;
         }
 
-        if (response.ok) {
-          // Маппим сообщения с вложениями (оптимизировано - используем данные с сервера)
-          // Обрабатываем вложения, формируя storage_url если он отсутствует
-          const mappedMessages = (data.messages || []).map(
-            (m: {
+        const mappedMessages: Message[] = (data.messages || []).map(
+          (m: {
+            id: string;
+            message_text: string;
+            sender_type: string;
+            created_at: string;
+            is_read: boolean;
+            sender?: { id: string; username: string; user_id: string; avatar?: string | null };
+            attachments?: Array<{
               id: string;
-              message_text: string;
-              sender_type: string;
-              created_at: string;
-              is_read: boolean;
-              sender?: { id: string; username: string; user_id: string; avatar?: string | null };
-              attachments?: Array<{
-                id: string;
-                file_name: string;
-                file_type: string;
-                file_size: number;
-                storage_url?: string;
-                storage_path?: string;
-              }>;
-            }) => ({
-              id: m.id,
-              ticket_id: ticketId,
-              sender_id: m.sender?.id || '',
-              sender_type: m.sender_type,
-              message_text: m.message_text,
-              is_read: m.is_read,
-              created_at: m.created_at,
-              sender: m.sender,
-              attachments: processAttachments(m.attachments),
-            }),
-          );
+              file_name: string;
+              file_type: string;
+              file_size: number;
+              storage_url?: string;
+              storage_path?: string;
+            }>;
+          }) => ({
+            id: m.id,
+            ticket_id: ticketId,
+            sender_id: m.sender?.id || '',
+            sender_type: m.sender_type as 'user' | 'support',
+            message_text: m.message_text,
+            is_read: m.is_read,
+            created_at: m.created_at,
+            sender: m.sender,
+            attachments: processAttachments(m.attachments),
+          }),
+        );
 
-          setMessages(mappedMessages);
+        setMessages(mappedMessages);
 
-          // Кэшируем сообщения
-          saveMessagesToCache(ticketId, mappedMessages);
+        saveMessagesToCache(ticketId, mappedMessages);
 
-          // После первой загрузки сбрасываем флаг и восстанавливаем скролл
-          if (isFirstLoad) {
-            // Используем setTimeout, чтобы дать React время отрендерить сообщения без анимации
-            setTimeout(() => {
-              isInitialMessagesLoadRef.current = false;
-              // Восстанавливаем позицию скролла только если не было кэша
-              if (!cachedMessages || cachedMessages.length === 0) {
-                restoreScrollPosition(ticketId);
-              }
-            }, 100);
-          }
+        if (isFirstLoad) {
+          setTimeout(() => {
+            isInitialMessagesLoadRef.current = false;
+            if (!cachedMessages || cachedMessages.length === 0) {
+              restoreScrollPosition(ticketId);
+            }
+          }, 100);
+        }
 
-          // Обновляем activeTicket с актуальными данными тикета (статус, назначение и т.д.)
-          // чтобы UI корректно отображал состояние тикета после получения новых сообщений
-          // Это особенно важно, когда приходит системное сообщение о взятии тикета
-          if (data.ticket && currentTicketIdRef.current === ticketId) {
-            setActiveTicket((prev) => {
-              if (prev && prev.id === ticketId) {
-                // ВАЖНО: всегда обновляем assigned_to и assigned_user из ответа API
-                // даже если они null - это означает, что тикет не назначен
-                // Используем явную проверку на undefined, чтобы не потерять данные
-                return {
-                  ...prev,
-                  status: data.ticket.status,
-                  user_id: data.ticket.user_id ?? prev.user_id, // Сохраняем user_id для проверки прав
-                  user: data.ticket.user || prev.user,
-                  // КРИТИЧНО: API всегда возвращает assigned_to и assigned_user в ответе
-                  // Используем их напрямую, даже если они null (тикет не назначен)
-                  // Это гарантирует, что UI всегда синхронизирован с сервером
-                  assigned_to: data.ticket.assigned_to ?? null,
-                  assigned_user: data.ticket.assigned_user ?? null,
-                  updated_at: data.ticket.updated_at,
-                  closed_at: 'closed_at' in data.ticket ? data.ticket.closed_at : prev.closed_at,
-                };
-              } else if (data.ticket) {
-                return {
-                  ...data.ticket,
-                  user_id: data.ticket.user_id, // Сохраняем user_id для проверки прав
-                  assigned_to: data.ticket.assigned_to ?? null,
-                  assigned_user: data.ticket.assigned_user ?? null,
-                };
-              }
-              return prev;
-            });
-
-            // Также обновляем тикет в списке, чтобы данные были синхронизированы
-            updateTicketInList(ticketId, {
-              status: data.ticket.status,
-              assigned_to: data.ticket.assigned_to ?? null,
-              assigned_user: data.ticket.assigned_user ?? null,
-              updated_at: data.ticket.updated_at,
-              closed_at: data.ticket.closed_at ?? undefined,
-            });
-          }
-
-          // Отмечаем сообщения как прочитанные (debounced)
-          markMessagesAsRead(ticketId);
-          debugEnd('fetchMessages', {
-            ticketId,
-            messagesCount: mappedMessages.length,
+        if (data.ticket && currentTicketIdRef.current === ticketId) {
+          setActiveTicket((prev) => {
+            if (prev && prev.id === ticketId) {
+              return {
+                ...prev,
+                status: data.ticket.status,
+                user_id: data.ticket.user_id ?? prev.user_id,
+                user: data.ticket.user || prev.user,
+                assigned_to: data.ticket.assigned_to ?? null,
+                assigned_user: data.ticket.assigned_user ?? null,
+                updated_at: data.ticket.updated_at,
+                closed_at: 'closed_at' in data.ticket ? data.ticket.closed_at : prev.closed_at,
+              };
+            } else if (data.ticket) {
+              return {
+                ...data.ticket,
+                user_id: data.ticket.user_id,
+                assigned_to: data.ticket.assigned_to ?? null,
+                assigned_user: data.ticket.assigned_user ?? null,
+              };
+            }
+            return prev;
           });
-        } else {
-          const errorMessage = data.error || 'Ошибка загрузки сообщений';
-          debugError('fetchMessages', { ticketId, error: errorMessage });
-          showNotification(translateError(errorMessage), 'error');
+
+          updateTicketInList(ticketId, {
+            status: data.ticket.status,
+            assigned_to: data.ticket.assigned_to ?? null,
+            assigned_user: data.ticket.assigned_user ?? null,
+            updated_at: data.ticket.updated_at,
+            closed_at: data.ticket.closed_at ?? undefined,
+          });
         }
+
+        markMessagesAsRead(ticketId);
+        debugEnd('fetchMessages', {
+          ticketId,
+          messagesCount: mappedMessages.length,
+        });
       } catch (error) {
-        if (error instanceof Error && error.message === 'RATE_LIMIT_EXCEEDED') {
-          // Rate limit обрабатывается через капчу, не показываем ошибку
-          setMessagesLoading(false);
-          return;
-        }
         debugError('fetchMessages', { ticketId, error });
         showNotification(translateError('Ошибка загрузки сообщений'), 'error');
       } finally {
@@ -1873,77 +1610,60 @@ export default function AdminSupportClient({
     if (!activeTicket || !messageText.trim()) return;
 
     try {
-      // Получаем CSRF токен для защиты от спама
-      const { getCSRFToken } = await import('@/lib/utils/csrf-client');
-      const csrfToken = await getCSRFToken();
-
-      const response = await fetchWithRateLimit(
-        `/api/support/tickets/${activeTicket.id}/messages`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          credentials: 'include',
-          body: JSON.stringify({
-            message: messageText.trim(),
-            csrfToken,
-          }),
-        },
-        handleSendMessage, // Retry callback
-      );
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setMessageText('');
-        // Обновляем сообщения после отправки
-        const ticketResponse = await fetchWithRateLimit(
-          `/api/support/tickets/${activeTicket.id}`,
-          {
-            credentials: 'include',
-          },
-          async () => {
-            // Retry callback
-            const retryResponse = await fetch(`/api/support/tickets/${activeTicket.id}`, {
-              credentials: 'include',
-            });
-            const retryData = await retryResponse.json();
-            if (retryResponse.ok && currentTicketIdRef.current === activeTicket.id) {
-              setMessages(retryData.messages || []);
-              markMessagesAsRead(activeTicket.id);
-            }
-          },
-        );
-        const ticketData = await ticketResponse.json();
-        if (ticketResponse.ok && currentTicketIdRef.current === activeTicket.id) {
-          setMessages(ticketData.messages || []);
-          // Отмечаем сообщения как прочитанные (debounced)
-          markMessagesAsRead(activeTicket.id);
-          // Обновляем только last_message_at в списке тикетов, без полного перезапроса
-          setTickets((prevTickets) =>
-            prevTickets.map((ticket) =>
-              ticket.id === activeTicket.id
-                ? {
-                    ...ticket,
-                    last_message_at: ticketData.ticket?.last_message_at || ticket.last_message_at,
-                  }
-                : ticket,
-            ),
-          );
-        }
-        // Сообщение отправлено успешно - уведомление не показываем
-      } else {
-        const errorMessage = data.error || 'Ошибка отправки сообщения';
-        showNotification(translateError(errorMessage), 'error');
+      let csrfToken = csrfQuery.data?.csrfToken ?? '';
+      if (!csrfToken) {
+        const result = await csrfQuery.refetch();
+        csrfToken = result.data?.csrfToken ?? '';
       }
-    } catch (error) {
-      if (error instanceof Error && error.message === 'RATE_LIMIT_EXCEEDED') {
-        // Rate limit обрабатывается через капчу, не показываем ошибку
+      if (!csrfToken) {
+        showNotification(translateError('Ошибка загрузки. Обновите страницу.'), 'error');
         return;
       }
-      // Ошибка отправки сообщения - не логируем
-      showNotification(translateError('Ошибка отправки сообщения'), 'error');
+
+      await sendMessageMutation.mutateAsync({
+        ticketId: activeTicket.id,
+        message: messageText.trim(),
+        csrfToken,
+      });
+
+      setMessageText('');
+
+      const ticketData = await utils.support.tickets.get.fetch({
+        ticketId: activeTicket.id,
+        limit: 100,
+        offset: 0,
+      });
+      if (currentTicketIdRef.current === activeTicket.id) {
+        setMessages(ticketData.messages || []);
+        markMessagesAsRead(activeTicket.id);
+        setTickets((prevTickets) =>
+          prevTickets.map((ticket) =>
+            ticket.id === activeTicket.id
+              ? {
+                  ...ticket,
+                  last_message_at: ticketData.ticket?.last_message_at || ticket.last_message_at,
+                }
+              : ticket,
+          ),
+        );
+        // Прокрутка вниз после отправки своего сообщения
+        if (typeof window !== 'undefined' && activeTicket.id) {
+          localStorage.setItem(`support_panel_scroll_${activeTicket.id}`, 'bottom');
+        }
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            if (messagesEndRef.current && !isRestoringScrollRef.current) {
+              messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+            }
+          });
+        });
+      }
+    } catch (error) {
+      const msg =
+        error instanceof Error && 'data' in error
+          ? (error as any).message
+          : 'Ошибка отправки сообщения';
+      showNotification(translateError(msg), 'error');
     }
   };
 
@@ -1954,35 +1674,22 @@ export default function AdminSupportClient({
     );
   };
 
-  // Функция для закрепления/отвязывания тикета за саппортом
   const handleAssignTicket = async (ticketId: string, userId: string) => {
     try {
       const currentTicket = tickets.find((t) => t.id === ticketId) || activeTicket;
 
-      // Архивные тикеты (closed) не могут быть закреплены/отвязаны
       if (currentTicket && currentTicket.status === 'closed') {
         showNotification('Архивные тикеты не могут быть закреплены или отвязаны', 'error');
         return;
       }
 
-      // Если тикет уже взят текущим саппортом - отвязываем его
       if (currentTicket?.assigned_to === userId) {
-        const response = await fetchWithRateLimit(
-          `/api/support/tickets/${ticketId}`,
-          {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ assignedTo: null }),
-          },
-          () => handleAssignTicket(ticketId, userId), // Retry callback
-        );
+        const data = await updateTicketMutation.mutateAsync({
+          ticketId,
+          assignedTo: null,
+        });
 
-        const data = await response.json();
-
-        if (response.ok && data.ticket) {
-          // Тикет отвязан успешно - уведомление не показываем
-          // Обновляем активный тикет
+        if (data.ticket) {
           if (activeTicket?.id === ticketId) {
             setActiveTicket((prev) => {
               if (prev && prev.id === ticketId) {
@@ -1995,41 +1702,26 @@ export default function AdminSupportClient({
               return prev;
             });
           }
-          // Обновляем только конкретный тикет в списке
           updateTicketInList(ticketId, {
             assigned_to: null,
             assigned_user: null,
           });
-        } else {
-          const errorMessage = data.error || 'Ошибка при отвязывании тикета';
-          showNotification(translateError(errorMessage), 'error');
         }
         return;
       }
 
-      // Проверяем, не занят ли тикет другим саппортом
       if (currentTicket?.assigned_to && currentTicket.assigned_to !== userId) {
         showNotification('Тикет уже занят другим специалистом поддержки', 'error');
         return;
       }
 
-      // Закрепляем тикет за саппортом и меняем статус на "В работе"
-      const response = await fetchWithRateLimit(
-        `/api/support/tickets/${ticketId}`,
-        {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ assignedTo: userId, status: 'pending' }),
-        },
-        () => handleAssignTicket(ticketId, userId), // Retry callback
-      );
+      const data = await updateTicketMutation.mutateAsync({
+        ticketId,
+        assignedTo: userId,
+        status: 'pending',
+      });
 
-      const data = await response.json();
-
-      if (response.ok && data.ticket) {
-        // Тикет успешно взят - уведомление не показываем
-        // Обновляем активный тикет с данными о назначенном пользователе и статусом
+      if (data.ticket) {
         if (activeTicket?.id === ticketId) {
           setActiveTicket((prev) => {
             if (prev && prev.id === ticketId) {
@@ -2043,28 +1735,22 @@ export default function AdminSupportClient({
             return prev;
           });
         }
-        // Обновляем только конкретный тикет в списке
         updateTicketInList(ticketId, {
           assigned_to: data.ticket.assigned_to || null,
           assigned_user: data.ticket.assigned_user || null,
           status: data.ticket.status || 'pending',
         });
 
-        // ВАЖНО: Обновляем сообщения, чтобы показать системное сообщение о взятии тикета
-        // Это обновит activeTicket с актуальными данными из API, включая assigned_to и assigned_user
         if (activeTicket?.id === ticketId) {
           await fetchMessages(ticketId);
         }
-      } else {
-        const errorMessage = data.error || 'Ошибка при взятии тикета';
-        showNotification(translateError(errorMessage), 'error');
       }
     } catch (error) {
-      if (error instanceof Error && error.message === 'RATE_LIMIT_EXCEEDED') {
-        return;
-      }
-      // Ошибка назначения тикета - не логируем
-      showNotification('Ошибка при взятии тикета', 'error');
+      const msg =
+        error instanceof Error && 'data' in error
+          ? (error as any).message
+          : 'Ошибка при взятии тикета';
+      showNotification(translateError(msg), 'error');
     }
   };
 
@@ -2092,35 +1778,24 @@ export default function AdminSupportClient({
     closeReason?: string,
   ) => {
     try {
-      // Проверяем, не является ли текущий тикет архивным
       const currentTicket = tickets.find((t) => t.id === ticketId) || activeTicket;
       if (currentTicket && currentTicket.status === 'closed') {
         showNotification('Статус архивных тикетов нельзя изменить', 'error');
         return;
       }
 
-      const response = await fetchWithRateLimit(
-        `/api/support/tickets/${ticketId}`,
-        {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          credentials: 'include',
-          body: JSON.stringify({ status, closeReason }),
-        },
-        () => handleUpdateTicketStatus(ticketId, status, closeReason), // Retry callback
-      );
+      const data = await updateTicketMutation.mutateAsync({
+        ticketId,
+        status: status as 'open' | 'closed' | 'pending' | 'resolved',
+        closeReason,
+      });
 
-      const data = await response.json();
-
-      if (response.ok && data.ticket) {
+      if (data.ticket) {
         const newStatus = status as 'open' | 'pending' | 'closed';
         const wasActive = activeTicket?.status === 'open' || activeTicket?.status === 'pending';
         const isNowActive = newStatus === 'open' || newStatus === 'pending';
         const statusCategoryChanged = wasActive !== isNowActive;
 
-        // Обновляем активный тикет с полными данными (включая assigned_to)
         if (activeTicket?.id === ticketId) {
           setActiveTicket({
             ...activeTicket,
@@ -2130,7 +1805,6 @@ export default function AdminSupportClient({
           });
         }
 
-        // Обновляем только конкретный тикет в списке
         updateTicketInList(ticketId, {
           status: newStatus,
           updated_at: data.ticket.updated_at,
@@ -2139,13 +1813,9 @@ export default function AdminSupportClient({
           assigned_user: data.ticket.assigned_user || null,
         });
 
-        // Если статус изменился между активными и архивными - обновляем весь список
-        // (тикет должен переместиться в другую категорию)
         if (statusCategoryChanged) {
-          // Если тикет перешел из архива в активные - переключаем фильтр
           if (isNowActive && statusFilter === 'archive') {
             setStatusFilter('active');
-            // Обновляем скелетон лоадер для нового фильтра
             const cached = localStorage.getItem(`support_panel_tickets_count_active`);
             if (cached !== null) {
               const parsed = parseInt(cached, 10);
@@ -2157,64 +1827,39 @@ export default function AdminSupportClient({
             } else {
               setSkeletonCount(3);
             }
-            // useEffect автоматически вызовет fetchTickets() при изменении statusFilter
-          }
-          // Если тикет перешел из активных в архив - переключаем фильтр
-          else if (!isNowActive && statusFilter === 'active') {
+          } else if (!isNowActive && statusFilter === 'active') {
             setStatusFilter('archive');
-            // Устанавливаем скелетон лоадер для нового фильтра
             setSkeletonCount(3);
-            // useEffect автоматически вызовет fetchTickets() при изменении statusFilter
           } else if (!isNowActive && statusFilter === 'archive') {
-            // Если тикет уже в архиве и мы в архиве - просто обновляем список
             await fetchTickets();
           } else {
-            // Если фильтр уже правильный, просто обновляем список
             await fetchTickets();
           }
         } else if (newStatus === 'closed') {
-          // Если тикет закрыт, но мы уже в архиве - просто обновляем список
-          // чтобы новый тикет появился в архиве
           if (statusFilter === 'archive') {
             await fetchTickets();
           } else if (statusFilter === 'active') {
-            // Если мы в активных, а тикет закрыт - переключаемся в архив
             setStatusFilter('archive');
             setSkeletonCount(3);
-            // useEffect автоматически вызовет fetchTickets() при изменении statusFilter
           }
         }
 
-        // Обновляем сообщения, чтобы показать системное сообщение о смене статуса
-        // ВАЖНО: fetchMessages также обновит activeTicket с актуальными данными о назначении
         if (activeTicket?.id === ticketId) {
-          // Загружаем сообщения, которые обновят activeTicket с актуальными данными
-          // включая assigned_to и assigned_user из ответа API
           await fetchMessages(ticketId);
-        }
-
-        // Статус тикета обновлен успешно - уведомление не показываем
-      } else {
-        const errorMessage = data.error || 'Ошибка обновления статуса';
-        // Специальная обработка ошибок валидации статусов
-        if (errorMessage.includes('status transition') || errorMessage.includes('Invalid status')) {
-          showNotification(
-            'Недопустимый переход статуса. Проверьте правила изменения статусов.',
-            'error',
-          );
-        } else if (errorMessage.includes('not assigned') || errorMessage.includes('assigned')) {
-          showNotification('Тикет должен быть назначен вам для изменения статуса', 'error');
-        } else {
-          showNotification(translateError(errorMessage), 'error');
         }
       }
     } catch (error) {
-      if (error instanceof Error && error.message === 'RATE_LIMIT_EXCEEDED') {
-        // Rate limit обрабатывается через капчу, не показываем ошибку
-        return;
+      const errorMessage = error instanceof Error ? error.message : 'Ошибка обновления статуса';
+      if (errorMessage.includes('status transition') || errorMessage.includes('Invalid status')) {
+        showNotification(
+          'Недопустимый переход статуса. Проверьте правила изменения статусов.',
+          'error',
+        );
+      } else if (errorMessage.includes('not assigned') || errorMessage.includes('assigned')) {
+        showNotification('Тикет должен быть назначен вам для изменения статуса', 'error');
+      } else {
+        showNotification(translateError(errorMessage), 'error');
       }
-      // Ошибка обновления статуса тикета - не логируем
-      showNotification(translateError('Ошибка обновления статуса'), 'error');
     }
   };
 
@@ -2245,46 +1890,6 @@ export default function AdminSupportClient({
     }
   };
 
-  // Получить цвет индикатора давности тикета
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const getTicketUrgencyColor = (_ticket: Ticket): string => {
-    // Убрали glow эффект
-    return '';
-  };
-
-  // Проверка, является ли тикет старым (37+ минут без ответа)
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const isTicketOld = (_ticket: Ticket): boolean => {
-    if (_ticket.status === 'closed') return false;
-
-    const lastMessageTime = new Date(_ticket.last_message_at).getTime();
-    const now = Date.now();
-    const minutesSinceLastMessage = (now - lastMessageTime) / (1000 * 60);
-
-    return minutesSinceLastMessage >= 37;
-  };
-
-  // Получить цвет для надписи "UP" в зависимости от давности тикета
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const getUpLabelColor = (_ticket: Ticket): string => {
-    if (_ticket.status === 'closed') return '';
-
-    const lastMessageTime = new Date(_ticket.last_message_at).getTime();
-    const now = Date.now();
-    const minutesSinceLastMessage = (now - lastMessageTime) / (1000 * 60);
-
-    // 2 часа = 120 минут - красный
-    if (minutesSinceLastMessage >= 120) {
-      return 'text-red-400';
-    }
-    // 37 минут - желтый
-    if (minutesSinceLastMessage >= 37) {
-      return 'text-yellow-400';
-    }
-
-    return '';
-  };
-
   // Получить цвет индикатора для тикета (желтый или красный)
   // Получить текст индикатора давности
   const getTicketUrgencyText = (ticket: Ticket): string => {
@@ -2304,6 +1909,24 @@ export default function AdminSupportClient({
   };
 
   // Получить цвет текста индикатора
+  const getTicketUrgencyColor = (ticket: Ticket): string => {
+    if (statusFilter === 'archive') return '';
+    if (ticket.status === 'closed') return '';
+
+    const lastMessageTime = new Date(ticket.last_message_at).getTime();
+    const now = Date.now();
+    const minutesSinceLastMessage = (now - lastMessageTime) / (1000 * 60);
+
+    if (minutesSinceLastMessage >= 120) {
+      return 'border-red-500/50';
+    }
+    if (minutesSinceLastMessage >= 30) {
+      return 'border-yellow-500/50';
+    }
+
+    return '';
+  };
+
   const getTicketUrgencyTextColor = (ticket: Ticket): string => {
     if (statusFilter === 'archive') return '';
     if (ticket.status === 'closed') return '';
@@ -2375,6 +1998,7 @@ export default function AdminSupportClient({
             </p>
             <Link
               href="/ui/panel"
+              prefetch={false}
               className="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700"
             >
               <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -3277,11 +2901,9 @@ export default function AdminSupportClient({
           isOpen={showRateLimitCaptcha}
           onSuccess={handleRateLimitSuccess}
           onClose={() => {
-            // При закрытии очищаем очередь и сбрасываем все флаги
             isCaptchaOpenRef.current = false;
-            isProcessingCaptchaRef.current = false;
             setShowRateLimitCaptcha(false);
-            pendingRequestsQueueRef.current = [];
+            rateLimitRetryRef.current = null;
           }}
         />
       )}

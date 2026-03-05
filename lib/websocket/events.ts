@@ -31,7 +31,6 @@ export interface SupportWebSocketEvents {
         file_type: string;
         file_size: number;
         storage_path: string;
-        storage_url?: string;
       }>;
     };
   }) => void;

@@ -19,8 +19,7 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
-        // Apply security headers to all routes except static files
-        // Exclude static file extensions to avoid HTTP/2 protocol errors
+        // -- Apply security headers to all routes except static files --
         source:
           '/:path((?!_next/static|static|favicon\\.ico|.*\\.svg$|.*\\.png$|.*\\.jpg$|.*\\.jpeg$|.*\\.gif$|.*\\.webp$|.*\\.ico$|.*\\.woff$|.*\\.woff2$|.*\\.ttf$|.*\\.eot$|.*\\.css$|.*\\.js$|.*\\.map$).*)',
         headers: [
@@ -38,8 +37,8 @@ const nextConfig: NextConfig = {
           },
         ],
       },
-      // CORS headers for static files: /static/*, /_next/static/*, /favicon.ico
       {
+        // -- CORS headers for static files: /static/*, /_next/static/*, /favicon.ico --
         source: '/:path((?:static(?:/.*)?|_next/static(?:/.*)?|favicon\\.ico))',
         headers: [
           { key: 'Access-Control-Allow-Origin', value: '*' },

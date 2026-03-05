@@ -1,5 +1,6 @@
 'use client';
 
+import { trpc } from '@/lib/trpc/client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -8,7 +9,6 @@ import { UserData } from '@/types';
 import { useMenuAnimation } from '@/hooks/useMenuAnimation';
 import { getGradientClasses, getAvatarUrl } from '@/lib/utils/avatar-gradients';
 import {
-  User,
   Settings,
   Receipt,
   LogOut,
@@ -33,12 +33,13 @@ export function UserMenu({
   userData,
   isOpen,
   onClose,
-  showUserId = true,
+  showUserId: _showUserId = true,
   hideBalance = false,
   menuRef: externalMenuRef,
   persist = true,
 }: UserMenuProps) {
   const router = useRouter();
+  const logoutMutation = trpc.auth.logout.useMutation();
   const { shouldRender, menuRef: animatedMenuRef } = useMenuAnimation(isOpen, {
     onClose,
     persist,
@@ -70,11 +71,9 @@ export function UserMenu({
 
   const handleLogout = async () => {
     try {
-      const response = await fetch('/api/auth/logout', { method: 'POST' });
-      if (response.ok) {
-        onClose();
-        router.push('/auth');
-      }
+      await logoutMutation.mutateAsync({ scope: 'user' });
+      onClose();
+      router.push('/auth');
     } catch (error) {
       console.error('Logout error:', error);
     }
@@ -91,6 +90,7 @@ export function UserMenu({
       <div className="p-2">
         <Link
           href={`/dashboard/${userData.user_id}`}
+          prefetch={false}
           onClick={onClose}
           className="group relative block rounded-xl border border-white/5 bg-gradient-to-br from-white/5 to-white/[0.02] p-4 transition-all duration-300 hover:border-white/10"
         >
@@ -234,6 +234,7 @@ function MenuItem({ href, onClick, icon: Icon, label, highlight }: MenuItemProps
   return (
     <Link
       href={href}
+      prefetch={false}
       onClick={onClick}
       className="group flex items-center justify-between rounded-xl px-3 py-2.5 text-neutral-300 transition-all duration-200 hover:bg-white/5 hover:text-white"
     >

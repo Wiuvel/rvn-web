@@ -56,7 +56,6 @@ export async function GET(request: NextRequest) {
     // Get OAuth parameters
     const code = searchParams.get('code');
     const vkError = searchParams.get('error');
-    const errorDescription = searchParams.get('error_description');
 
     // Check for VK errors
     if (vkError) {
@@ -155,7 +154,6 @@ export async function GET(request: NextRequest) {
     }
 
     let vkUsername: string | undefined;
-    let avatarUrl: string | undefined;
     if (userInfoResponse.ok) {
       const userInfoData = await userInfoResponse.json();
       if (userInfoData.response && userInfoData.response[0]) {
@@ -166,8 +164,6 @@ export async function GET(request: NextRequest) {
           (vkUser.first_name && vkUser.last_name
             ? `${vkUser.first_name}_${vkUser.last_name}`.toLowerCase().replace(/[^a-z0-9_]/g, '_')
             : undefined);
-        // VK возвращает URL аватара в поле photo_max или photo_200
-        avatarUrl = vkUser.photo_200 || vkUser.photo_max;
       }
     }
 
@@ -205,8 +201,9 @@ export async function GET(request: NextRequest) {
       await SessionManager.destroySession(oldSessionId);
     }
 
-    // Register device and get new token
-    const token = await SessionManager.registerDevice(user.id, userAgent, ipAddress);
+    // Register device and get new token (fpid for Layer 2 grouping)
+    const fpid = request.cookies.get('rvn_fpid')?.value ?? null;
+    const token = await SessionManager.registerDevice(user.id, userAgent, ipAddress, fpid);
 
     const sessionId = await SessionManager.createSession(
       user.id,
@@ -226,6 +223,9 @@ export async function GET(request: NextRequest) {
         )
       : new URL(`/dashboard/${user.user_id}`, origin);
     const response = NextResponse.redirect(redirectUrl);
+
+    // Clear FPID cookie after use (OAuth only)
+    response.cookies.set('rvn_fpid', '', { maxAge: 0, path: '/' });
 
     // Copy protection cookies from request if they exist, or set temporary ones
     const accessGranted = request.cookies.get('access_granted')?.value;
@@ -335,7 +335,6 @@ export async function GET(request: NextRequest) {
     });
 
     try {
-      const env = getEnv();
       {
         const origin = domains.mainUrl.endsWith('/')
           ? domains.mainUrl.slice(0, -1)

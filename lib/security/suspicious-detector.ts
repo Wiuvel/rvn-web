@@ -163,7 +163,7 @@ function isBotPattern(userAgent: string): boolean {
  */
 function hasSuspiciousBehavior(
   headers: Record<string, string | null>,
-  referer: string | null,
+  _referer: string | null,
 ): boolean {
   const hasAccept = !!headers['accept'] && headers['accept']!.length > 0;
   const hasAcceptLanguage = !!headers['accept-language'] && headers['accept-language']!.length > 0;

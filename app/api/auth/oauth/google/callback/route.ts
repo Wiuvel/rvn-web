@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getEnv } from '@/lib/validation/env-validation';
 import { createUserFromOAuth, getUserByEmail } from '@/lib/auth/index';
 import { SessionManager } from '@/lib/auth/session-manager';
-import { sanitizeInput } from '@/lib/security/sanitize';
 import { setCorsHeaders, handleCorsPreflight } from '@/lib/security/cors';
 import { logger } from '@/lib/utils/secure-logger';
 import { authRateLimit } from '@/lib/security/rate-limit';
@@ -135,7 +134,7 @@ export async function GET(request: NextRequest) {
     }
 
     const userInfo = await userInfoResponse.json();
-    const { email, verified_email, picture } = userInfo;
+    const { email, verified_email } = userInfo;
 
     if (!email) {
       logger.error('No email in user info');
@@ -184,8 +183,9 @@ export async function GET(request: NextRequest) {
       await SessionManager.destroySession(oldSessionId);
     }
 
-    // Register device and get new token
-    const token = await SessionManager.registerDevice(user.id, userAgent, ipAddress);
+    // Register device and get new token (fpid for Layer 2 grouping)
+    const fpid = request.cookies.get('rvn_fpid')?.value ?? null;
+    const token = await SessionManager.registerDevice(user.id, userAgent, ipAddress, fpid);
 
     const sessionId = await SessionManager.createSession(
       user.id,
@@ -205,6 +205,9 @@ export async function GET(request: NextRequest) {
         )
       : new URL(`/dashboard/${user.user_id}`, origin);
     const response = NextResponse.redirect(redirectUrl);
+
+    // Clear FPID cookie after use (OAuth only)
+    response.cookies.set('rvn_fpid', '', { maxAge: 0, path: '/' });
 
     // Copy protection cookies from request if they exist, or set temporary ones
     // Note: Due to SameSite=Strict, protection cookies may not be sent in cross-site OAuth callback
@@ -322,7 +325,6 @@ export async function GET(request: NextRequest) {
 
     // Get origin for error redirect
     try {
-      const env = getEnv();
       {
         const origin = domains.mainUrl.endsWith('/')
           ? domains.mainUrl.slice(0, -1)

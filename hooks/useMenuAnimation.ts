@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { gsap } from 'gsap';
-import { GSAP_DEFAULT_DURATION, GSAP_DEFAULT_EASE } from '@/lib/utils/constants';
+import { GSAP_DEFAULT_EASE } from '@/lib/utils/constants';
 
 export interface UseMenuAnimationOptions {
   blockScroll?: boolean;
@@ -88,13 +88,15 @@ export function useMenuAnimation(
   }, [isOpen, shouldRender, onClose, persist]);
 
   useEffect(() => {
+    const menu = menuRef.current;
+
     return () => {
       if (animationRef.current) {
         animationRef.current.kill();
         animationRef.current = null;
       }
-      if (menuRef.current) {
-        gsap.killTweensOf(menuRef.current);
+      if (menu) {
+        gsap.killTweensOf(menu);
       }
     };
   }, []);

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { trpc } from '@/lib/trpc/client';
 import { AdvancedBentoCard } from './AdvancedBentoCard';
 import MaintenanceModal from '@/components/admin/MaintenanceModal';
 
@@ -18,39 +19,21 @@ interface MagicBentoGridProps {
 export default function AdvancedBentoGrid({ teamCount }: MagicBentoGridProps) {
   const [mounted, setMounted] = useState(false);
   const [isMaintenanceModalOpen, setIsMaintenanceModalOpen] = useState(false);
-  const [maintenanceConfig, setMaintenanceConfig] = useState<MaintenanceConfig>({
+
+  const { data: maintenanceData } = trpc.admin.maintenance.get.useQuery(undefined, {
+    staleTime: 30_000,
+  });
+  const maintenanceConfig: MaintenanceConfig = maintenanceData ?? {
     isActive: false,
     scheduledStart: null,
     scheduledEnd: null,
     message: '',
-  });
-
-  const fetchMaintenanceConfig = async (signal?: AbortSignal) => {
-    try {
-      const res = await fetch('/api/admin/maintenance', { signal });
-      if (res.ok) {
-        const data = await res.json();
-        setMaintenanceConfig(data);
-      }
-    } catch (error) {
-      if (error instanceof Error && error.name === 'AbortError') return;
-      console.error('Failed to fetch maintenance config:', error);
-    }
   };
 
   useEffect(() => {
     setMounted(true);
-    const controller = new AbortController();
 
-    // Небольшая задержка для предотвращения двойного запроса в React Strict Mode (Development)
-    const timeoutId = setTimeout(() => {
-      fetchMaintenanceConfig(controller.signal);
-    }, 50);
-
-    return () => {
-      clearTimeout(timeoutId);
-      controller.abort();
-    };
+    return () => {};
   }, []);
 
   if (!mounted) return null;
@@ -304,7 +287,6 @@ export default function AdvancedBentoGrid({ teamCount }: MagicBentoGridProps) {
           isOpen={isMaintenanceModalOpen}
           onClose={() => {
             setIsMaintenanceModalOpen(false);
-            fetchMaintenanceConfig();
           }}
           initialConfig={maintenanceConfig}
         />

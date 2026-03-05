@@ -16,7 +16,6 @@ export interface RawAttachmentApi {
   file_type: string;
   file_size: number;
   storage_path?: string;
-  storage_url?: string;
   blur_hash?: string;
   width?: number;
   height?: number;

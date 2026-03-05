@@ -5,7 +5,6 @@ import ServerError from '@/components/error/ServerError';
 
 export default function Error({
   error,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   reset: _reset,
 }: {
   error: Error & { digest?: string };

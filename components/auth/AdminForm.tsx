@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { useApiSWR } from '@/lib/swr';
+import { trpc } from '@/lib/trpc/client';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import dynamic from 'next/dynamic';
@@ -60,7 +60,7 @@ export default function AdminAuthForm({ initialAuthState, onAuthSuccess }: Admin
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(!initialAuthState);
 
-  const { data: csrfData } = useApiSWR<{ csrfToken: string }>('/api/admin/csrf');
+  const { data: csrfData } = trpc.auth.csrf.useQuery({ scope: 'admin' });
   const csrfToken = csrfData?.csrfToken ?? '';
 
   // Update form resolver when switching between login/register
@@ -73,24 +73,36 @@ export default function AdminAuthForm({ initialAuthState, onAuthSuccess }: Admin
     }
   }, [isLogin, form]);
 
-  const checkAuthStatus = useCallback(async () => {
+  const adminCheck = trpc.admin.check.useQuery(undefined, {
+    enabled: !initialAuthState,
+  });
+
+  useEffect(() => {
+    if (adminCheck.data) {
+      setAuthState(adminCheck.data);
+      setIsCheckingAuth(false);
+    }
+  }, [adminCheck.data]);
+
+  const checkAuthStatus = async () => {
+    setIsCheckingAuth(true);
     try {
-      setIsCheckingAuth(true);
-      const response = await fetch('/api/admin/check');
-      const data = await response.json();
-      setAuthState(data);
-    } catch (error) {
-      console.error('Error checking auth status:', error);
+      const result = await adminCheck.refetch();
+      if (result.data) {
+        setAuthState(result.data);
+      }
     } finally {
       setIsCheckingAuth(false);
     }
-  }, []);
+  };
 
   useEffect(() => {
-    if (!initialAuthState) checkAuthStatus();
     const timer = setTimeout(() => setShowForm(true), 100);
     return () => clearTimeout(timer);
-  }, [checkAuthStatus, initialAuthState]);
+  }, []);
+
+  const loginMutation = trpc.auth.login.useMutation();
+  const registerMutation = trpc.auth.register.useMutation();
 
   const handleSubmit = async (data: AdminAuthFormData | AdminRegisterFormData) => {
     setLoading(true);
@@ -98,36 +110,17 @@ export default function AdminAuthForm({ initialAuthState, onAuthSuccess }: Admin
     setError('');
 
     try {
-      const endpoint = isLogin ? '/api/admin/login' : '/api/admin/register';
-
-      const response: Response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+      if (isLogin) {
+        const responseData = await loginMutation.mutateAsync({
+          scope: 'admin',
           username: data.username,
           password: data.password,
-          confirmPassword: data.confirmPassword,
           csrfToken,
-        }),
-      });
+        });
 
-      const responseData = await response.json();
-
-      if (!response.ok) {
-        const translatedError = translateError(responseData.error || 'An error occurred');
-        setError(translatedError);
-        setLoading(false);
-        setLoginSuccess(false);
-        return;
-      }
-
-      if (isLogin) {
-        // Update auth state immediately after successful login
         setAuthState({
           isAuthenticated: true,
-          username: data.username,
+          username: 'username' in responseData ? responseData.username : data.username,
           adminExists: true,
         });
         setLoginSuccess(true);
@@ -136,10 +129,17 @@ export default function AdminAuthForm({ initialAuthState, onAuthSuccess }: Admin
         if (onAuthSuccess) {
           onAuthSuccess();
         } else {
-          // Force hard navigation to ensure clean state
           window.location.href = '/ui/panel/admin';
         }
       } else {
+        await registerMutation.mutateAsync({
+          scope: 'admin',
+          username: data.username,
+          password: data.password,
+          confirmPassword: (data as AdminRegisterFormData).confirmPassword,
+          csrfToken,
+        });
+
         setError('');
         setIsTransitioning(true);
         setTimeout(() => {
@@ -149,9 +149,10 @@ export default function AdminAuthForm({ initialAuthState, onAuthSuccess }: Admin
           alert('Запись успешно создана. Войдите в систему.');
         }, 300);
       }
-    } catch (error) {
-      console.error('Auth error:', error);
-      setError(translateError(ERROR_NETWORK));
+    } catch (err) {
+      console.error('Auth error:', err);
+      const message = err instanceof Error ? err.message : ERROR_NETWORK;
+      setError(translateError(message));
       setLoginSuccess(false);
     } finally {
       setLoading(false);

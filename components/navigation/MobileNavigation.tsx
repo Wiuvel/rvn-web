@@ -1,5 +1,6 @@
 'use client';
 
+import { trpc } from '@/lib/trpc/client';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -127,7 +128,7 @@ export default function MobileNavigation() {
       // Clean up overflow only on unmount, NOT on every effect run
       // document.body.style.overflow = '';
     };
-  }, [isOpen]);
+  }, [isOpen, shouldRender]);
 
   // ── Close overlay only when route actually changes (not on mount/hydration) ──
   useEffect(() => {
@@ -175,25 +176,28 @@ export default function MobileNavigation() {
   useEffect(() => {
     if (!shouldRender) return;
 
+    const overlay = overlayRef.current;
+    const backdrop = backdropRef.current;
+
     return () => {
-      if (overlayRef.current) gsap.killTweensOf(overlayRef.current);
-      if (backdropRef.current) gsap.killTweensOf(backdropRef.current);
+      if (overlay) gsap.killTweensOf(overlay);
+      if (backdrop) gsap.killTweensOf(backdrop);
       document.body.style.overflow = '';
     };
   }, [shouldRender]);
 
   // ── Handlers ──
+  const logoutMutation = trpc.auth.logout.useMutation();
+
   const handleLogout = useCallback(async () => {
     try {
-      const response = await fetch('/api/auth/logout', { method: 'POST' });
-      if (response.ok) {
-        setIsOpen(false);
-        router.push('/auth');
-      }
+      await logoutMutation.mutateAsync({ scope: 'user' });
+      setIsOpen(false);
+      router.push('/auth');
     } catch (error) {
       console.error('Logout error:', error);
     }
-  }, [router]);
+  }, [router, logoutMutation]);
 
   const closeOverlay = useCallback(() => setIsOpen(false), []);
   const toggleOverlay = useCallback(() => {
@@ -258,6 +262,7 @@ export default function MobileNavigation() {
           ) : userData ? (
             <Link
               href={`/dashboard/${userData.user_id}`}
+              prefetch={false}
               onClick={closeOverlay}
               className="group flex items-center gap-3.5 rounded-2xl border border-white/5 bg-gradient-to-br from-white/[0.04] to-white/[0.01] p-4 transition-all hover:border-white/10 active:scale-[0.98]"
             >
@@ -312,6 +317,7 @@ export default function MobileNavigation() {
           ) : (
             <Link
               href="/auth"
+              prefetch={false}
               onClick={closeOverlay}
               className="flex w-full items-center justify-center gap-2.5 rounded-2xl bg-primary-500 py-3.5 font-medium text-white shadow-glow transition-all hover:bg-primary-400 active:scale-[0.98]"
             >
@@ -414,7 +420,13 @@ export default function MobileNavigation() {
       >
         <div className="mx-auto flex h-[60px] max-w-lg items-center justify-around px-1">
           <NavItem href="/" icon={Home} label="Главная" active={isActive('/')} />
-          <NavItem href="/about" icon={Info} label="О проекте" active={isActive('/about')} />
+          <NavItem
+            href="/about"
+            icon={Info}
+            label="О проекте"
+            active={isActive('/about')}
+            prefetch={false}
+          />
 
           {/* Center Logo Button */}
           <Link
@@ -435,6 +447,7 @@ export default function MobileNavigation() {
             icon={LifeBuoy}
             label="Помощь"
             active={isActivePrefix('/support')}
+            prefetch={false}
           />
 
           {/* Menu toggle — always clickable because nav is z-[70] */}
@@ -485,12 +498,14 @@ interface NavItemProps {
   icon: React.ElementType;
   label: string;
   active?: boolean;
+  prefetch?: boolean;
 }
 
-function NavItem({ href, icon: Icon, label, active }: NavItemProps) {
+function NavItem({ href, icon: Icon, label, active, prefetch }: NavItemProps) {
   return (
     <Link
       href={href}
+      prefetch={prefetch}
       className={`flex min-w-[52px] flex-col items-center justify-center gap-0.5 py-1 transition-colors ${active ? 'text-white' : 'text-neutral-500 active:text-neutral-300'}`}
     >
       <Icon className="h-5 w-5" strokeWidth={active ? 2.2 : 1.8} />
@@ -506,6 +521,7 @@ interface OverlayMenuItemProps {
   label: string;
   highlight?: boolean;
   active?: boolean;
+  prefetch?: boolean;
 }
 
 function OverlayMenuItem({
@@ -515,10 +531,12 @@ function OverlayMenuItem({
   label,
   highlight,
   active,
+  prefetch = false,
 }: OverlayMenuItemProps) {
   return (
     <Link
       href={href}
+      prefetch={prefetch}
       onClick={onClick}
       className={`group flex items-center gap-3 rounded-xl px-3 py-3 transition-all active:scale-[0.98] ${active ? 'bg-white/5 text-white' : 'text-neutral-300 hover:bg-white/5 hover:text-white'}`}
     >

@@ -22,8 +22,7 @@ export default function SessionExpiredModal() {
 
   const handleLogin = () => {
     setIsOpen(false);
-    window.location.href =
-      '/auth?retpatch=' + encodeURIComponent(window.location.pathname);
+    window.location.href = '/auth?retpatch=' + encodeURIComponent(window.location.pathname);
   };
 
   const handleHome = () => {
@@ -43,8 +42,7 @@ export default function SessionExpiredModal() {
 
           <h2 className="mb-2 text-xl font-bold text-white">Сессия истекла</h2>
           <p className="mb-6 text-neutral-400">
-            Ваша сессия завершена или токен безопасности недействителен. Пожалуйста, войдите снова,
-            чтобы продолжить.
+            Ваша сессия завершена или недействительна. Пожалуйста, войдите снова, чтобы продолжить.
           </p>
 
           <div className="flex flex-col gap-3 sm:flex-row">

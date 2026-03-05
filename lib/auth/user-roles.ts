@@ -88,7 +88,6 @@ export async function batchHasUserRole(
 
   // Проверяем кэш для каждого пользователя
   const uncachedUserIds: string[] = [];
-  const cachePromises: Promise<[string, boolean]>[] = [];
 
   for (const userId of uniqueUserIds) {
     const cacheKey = `user_role:${userId}:${role}`;

@@ -28,7 +28,7 @@ export default function BannerUploadModal({
   isOpen,
   onClose,
   onUploadComplete,
-  currentBannerUrl,
+  currentBannerUrl: _currentBannerUrl,
 }: BannerUploadModalProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -258,8 +258,6 @@ export default function BannerUploadModal({
 
       const container = imageContainerRef.current;
       const rect = container.getBoundingClientRect();
-      const containerWidth = container.clientWidth;
-      const containerHeight = container.clientHeight;
 
       if (isDraggingCrop) {
         // Перемещение области обрезки
@@ -667,7 +665,6 @@ export default function BannerUploadModal({
                   style={{ minHeight: '200px', maxHeight: '400px' }}
                 >
                   {/* Native img required: ref + onLoad for crop area init (getBoundingClientRect, naturalWidth) */}
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     ref={imageRef}
                     src={imagePreview}

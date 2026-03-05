@@ -1,0 +1,31 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": [
+    "eslint",
+    "typescript",
+    "unicorn",
+    "oxc",
+    "react",
+    "react-perf",
+    "nextjs",
+    "import",
+    "jsx-a11y",
+    "node",
+    "promise",
+    "vitest"
+  ],
+  "rules": {
+    "nextjs/no-img-element": "off",
+    "nextjs/no-before-interactive-script-outside-document": "off",
+    "jsx-a11y/prefer-tag-over-role": "off"
+  },
+  "ignorePatterns": [
+    "node_modules",
+    ".next",
+    "out",
+    "build",
+    "next-env.d.ts",
+    "lib/wasm/pkg",
+    "server.js"
+  ]
+}

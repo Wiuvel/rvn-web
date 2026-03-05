@@ -36,7 +36,7 @@ export default function DashboardPreviewSection() {
                 variant="ghost"
                 className="border border-neutral-700/50 bg-neutral-900/30 backdrop-blur-sm transition-all duration-300 hover:scale-105 hover:border-neutral-600 hover:bg-neutral-800/50"
               >
-                <Link href="/auth">
+                <Link href="/auth" prefetch={false}>
                   <LogIn className="h-5 w-5 flex-shrink-0" />
                   <span className="whitespace-nowrap">Авторизация</span>
                 </Link>

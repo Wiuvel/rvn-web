@@ -27,7 +27,13 @@ interface UseWebSocketReturn {
 }
 
 export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketReturn {
-  const { enabled = true, userId, ticketId, isSupport = false, token } = options;
+  const {
+    enabled = true,
+    userId: _userId,
+    ticketId,
+    isSupport: _isSupport = false,
+    token,
+  } = options;
   const [isConnected, setIsConnected] = useState(false);
   const socketRef = useRef<SocketType | null>(null);
   const cleanupRef = useRef<(() => void) | null>(null);

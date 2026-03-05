@@ -398,7 +398,7 @@ export async function getUserByToken(authToken: string): Promise<User | null> {
     }
 
     return user as User;
-  } catch (error) {
+  } catch {
     return null;
   }
 }

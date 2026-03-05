@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import Image from 'next/image';
-import { useApiSWR } from '@/lib/swr';
+import { trpc } from '@/lib/trpc/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { MessageSquare, Reply, ChevronUp, Loader2 } from 'lucide-react';
@@ -49,21 +49,37 @@ export default function CommentsSection({
     token: authToken,
   });
 
-  // SWR — основной источник комментариев (fallback на initialComments с сервера)
-  const {
-    data: swrComments,
-    error: swrError,
-    isLoading: swrLoading,
-    mutate: mutateComments,
-  } = useApiSWR<Comment[]>(profileUserId ? `/api/user/${profileUserId}/comments` : null, {
-    fallbackData: initialComments,
-    revalidateOnFocus: true,
-  });
+  // tRPC — основной источник комментариев (fallback на initialComments с сервера)
+  const utils = trpc.useUtils();
+  const queryInput = useMemo(() => ({ user_id: profileUserId }), [profileUserId]);
+  const { data: trpcComments, isLoading: swrLoading } = trpc.user.comments.list.useQuery(
+    queryInput,
+    {
+      enabled: !!profileUserId,
+      placeholderData: initialComments.length > 0 ? initialComments : undefined,
+      refetchOnWindowFocus: true,
+    },
+  );
 
-  const comments = swrComments ?? EMPTY_COMMENTS;
+  const comments = (trpcComments ?? EMPTY_COMMENTS) as Comment[];
 
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // Helper for optimistic cache updates
+  const mutateComments = useCallback(
+    (updater: (prev: Comment[] | undefined) => Comment[] | undefined, revalidate = true) => {
+      utils.user.comments.list.setData(queryInput, (prev) => {
+        const result = updater(prev as Comment[] | undefined);
+        return result as any;
+      });
+      if (revalidate) {
+        utils.user.comments.list.invalidate(queryInput);
+      }
+    },
+    [utils, queryInput],
+  );
+
+  const createComment = trpc.user.comments.create.useMutation();
+
+  const [loading] = useState(false);
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [newCommentText, setNewCommentText] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -164,23 +180,16 @@ export default function CommentsSection({
     setSubmitting(true);
 
     try {
-      const res = await fetch(`/api/user/${profileUserId}/comments`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content, parent_id: parentId }),
+      const savedComment = await createComment.mutateAsync({
+        user_id: profileUserId,
+        content,
+        parent_id: parentId,
       });
-
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.error || 'Failed to post');
-      }
-
-      const savedComment = await res.json();
 
       // Replace temp comment with real one
       mutateComments((prev) => {
         const current = prev ?? [];
-        return current.map((c) => (c.id === tempId ? savedComment : c));
+        return current.map((c) => (c.id === tempId ? (savedComment as Comment) : c));
       }, false);
     } catch (err) {
       // Revert optimistic update on error
@@ -245,7 +254,7 @@ export default function CommentsSection({
       ) : (
         <div className="mb-8 rounded-xl border border-white/5 bg-neutral-900/40 p-6 text-center">
           <p className="text-base text-neutral-400">
-            <Link href="/auth" className="font-medium text-white hover:underline">
+            <Link href="/auth" prefetch={false} className="font-medium text-white hover:underline">
               Войдите
             </Link>
             , чтобы присоединиться к обсуждению

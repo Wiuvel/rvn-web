@@ -388,7 +388,6 @@ export function initWebSocketServer(
     // Обработка присоединения к тикету с полной валидацией прав доступа
     socket.on('support:join', async (data) => {
       const { ticketId } = data;
-      const user = socket.data.user;
       const userId = socket.data.userId;
       const isSupport = socket.data.isSupport;
 
@@ -910,7 +909,7 @@ export function broadcastNewComment(profileId: string, comment: CommentNewData['
     if (httpServer) {
       try {
         initWebSocketServer(httpServer);
-      } catch (e) {}
+      } catch {}
     }
   }
 

@@ -2,18 +2,16 @@
 
 import { useState, useEffect, useRef, useCallback, startTransition } from 'react';
 import dynamic from 'next/dynamic';
-import { useRouter } from 'next/navigation';
-import useSWR, { useSWRConfig } from 'swr';
+import { trpc } from '@/lib/trpc/client';
+import { onRateLimited } from '@/lib/trpc/rate-limit-link';
 import { useSupportState } from '@/hooks/useSupportState';
 import Link from 'next/link';
-import Image from 'next/image';
 import { gsap } from 'gsap';
 import {
   MESSAGE_MAX_LENGTH,
   TICKET_SUBJECT_MAX_LENGTH,
   MAX_TICKETS_PER_USER,
   MESSAGE_TIMEOUT,
-  AUTH_FETCH_TIMEOUT,
   GSAP_DEFAULT_DURATION,
   GSAP_DEFAULT_EASE,
   MARK_AS_READ_DEBOUNCE,
@@ -23,7 +21,6 @@ import {
   normalizeLastMessageDisplayText,
 } from '@/lib/utils/support-messages';
 import { translateError } from '@/lib/utils/error-translations';
-import { getGradientClasses, getAvatarUrl } from '@/lib/utils/avatar-gradients';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { debugPerformanceAsync, debugStart, debugEnd, debugError } from '@/lib/utils/debug';
 import TicketSkeleton from '@/components/ui/TicketSkeleton';
@@ -33,12 +30,11 @@ import ChatHeader from '@/components/support/ChatHeader';
 import MessageItem from '@/components/support/MessageItem';
 import TicketListItem from '@/components/support/TicketListItem';
 import CreateTicketForm from '@/components/support/CreateTicketForm';
-import { X, AlertCircle, PanelLeftClose, PanelLeft, Plus } from 'lucide-react';
+import { PanelLeftClose, PanelLeft, Plus } from 'lucide-react';
 import ImageViewer from '@/components/support/ImageViewer';
 import Header from '@/components/layout/Header';
-import { UserMenu } from '@/components/navigation/UserMenu';
 import { UserData } from '@/types';
-import type { Message, Ticket, MessageAttachment, UploadedFile } from '@/components/support/types';
+import type { Message, Ticket, UploadedFile } from '@/components/support/types';
 import type { RawTicketApi, RawMessageApi } from '@/lib/types/support-api';
 import { mapRawTicketsToUi } from '@/lib/utils/support-mappers';
 
@@ -57,8 +53,6 @@ interface SupportClientProps {
 
 const EMPTY_TICKETS: RawTicketApi[] = [];
 const EMPTY_MESSAGES: RawMessageApi[] = [];
-
-const TICKETS_SWR_KEY = '/api/support/tickets?status=all&forUser=true';
 
 function mapApiTicketsToState(rawTickets: RawTicketApi[]): Ticket[] {
   return mapRawTicketsToUi(rawTickets);
@@ -82,7 +76,6 @@ export default function SupportClient({
   stateRef.current = state;
 
   const {
-    userMenuOpen,
     userData,
     loading,
     isSupport,
@@ -113,15 +106,6 @@ export default function SupportClient({
       const newVal = typeof val === 'function' ? val(currentVal) : val;
       dispatch({ type: 'TOGGLE_USER_MENU', payload: newVal });
     },
-    [dispatch],
-  );
-
-  const setUserData = useCallback(
-    (val: UserData | null) => dispatch({ type: 'SET_USER_DATA', payload: val }),
-    [dispatch],
-  );
-  const setLoading = useCallback(
-    (val: boolean) => dispatch({ type: 'SET_LOADING', payload: val }),
     [dispatch],
   );
 
@@ -227,10 +211,8 @@ export default function SupportClient({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const messagesTopRef = useRef<HTMLDivElement>(null);
-  const scrollPositionRef = useRef<number | null>(null);
   const isRestoringScrollRef = useRef(false);
   const [scrollRestored, setScrollRestored] = useState(true);
-  const router = useRouter();
 
   // Закрытие десктоп-меню при переключении viewport (DevTools / resize)
   useEffect(() => {
@@ -241,6 +223,7 @@ export default function SupportClient({
     };
     mq.addEventListener('change', handler);
     return () => mq.removeEventListener('change', handler);
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Подсчет активных тикетов (только open и pending)
@@ -248,7 +231,6 @@ export default function SupportClient({
     (t) => t.status === 'open' || t.status === 'pending',
   ).length;
 
-  const userMenuRef = useRef<HTMLDivElement>(null);
   const notificationRef = useRef<HTMLDivElement>(null);
   const messageInputRef = useRef<HTMLInputElement>(null);
   const messageTextareaRef = useRef<HTMLTextAreaElement>(null); // Для формы создания нового тикета
@@ -264,10 +246,8 @@ export default function SupportClient({
 
   const {
     showRateLimitCaptcha,
-    ticketsListVisible,
     sidebarCollapsed,
     showFileUploadModal,
-    isUploading,
     uploadedFiles,
     filePreviews,
     fileErrors,
@@ -279,15 +259,6 @@ export default function SupportClient({
 
   const setShowRateLimitCaptcha = useCallback(
     (val: boolean) => dispatch({ type: 'SET_SHOW_RATE_LIMIT_CAPTCHA', payload: val }),
-    [dispatch],
-  );
-
-  const setTicketsListVisible = useCallback(
-    (val: boolean | ((prev: boolean) => boolean)) => {
-      const currentVal = stateRef.current.ticketsListVisible;
-      const newVal = typeof val === 'function' ? val(currentVal) : val;
-      dispatch({ type: 'SET_TICKETS_LIST_VISIBLE', payload: newVal });
-    },
     [dispatch],
   );
 
@@ -304,11 +275,6 @@ export default function SupportClient({
     (val: boolean) => dispatch({ type: 'SET_SHOW_FILE_UPLOAD_MODAL', payload: val }),
     [dispatch],
   );
-  const setIsUploading = useCallback(
-    (val: boolean) => dispatch({ type: 'SET_IS_UPLOADING', payload: val }),
-    [dispatch],
-  );
-
   const setUploadedFiles = useCallback(
     (val: UploadedFile[] | ((prev: UploadedFile[]) => UploadedFile[])) => {
       const currentVal = stateRef.current.uploadedFiles;
@@ -359,6 +325,7 @@ export default function SupportClient({
         setSidebarCollapsed(cached === 'true');
       }
     }
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Загружаем превью для изображений после загрузки файлов
@@ -373,10 +340,10 @@ export default function SupportClient({
         setFilePreviews((prev) => new Map(prev).set(file.storageUrl, file.storageUrl));
       }
     });
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [uploadedFiles]);
-  // Очередь запросов вместо одного callback - исправляет race condition
-  const pendingRequestsQueueRef = useRef<Array<() => Promise<void>>>([]);
-  const isProcessingCaptchaRef = useRef(false); // Флаг обработки капчи - предотвращает повторные открытия
+  const rateLimitRetriesRef = useRef<Array<() => void>>([]);
+  const isProcessingCaptchaRef = useRef(false);
   const markReadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Лимиты символов (используем константы из lib/constants.ts)
@@ -444,121 +411,60 @@ export default function SupportClient({
       }));
 
       return messages;
-    } catch (error) {
+    } catch {
       // Игнорируем ошибки парсинга
       localStorage.removeItem(getCacheKey(ticketId));
       return null;
     }
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Обертка для fetch с обработкой rate limit
-  const fetchWithRateLimit = useCallback(
-    async (
-      url: string,
-      options: RequestInit = {},
-      retryCallback?: () => Promise<void>,
-    ): Promise<Response> => {
-      const response = await fetch(url, options);
-
-      if (response.status === 429) {
-        // Добавляем callback в очередь вместо перезаписи - исправляет race condition
-        if (retryCallback) {
-          pendingRequestsQueueRef.current.push(retryCallback);
-        }
-
-        // Открываем модальное окно только если:
-        // 1. Оно еще не открыто
-        // 2. Капча не обрабатывается (предотвращает повторные открытия)
-        if (!isCaptchaOpenRef.current && !isProcessingCaptchaRef.current) {
-          isCaptchaOpenRef.current = true;
-          dispatch({ type: 'SET_SHOW_RATE_LIMIT_CAPTCHA', payload: true });
-        }
-        throw new Error('RATE_LIMIT_EXCEEDED');
+  useEffect(() => {
+    const unsub = onRateLimited((retry) => {
+      rateLimitRetriesRef.current.push(retry);
+      if (!isCaptchaOpenRef.current && !isProcessingCaptchaRef.current) {
+        isCaptchaOpenRef.current = true;
+        dispatch({ type: 'SET_SHOW_RATE_LIMIT_CAPTCHA', payload: true });
       }
-
-      return response;
-    },
-    [dispatch],
-  );
+    });
+    return unsub;
+  }, [dispatch]);
 
   const handleRateLimitSuccess = useCallback(async () => {
-    // Устанавливаем флаг обработки капчи - предотвращает повторные открытия
     isProcessingCaptchaRef.current = true;
-
-    // Закрываем модальное окно
     isCaptchaOpenRef.current = false;
     dispatch({ type: 'SET_SHOW_RATE_LIMIT_CAPTCHA', payload: false });
 
-    // Увеличиваем задержку для гарантированного применения иммунитета на сервере
-    // Cookie устанавливается сразу, но store может обновиться с небольшой задержкой
     await new Promise((resolve) => setTimeout(resolve, 1000));
 
-    // Обрабатываем ВСЕ запросы из очереди последовательно
-    const queue = [...pendingRequestsQueueRef.current];
-    pendingRequestsQueueRef.current = []; // Очищаем очередь сразу
-
-    for (const requestCallback of queue) {
-      try {
-        await requestCallback();
-      } catch (error) {
-        // Если запрос снова получил rate limit после иммунитета - это критическая ошибка
-        // НЕ добавляем обратно в очередь и НЕ показываем капчу снова
-        if (error instanceof Error && error.message === 'RATE_LIMIT_EXCEEDED') {
-          // Rate limit все еще активен - не логируем
-        } else {
-          // Ошибка при повторном запросе - не логируем
-        }
-      }
+    const retries = [...rateLimitRetriesRef.current];
+    rateLimitRetriesRef.current = [];
+    for (const retry of retries) {
+      retry();
     }
 
-    // Сбрасываем флаг обработки только после обработки всех запросов
     isProcessingCaptchaRef.current = false;
   }, [dispatch]);
 
-  // SWR: список тикетов (источник правды для списка; синхронизируем в reducer)
-  const { mutate: globalMutate } = useSWRConfig();
-  const ticketsFetcher = useCallback(
-    async (url: string) => {
-      const res = await fetchWithRateLimit(url, { credentials: 'include' }, () =>
-        globalMutate(TICKETS_SWR_KEY),
-      );
-      const data = await res.json();
-      if (!res.ok) {
-        const err = new Error(data.error || 'Request failed') as Error & { status?: number };
-        err.status = res.status;
-        throw err;
-      }
-      return data as { tickets: any[] };
-    },
-    [fetchWithRateLimit, globalMutate],
-  );
+  const utils = trpc.useUtils();
   const {
-    data: ticketsSwrData,
-    error: ticketsSwrError,
+    data: ticketsData,
     isLoading: ticketsSwrLoading,
-    mutate: mutateTickets,
-  } = useSWR<{ tickets: any[] }>(userData ? TICKETS_SWR_KEY : null, ticketsFetcher, {
-    fallbackData: { tickets: initialTickets },
-    revalidateOnFocus: true,
-    onErrorRetry: (err, _key, _config, revalidate, { retryCount }) => {
-      if ((err as Error & { status?: number }).status === 401) return;
-      if (retryCount >= 3) return;
-      setTimeout(() => revalidate({ retryCount }), 5000);
-    },
+    error: ticketsSwrError,
+  } = trpc.support.tickets.list.useQuery(
+    { status: 'all', forUser: 'true' },
+    { enabled: !!userData, staleTime: 30_000, refetchOnWindowFocus: true },
+  );
+  const csrfQuery = trpc.auth.csrf.useQuery({ scope: 'user' });
+  const createTicketMutation = trpc.support.tickets.create.useMutation({
+    onSuccess: () => utils.support.tickets.list.invalidate(),
   });
+  const sendMessageMutation = trpc.support.tickets.sendMessage.useMutation({
+    onSuccess: () => utils.support.tickets.list.invalidate(),
+  });
+  const markAsReadMutation = trpc.support.tickets.markAsRead.useMutation();
 
   const hasRestoredLastTicketRef = useRef(false);
-
-  useEffect(() => {
-    if (
-      ticketsSwrError?.message === 'RATE_LIMIT_EXCEEDED' &&
-      !isCaptchaOpenRef.current &&
-      !isProcessingCaptchaRef.current
-    ) {
-      isCaptchaOpenRef.current = true;
-      setShowRateLimitCaptcha(true);
-    }
-  }, [ticketsSwrError]);
 
   // Функция для показа notification
   const showNotification = useCallback(
@@ -585,32 +491,27 @@ export default function SupportClient({
     [setNotification],
   );
 
-  // Синхронизация SWR → reducer
+  // Синхронизация tRPC → reducer
   useEffect(() => {
-    // 1. Sync Loading (only if changed)
     if (stateRef.current.ticketsLoading !== ticketsSwrLoading) {
       setTicketsLoading(ticketsSwrLoading);
     }
 
-    if (ticketsSwrError && ticketsSwrError.message === 'RATE_LIMIT_EXCEEDED') return;
     if (ticketsSwrError) {
       const errorMessage = translateError(ticketsSwrError.message) || 'Ошибка загрузки обращений';
-      // Only show if not already showing or different message
       if (lastShownErrorRef.current !== errorMessage) {
         showNotification(errorMessage);
         lastShownErrorRef.current = errorMessage;
       }
       return;
     } else {
-      // Clear last error if no error
       lastShownErrorRef.current = null;
     }
 
-    if (!ticketsSwrData?.tickets) return;
+    if (!ticketsData?.tickets) return;
 
-    const mappedTickets = mapApiTicketsToState(ticketsSwrData.tickets);
+    const mappedTickets = mapApiTicketsToState(ticketsData.tickets);
 
-    // 2. Sync Tickets - Deep compare with current state to avoid loop
     const currentTickets = stateRef.current.tickets;
     const hasChanged = JSON.stringify(mappedTickets) !== JSON.stringify(currentTickets);
 
@@ -619,14 +520,13 @@ export default function SupportClient({
       if (typeof window !== 'undefined') {
         const count = mappedTickets.length;
         localStorage.setItem('support_tickets_count', count.toString());
-        // Guard skeleton count update
         if (stateRef.current.skeletonCount !== count) {
           setSkeletonCount(count === 0 ? null : count);
         }
       }
     }
   }, [
-    ticketsSwrData,
+    ticketsData,
     ticketsSwrLoading,
     ticketsSwrError,
     setTicketsLoading,
@@ -660,6 +560,7 @@ export default function SupportClient({
     };
     window.addEventListener('keydown', handleEscape);
     return () => window.removeEventListener('keydown', handleEscape);
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [showCreateTicketModal]);
 
   // Функция для анимации тряски с GSAP
@@ -682,24 +583,10 @@ export default function SupportClient({
       .to(inputElement, { x: 0, duration: 0.05, ease: 'power2.out' });
   };
 
-  // Инициализация CSRF токена
-  useEffect(() => {
-    if (userData && typeof window !== 'undefined') {
-      import('@/lib/utils/csrf-client').then(({ getCSRFToken }) => {
-        getCSRFToken().catch(() => {});
-      });
-    }
-  }, [userData]);
-
   // Инициализация WebSocket
   // ВАЖНО: Токен передается только после загрузки userData для предотвращения преждевременных подключений
   // Токен хранится только в памяти компонента, не в localStorage/sessionStorage для безопасности
-  const {
-    socket,
-    isConnected: isWebSocketConnected,
-    joinTicket,
-    leaveTicket,
-  } = useWebSocket({
+  const { socket, isConnected: isWebSocketConnected } = useWebSocket({
     enabled: !!userData && !!userData.token,
     userId: userData?.id,
     ticketId: activeTicket?.id,
@@ -707,37 +594,22 @@ export default function SupportClient({
     token: userData?.token, // Передаем токен для аутентификации WebSocket
   });
 
-  // Отметка сообщений как прочитанных с улучшенным debounce
-  // Используем useCallback для мемоизации функции и предотвращения лишних пересозданий
   const markMessagesAsRead = useCallback(async (ticketId: string) => {
-    // Очищаем предыдущий таймер, если он существует
     if (markReadTimeoutRef.current) {
       clearTimeout(markReadTimeoutRef.current);
       markReadTimeoutRef.current = null;
     }
 
-    // Устанавливаем новый таймер с debounce
     markReadTimeoutRef.current = setTimeout(async () => {
-      // Очищаем ref после выполнения
       markReadTimeoutRef.current = null;
-
       try {
-        await fetchWithRateLimit(
-          `/api/support/tickets/${ticketId}/messages/read`,
-          {
-            method: 'POST',
-            credentials: 'include',
-          },
-          () => markMessagesAsRead(ticketId), // Retry callback
-        );
-      } catch (error) {
-        // Не логируем RATE_LIMIT_EXCEEDED, так как это обрабатывается через капчу
-        if (error instanceof Error && error.message !== 'RATE_LIMIT_EXCEEDED') {
-          // Ошибка отметки сообщений - не логируем
-        }
+        await markAsReadMutation.mutateAsync({ ticketId });
+      } catch {
+        // Rate limits handled by rateLimitLink
       }
     }, MARK_AS_READ_DEBOUNCE);
-  }, []); // Пустой массив зависимостей, так как функция не зависит от состояния
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Очистка таймера при размонтировании
   useEffect(() => {
@@ -838,7 +710,7 @@ export default function SupportClient({
       const newMessage: Message = {
         id: data.message.id,
         text: data.message.message_text,
-        sender: data.message.sender_type,
+        sender: data.message.sender_type as 'user' | 'support',
         timestamp: new Date(data.message.created_at),
         isRead: data.message.is_read,
         senderData: data.message.sender,
@@ -988,6 +860,7 @@ export default function SupportClient({
       socket.off('support:ticket:updated', handleTicketUpdate);
       socket.off('support:message:read', handleMessageRead);
     };
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [socket, activeTicket?.id, markMessagesAsRead]);
 
   // Анимация появления/исчезновения формы создания тикета
@@ -1024,6 +897,7 @@ export default function SupportClient({
         },
       });
     }
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [showNewTicketForm]);
 
   // Анимация перехода между чатами
@@ -1057,21 +931,13 @@ export default function SupportClient({
       }
 
       try {
-        const response = await fetchWithRateLimit(
-          `/api/support/tickets/${activeTicket.id}`,
-          {
-            credentials: 'include',
-          },
-          async () => {
-            // Retry callback для обновления сообщений
-            if (activeTicket) {
-              await fetchTicketMessages(activeTicket.id, 25, 0, false);
-            }
-          },
-        );
-        const data = await response.json();
+        const data = await utils.support.tickets.get.fetch({
+          ticketId: activeTicket.id,
+          limit: 100,
+          offset: 0,
+        });
 
-        if (response.ok && data.ticket && data.messages) {
+        if (data.ticket && data.messages) {
           const currentMessageCount = data.messages.length;
           const currentMessagesHash = hashMessages(data.messages);
 
@@ -1110,9 +976,9 @@ export default function SupportClient({
               }) => ({
                 id: m.id,
                 text: m.message_text,
-                sender: m.sender_type,
+                sender: m.sender_type as 'user' | 'support',
                 timestamp: new Date(m.created_at),
-                isRead: m.is_read,
+                isRead: m.is_read ?? false,
                 senderData: m.sender
                   ? {
                       id: m.sender.id,
@@ -1140,10 +1006,8 @@ export default function SupportClient({
             lastMessageCount = currentMessageCount;
             lastMessagesHash = currentMessagesHash;
 
-            // Обновляем список тикетов при изменении статуса (особенно при переходе между активными и архивными)
             if (statusChanged || statusCategoryChanged) {
-              // Немедленное обновление списка тикетов (SWR revalidate)
-              mutateTickets();
+              utils.support.tickets.list.invalidate();
             }
 
             // Отмечаем сообщения как прочитанные
@@ -1179,7 +1043,7 @@ export default function SupportClient({
     return () => {
       if (interval) clearInterval(interval);
     };
-    // eslint_disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTicket?.id, userData, activeTicket?.status, isWebSocketConnected, socket?.connected]);
 
   // Очистка таймера при размонтировании компонента
@@ -1438,6 +1302,7 @@ export default function SupportClient({
         setIsLoadingOlderMessages(false);
       }
     });
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTicket?.id, isLoadingOlderMessages, hasMoreMessages, loadedMessageCount]);
 
   // Intersection Observer для загрузки старых сообщений при прокрутке вверх
@@ -1478,6 +1343,7 @@ export default function SupportClient({
     }, 1000);
 
     return () => clearInterval(interval);
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [lastMessageTime, timeoutSeconds]);
 
   const handleCreateTicket = async () => {
@@ -1509,99 +1375,34 @@ export default function SupportClient({
     setIsCreatingTicket(true);
 
     try {
-      const response = await fetchWithRateLimit(
-        '/api/support/tickets',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          credentials: 'include',
-          body: JSON.stringify({
-            subject: newTicketSubject.trim(),
-            message: newTicketMessage.trim(),
-          }),
-        },
-        handleCreateTicket, // Retry callback
-      );
+      const createResult = await createTicketMutation.mutateAsync({
+        subject: newTicketSubject.trim(),
+        message: newTicketMessage.trim(),
+      });
 
-      const data = await response.json();
-
-      if (response.ok && data.ticket) {
-        // Сначала очищаем старый тикет, чтобы избежать показа старой истории
+      if (createResult.ticket) {
         setActiveTicket(null);
         fetchingTicketIdRef.current = null;
 
-        // Загружаем тикеты заново (SWR revalidate)
-        await mutateTickets();
-
-        // Сбрасываем счетчик сообщений при создании нового тикета
         setMessagesSentCount(0);
         setLastMessageTime(null);
         setTimeoutSeconds(0);
 
-        // Устанавливаем активный тикет напрямую, без вызова fetchTicketMessages
-        // чтобы избежать дублирующихся запросов (useEffect не будет вызывать fetchTicketMessages,
-        // так как сообщения уже будут загружены)
-        const ticketResponse = await fetchWithRateLimit(
-          `/api/support/tickets/${data.ticket.id}`,
-          {
-            credentials: 'include',
-          },
-          async () => {
-            // Retry callback
-            const retryResponse = await fetch(`/api/support/tickets/${data.ticket.id}`, {
-              credentials: 'include',
-            });
-            const retryData = await retryResponse.json();
-            if (retryResponse.ok) {
-              fetchingTicketIdRef.current = data.ticket.id;
-              setActiveTicket({
-                id: retryData.ticket.id,
-                subject: retryData.ticket.subject,
-                status: retryData.ticket.status,
-                createdAt: new Date(retryData.ticket.created_at),
-                user_id: retryData.ticket.user_id, // Сохраняем user_id для проверки прав
-                messages: (retryData.messages || []).map(
-                  (m: {
-                    id: string;
-                    message_text: string;
-                    sender_type: string;
-                    created_at: string;
-                    is_read: boolean;
-                    sender?: { id: string; username: string; user_id: string };
-                    attachments?: Array<{
-                      id: string;
-                      file_name: string;
-                      file_type: string;
-                      file_size: number;
-                      storage_url: string;
-                    }>;
-                  }) => ({
-                    id: m.id,
-                    text: m.message_text,
-                    sender: m.sender_type,
-                    timestamp: new Date(m.created_at),
-                    isRead: m.is_read,
-                    senderData: m.sender,
-                    attachments: m.attachments || [],
-                  }),
-                ),
-              });
-              markMessagesAsRead(data.ticket.id);
-            }
-          },
-        );
-        const ticketData = await ticketResponse.json();
-        if (ticketResponse.ok) {
-          fetchingTicketIdRef.current = data.ticket.id;
+        const ticketDetail = await utils.support.tickets.get.fetch({
+          ticketId: createResult.ticket.id,
+          limit: 100,
+          offset: 0,
+        });
+
+        if (ticketDetail.ticket) {
+          fetchingTicketIdRef.current = createResult.ticket.id;
           setActiveTicket({
-            id: ticketData.ticket.id,
-            subject: ticketData.ticket.subject,
-            status: ticketData.ticket.status,
-            createdAt: new Date(ticketData.ticket.created_at),
-            user_id: ticketData.ticket.user_id, // Сохраняем user_id для проверки прав
-            messages: (ticketData.messages || []).map(
+            id: ticketDetail.ticket.id,
+            subject: ticketDetail.ticket.subject,
+            status: ticketDetail.ticket.status,
+            createdAt: new Date(ticketDetail.ticket.created_at),
+            user_id: ticketDetail.ticket.user_id,
+            messages: (ticketDetail.messages || []).map(
               (m: {
                 id: string;
                 message_text: string;
@@ -1619,9 +1420,9 @@ export default function SupportClient({
               }) => ({
                 id: m.id,
                 text: m.message_text,
-                sender: m.sender_type,
+                sender: m.sender_type as 'user' | 'support',
                 timestamp: new Date(m.created_at),
-                isRead: m.is_read,
+                isRead: m.is_read ?? false,
                 senderData: m.sender
                   ? {
                       id: m.sender.id,
@@ -1635,39 +1436,28 @@ export default function SupportClient({
             ),
           });
 
-          // Сохраняем ID последнего открытого тикета
           if (typeof window !== 'undefined') {
-            localStorage.setItem('support_last_ticket_id', data.ticket.id);
+            localStorage.setItem('support_last_ticket_id', createResult.ticket.id);
           }
 
-          // Отмечаем сообщения как прочитанные
-          markMessagesAsRead(data.ticket.id);
+          markMessagesAsRead(createResult.ticket.id);
         }
         setNewTicketSubject('');
         setNewTicketMessage('');
         setShowNewTicketForm(false);
         setShowCreateTicketModal(false);
         showNotification('Обращение создано', 'info');
-      } else {
-        const errorMessage = data.error || 'Ошибка создания обращения';
-        showNotification(translateError(errorMessage));
-        if (
-          data.error &&
-          (data.error.toLowerCase().includes('limit') || data.error.toLowerCase().includes('лимит'))
-        ) {
-          triggerShake('subject');
-        }
       }
     } catch (error) {
-      if (error instanceof Error && error.message === 'RATE_LIMIT_EXCEEDED') {
-        // Rate limit обрабатывается через капчу, не показываем ошибку
-        // НЕ сбрасываем флаг, так как после капчи запрос повторится
-        return;
+      const errorMessage = (error as any)?.message || 'Ошибка создания обращения';
+      showNotification(translateError(errorMessage));
+      if (
+        errorMessage.toLowerCase().includes('limit') ||
+        errorMessage.toLowerCase().includes('лимит')
+      ) {
+        triggerShake('subject');
       }
-      // Ошибка создания тикета - не логируем
-      showNotification('Ошибка создания обращения');
     } finally {
-      // Сбрасываем флаг создания тикета в любом случае
       setIsCreatingTicket(false);
     }
   };
@@ -1713,10 +1503,19 @@ export default function SupportClient({
     // Устанавливаем флаг отправки
     setIsSendingMessage(true);
 
+    let tempId: string | null = null;
+
     try {
-      // Получаем CSRF токен для защиты от спама
-      const { getCSRFToken } = await import('@/lib/utils/csrf-client');
-      const csrfToken = await getCSRFToken();
+      // Получаем CSRF токен для защиты от спама (через tRPC)
+      let csrfToken = csrfQuery.data?.csrfToken ?? '';
+      if (!csrfToken) {
+        const result = await csrfQuery.refetch();
+        csrfToken = result.data?.csrfToken ?? '';
+      }
+      if (!csrfToken) {
+        showNotification(translateError('Ошибка загрузки. Обновите страницу.'), 'error');
+        return;
+      }
 
       // Разделяем файлы на изображения и документы
       const images = uploadedFiles.filter((f) => f.fileType.startsWith('image/'));
@@ -1724,54 +1523,22 @@ export default function SupportClient({
 
       // Если есть и документы, и изображения - отправляем отдельными сообщениями
       if (documents.length > 0 && images.length > 0) {
-        // Сначала отправляем сообщение с текстом и изображениями (если есть)
         if (messageText.trim() || images.length > 0) {
-          const response = await fetchWithRateLimit(
-            `/api/support/tickets/${activeTicket.id}/messages`,
-            {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              credentials: 'include',
-              body: JSON.stringify({
-                message: messageText.trim() || '',
-                csrfToken,
-                attachments: images.length > 0 ? images : undefined,
-              }),
-            },
-            handleSendMessage,
-          );
-
-          if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'Ошибка отправки сообщения');
-          }
+          await sendMessageMutation.mutateAsync({
+            ticketId: activeTicket.id,
+            message: messageText.trim() || '',
+            csrfToken,
+            attachments: images.length > 0 ? images : undefined,
+          });
         }
 
-        // Затем отправляем документы отдельными сообщениями
         for (const doc of documents) {
-          const docResponse = await fetchWithRateLimit(
-            `/api/support/tickets/${activeTicket.id}/messages`,
-            {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              credentials: 'include',
-              body: JSON.stringify({
-                message: '',
-                csrfToken,
-                attachments: [doc],
-              }),
-            },
-            handleSendMessage,
-          );
-
-          if (!docResponse.ok) {
-            const errorData = await docResponse.json();
-            throw new Error(errorData.error || 'Ошибка отправки документа');
-          }
+          await sendMessageMutation.mutateAsync({
+            ticketId: activeTicket.id,
+            message: '',
+            csrfToken,
+            attachments: [doc],
+          });
         }
 
         // Обновляем UI после всех отправок
@@ -1794,135 +1561,133 @@ export default function SupportClient({
         return;
       }
 
-      // Обычная отправка (только изображения или только документы, или без файлов)
-      const response = await fetchWithRateLimit(
-        `/api/support/tickets/${activeTicket.id}/messages`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          credentials: 'include',
-          body: JSON.stringify({
-            message: messageText.trim() || '',
-            csrfToken,
-            attachments: uploadedFiles.length > 0 ? uploadedFiles : undefined,
-          }),
-        },
-        handleSendMessage, // Retry callback
+      const sentText = messageText.trim();
+      const sentFiles = [...uploadedFiles];
+      tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+
+      // Оптимистичное сообщение: показываем в UI до ответа сервера
+      const optimisticMessage: Message = {
+        id: tempId,
+        text: sentText,
+        sender: 'user' as const,
+        timestamp: new Date(),
+        isRead: false,
+        isPending: true,
+        senderData: userData
+          ? {
+              id: userData.id,
+              username: userData.username,
+              user_id: userData.user_id,
+            }
+          : undefined,
+        attachments:
+          sentFiles.length > 0
+            ? sentFiles.map((f, idx) => ({
+                id: `temp-att-${idx}`,
+                file_name: f.fileName,
+                file_type: f.fileType,
+                file_size: f.fileSize,
+                storage_url: f.previewUrl || f.storageUrl,
+                blur_hash: f.blur_hash,
+                width: f.width,
+                height: f.height,
+              }))
+            : [],
+      };
+
+      setActiveTicket((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          messages: [...(prev.messages || []), { ...optimisticMessage, _renderKey: tempId ?? undefined }],
+        };
+      });
+      // Не добавляем tempId в loadedMessagesRef — тогда эффект автопрокрутки сработает на «новое» сообщение
+
+      const optimisticLastMessageText =
+        sentText || (sentFiles.length > 0 ? getLastMessageLabelForAttachments(sentFiles) : '');
+      setTickets((prev) =>
+        prev.map((t) =>
+          t.id === activeTicket.id
+            ? {
+                ...t,
+                last_message: {
+                  id: tempId ?? '',
+                  message_text: optimisticLastMessageText,
+                  sender_type: 'user' as const,
+                  created_at: optimisticMessage.timestamp.toISOString(),
+                  is_read: false,
+                },
+                last_message_at: optimisticMessage.timestamp.toISOString(),
+              }
+            : t,
+        ),
       );
 
-      const data = await response.json();
+      setMessageText('');
+      setUploadedFiles([]);
+      setFilePreviews(new Map());
+      setFileErrors(new Set());
+      const newCount = messagesSentCount + 1;
+      setMessagesSentCount(newCount);
+      if (newCount >= 2) {
+        setLastMessageTime(Date.now());
+        setTimeoutSeconds(MESSAGE_TIMEOUT / 1000);
+      }
 
-      if (response.ok && data.message) {
-        const sentText = messageText.trim();
-        const sentFiles = [...uploadedFiles];
+      // Прокрутка вниз при отправке своего сообщения (после коммита DOM)
+      if (typeof window !== 'undefined' && activeTicket.id) {
+        localStorage.setItem(`support_scroll_${activeTicket.id}`, 'bottom');
+      }
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (messagesEndRef.current && !isRestoringScrollRef.current) {
+            messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+          }
+        });
+      });
 
-        setMessageText('');
-        setUploadedFiles([]); // Очищаем загруженные файлы после отправки
-        setFilePreviews(new Map()); // Очищаем превью
-        setFileErrors(new Set()); // Очищаем ошибки
+      const data = await sendMessageMutation.mutateAsync({
+        ticketId: activeTicket.id,
+        message: sentText,
+        csrfToken,
+        attachments: uploadedFiles.length > 0 ? uploadedFiles : undefined,
+      });
 
-        // Увеличиваем счетчик отправленных сообщений
-        const newCount = messagesSentCount + 1;
-        setMessagesSentCount(newCount);
-
-        // Устанавливаем тайм-аут только после второго сообщения
-        if (newCount >= 2) {
-          setLastMessageTime(Date.now());
-          setTimeoutSeconds(MESSAGE_TIMEOUT / 1000);
-        }
-
-        // ОПТИМИЗАЦИЯ: Не загружаем сообщения заново - WebSocket обновит их автоматически
-        // Добавляем отправленное сообщение оптимистично в локальное состояние
-        // WebSocket подтвердит и обновит при получении события support:message:new
-        const optimisticMessage: Message = {
-          id: data.message.id,
-          text: sentText,
-          sender: 'user' as const,
-          timestamp: new Date(),
-          isRead: false,
-          isPending: true,
-          senderData: userData
-            ? {
-                id: userData.id,
-                username: userData.username,
-                user_id: userData.user_id,
-              }
-            : undefined,
-          attachments:
-            sentFiles.length > 0
-              ? sentFiles.map((f, idx) => ({
-                  id: `temp-${idx}`,
-                  file_name: f.fileName,
-                  file_type: f.fileType,
-                  file_size: f.fileSize,
-                  storage_url: f.previewUrl || f.storageUrl,
-                  blur_hash: f.blur_hash,
-                  width: f.width,
-                  height: f.height,
-                }))
-              : [],
-        };
+      if (data.message) {
+        loadedMessagesRef.current.delete(tempId);
+        loadedMessagesRef.current.add(data.message.id);
 
         setActiveTicket((prev) => {
           if (!prev) return prev;
-          // Проверяем, что сообщение еще не добавлено
-          const messageExists = prev.messages?.some((m) => m.id === optimisticMessage.id);
-          if (messageExists) return prev;
-
-          return {
-            ...prev,
-            messages: [...(prev.messages || []), optimisticMessage],
-          };
-        });
-
-        // Отмечаем сообщение как загруженное
-        loadedMessagesRef.current.add(optimisticMessage.id);
-
-        // Сразу после успешного ответа сервера обновляем сообщение:
-        // - Убираем isPending (сообщение доставлено)
-        // - Обновляем attachments с серверными данными (blur_hash, width, height, правильные id)
-        setTimeout(() => {
-          setActiveTicket((prev) => {
-            if (!prev) return prev;
-
-            const serverAttachments = data.message.attachments || [];
-            const updatedMessages = prev.messages.map((m) => {
-              if (m.id !== data.message.id) return m;
-
-              return {
-                ...m,
-                isPending: false,
-                attachments:
-                  serverAttachments.length > 0
-                    ? serverAttachments.map((att: any) => ({
-                        id: att.id,
-                        file_name: att.file_name,
-                        file_type: att.file_type,
-                        file_size: att.file_size,
-                        storage_path: att.storage_path,
-                        storage_url:
-                          att.storage_url ||
-                          `/support/files/${encodeURIComponent(att.storage_path)}`,
-                        blur_hash: att.blur_hash,
-                        width: att.width,
-                        height: att.height,
-                      }))
-                    : m.attachments,
-              };
-            });
-
-            activeTicketMessagesRef.current = updatedMessages;
-            return { ...prev, messages: updatedMessages };
+          const serverAttachments = data.message.attachments || [];
+          const updatedMessages = prev.messages.map((m) => {
+            if (m.id !== tempId) return m;
+            return {
+              ...m,
+              id: data.message.id,
+              isPending: false,
+              _renderKey: m._renderKey,
+              attachments:
+                serverAttachments.length > 0
+                  ? serverAttachments.map((att: any) => ({
+                      id: att.id,
+                      file_name: att.file_name,
+                      file_type: att.file_type,
+                      file_size: att.file_size,
+                      storage_path: att.storage_path,
+                      storage_url:
+                        att.storage_url || `/support/files/${encodeURIComponent(att.storage_path)}`,
+                      blur_hash: att.blur_hash,
+                      width: att.width,
+                      height: att.height,
+                    }))
+                  : m.attachments,
+            };
           });
-        }, 100); // Небольшая задержка чтобы optimistic сообщение успело отрендериться
-
-        // Отмечаем сообщения как прочитанные
-        markMessagesAsRead(activeTicket.id);
-
-        const optimisticLastMessageText =
-          sentText || (sentFiles.length > 0 ? getLastMessageLabelForAttachments(sentFiles) : '');
+          activeTicketMessagesRef.current = updatedMessages;
+          return { ...prev, messages: updatedMessages };
+        });
 
         setTickets((prev) =>
           prev.map((t) =>
@@ -1930,9 +1695,9 @@ export default function SupportClient({
               ? {
                   ...t,
                   last_message: {
-                    id: optimisticMessage.id,
+                    id: data.message.id,
                     message_text: optimisticLastMessageText,
-                    sender_type: 'user',
+                    sender_type: 'user' as const,
                     created_at: optimisticMessage.timestamp.toISOString(),
                     is_read: false,
                   },
@@ -1941,26 +1706,48 @@ export default function SupportClient({
               : t,
           ),
         );
-      } else {
-        const errorMessage = data.error || 'Ошибка отправки сообщения';
-        showNotification(translateError(errorMessage));
+
+        markMessagesAsRead(activeTicket.id);
       }
     } catch (error) {
-      if (error instanceof Error && error.message === 'RATE_LIMIT_EXCEEDED') {
-        // Rate limit обрабатывается через капчу, не показываем ошибку
-        return;
+      // Откат оптимистичного сообщения при ошибке
+      if (tempId) {
+        setActiveTicket((prev) => {
+          if (!prev) return prev;
+          const filtered = (prev.messages || []).filter((m) => m.id !== tempId);
+          if (filtered.length === prev.messages?.length) return prev;
+          activeTicketMessagesRef.current = filtered;
+          return { ...prev, messages: filtered };
+        });
+        setTickets((prev) =>
+          prev.map((t) => {
+            if (t.id !== activeTicket.id) return t;
+            const prevLast = t.last_message;
+            if (!prevLast || prevLast.id !== tempId) return t;
+            const prevMessages = stateRef.current.activeTicket?.messages ?? [];
+            const lastReal = prevMessages.filter((m) => m.id !== tempId).pop();
+            return {
+              ...t,
+              last_message: lastReal
+                ? {
+                    id: lastReal.id,
+                    message_text: lastReal.text,
+                    sender_type: 'user' as const,
+                    created_at: lastReal.timestamp.toISOString(),
+                    is_read: lastReal.isRead ?? false,
+                  }
+                : undefined,
+            };
+          }),
+        );
+        loadedMessagesRef.current.delete(tempId);
       }
-      // Ошибка отправки сообщения - не логируем
-      showNotification('Ошибка отправки сообщения');
+      const errorMessage = (error as any)?.message || 'Ошибка отправки сообщения';
+      showNotification(translateError(errorMessage));
     } finally {
-      // Сбрасываем флаг отправки в любом случае
       setIsSendingMessage(false);
     }
   };
-
-  const fetchTickets = useCallback(async () => {
-    await mutateTickets();
-  }, [mutateTickets]);
 
   const fetchTicketMessages = useCallback(
     async (
@@ -2008,17 +1795,13 @@ export default function SupportClient({
 
           debugStart('fetchTicketMessages', { ticketId, limit, offset, restoreScroll });
 
-          // Загружаем только последние N сообщений для оптимизации
-          const response = await fetchWithRateLimit(
-            `/api/support/tickets/${ticketId}?limit=${limit}&offset=${offset}`,
-            {
-              credentials: 'include',
-            },
-            () => fetchTicketMessages(ticketId, limit, offset, restoreScroll), // Retry callback
-          );
-          const data = await response.json();
+          const data = await utils.support.tickets.get.fetch({
+            ticketId,
+            limit,
+            offset,
+          });
 
-          if (response.ok) {
+          if (data) {
             // Маппим сообщения с вложениями (оптимизировано - используем данные с сервера)
             const mappedMessages = (data.messages || []).map(
               (m: {
@@ -2042,9 +1825,9 @@ export default function SupportClient({
               }) => ({
                 id: m.id,
                 text: m.message_text,
-                sender: m.sender_type,
+                sender: m.sender_type as 'user' | 'support',
                 timestamp: new Date(m.created_at),
-                isRead: m.is_read,
+                isRead: m.is_read ?? false,
                 senderData: m.sender
                   ? {
                       id: m.sender.id,
@@ -2096,8 +1879,10 @@ export default function SupportClient({
                 // Если загрузили меньше чем запросили, значит это все сообщения
                 setHasMoreMessages(mappedMessages.length >= limit);
               } else {
-                // Добавляем старые сообщения в начало
-                finalMessages = [...mappedMessages, ...(prev?.messages || [])];
+                finalMessages = [
+                  ...mappedMessages,
+                  ...(prev?.messages || []),
+                ] as typeof mappedMessages;
                 setLoadedMessageCount((prev) => prev + mappedMessages.length);
                 // Если загрузили меньше чем запросили, значит больше нет старых сообщений
                 setHasMoreMessages(mappedMessages.length >= limit);
@@ -2163,16 +1948,8 @@ export default function SupportClient({
               messagesCount: mappedMessages.length,
               hasMore: mappedMessages.length >= limit,
             });
-          } else {
-            if (!restoreScroll) {
-              fetchingTicketIdRef.current = null;
-            }
-            const errorMessage = data.error || 'Ошибка загрузки сообщений';
-            debugError('fetchTicketMessages', { ticketId, error: errorMessage });
-            showNotification(translateError(errorMessage));
           }
         } catch (error) {
-          // Ошибка получения сообщений
           if (!restoreScroll) {
             fetchingTicketIdRef.current = null;
           }
@@ -2185,7 +1962,7 @@ export default function SupportClient({
       loadMessagesFromCache,
       setActiveTicket,
       restoreScrollPosition,
-      fetchWithRateLimit,
+      utils,
       setLoadedMessageCount,
       setHasMoreMessages,
       saveMessagesToCache,
@@ -2196,9 +1973,9 @@ export default function SupportClient({
 
   // Загрузка последнего тикета из localStorage (один раз)
   useEffect(() => {
-    if (!ticketsSwrData?.tickets || hasRestoredLastTicketRef.current || activeTicket) return;
+    if (!ticketsData?.tickets || hasRestoredLastTicketRef.current || activeTicket) return;
 
-    const mappedTickets = mapApiTicketsToState(ticketsSwrData.tickets);
+    const mappedTickets = mapApiTicketsToState(ticketsData.tickets);
     if (mappedTickets.length > 0) {
       const lastTicketId = localStorage.getItem('support_last_ticket_id');
       if (lastTicketId) {
@@ -2212,7 +1989,7 @@ export default function SupportClient({
         }
       }
     }
-  }, [ticketsSwrData, activeTicket, setActiveTicket, fetchTicketMessages]);
+  }, [ticketsData, activeTicket, setActiveTicket, fetchTicketMessages]);
 
   const formatTime = (date: Date) => {
     return new Intl.DateTimeFormat('ru-RU', {
@@ -2290,6 +2067,7 @@ export default function SupportClient({
             </p>
             <Link
               href={`/auth?retpatch=${encodeURIComponent('/support/')}`}
+              prefetch={false}
               className="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700"
             >
               <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2590,7 +2368,7 @@ export default function SupportClient({
 
                                   return (
                                     <MessageItem
-                                      key={message.id}
+                                      key={message._renderKey ?? message.id}
                                       message={message}
                                       showDate={showDate}
                                       userData={userData}
@@ -2841,7 +2619,7 @@ export default function SupportClient({
             isCaptchaOpenRef.current = false;
             isProcessingCaptchaRef.current = false;
             setShowRateLimitCaptcha(false);
-            pendingRequestsQueueRef.current = [];
+            rateLimitRetriesRef.current = [];
           }}
         />
       )}

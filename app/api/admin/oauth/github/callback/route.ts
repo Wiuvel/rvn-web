@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getEnv } from '@/lib/validation/env-validation';
-import { authenticateAdmin } from '@/lib/auth/index';
 import { SessionManager } from '@/lib/auth/session-manager';
 import { sanitizeInput } from '@/lib/security/sanitize';
 import { setCorsHeaders, handleCorsPreflight } from '@/lib/security/cors';
 import { logger } from '@/lib/utils/secure-logger';
 import { authRateLimit } from '@/lib/security/rate-limit';
 import { getErrorRedirectUrl, GOOGLE_ERROR_MAP } from '@/lib/utils/oauth-errors';
-import { domains, getCookieDomain } from '@/lib/utils';
+import { domains } from '@/lib/utils';
 
 const ADMIN_SESSION_COOKIE = 'admin_sid';
 
@@ -336,7 +335,6 @@ export async function GET(request: NextRequest) {
     });
 
     try {
-      const env = getEnv();
       {
         const origin = domains.mainUrl.endsWith('/')
           ? domains.mainUrl.slice(0, -1)

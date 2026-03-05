@@ -1,30 +1,24 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useFadeIn, useStaggeredFadeIn } from '@/hooks/useGSAP';
-import { gsap } from 'gsap';
-import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { getGradientClasses, getAvatarUrl, getBannerUrl } from '@/lib/utils/avatar-gradients';
 import { APP_VERSION } from '@/lib/utils/constants';
 import AvatarUploadModal from '@/components/auth/AvatarUploadModal';
 import BannerUploadModal from '@/components/auth/BannerUploadModal';
 import {
   Pencil,
-  Lock as Key,
   Monitor as Server,
   Activity,
   ChevronRight,
   Settings,
-  Zap,
   Clock,
   TrendingUp,
   CreditCard,
   Wallet,
   Headphones as HeadphonesIcon,
-  Hash,
   Calendar,
   Smartphone,
   ShoppingBag,
@@ -122,7 +116,7 @@ function QuickAction({
 
   if (href) {
     return (
-      <Link href={href} className={className}>
+      <Link href={href} prefetch={false} className={className}>
         {content}
       </Link>
     );
@@ -147,7 +141,6 @@ export default function DashboardClient({ initialUserData }: DashboardClientProp
   const [showAvatarModal, setShowAvatarModal] = useState(false);
   const [showBannerModal, setShowBannerModal] = useState(false);
   const [avatarLoading, setAvatarLoading] = useState(true);
-  const router = useRouter();
   const userMenuRef = useRef<HTMLDivElement>(null);
   const userMenuButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -165,16 +158,6 @@ export default function DashboardClient({ initialUserData }: DashboardClientProp
   };
 
   const getShortId = (id: string) => id;
-
-  const getRoleInfo = () => {
-    if (userData?.isAdmin) {
-      return { label: 'Администратор', color: 'text-orange-500' };
-    }
-    if (userData?.isSupport) {
-      return { label: 'Поддержка', color: 'text-green-500' };
-    }
-    return { label: 'Пользователь', color: 'text-neutral-400' };
-  };
 
   // Закрытие десктоп-меню при переключении viewport (DevTools / resize)
   useEffect(() => {
@@ -214,8 +197,6 @@ export default function DashboardClient({ initialUserData }: DashboardClientProp
       };
     }
   }, [userMenuOpen]);
-
-  const roleInfo = getRoleInfo();
 
   return (
     <div className="dashboard-page">

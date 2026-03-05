@@ -64,6 +64,7 @@ export default function ErrorState({
             <div className="pt-4">
               <Link
                 href={buttonHref}
+                prefetch={false}
                 className="group relative inline-flex items-center gap-2 rounded-xl bg-white px-8 py-4 font-semibold text-black transition-all duration-300 hover:scale-[1.02] hover:bg-neutral-200 active:scale-[0.98]"
               >
                 <ArrowLeft className="h-5 w-5 transition-transform duration-300 group-hover:-translate-x-1" />

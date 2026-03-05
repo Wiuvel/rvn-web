@@ -7,13 +7,10 @@ import { pageMetadata } from '@/lib/utils/seo';
 import { exo2 } from './fonts';
 import HomeStructuredData from '@/components/seo/HomeStructuredData';
 import { domains, getStaticUrl } from '@/lib/utils';
-import MaintenanceGuard from '@/components/layout/MaintenanceGuard';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import { TRPCProvider } from '@/components/providers/TRPCProvider';
 
 import SessionExpiredModal from '@/components/auth/SessionExpiredModal';
-
-// Force dynamic rendering to support maintenance mode checks via headers/cookies
-export const dynamic = 'force-dynamic';
 
 // Generate favicon URLs
 const getFaviconUrl = (path: string) => getStaticUrl(path);
@@ -50,16 +47,14 @@ export default function RootLayout({
       <body
         className={`relative h-full bg-neutral-950 text-neutral-100 antialiased ${exo2.className}`}
       >
-        <Suspense fallback={<LoadingSpinner fullScreen />}>
-          <MaintenanceGuard>
-            <HomeStructuredData />
-            <SmoothScroll />
-            <SessionExpiredModal />
-            <Suspense fallback={<main className="min-h-screen" />}>
-              <ConditionalLayout>{children}</ConditionalLayout>
-            </Suspense>
-          </MaintenanceGuard>
-        </Suspense>
+        <TRPCProvider>
+          <HomeStructuredData />
+          <SmoothScroll />
+          <SessionExpiredModal />
+          <Suspense fallback={<LoadingSpinner fullScreen />}>
+            <ConditionalLayout>{children}</ConditionalLayout>
+          </Suspense>
+        </TRPCProvider>
       </body>
     </html>
   );

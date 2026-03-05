@@ -67,7 +67,7 @@ export async function trackTicketCreated(
     if (client.status !== 'ready') {
       try {
         await client.connect();
-      } catch (connectError) {
+      } catch {
         // Redis необязателен - не логируем ошибки переподключения
         return;
       }
@@ -126,7 +126,7 @@ export async function trackTicketClosed(
     if (client.status !== 'ready') {
       try {
         await client.connect();
-      } catch (connectError) {
+      } catch {
         // Redis необязателен - не логируем ошибки переподключения
         return;
       }
@@ -195,7 +195,7 @@ export async function trackMessageSent(
     if (client.status !== 'ready') {
       try {
         await client.connect();
-      } catch (connectError) {
+      } catch {
         // Redis необязателен - не логируем ошибки переподключения
         return;
       }

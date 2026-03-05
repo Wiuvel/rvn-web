@@ -11,6 +11,7 @@ import { logger } from '../utils/secure-logger';
 import { getSessionStore, type SessionData } from './session-store';
 import { getEnv } from '../validation/env-validation';
 import { supabaseAdmin } from '../database/supabase';
+import { computeDeviceFpHash } from './device-fingerprint.server';
 
 export type { SessionData };
 
@@ -42,30 +43,92 @@ export class SessionManager {
   }
 
   /**
-   * Регистрирует новое устройство пользователя
+   * Регистрирует новое устройство пользователя.
+   * Layer 2 grouping: при наличии fpid ищет существующее устройство по device_fp_hash
+   * (User-Agent + IP prefix + FPID) и обновляет его вместо создания дубликата.
+   * @param fpid - опциональный FPID из IndexedDB (Layer 1)
    * @returns Токен устройства (raw)
    */
   static async registerDevice(
     userId: string,
     userAgent: string,
     ipAddress: string,
+    fpid?: string | null,
   ): Promise<string> {
-    const token = generateSessionIdUtil(); // Используем надежный генератор ID как токен
+    const token = generateSessionIdUtil();
     const tokenHash = computeTokenHash(token);
     const deviceName = this.parseDeviceName(userAgent);
+    const now = new Date().toISOString();
 
-    if (supabaseAdmin) {
+    if (!supabaseAdmin) {
+      return token;
+    }
+
+    if (fpid) {
+      const deviceFpHash = computeDeviceFpHash(userAgent, ipAddress, fpid);
+      const { data: existing } = await supabaseAdmin
+        .from('user_devices')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('device_fp_hash', deviceFpHash)
+        .maybeSingle();
+
+      if (existing) {
+        const { error } = await supabaseAdmin
+          .from('user_devices')
+          .update({
+            token_hash: tokenHash,
+            last_active: now,
+            ip_address: ipAddress,
+          })
+          .eq('id', existing.id);
+
+        if (error) {
+          logger.warn('Failed to update device on grouping', {
+            error: error.message,
+            userId,
+            deviceId: existing.id,
+          });
+        } else {
+          return token;
+        }
+      }
+
       const { error } = await supabaseAdmin.from('user_devices').insert({
         user_id: userId,
         token_hash: tokenHash,
         device_name: deviceName,
         ip_address: ipAddress,
-        last_active: new Date().toISOString(),
+        last_active: now,
+        device_fp_hash: deviceFpHash,
       });
 
       if (error) {
-        logger.error('Failed to register device', { error: error.message, userId });
+        if (error.code === '42703' || error.message?.includes('device_fp_hash')) {
+          await supabaseAdmin.from('user_devices').insert({
+            user_id: userId,
+            token_hash: tokenHash,
+            device_name: deviceName,
+            ip_address: ipAddress,
+            last_active: now,
+          });
+        } else {
+          logger.error('Failed to register device', { error: error.message, userId });
+        }
       }
+      return token;
+    }
+
+    const { error } = await supabaseAdmin.from('user_devices').insert({
+      user_id: userId,
+      token_hash: tokenHash,
+      device_name: deviceName,
+      ip_address: ipAddress,
+      last_active: now,
+    });
+
+    if (error) {
+      logger.error('Failed to register device', { error: error.message, userId });
     }
 
     return token;

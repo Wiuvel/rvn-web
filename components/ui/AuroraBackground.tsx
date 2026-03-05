@@ -167,8 +167,7 @@ export default function AuroraBackground(props: AuroraBackgroundProps) {
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
     gl.canvas.style.backgroundColor = 'transparent';
 
-    // eslint-disable-next-line prefer-const
-    let program: any; // eslint-disable-line @typescript-eslint/no-explicit-any
+    let program: any;
 
     function resize() {
       if (!ctn) return;
@@ -227,7 +226,6 @@ export default function AuroraBackground(props: AuroraBackgroundProps) {
       }
       gl.getExtension('WEBGL_lose_context')?.loseContext();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Run once on mount
 
   return (

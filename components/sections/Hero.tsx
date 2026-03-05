@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { getStaticUrl } from '@/lib/utils';
-import FloatingParticles from '@/components/decorative/FloatingParticles';
 import { Shield, ChevronRight } from 'lucide-react';
 
 const INITIAL_PING = () => Math.floor(Math.random() * 15) + 48;

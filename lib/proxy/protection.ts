@@ -69,7 +69,7 @@ async function checkRateLimit(ip: string): Promise<boolean> {
     await redis.expire(key, Math.ceil((windowMs + 10000) / 1000));
 
     return false;
-  } catch (error) {
+  } catch {
     return false;
   }
 }
@@ -165,7 +165,7 @@ export async function handleProtection(
         if (signatureHex === accessHash) {
           return null; // Подпись верна
         }
-      } catch (e) {
+      } catch {
         // Ошибка проверки подписи - считаем невалидным
       }
     }

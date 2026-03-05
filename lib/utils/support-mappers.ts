@@ -8,7 +8,12 @@ import type {
   RawAttachmentApi,
   RawLastMessageApi,
 } from '@/lib/types/support-api';
-import type { Ticket, Message, MessageAttachment, LastMessagePreview } from '@/components/support/types';
+import type {
+  Ticket,
+  Message,
+  MessageAttachment,
+  LastMessagePreview,
+} from '@/components/support/types';
 
 function buildStorageUrl(storagePath: string | undefined): string {
   return storagePath ? `/support/files/${encodeURIComponent(storagePath)}` : '';
@@ -21,7 +26,7 @@ export function mapRawAttachmentToUi(raw: RawAttachmentApi): MessageAttachment {
     file_type: raw.file_type,
     file_size: raw.file_size,
     storage_path: raw.storage_path,
-    storage_url: raw.storage_url ?? buildStorageUrl(raw.storage_path),
+    storage_url: buildStorageUrl(raw.storage_path),
     blur_hash: raw.blur_hash,
     width: raw.width,
     height: raw.height,
@@ -58,9 +63,7 @@ export function mapRawMessageToUi(raw: RawMessageApi): Message {
   };
 }
 
-function normalizeLastMessage(
-  lm: RawLastMessageApi | null | undefined,
-): LastMessagePreview | null {
+function normalizeLastMessage(lm: RawLastMessageApi | null | undefined): LastMessagePreview | null {
   if (!lm) return null;
   const attachments =
     lm.attachments?.map((a) => ({

@@ -76,10 +76,13 @@ export default async function SupportPanelPage({
             type RpcLastMessage = (typeof lastMessages)[number] & { ticket_id: string };
             const messagesMap = (lastMessages as RpcLastMessage[]).reduce<
               Record<string, RawTicketApi['last_message']>
-            >((acc, m) => {
-              acc[m.ticket_id] = m as RawTicketApi['last_message'];
-              return acc;
-            }, {} as Record<string, RawTicketApi['last_message']>);
+            >(
+              (acc, m) => {
+                acc[m.ticket_id] = m as RawTicketApi['last_message'];
+                return acc;
+              },
+              {} as Record<string, RawTicketApi['last_message']>,
+            );
 
             tickets = tickets.map((t) => ({
               ...t,

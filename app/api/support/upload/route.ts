@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { uploadFileToS3, generateStoragePath, validateFile } from '@/lib/storage/s3-client';
+import {
+  uploadFileToS3,
+  generateStoragePath,
+  validateFile,
+  validateFileWithContent,
+} from '@/lib/storage/s3-client';
 import { checkAuth } from '@/lib/auth/helper';
 import { setCorsHeaders, handleCorsPreflight } from '@/lib/security/cors';
 import { generalRateLimit } from '@/lib/security/rate-limit';
@@ -105,13 +110,30 @@ export async function POST(request: NextRequest) {
       const arrayBuffer = await file.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
 
+      // Валидация содержимого по magic bytes
+      const contentCheck = validateFileWithContent(
+        { size: file.size, type: file.type, name: file.name },
+        buffer,
+      );
+
+      if (!contentCheck.valid) {
+        return setCorsHeaders(
+          NextResponse.json(
+            { error: contentCheck.error || 'FILE_CONTENT_INVALID' },
+            { status: 400 },
+          ),
+        );
+      }
+
+      const verifiedType = contentCheck.detectedType || file.type;
+
       // Генерируем ThumbHash и размер изображения на сервере (Node/WASM),
       // чтобы не зависеть от клиентского WASM и не тянуть `fs` в браузерный бандл.
       let blurHash: string | null = null;
       let width: number | null = null;
       let height: number | null = null;
 
-      if (file.type.startsWith('image/')) {
+      if (verifiedType.startsWith('image/')) {
         try {
           const result = await generateThumbhash(buffer);
           blurHash = result.thumbhash;
@@ -125,12 +147,12 @@ export async function POST(request: NextRequest) {
       // Генерируем путь для хранения
       const storagePath = generateStoragePath(ticketId, file.name);
 
-      // Загружаем в S3
-      const fileUrl = await uploadFileToS3(buffer, storagePath, file.type);
+      // Загружаем в S3 (используем verified type из magic bytes)
+      await uploadFileToS3(buffer, storagePath, verifiedType);
 
       uploadResults.push({
         fileName: file.name,
-        fileType: file.type,
+        fileType: verifiedType,
         fileSize: file.size,
         storagePath,
         storageUrl: `/support/files/${encodeURIComponent(storagePath)}`, // Используем endpoint для авторизованного доступа

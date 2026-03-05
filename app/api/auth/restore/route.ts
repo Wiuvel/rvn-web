@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { checkAuth } from '@/lib/auth/helper';
 import { setUserDataCookie } from '@/lib/auth/helper';
 
@@ -29,7 +28,7 @@ export async function GET(request: NextRequest) {
       // Use absolute URL to prevent issues with relative redirects
       return NextResponse.redirect(new URL(redirectUrl, baseUrl));
     }
-  } catch (error) {
+  } catch {
     // Ignore errors, proceed to logout
   }
 

@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import dynamic from 'next/dynamic';
-import { useApiSWR } from '@/lib/swr';
+import { trpc } from '@/lib/trpc/client';
 import { gsap } from 'gsap';
 import {
   User as PersonIcon,
@@ -13,9 +13,7 @@ import {
   Star as StarFilledIcon,
   MessageSquare as ChatBubbleIcon,
   Search as MagnifyingGlassIcon,
-  RefreshCw as UpdateIcon,
   X as Cross2Icon,
-  ArrowUpDown as CaretSortIcon,
   Menu as HamburgerMenuIcon,
 } from 'lucide-react';
 import AdminAuthForm from '@/components/auth/AdminForm';
@@ -57,11 +55,11 @@ export default function AdminPanelContent({ teamCount }: AdminPanelContentProps)
     }
     return 'dashboard';
   });
-  const {
-    data: authData,
-    isLoading: authLoading,
-    mutate: mutateAuth,
-  } = useApiSWR<AuthState>('/api/admin/check');
+  const { data: authData, isLoading: authLoading } = trpc.admin.check.useQuery(undefined, {
+    staleTime: 30_000,
+  });
+  const utils = trpc.useUtils();
+  const mutateAuth = () => utils.admin.check.invalidate();
   const authState: AuthState = authData ?? {
     isAuthenticated: false,
     username: null,
@@ -162,7 +160,7 @@ export default function AdminPanelContent({ teamCount }: AdminPanelContentProps)
         document.removeEventListener('mousedown', handleClickOutside);
       };
     }
-  }, [showAddRoleMenu]);
+  }, [showAddRoleMenu, setShowAddRoleMenu]);
 
   useEffect(() => {
     if (authState.isAuthenticated) {
@@ -184,10 +182,13 @@ export default function AdminPanelContent({ teamCount }: AdminPanelContentProps)
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  const logoutMutation = trpc.auth.logout.useMutation({
+    onSuccess: () => mutateAuth(),
+  });
+
   const handleLogout = async () => {
     try {
-      await fetch('/api/admin/logout', { method: 'POST' });
-      mutateAuth();
+      await logoutMutation.mutateAsync({ scope: 'admin' });
     } catch (error) {
       console.error('Logout error:', error);
     }
@@ -231,9 +232,7 @@ export default function AdminPanelContent({ teamCount }: AdminPanelContentProps)
   }
 
   if (!authState.isAuthenticated) {
-    return (
-      <AdminAuthForm initialAuthState={authState} onAuthSuccess={() => mutateAuth()} />
-    );
+    return <AdminAuthForm initialAuthState={authState} onAuthSuccess={() => mutateAuth()} />;
   }
 
   const tabs = [

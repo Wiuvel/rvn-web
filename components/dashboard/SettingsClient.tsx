@@ -1,9 +1,9 @@
 'use client';
 
+import { trpc } from '@/lib/trpc/client';
 import { useState } from 'react';
 import Header from '@/components/layout/Header';
-import LoadingSpinner from '@/components/ui/LoadingSpinner';
-import { Monitor, Smartphone, Trash2, Clock, Globe, ShieldCheck, Lock, Key } from 'lucide-react';
+import { Monitor, Smartphone, Trash2, Clock, Globe, Lock, Key } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { passwordChangeSchema, PasswordChangeFormData } from '@/lib/validation/schemas';
@@ -17,91 +17,6 @@ interface Device {
   last_active: string;
   created_at: string;
   is_current: boolean;
-}
-
-// Skeleton component for the settings page (Header removed)
-function SettingsSkeleton() {
-  return (
-    <main className="relative overflow-hidden pb-16 pt-6 lg:pt-32">
-      {/* Background effects from dashboard */}
-      <svg
-        className="absolute inset-0 -z-10 h-full w-full opacity-20"
-        xmlns="http://www.w3.org/2000/svg"
-        preserveAspectRatio="none"
-        aria-hidden="true"
-      >
-        <defs>
-          <radialGradient id="dash-grad" cx="50%" cy="50%" r="75%" fx="50%" fy="50%">
-            <stop offset="0%" stopColor="#16a3ff" stopOpacity="0.18" />
-            <stop offset="100%" stopColor="transparent" stopOpacity="0" />
-          </radialGradient>
-        </defs>
-        <rect width="100%" height="100%" fill="url(#dash-grad)" />
-        <g stroke="rgba(255,255,255,0.04)" strokeWidth="1">
-          <line x1="0" y1="25%" x2="100%" y2="25%" />
-          <line x1="0" y1="50%" x2="100%" y2="50%" />
-          <line x1="0" y1="75%" x2="100%" y2="75%" />
-        </g>
-      </svg>
-      <div className="pointer-events-none absolute -right-20 -top-32 -z-10 h-80 w-80 rounded-full bg-primary-500/10 blur-3xl"></div>
-      <div className="pointer-events-none absolute -bottom-24 -left-24 -z-10 h-72 w-72 rounded-full bg-white/5 blur-[100px]"></div>
-
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="mb-8">
-          <div className="h-4 w-96 animate-pulse rounded-lg bg-neutral-800/50"></div>
-        </div>
-
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
-          {/* Password Change Skeleton */}
-          <div className="h-fit rounded-2xl border border-neutral-800 bg-neutral-900/50 p-6">
-            <div className="mb-6 flex items-center gap-3">
-              <div>
-                <div className="mb-2 h-5 w-32 animate-pulse rounded bg-neutral-800"></div>
-                <div className="h-3 w-48 animate-pulse rounded bg-neutral-800/50"></div>
-              </div>
-            </div>
-            <div className="space-y-4">
-              {['device-skeleton-1', 'device-skeleton-2', 'device-skeleton-3'].map(
-                (skeletonKey) => (
-                  <div key={skeletonKey}>
-                    <div className="mb-2 h-4 w-24 animate-pulse rounded bg-neutral-800"></div>
-                    <div className="h-10 w-full animate-pulse rounded-xl bg-neutral-800"></div>
-                  </div>
-                ),
-              )}
-              <div className="mt-2 h-10 w-full animate-pulse rounded-xl bg-neutral-800"></div>
-            </div>
-          </div>
-
-          {/* Active Sessions Skeleton */}
-          <div className="rounded-2xl border border-neutral-800 bg-neutral-900/50 p-6 lg:col-span-2">
-            <div className="mb-6 flex items-center gap-3">
-              <div>
-                <div className="mb-2 h-5 w-32 animate-pulse rounded bg-neutral-800"></div>
-                <div className="h-3 w-48 animate-pulse rounded bg-neutral-800/50"></div>
-              </div>
-            </div>
-            <div className="space-y-4">
-              {['session-skeleton-1'].map((skeletonKey) => (
-                <div
-                  key={skeletonKey}
-                  className="flex flex-col justify-between gap-4 rounded-xl border border-neutral-800 bg-neutral-950/50 p-4 sm:flex-row"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="h-12 w-12 animate-pulse rounded-lg bg-neutral-800"></div>
-                    <div>
-                      <div className="mb-2 h-5 w-40 animate-pulse rounded bg-neutral-800"></div>
-                      <div className="h-3 w-32 animate-pulse rounded bg-neutral-800/50"></div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    </main>
-  );
 }
 
 // Helper to format relative time
@@ -133,8 +48,10 @@ interface SettingsClientProps {
 
 export default function SettingsClient({ userData, initialDevices }: SettingsClientProps) {
   const [devices, setDevices] = useState<Device[]>(initialDevices);
+  const revokeDeviceMutation = trpc.auth.revokeDevice.useMutation();
+  const changePasswordMutation = trpc.auth.changePassword.useMutation();
 
-  const [error, setError] = useState<string | null>(null);
+  const [error] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
@@ -152,14 +69,8 @@ export default function SettingsClient({ userData, initialDevices }: SettingsCli
     if (!confirm('Вы уверены, что хотите завершить сеанс на этом устройстве?')) return;
 
     try {
-      const res = await fetch(`/api/auth/devices/${deviceId}`, {
-        method: 'DELETE',
-      });
-      if (res.ok) {
-        setDevices(devices.filter((d) => d.id !== deviceId));
-      } else {
-        alert('Не удалось завершить сеанс');
-      }
+      await revokeDeviceMutation.mutateAsync({ deviceId });
+      setDevices(devices.filter((d) => d.id !== deviceId));
     } catch (error) {
       console.error('Error revoking device', error);
       alert('Ошибка при завершении сеанса');
@@ -172,31 +83,17 @@ export default function SettingsClient({ userData, initialDevices }: SettingsCli
     setPasswordSuccess(null);
 
     try {
-      const res = await fetch('/api/auth/password/change', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          oldPassword: data.oldPassword,
-          newPassword: data.newPassword,
-          confirmNewPassword: data.confirmNewPassword,
-        }),
+      await changePasswordMutation.mutateAsync({
+        oldPassword: data.oldPassword,
+        newPassword: data.newPassword,
+        confirmNewPassword: data.confirmNewPassword,
       });
-
-      const result = await res.json();
-
-      if (!res.ok) {
-        setPasswordError(result.error || 'Ошибка при смене пароля');
-      } else {
-        setPasswordSuccess('Пароль успешно изменен. Другие сессии завершены.');
-        reset();
-        // Refresh devices list logic would need to be updated since we don't have fetchDevices here.
-        // Or we can assume all other devices are revoked.
-        // The API likely revokes other sessions.
-        // So we should filter devices to only keep the current one.
-        setDevices(devices.filter((d) => d.is_current));
-      }
-    } catch (error) {
-      setPasswordError('Произошла ошибка при смене пароля');
+      setPasswordSuccess('Пароль успешно изменен. Другие сессии завершены.');
+      reset();
+      setDevices(devices.filter((d) => d.is_current));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Произошла ошибка при смене пароля';
+      setPasswordError(message);
     } finally {
       setIsChangingPassword(false);
     }
@@ -246,6 +143,16 @@ export default function SettingsClient({ userData, initialDevices }: SettingsCli
               </div>
 
               <form onSubmit={handleSubmit(onChangePassword)} className="w-full space-y-4">
+                {/* Hidden username for accessibility and password managers (see [DOM] warning) */}
+                <input
+                  type="text"
+                  name="username"
+                  defaultValue={userData.username}
+                  autoComplete="username"
+                  tabIndex={-1}
+                  className="pointer-events-none absolute -left-[9999px] h-px w-px opacity-0"
+                  aria-hidden="true"
+                />
                 <div>
                   <label
                     htmlFor="old-password"

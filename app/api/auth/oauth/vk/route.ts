@@ -83,7 +83,6 @@ export async function GET(request: NextRequest) {
     });
 
     try {
-      const env = getEnv();
       if (domains.mainUrl) {
         const origin = domains.mainUrl.endsWith('/')
           ? domains.mainUrl.slice(0, -1)

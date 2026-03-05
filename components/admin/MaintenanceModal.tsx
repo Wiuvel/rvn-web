@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Settings, Check as Save, AlertTriangle, X, Calendar } from 'lucide-react';
+import { trpc } from '@/lib/trpc/client';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 
 interface MaintenanceConfig {
@@ -31,10 +32,28 @@ export default function MaintenanceModal({
       message: '',
     },
   );
-  const [loading, setLoading] = useState(!initialConfig);
-  const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   const [mounted, setMounted] = useState(false);
+
+  const { isLoading: loading } = trpc.admin.maintenance.get.useQuery(undefined, {
+    enabled: !initialConfig,
+    onSuccess: (data: MaintenanceConfig) => setConfig(data),
+  } as any);
+
+  const updateMutation = trpc.admin.maintenance.update.useMutation({
+    onSuccess: () => {
+      setMessage({ text: 'Настройки сохранены', type: 'success' });
+      setTimeout(() => {
+        onClose();
+        setMessage(null);
+      }, 1500);
+    },
+    onError: () => {
+      setMessage({ text: 'Ошибка сохранения', type: 'error' });
+    },
+  });
+
+  const saving = updateMutation.isPending;
 
   useEffect(() => {
     setMounted(true);
@@ -43,52 +62,12 @@ export default function MaintenanceModal({
   useEffect(() => {
     if (initialConfig) {
       setConfig(initialConfig);
-      setLoading(false);
-    } else {
-      fetchConfig();
     }
   }, [initialConfig]);
 
-  const fetchConfig = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch('/api/admin/maintenance');
-      if (res.ok) {
-        const data = await res.json();
-        setConfig(data);
-      }
-    } catch (error) {
-      console.error('Failed to fetch maintenance config:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSave = async () => {
-    setSaving(true);
+  const handleSave = () => {
     setMessage(null);
-    try {
-      const res = await fetch('/api/admin/maintenance', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(config),
-      });
-
-      if (res.ok) {
-        setMessage({ text: 'Настройки сохранены', type: 'success' });
-        setTimeout(() => {
-          onClose();
-          setMessage(null);
-        }, 1500);
-      } else {
-        setMessage({ text: 'Ошибка сохранения', type: 'error' });
-      }
-    } catch (error) {
-      console.error('Failed to save maintenance config:', error);
-      setMessage({ text: 'Ошибка сохранения', type: 'error' });
-    } finally {
-      setSaving(false);
-    }
+    updateMutation.mutate(config);
   };
 
   const toInputFormat = (isoString: string | null) => {

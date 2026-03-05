@@ -12,6 +12,11 @@ import {
   SUPPORT_FILE_SIZE_LIMIT_ERROR,
 } from '@/lib/utils/constants';
 import { Readable } from 'stream';
+import {
+  validateFileContent,
+  getExtensionFromMime,
+  type ContentValidationResult,
+} from '@/lib/validation/magic-bytes';
 
 /**
  * Создает и возвращает клиент S3 для Object Storage
@@ -288,28 +293,28 @@ export async function uploadAvatarFromUrl(
       return null;
     }
 
-    // Определяем расширение файла из content-type или URL
-    let extension = 'jpg';
-    if (contentType.includes('png')) {
-      extension = 'png';
-    } else if (contentType.includes('gif')) {
-      extension = 'gif';
-    } else if (contentType.includes('webp')) {
-      extension = 'webp';
-    } else {
-      // Пытаемся определить из URL
-      const urlMatch = imageUrl.match(/\.(jpg|jpeg|png|gif|webp)(\?|$)/i);
-      if (urlMatch) {
-        extension = urlMatch[1].toLowerCase();
-      }
+    // Валидация содержимого по magic bytes
+    const contentValidation = validateFileContent(
+      buffer,
+      contentType || 'application/octet-stream',
+      'avatar',
+    );
+    if (!contentValidation.valid || !contentValidation.detectedType) {
+      console.warn(`Avatar content validation failed: ${contentValidation.error}`);
+      return null;
     }
+
+    const verifiedType = contentValidation.detectedType;
+
+    // Определяем расширение из реального типа
+    const extension = getExtensionFromMime(verifiedType);
 
     // Генерируем путь для хранения аватара
     const timestamp = Date.now();
     const storagePath = `avatars/${userId}/${timestamp}.${extension}`;
 
-    // Загружаем в S3 с публичным доступом
-    await uploadAvatarToS3(buffer, storagePath, contentType);
+    // Загружаем в S3 с публичным доступом (используем verified type)
+    await uploadAvatarToS3(buffer, storagePath, verifiedType);
 
     return storagePath;
   } catch (error) {
@@ -340,14 +345,7 @@ export function validateFile(file: { size: number; type: string; name: string })
   }
 
   // Разрешенные типы файлов
-  const allowedImageTypes = [
-    'image/png',
-    'image/jpeg',
-    'image/jpg',
-    'image/gif',
-    'image/webp',
-    'image/svg+xml',
-  ];
+  const allowedImageTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp'];
   const allowedDocumentTypes = ['application/pdf', 'text/plain'];
 
   const isImage = allowedImageTypes.includes(file.type);
@@ -359,10 +357,27 @@ export function validateFile(file: { size: number; type: string; name: string })
   if (!isImage && !isDocument) {
     return {
       valid: false,
-      error:
-        'Разрешены только изображения (.png, .jpg, .gif, .webp, .svg) и документы (.pdf, .txt)',
+      error: 'Разрешены только изображения (.png, .jpg, .gif, .webp) и документы (.pdf, .txt)',
     };
   }
 
   return { valid: true };
+}
+
+/**
+ * Валидация файла с проверкой содержимого по magic bytes.
+ * Вызывать после чтения буфера — определяет реальный тип файла.
+ */
+export function validateFileWithContent(
+  file: { size: number; type: string; name: string },
+  buffer: Buffer,
+): ContentValidationResult {
+  // Сначала быстрая проверка метаданных
+  const metaCheck = validateFile(file);
+  if (!metaCheck.valid) {
+    return { valid: false, detectedType: null, error: metaCheck.error };
+  }
+
+  // Проверка содержимого по magic bytes
+  return validateFileContent(buffer, file.type, file.name);
 }
