@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { checkAuth } from '@/lib/auth/helper';
 import { setUserDataCookie } from '@/lib/auth/helper';
 
-export const dynamic = 'force-dynamic';
-
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const redirectUrl = searchParams.get('redirect') || '/dashboard';
@@ -35,7 +33,7 @@ export async function GET(request: NextRequest) {
   // If authentication failed or error occurred -> clear only token and user_data, redirect to auth
   // session_id не трогаем: для неавторизованных его можно сохранять (CSRF, повторный вход)
   const authUrl = new URL('/auth', baseUrl);
-  authUrl.searchParams.set('session_expired', 'cx');
+  authUrl.searchParams.set('reason', 'session_expired');
   const response = NextResponse.redirect(authUrl);
 
   response.cookies.set('token', '', { maxAge: 0, path: '/' });

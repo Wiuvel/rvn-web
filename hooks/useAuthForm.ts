@@ -107,8 +107,11 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
   }
 }
 
-export function useAuthForm() {
-  const [state, dispatch] = useReducer(authReducer, initialState);
+export function useAuthForm(initialTab?: 'login' | 'register') {
+  const [state, dispatch] = useReducer(authReducer, {
+    ...initialState,
+    currentTab: initialTab || initialState.currentTab,
+  });
 
   return { state, dispatch };
 }

@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { checkAuth } from '@/lib/auth/helper';
@@ -5,8 +6,21 @@ import { hasUserRole } from '@/lib/auth/user-roles';
 import { supabaseAdmin } from '@/lib/database/supabase';
 import AdminSupportClient from '@/components/support/AdminSupportClient';
 import type { RawTicketApi, RawMessageApi } from '@/lib/types/support-api';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
 
-export default async function SupportPanelPage({
+export default function SupportPanelPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ ticketId?: string }>;
+}) {
+  return (
+    <Suspense fallback={<LoadingSpinner fullScreen />}>
+      <SupportPanelContent searchParams={searchParams} />
+    </Suspense>
+  );
+}
+
+async function SupportPanelContent({
   searchParams,
 }: {
   searchParams: Promise<{ ticketId?: string }>;
@@ -16,13 +30,12 @@ export default async function SupportPanelPage({
   const cookieStore = await cookies();
   const token = cookieStore.get('token')?.value;
 
-  // If token exists but auth fails, clear cookies via restore route
   if (token && (!authResult.isAuthenticated || !authResult.user)) {
     redirect(`/api/auth/restore?redirect=/ui/panel/support`);
   }
 
   if (!authResult.isAuthenticated || !authResult.user) {
-    redirect('/auth/login?redirect=/ui/panel/support');
+    redirect(`/auth?return_to=${encodeURIComponent('/ui/panel/support')}`);
   }
 
   const user = authResult.user;
@@ -33,7 +46,6 @@ export default async function SupportPanelPage({
     redirect('/dashboard');
   }
 
-  // Construct AuthState
   const authState = {
     isAuthenticated: true,
     hasSupportAccess: true,
@@ -42,7 +54,6 @@ export default async function SupportPanelPage({
     user_id: user.user_id,
   };
 
-  // Fetch tickets (initial status='active' -> open, pending)
   let tickets: RawTicketApi[] = [];
   let selectedTicketMessages: RawMessageApi[] = [];
   let selectedTicket: RawTicketApi | null = null;
@@ -64,7 +75,6 @@ export default async function SupportPanelPage({
       if (!error && data) {
         tickets = data as RawTicketApi[];
 
-        // Fetch last messages via RPC
         const ticketIds = tickets.map((t) => t.id);
         if (ticketIds.length > 0) {
           const { data: lastMessages, error: rpcError } = await supabaseAdmin.rpc(
@@ -94,14 +104,11 @@ export default async function SupportPanelPage({
         console.error('Error fetching admin tickets:', error);
       }
 
-      // Fetch selected ticket details if present
       const { ticketId } = await searchParams;
       if (ticketId) {
-        // Find in already fetched tickets first to save DB call
         selectedTicket = tickets.find((t) => t.id === ticketId) ?? null;
 
         if (!selectedTicket) {
-          // If not in the list (e.g. closed), fetch it
           const { data: ticketData, error: ticketError } = await supabaseAdmin
             .from('support_tickets')
             .select(

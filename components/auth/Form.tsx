@@ -48,12 +48,13 @@ const RateLimitCaptcha = dynamic(() => import('@/components/auth/RateLimitCaptch
 });
 
 interface AuthFormProps {
-  retpatch?: string;
+  return_to?: string;
   initialError?: string;
+  mode?: 'login' | 'register';
 }
 
-export default function AuthForm({ retpatch = '/dashboard/', initialError }: AuthFormProps) {
-  const { state, dispatch } = useAuthForm();
+export default function AuthForm({ return_to = '/dashboard/', initialError, mode }: AuthFormProps) {
+  const { state, dispatch } = useAuthForm(mode);
 
   const [showRateLimitCaptcha, setShowRateLimitCaptcha] = useState(false);
   const rateLimitRetryRef = useRef<(() => void) | null>(null);
@@ -184,8 +185,14 @@ export default function AuthForm({ retpatch = '/dashboard/', initialError }: Aut
 
       markFpidSent();
       const userId = 'user_id' in result ? result.user_id : '';
-      window.location.href =
-        retpatch && retpatch !== '/dashboard/' ? retpatch : `/dashboard/${userId}`;
+      const safeReturnTo =
+        return_to &&
+        return_to !== '/dashboard/' &&
+        return_to.startsWith('/') &&
+        !return_to.startsWith('//')
+          ? return_to
+          : `/dashboard/${userId}`;
+      window.location.href = safeReturnTo;
     } catch (error) {
       dispatch({ type: 'SET_LOGIN_ATTEMPT_STATE', payload: 'error' });
       const message = error instanceof Error ? error.message : 'Ошибка входа';

@@ -13,11 +13,41 @@ import { trpc } from '@/lib/trpc/client';
 import { rateLimitLink } from '@/lib/trpc/rate-limit-link';
 
 const PERSIST_MAX_AGE = 24 * 60 * 60 * 1000; // 24h
+const PERSIST_CACHE_KEY = 'REACT_QUERY_OFFLINE_CACHE';
+
+/**
+ * Очищает tRPC/React Query кеш и localStorage при смене аккаунта/логауте.
+ * Вызывать перед редиректом на /auth.
+ */
+export function clearQueryCache() {
+  if (typeof window === 'undefined') return;
+  // Очищаем persisted React Query cache
+  try {
+    window.localStorage.removeItem(PERSIST_CACHE_KEY);
+  } catch {}
+  // Очищаем support-related кеш
+  try {
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < window.localStorage.length; i++) {
+      const key = window.localStorage.key(i);
+      if (key && (key.startsWith('support_') || key.startsWith('support_panel_'))) {
+        keysToRemove.push(key);
+      }
+    }
+    keysToRemove.forEach((key) => window.localStorage.removeItem(key));
+  } catch {}
+}
 
 function handleTRPCError(err: unknown) {
   if (err instanceof TRPCClientError && err.data?.code === 'UNAUTHORIZED') {
     if (typeof window !== 'undefined') {
-      window.location.href = '/auth?session_expired';
+      const path = window.location.pathname || '';
+      // Не перенаправляем со страниц /auth и /ui/panel/admin,
+      // чтобы не ломать формы входа пользователя и админа
+      if (path !== '/auth' && !path.startsWith('/ui/panel/admin')) {
+        const return_to = path && path !== '/' ? `&return_to=${encodeURIComponent(path)}` : '';
+        window.location.href = `/auth?reason=session_expired${return_to}`;
+      }
     }
     return;
   }

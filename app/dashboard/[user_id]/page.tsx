@@ -1,10 +1,20 @@
+import { Suspense } from 'react';
 import { redirect } from 'next/navigation';
 import { cookies, headers } from 'next/headers';
 import { checkAuth } from '@/lib/auth/helper';
 import { hasUserRole } from '@/lib/auth/user-roles';
 import DashboardClient from '@/components/dashboard/DashboardClient';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
 
-export default async function DashboardPage({ params }: { params: Promise<{ user_id: string }> }) {
+export default function DashboardPage({ params }: { params: Promise<{ user_id: string }> }) {
+  return (
+    <Suspense fallback={<LoadingSpinner fullScreen />}>
+      <DashboardContent params={params} />
+    </Suspense>
+  );
+}
+
+async function DashboardContent({ params }: { params: Promise<{ user_id: string }> }) {
   const { user_id } = await params;
   const headersList = await headers();
   const cookieStore = await cookies();
@@ -21,19 +31,15 @@ export default async function DashboardPage({ params }: { params: Promise<{ user
 
   const user = authResult.user;
 
-  // Security check: ensure user is accessing their own dashboard
   if (user.user_id !== user_id) {
     redirect(`/dashboard/${user.user_id}`);
   }
 
-  // Fetch roles
   const [isSupport, isAdmin] = await Promise.all([
     hasUserRole(user.id, 'support'),
     hasUserRole(user.id, 'admin'),
   ]);
 
-  // Prepare user data for client component
-  // Ensure dates are serialized to strings
   const userData = {
     id: user.id,
     user_id: user.user_id,

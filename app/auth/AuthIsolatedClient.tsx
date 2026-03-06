@@ -7,13 +7,38 @@ import Image from 'next/image';
 import AuthForm from '@/components/auth/Form';
 import ParticlesBackground from '@/components/effects/Particles';
 
+const REASON_MESSAGES: Record<string, string> = {
+  session_expired: 'Сессия истекла. Войдите снова.',
+  access_denied: 'Требуется авторизация для доступа.',
+  role_required: 'Недостаточно прав. Войдите с другим аккаунтом.',
+};
+
+function isValidReturnTo(path: string): boolean {
+  if (!path) return false;
+  try {
+    const url = new URL(path, 'http://localhost');
+    if (url.origin !== 'http://localhost') return false;
+  } catch {
+    return false;
+  }
+  return path.startsWith('/') && !path.startsWith('//');
+}
+
 function AuthIsolatedClientContent() {
   const searchParams = useSearchParams();
-  const retpatch = searchParams.get('retpatch') || '/dashboard/';
+  const rawReturnTo = searchParams.get('return_to') || '/dashboard/';
+  const return_to = isValidReturnTo(rawReturnTo) ? rawReturnTo : '/dashboard/';
   const errorParam = searchParams.get('error');
-  const sessionExpiredParam = searchParams.get('session_expired') === 'cx';
-  const [showSessionExpired, setShowSessionExpired] = useState(sessionExpiredParam);
-  const [sessionFadeOut, setSessionFadeOut] = useState(false);
+  const modeParam = searchParams.get('mode') as 'login' | 'register' | null;
+  const mode = modeParam === 'register' ? 'register' : undefined;
+
+  const reasonParam = searchParams.get('reason');
+  const sessionExpiredLegacy = searchParams.get('session_expired') === 'cx';
+  const reasonKey = reasonParam || (sessionExpiredLegacy ? 'session_expired' : null);
+  const reasonMessage = reasonKey ? REASON_MESSAGES[reasonKey] || null : null;
+
+  const [showReason, setShowReason] = useState(!!reasonMessage);
+  const [reasonFadeOut, setReasonFadeOut] = useState(false);
   const [preloaderVisible, setPreloaderVisible] = useState(true);
   const [blueWidth, setBlueWidth] = useState<'0%' | '100%'>('0%');
 
@@ -33,14 +58,15 @@ function AuthIsolatedClientContent() {
   }, []);
 
   useEffect(() => {
-    if (!showSessionExpired || !sessionExpiredParam) return;
-    setSessionFadeOut(false);
+    if (!showReason || !reasonMessage) return;
+    setReasonFadeOut(false);
     const fadeTimer = setTimeout(() => {
-      setSessionFadeOut(true);
+      setReasonFadeOut(true);
     }, 4500);
     const hideTimer = setTimeout(() => {
-      setShowSessionExpired(false);
+      setShowReason(false);
       const url = new URL(window.location.href);
+      url.searchParams.delete('reason');
       url.searchParams.delete('session_expired');
       window.history.replaceState(null, '', url.pathname + url.search);
     }, 5000);
@@ -48,7 +74,7 @@ function AuthIsolatedClientContent() {
       clearTimeout(fadeTimer);
       clearTimeout(hideTimer);
     };
-  }, [showSessionExpired, sessionExpiredParam]);
+  }, [showReason, reasonMessage]);
 
   return (
     <>
@@ -128,10 +154,10 @@ function AuthIsolatedClientContent() {
       <section className="flex flex-grow items-center justify-center px-4 py-12 sm:px-6 lg:px-8">
         <ParticlesBackground />
         <div className="z-10 grid w-full max-w-5xl grid-cols-1 items-center gap-12 md:grid-cols-2">
-          {showSessionExpired && (
+          {showReason && reasonMessage && (
             <div
               className={`fixed left-1/2 top-24 z-[100] flex -translate-x-1/2 items-center justify-center gap-3 rounded-lg border-2 border-red-500/80 bg-neutral-900 px-3 py-2 shadow-lg transition-all duration-500 ${
-                sessionFadeOut ? '-translate-y-1 opacity-0' : 'translate-y-0 opacity-100'
+                reasonFadeOut ? '-translate-y-1 opacity-0' : 'translate-y-0 opacity-100'
               }`}
               role="alert"
               aria-live="polite"
@@ -153,11 +179,11 @@ function AuthIsolatedClientContent() {
                 </svg>
               </div>
               <span className="text-sm font-medium leading-snug text-neutral-200">
-                Сессия истекла. Войдите снова.
+                {reasonMessage}
               </span>
             </div>
           )}
-          <AuthForm retpatch={retpatch} initialError={errorParam || undefined} />
+          <AuthForm return_to={return_to} initialError={errorParam || undefined} mode={mode} />
         </div>
         {/* Decorative Tree Image */}
         <div className="pointer-events-none fixed bottom-0 left-0 right-0 z-0 hidden items-end justify-center md:flex">

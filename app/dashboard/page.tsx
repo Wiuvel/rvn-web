@@ -1,7 +1,17 @@
+import { Suspense } from 'react';
 import { redirect } from 'next/navigation';
 import { getUserData } from '@/lib/auth/user-cookie.server';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
 
-export default async function DashboardPage() {
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={<LoadingSpinner fullScreen />}>
+      <DashboardRedirect />
+    </Suspense>
+  );
+}
+
+async function DashboardRedirect(): Promise<React.ReactNode> {
   const userData = await getUserData();
 
   if (!userData) {
@@ -12,6 +22,5 @@ export default async function DashboardPage() {
     redirect(`/dashboard/${userData.user_id}`);
   }
 
-  // Fallback if user_id is missing but userData exists (should not happen normally)
   redirect('/auth');
 }

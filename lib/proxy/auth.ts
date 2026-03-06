@@ -68,9 +68,9 @@ export function handleAuth(
     }
 
     if (hasToken) {
-      const retpatch = request.nextUrl.searchParams.get('retpatch');
-      if (retpatch) {
-        const response = NextResponse.redirect(new URL(retpatch, request.url));
+      const return_to = request.nextUrl.searchParams.get('return_to');
+      if (return_to && return_to.startsWith('/') && !return_to.startsWith('//')) {
+        const response = NextResponse.redirect(new URL(return_to, request.url));
         applySecurityHeaders(response, false);
         return response;
       }
@@ -90,8 +90,8 @@ export function handleAuth(
    */
   if (pathname.startsWith('/user/settings')) {
     if (!hasToken) {
-      const retpatch = encodeURIComponent(pathname);
-      const response = NextResponse.redirect(new URL(`/auth?retpatch=${retpatch}`, request.url));
+      const return_to = encodeURIComponent(pathname);
+      const response = NextResponse.redirect(new URL(`/auth?return_to=${return_to}`, request.url));
       applySecurityHeaders(response, false);
       return response;
     }
@@ -106,8 +106,8 @@ export function handleAuth(
    */
   if (pathname.startsWith('/dashboard')) {
     if (!hasToken) {
-      const retpatch = encodeURIComponent(pathname);
-      const response = NextResponse.redirect(new URL(`/auth?retpatch=${retpatch}`, request.url));
+      const return_to = encodeURIComponent(pathname);
+      const response = NextResponse.redirect(new URL(`/auth?return_to=${return_to}`, request.url));
       applySecurityHeaders(response, false);
       return response;
     }
@@ -143,8 +143,8 @@ export function handleAuth(
    */
   if (pathname.startsWith('/ui/panel/support')) {
     if (!hasToken) {
-      const retpatch = encodeURIComponent(pathname);
-      const response = NextResponse.redirect(new URL(`/auth?retpatch=${retpatch}`, request.url));
+      const return_to = encodeURIComponent(pathname);
+      const response = NextResponse.redirect(new URL(`/auth?return_to=${return_to}`, request.url));
       applySecurityHeaders(response, false);
       return response;
     }

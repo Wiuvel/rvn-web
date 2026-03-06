@@ -455,13 +455,10 @@ export default function SupportClient({
     { status: 'all', forUser: 'true' },
     { enabled: !!userData, staleTime: 30_000, refetchOnWindowFocus: true },
   );
-  const csrfQuery = trpc.auth.csrf.useQuery({ scope: 'user' });
   const createTicketMutation = trpc.support.tickets.create.useMutation({
     onSuccess: () => utils.support.tickets.list.invalidate(),
   });
-  const sendMessageMutation = trpc.support.tickets.sendMessage.useMutation({
-    onSuccess: () => utils.support.tickets.list.invalidate(),
-  });
+  const sendMessageMutation = trpc.support.tickets.sendMessage.useMutation();
   const markAsReadMutation = trpc.support.tickets.markAsRead.useMutation();
 
   const hasRestoredLastTicketRef = useRef(false);
@@ -1558,12 +1555,9 @@ export default function SupportClient({
     let tempId: string | null = null;
 
     try {
-      // Получаем CSRF токен для защиты от спама (через tRPC)
-      let csrfToken = csrfQuery.data?.csrfToken ?? '';
-      if (!csrfToken) {
-        const result = await csrfQuery.refetch();
-        csrfToken = result.data?.csrfToken ?? '';
-      }
+      // Получаем свежий CSRF токен напрямую с сервера (обходим React Query кеш)
+      const csrfResult = await utils.auth.csrf.fetch({ scope: 'user' });
+      const csrfToken = csrfResult?.csrfToken ?? '';
       if (!csrfToken) {
         showNotification(translateError('Ошибка загрузки. Обновите страницу.'), 'error');
         return;
@@ -1706,7 +1700,7 @@ export default function SupportClient({
         ticketId: activeTicket.id,
         message: sentText,
         csrfToken,
-        attachments: uploadedFiles.length > 0 ? uploadedFiles : undefined,
+        attachments: sentFiles.length > 0 ? sentFiles : undefined,
       });
 
       if (data.message) {
@@ -2129,7 +2123,7 @@ export default function SupportClient({
               в Telegram Bot'а.
             </p>
             <Link
-              href={`/auth?retpatch=${encodeURIComponent('/support/')}`}
+              href={`/auth?return_to=${encodeURIComponent('/support/')}`}
               prefetch={false}
               className="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700"
             >

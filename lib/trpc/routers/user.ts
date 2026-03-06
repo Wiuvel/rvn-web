@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { revalidateTag } from 'next/cache';
 import { TRPCError } from '@trpc/server';
 import { router, publicProcedure, protectedProcedure } from '../init';
 import { supabaseAdmin } from '@/lib/database/supabase';
@@ -193,6 +194,8 @@ export const userRouter = router({
             avatar: author.avatar,
           },
         };
+
+        revalidateTag(`user-profile:${input.user_id}`, 'max');
 
         try {
           broadcastNewComment(profileOwner.id, fullComment);

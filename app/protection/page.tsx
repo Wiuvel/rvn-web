@@ -1,16 +1,17 @@
+import { Suspense } from 'react';
 import { headers } from 'next/headers';
 import ProtectionClient from '@/components/protection/ProtectionClient';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
 
-/**
- * Страница защиты от ботов и DDoS атак
- *
- * Функциональность:
- * - Отображает Cloudflare Turnstile CAPTCHA для проверки человечности
- * - Показывает IP адрес пользователя (с возможностью раскрытия)
- * - После успешной проверки устанавливает куки доступа на 12 часов
- * - Автоматически перенаправляет на исходную страницу после проверки
- */
-export default async function ProtectionPage() {
+export default function ProtectionPage() {
+  return (
+    <Suspense fallback={<LoadingSpinner fullScreen />}>
+      <ProtectionContent />
+    </Suspense>
+  );
+}
+
+async function ProtectionContent() {
   const headersList = await headers();
   const forwardedFor = headersList.get('x-forwarded-for');
   const realIp = headersList.get('x-real-ip');

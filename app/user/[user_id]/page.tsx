@@ -1,3 +1,4 @@
+import { cacheLife, cacheTag } from 'next/cache';
 import { hasUserRole } from '@/lib/auth/user-roles';
 import { supabaseAdmin } from '@/lib/database/supabase';
 import PublicProfileClient, { PublicUserData } from '@/components/profile/PublicProfileClient';
@@ -7,7 +8,11 @@ export default async function PublicProfilePage({
 }: {
   params: Promise<{ user_id: string }>;
 }) {
+  'use cache';
+  cacheLife({ stale: 60, revalidate: 300, expire: 3600 });
+
   const { user_id } = await params;
+  cacheTag(`user-profile:${user_id}`);
 
   if (!user_id || !supabaseAdmin) {
     return <PublicProfileClient userData={null} error={true} />;
@@ -29,7 +34,6 @@ export default async function PublicProfilePage({
       hasUserRole(user.id, 'admin'),
     ]);
 
-    // Fetch comments
     const { data: commentsData, error: commentsError } = await supabaseAdmin
       .from('profile_comments')
       .select(

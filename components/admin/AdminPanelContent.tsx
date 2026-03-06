@@ -544,13 +544,22 @@ export default function AdminPanelContent({ teamCount }: AdminPanelContentProps)
                                       }`}
                                     >
                                       {isClient && (
-                                        <PersonIcon className="h-4 w-4" style={{ color: '#6699ff' }} />
+                                        <PersonIcon
+                                          className="h-4 w-4"
+                                          style={{ color: '#6699ff' }}
+                                        />
                                       )}
                                       {isSupport && (
-                                        <ChatBubbleIcon className="h-4 w-4" style={{ color: '#4ade80' }} />
+                                        <ChatBubbleIcon
+                                          className="h-4 w-4"
+                                          style={{ color: '#4ade80' }}
+                                        />
                                       )}
                                       {isAdmin && (
-                                        <StarFilledIcon className="h-4 w-4" style={{ color: '#cc99ff' }} />
+                                        <StarFilledIcon
+                                          className="h-4 w-4"
+                                          style={{ color: '#cc99ff' }}
+                                        />
                                       )}
                                       {roleText}
                                     </span>

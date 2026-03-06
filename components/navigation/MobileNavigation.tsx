@@ -9,6 +9,7 @@ import { gsap } from 'gsap';
 import { useAuth } from '@/hooks/useAuth';
 import { getGradientClasses, getAvatarUrl } from '@/lib/utils/avatar-gradients';
 import { getStaticUrl } from '@/lib/utils';
+import { clearQueryCache } from '@/components/providers/TRPCProvider';
 import {
   Home,
   Info,
@@ -192,6 +193,7 @@ export default function MobileNavigation() {
   const handleLogout = useCallback(async () => {
     try {
       await logoutMutation.mutateAsync({ scope: 'user' });
+      clearQueryCache();
       setIsOpen(false);
       router.push('/auth');
     } catch (error) {

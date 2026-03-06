@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { cookies } from 'next/headers';
+import { revalidateTag } from 'next/cache';
 import { TRPCError } from '@trpc/server';
 import { router, publicProcedure, adminPanelProcedure } from '../init';
 import { checkAdminExists } from '@/lib/auth/index';
@@ -189,6 +190,7 @@ export const adminRouter = router({
           });
         }
 
+        revalidateTag('team-count', 'max');
         return { success: true, message: 'Role granted successfully' };
       }),
 
@@ -207,6 +209,7 @@ export const adminRouter = router({
               message: result.error || 'Failed to revoke role',
             });
           }
+          revalidateTag('team-count', 'max');
           return { success: true, message: 'Role revoked successfully' };
         }),
     }),

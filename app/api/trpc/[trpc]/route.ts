@@ -4,8 +4,6 @@ import { createTRPCContext } from '@/lib/trpc/init';
 import { setCorsHeaders, handleCorsPreflight } from '@/lib/security/cors';
 import { logger } from '@/lib/utils/secure-logger';
 
-export const dynamic = 'force-dynamic';
-
 export function OPTIONS() {
   return handleCorsPreflight();
 }

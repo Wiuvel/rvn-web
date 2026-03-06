@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation';
 import { UserData } from '@/types';
 import { useMenuAnimation } from '@/hooks/useMenuAnimation';
 import { getGradientClasses, getAvatarUrl } from '@/lib/utils/avatar-gradients';
+import { clearQueryCache } from '@/components/providers/TRPCProvider';
 import {
   Settings,
   Receipt,
@@ -72,6 +73,7 @@ export function UserMenu({
   const handleLogout = async () => {
     try {
       await logoutMutation.mutateAsync({ scope: 'user' });
+      clearQueryCache();
       onClose();
       router.push('/auth');
     } catch (error) {

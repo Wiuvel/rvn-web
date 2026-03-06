@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { checkAuth } from '@/lib/auth/helper';
@@ -6,28 +7,31 @@ import { supabaseAdmin } from '@/lib/database/supabase';
 import SupportClient from '@/components/support/SupportClient';
 import { UserData } from '@/types';
 import type { RawTicketApi, RawMessageApi } from '@/lib/types/support-api';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
 
-export default async function SupportPage({
+export default function SupportPage({
   searchParams,
 }: {
   searchParams: Promise<{ ticketId?: string }>;
 }) {
+  return (
+    <Suspense fallback={<LoadingSpinner fullScreen />}>
+      <SupportContent searchParams={searchParams} />
+    </Suspense>
+  );
+}
+
+async function SupportContent({ searchParams }: { searchParams: Promise<{ ticketId?: string }> }) {
   const headersList = await headers();
   const authResult = await checkAuth({ headers: headersList }, { readOnly: true });
   const cookieStore = await cookies();
   const token = cookieStore.get('token')?.value;
 
-  // If token exists but auth fails, clear cookies via restore route (which handles invalid tokens)
   if (token && (!authResult.isAuthenticated || !authResult.user)) {
     redirect(`/api/auth/restore?redirect=/support`);
   }
 
   if (!authResult.isAuthenticated || !authResult.user) {
-    // Redirect to login if not authenticated
-    // Or pass null to client which will handle it (show empty state or redirect)
-    // Given the previous client logic, it expected userData to be null and then did nothing?
-    // Actually lines 382-384: if (!user_id) setUserData(null); setIsSupport(false);
-    // So client can handle null.
     return (
       <SupportClient
         initialUserData={null}
@@ -40,11 +44,9 @@ export default async function SupportPage({
 
   const user = authResult.user;
 
-  // Check user roles
   const isSupport = await hasUserRole(user.id, 'support');
   const isAdmin = await hasUserRole(user.id, 'admin');
 
-  // Construct UserData object expected by client
   const userData: UserData = {
     id: user.id,
     user_id: user.user_id,
@@ -58,8 +60,6 @@ export default async function SupportPage({
     pex: isAdmin ? 'a' : isSupport ? 's' : 'u',
   };
 
-  // Fetch tickets for the user
-  // Replicating logic from /api/support/tickets with forUser=true
   let ticketsData: RawTicketApi[] = [];
   let selectedTicket: RawTicketApi | null = null;
   let selectedTicketMessages: RawMessageApi[] = [];
@@ -88,7 +88,6 @@ export default async function SupportPage({
       } else {
         ticketsData = (data || []) as RawTicketApi[];
 
-        // Post-process last_message to be a single object instead of array
         ticketsData = ticketsData.map((t) => ({
           ...t,
           last_message:
@@ -96,15 +95,9 @@ export default async function SupportPage({
         }));
       }
 
-      // Fetch selected ticket details if present
       const { ticketId } = await searchParams;
       if (ticketId) {
-        // Find in already fetched tickets first to save DB call
         selectedTicket = ticketsData.find((t) => t.id === ticketId) ?? null;
-
-        // If not in the list (e.g. might be closed/archived if we filtered them, but here we fetch all for user)
-        // But if we paginate, it might be missing. For now we fetch all for user so it should be there.
-        // If not found, we could fetch it explicitly, but let's assume it's in the list or access denied.
 
         if (selectedTicket) {
           const { data: messagesData, error: messagesError } = await supabaseAdmin

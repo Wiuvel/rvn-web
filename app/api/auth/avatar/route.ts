@@ -4,6 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidateTag } from 'next/cache';
 import { checkAuth } from '@/lib/auth/helper';
 import { setCorsHeaders, handleCorsPreflight } from '@/lib/security/cors';
 import { generalRateLimit } from '@/lib/security/rate-limit';
@@ -253,6 +254,8 @@ export async function POST(request: NextRequest) {
       banner: user.banner ?? null,
       pex,
     });
+    revalidateTag(`user-profile:${user.user_id}`, 'max');
+
     const response = NextResponse.json({
       success: true,
       avatar: newAvatarPath,

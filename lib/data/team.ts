@@ -1,3 +1,4 @@
+import { cacheLife, cacheTag } from 'next/cache';
 import { supabaseAdmin } from '@/lib/database/supabase';
 import { logger } from '@/lib/utils/secure-logger';
 
@@ -8,13 +9,16 @@ export interface TeamStats {
 }
 
 export async function getTeamCount(): Promise<TeamStats> {
+  'use cache';
+  cacheLife('hours');
+  cacheTag('team-count');
+
   try {
     if (!supabaseAdmin) {
       logger.error('Supabase admin client is not configured for team count');
       return { count: 0, support: 0, admin: 0 };
     }
 
-    // Получаем количество пользователей с ролями "Поддержка" и "Админ" напрямую из БД
     const { data: roleData, error: roleError } = await supabaseAdmin
       .from('user_roles')
       .select('user_id, role')
@@ -30,7 +34,6 @@ export async function getTeamCount(): Promise<TeamStats> {
       return { count: 0, support: 0, admin: 0 };
     }
 
-    // Получаем уникальные user_id
     const uniqueUserIds = new Set<string>();
     const supportCount = roleData?.filter((r) => r.role === 'support').length || 0;
     const adminCount = roleData?.filter((r) => r.role === 'admin').length || 0;

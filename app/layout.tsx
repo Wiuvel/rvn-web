@@ -50,8 +50,8 @@ export default function RootLayout({
         <TRPCProvider>
           <HomeStructuredData />
           <SmoothScroll />
-          <SessionExpiredModal />
           <Suspense fallback={<LoadingSpinner fullScreen />}>
+            <SessionExpiredModal />
             <ConditionalLayout>{children}</ConditionalLayout>
           </Suspense>
         </TRPCProvider>

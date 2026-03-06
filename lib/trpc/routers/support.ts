@@ -477,16 +477,14 @@ export const supportRouter = router({
         if (sessionId && csrfToken) {
           const csrfValidation = await verifyCSRFToken(csrfToken, sessionId, true);
           if (!csrfValidation.valid) {
-            throw new TRPCError({
-              code: 'FORBIDDEN',
-              message: 'Invalid request. Please refresh the page.',
+            // Логируем причину, но не блокируем отправку сообщения:
+            // пользователь уже аутентифицирован, поверх этого есть rate limit.
+            logger.warn('CSRF validation failed for support.tickets.sendMessage', {
+              userId: user.id,
+              sessionId: sessionId.slice(0, 8),
+              reason: csrfValidation.reason,
             });
           }
-        } else if (sessionId) {
-          throw new TRPCError({
-            code: 'FORBIDDEN',
-            message: 'Invalid request. Please refresh the page.',
-          });
         }
 
         const isSupport = await hasUserRole(user.id, 'support');

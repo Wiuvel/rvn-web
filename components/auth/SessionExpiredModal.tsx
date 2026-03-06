@@ -22,7 +22,8 @@ export default function SessionExpiredModal() {
 
   const handleLogin = () => {
     setIsOpen(false);
-    window.location.href = '/auth?retpatch=' + encodeURIComponent(window.location.pathname);
+    window.location.href =
+      '/auth?reason=session_expired&return_to=' + encodeURIComponent(window.location.pathname);
   };
 
   const handleHome = () => {

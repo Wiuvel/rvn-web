@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { checkAuth } from '@/lib/auth/helper';
@@ -6,14 +7,22 @@ import { createHash } from 'crypto';
 import SettingsClient from '@/components/dashboard/SettingsClient';
 import { UserData } from '@/types';
 import { hasUserRole } from '@/lib/auth/user-roles';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
 
-export default async function SettingsPage() {
+export default function SettingsPage() {
+  return (
+    <Suspense fallback={<LoadingSpinner fullScreen />}>
+      <SettingsContent />
+    </Suspense>
+  );
+}
+
+async function SettingsContent() {
   const headersList = await headers();
   const auth = await checkAuth({ headers: headersList }, { readOnly: true });
   const cookieStore = await cookies();
   const token = cookieStore.get('token')?.value;
 
-  // If token exists but auth fails, use restore route to clear cookies and redirect to auth
   if (token && (!auth.isAuthenticated || !auth.user)) {
     redirect('/api/auth/restore?redirect=/auth');
   }
@@ -27,7 +36,6 @@ export default async function SettingsPage() {
     return null;
   }
 
-  // Fetch devices
   const { data: devices, error } = await supabaseAdmin
     .from('user_devices')
     .select('*')
@@ -38,8 +46,6 @@ export default async function SettingsPage() {
     console.error('Failed to fetch devices', error);
   }
 
-  // Calculate current device
-  // cookieStore is already defined at the top
   const currentToken = token;
   const currentTokenHash = currentToken
     ? createHash('sha256').update(currentToken).digest('hex')

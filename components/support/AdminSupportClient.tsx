@@ -85,6 +85,9 @@ interface Message {
   message_text: string;
   is_read: boolean;
   created_at: string;
+  /** Стабильный ключ для React-списка (чтобы не переигрывать анимацию) */
+  _renderKey?: string;
+  isPending?: boolean;
   sender?: {
     id: string;
     username: string;
@@ -870,8 +873,6 @@ export default function AdminSupportClient({
 
   // tRPC utils for imperative fetching & cache invalidation
   const utils = trpc.useUtils();
-
-  const csrfQuery = trpc.auth.csrf.useQuery({ scope: 'user' });
   const updateTicketMutation = trpc.support.tickets.update.useMutation();
   const sendMessageMutation = trpc.support.tickets.sendMessage.useMutation();
   const markAsReadMutation = trpc.support.tickets.markAsRead.useMutation();
@@ -1050,11 +1051,66 @@ export default function AdminSupportClient({
     const handleNewMessage = (data: { ticketId: string; message: any }) => {
       if (data.ticketId !== activeTicketRef.current?.id) return;
 
-      // Проверяем, что сообщение еще не добавлено (используем ref для актуальных данных)
-      const messageExists = messagesRef.current.some((m) => m.id === data.message.id);
-      if (messageExists) return;
+      const existingMessage = messagesRef.current.find((m) => m.id === data.message.id);
+      if (existingMessage) {
+        if (existingMessage.isPending) {
+          setMessages((prev) => {
+            const updated = prev.map((m) =>
+              m.id === data.message.id ? { ...m, isPending: false } : m,
+            );
+            messagesRef.current = updated;
+            return updated;
+          });
+        }
+        return;
+      }
 
-      // Маппим вложения для нового сообщения (оптимизировано - используем данные из WebSocket)
+      const optimisticMatch = messagesRef.current.find(
+        (m) =>
+          m.isPending &&
+          m.sender_type === data.message.sender_type &&
+          Math.abs(new Date(data.message.created_at).getTime() - new Date(m.created_at).getTime()) <
+            60_000,
+      );
+      if (optimisticMatch) {
+        setMessages((prev) => {
+          const updated = prev.map((m) =>
+            m.id === optimisticMatch.id
+              ? {
+                  id: data.message.id,
+                  ticket_id: data.ticketId,
+                  sender_id: data.message.sender?.id || m.sender_id,
+                  sender_type: data.message.sender_type || m.sender_type,
+                  message_text: data.message.message_text,
+                  is_read: data.message.is_read,
+                  created_at: data.message.created_at,
+                  _renderKey: optimisticMatch._renderKey,
+                  isPending: false,
+                  sender: data.message.sender || m.sender,
+                  attachments: processAttachments(data.message.attachments) || m.attachments,
+                }
+              : m,
+          );
+          messagesRef.current = updated;
+          saveMessagesToCache(data.ticketId, updated);
+          return updated;
+        });
+
+        updateTicketInList(data.ticketId, {
+          last_message_at: data.message.created_at,
+          last_message: {
+            id: data.message.id,
+            message_text: data.message.message_text || '',
+            sender_type: data.message.sender_type,
+            created_at: data.message.created_at,
+            is_read: data.message.is_read,
+          },
+        });
+
+        markMessagesAsRead(data.ticketId);
+        return;
+      }
+
       const mappedMessage: Message = {
         id: data.message.id,
         ticket_id: data.ticketId,
@@ -1063,15 +1119,14 @@ export default function AdminSupportClient({
         message_text: data.message.message_text,
         is_read: data.message.is_read,
         created_at: data.message.created_at,
+        _renderKey: data.message.id,
         sender: data.message.sender,
         attachments: processAttachments(data.message.attachments),
       };
 
-      // Добавляем новое сообщение
       setMessages((prev) => {
         const updated = [...prev, mappedMessage];
-        messagesRef.current = updated; // Обновляем ref сразу
-        // Кэшируем обновленные сообщения
+        messagesRef.current = updated;
         if (data.ticketId) {
           saveMessagesToCache(data.ticketId, updated);
         }
@@ -1085,7 +1140,6 @@ export default function AdminSupportClient({
         lastMessageText = normalizeLastMessageDisplayText(lastMessageText);
       }
 
-      // Обновляем last_message_at и last_message в списке тикетов
       updateTicketInList(data.ticketId, {
         last_message_at: data.message.created_at,
         last_message: {
@@ -1097,7 +1151,6 @@ export default function AdminSupportClient({
         },
       });
 
-      // Отмечаем сообщение как прочитанное
       markMessagesAsRead(data.ticketId);
     };
 
@@ -1235,8 +1288,7 @@ export default function AdminSupportClient({
       statusChanged ||
       currentMessagesHash !== lastMessagesHash
     ) {
-      // Маппим сообщения с вложениями
-      const mappedMessages = (polledData.messages || []).map((m: any) => ({
+      const mappedMessages: Message[] = (polledData.messages || []).map((m: any) => ({
         id: m.id,
         ticket_id: activeTicket.id,
         sender_id: m.sender?.id || '',
@@ -1244,11 +1296,16 @@ export default function AdminSupportClient({
         message_text: m.message_text,
         is_read: m.is_read,
         created_at: m.created_at,
+        _renderKey: m.id,
         sender: m.sender,
         attachments: processAttachments(m.attachments),
       }));
 
-      setMessages(mappedMessages);
+      const pendingMessages = messagesRef.current.filter(
+        (m) => m.isPending && !mappedMessages.some((sm) => sm.id === m.id),
+      );
+
+      setMessages([...mappedMessages, ...pendingMessages]);
       // Ref messagesRef обновится автоматически через useEffect
 
       // Обновляем статус тикета
@@ -1541,6 +1598,7 @@ export default function AdminSupportClient({
             message_text: m.message_text,
             is_read: m.is_read,
             created_at: m.created_at,
+            _renderKey: m.id,
             sender: m.sender,
             attachments: processAttachments(m.attachments),
           }),
@@ -1609,56 +1667,126 @@ export default function AdminSupportClient({
   const handleSendMessage = async () => {
     if (!activeTicket || !messageText.trim()) return;
 
+    const sentText = messageText.trim();
+    const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+
+    const optimisticMessage: Message = {
+      id: tempId,
+      ticket_id: activeTicket.id,
+      sender_id: authState.userId || '',
+      sender_type: 'support',
+      message_text: sentText,
+      is_read: true,
+      created_at: new Date().toISOString(),
+      _renderKey: tempId,
+      isPending: true,
+      sender: authState.username
+        ? {
+            id: authState.userId || '',
+            username: authState.username,
+            user_id: authState.user_id || '',
+          }
+        : undefined,
+    };
+
+    setMessages((prev) => {
+      const updated = [...prev, optimisticMessage];
+      messagesRef.current = updated;
+      return updated;
+    });
+    setMessageText('');
+
+    updateTicketInList(activeTicket.id, {
+      last_message_at: optimisticMessage.created_at,
+      last_message: {
+        id: tempId,
+        message_text: sentText,
+        sender_type: 'support',
+        created_at: optimisticMessage.created_at,
+        is_read: true,
+      },
+    });
+
+    if (typeof window !== 'undefined' && activeTicket.id) {
+      localStorage.setItem(`support_panel_scroll_${activeTicket.id}`, 'bottom');
+    }
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (messagesEndRef.current && !isRestoringScrollRef.current) {
+          messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+        }
+      });
+    });
+
     try {
-      let csrfToken = csrfQuery.data?.csrfToken ?? '';
-      if (!csrfToken) {
-        const result = await csrfQuery.refetch();
-        csrfToken = result.data?.csrfToken ?? '';
-      }
+      const csrfResult = await utils.auth.csrf.fetch({ scope: 'user' });
+      const csrfToken = csrfResult?.csrfToken ?? '';
       if (!csrfToken) {
         showNotification(translateError('Ошибка загрузки. Обновите страницу.'), 'error');
+        setMessages((prev) => {
+          const filtered = prev.filter((m) => m.id !== tempId);
+          messagesRef.current = filtered;
+          return filtered;
+        });
+        setMessageText(sentText);
         return;
       }
 
-      await sendMessageMutation.mutateAsync({
+      const data = await sendMessageMutation.mutateAsync({
         ticketId: activeTicket.id,
-        message: messageText.trim(),
+        message: sentText,
         csrfToken,
       });
 
-      setMessageText('');
+      if (data.message && currentTicketIdRef.current === activeTicket.id) {
+        const serverMessage: Message = {
+          id: data.message.id,
+          ticket_id: data.message.ticket_id || activeTicket.id,
+          sender_id: data.message.sender_id || authState.userId || '',
+          sender_type: 'support',
+          message_text: data.message.message_text || sentText,
+          is_read: data.message.is_read ?? true,
+          created_at: data.message.created_at || optimisticMessage.created_at,
+          _renderKey: tempId,
+          isPending: false,
+          sender: data.message.sender
+            ? Array.isArray(data.message.sender)
+              ? data.message.sender[0]
+              : data.message.sender
+            : optimisticMessage.sender,
+          attachments: processAttachments(data.message.attachments),
+        };
 
-      const ticketData = await utils.support.tickets.get.fetch({
-        ticketId: activeTicket.id,
-        limit: 100,
-        offset: 0,
-      });
-      if (currentTicketIdRef.current === activeTicket.id) {
-        setMessages(ticketData.messages || []);
-        markMessagesAsRead(activeTicket.id);
-        setTickets((prevTickets) =>
-          prevTickets.map((ticket) =>
-            ticket.id === activeTicket.id
-              ? {
-                  ...ticket,
-                  last_message_at: ticketData.ticket?.last_message_at || ticket.last_message_at,
-                }
-              : ticket,
-          ),
-        );
-        // Прокрутка вниз после отправки своего сообщения
-        if (typeof window !== 'undefined' && activeTicket.id) {
-          localStorage.setItem(`support_panel_scroll_${activeTicket.id}`, 'bottom');
-        }
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            if (messagesEndRef.current && !isRestoringScrollRef.current) {
-              messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
-            }
-          });
+        setMessages((prev) => {
+          const withoutOptimisticAndDuplicate = prev.filter(
+            (m) => m.id !== tempId && m.id !== data.message.id,
+          );
+          const updated = [...withoutOptimisticAndDuplicate, serverMessage];
+          messagesRef.current = updated;
+          saveMessagesToCache(activeTicket.id, updated);
+          return updated;
         });
+
+        updateTicketInList(activeTicket.id, {
+          last_message_at: serverMessage.created_at,
+          last_message: {
+            id: data.message.id,
+            message_text: sentText,
+            sender_type: 'support',
+            created_at: serverMessage.created_at,
+            is_read: true,
+          },
+        });
+
+        markMessagesAsRead(activeTicket.id);
       }
     } catch (error) {
+      setMessages((prev) => {
+        const filtered = prev.filter((m) => m.id !== tempId);
+        messagesRef.current = filtered;
+        return filtered;
+      });
+
       const msg =
         error instanceof Error && 'data' in error
           ? (error as any).message
@@ -2619,7 +2747,7 @@ export default function AdminSupportClient({
 
                       return (
                         <MessageItem
-                          key={message.id}
+                          key={message._renderKey ?? message.id}
                           message={message}
                           showDate={showDate}
                           isSystemMessage={isSystemMessage}
