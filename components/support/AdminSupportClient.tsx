@@ -871,7 +871,7 @@ export default function AdminSupportClient({
   // tRPC utils for imperative fetching & cache invalidation
   const utils = trpc.useUtils();
 
-  const csrfQuery = trpc.auth.csrf.useQuery({ scope: 'admin' });
+  const csrfQuery = trpc.auth.csrf.useQuery({ scope: 'user' });
   const updateTicketMutation = trpc.support.tickets.update.useMutation();
   const sendMessageMutation = trpc.support.tickets.sendMessage.useMutation();
   const markAsReadMutation = trpc.support.tickets.markAsRead.useMutation();

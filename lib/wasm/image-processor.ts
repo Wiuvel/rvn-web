@@ -3,7 +3,6 @@
  * Provides resizing capabilities with graceful fallback to the original buffer.
  */
 
-import { console } from 'inspector';
 import path from 'path';
 import { createRequire } from 'module';
 

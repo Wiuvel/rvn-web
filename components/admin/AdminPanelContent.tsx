@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import Image from 'next/image';
 import dynamic from 'next/dynamic';
 import { trpc } from '@/lib/trpc/client';
 import { gsap } from 'gsap';
@@ -545,31 +544,13 @@ export default function AdminPanelContent({ teamCount }: AdminPanelContentProps)
                                       }`}
                                     >
                                       {isClient && (
-                                        <Image
-                                          src="/static/panel/roles/clients.svg"
-                                          alt="Клиент"
-                                          width={16}
-                                          height={16}
-                                          className="h-4 w-4"
-                                        />
+                                        <PersonIcon className="h-4 w-4" style={{ color: '#6699ff' }} />
                                       )}
                                       {isSupport && (
-                                        <Image
-                                          src="/static/panel/roles/supports.svg"
-                                          alt="Поддержка"
-                                          width={16}
-                                          height={16}
-                                          className="h-4 w-4"
-                                        />
+                                        <ChatBubbleIcon className="h-4 w-4" style={{ color: '#4ade80' }} />
                                       )}
                                       {isAdmin && (
-                                        <Image
-                                          src="/static/panel/roles/admins.svg"
-                                          alt="Админ"
-                                          width={16}
-                                          height={16}
-                                          className="h-4 w-4"
-                                        />
+                                        <StarFilledIcon className="h-4 w-4" style={{ color: '#cc99ff' }} />
                                       )}
                                       {roleText}
                                     </span>

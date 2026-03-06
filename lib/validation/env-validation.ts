@@ -49,6 +49,9 @@ const envSchema = z
     // Public domain for OAuth redirects (optional, falls back to host header)
     NEXT_PUBLIC_DOMAIN: z.string().url().optional(),
 
+    // Cloudflare Turnstile site key (public, used in client for captcha widget)
+    NEXT_PUBLIC_TURNSTILE_SITEKEY: z.string().optional(),
+
     // S3-compatible Object Storage
     S3_ENDPOINT: z.string().url().optional(),
     S3_BUCKET: z.string().optional(),
@@ -144,6 +147,7 @@ export function validateEnv(): Env {
       GITHUB_CLIENT_ID: process.env.GITHUB_CLIENT_ID,
       GITHUB_CLIENT_SECRET: process.env.GITHUB_CLIENT_SECRET,
       NEXT_PUBLIC_DOMAIN: process.env.NEXT_PUBLIC_DOMAIN,
+      NEXT_PUBLIC_TURNSTILE_SITEKEY: process.env.NEXT_PUBLIC_TURNSTILE_SITEKEY,
       S3_ENDPOINT: process.env.S3_ENDPOINT,
       S3_BUCKET: process.env.S3_BUCKET,
       S3_ACCESS_KEY: process.env.S3_ACCESS_KEY,

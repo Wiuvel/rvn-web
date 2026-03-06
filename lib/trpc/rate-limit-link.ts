@@ -21,16 +21,18 @@ export function onRateLimited(listener: RateLimitListener) {
 export const rateLimitLink: TRPCLink<AppRouter> = () => {
   return ({ next, op }) => {
     return observable((observer) => {
+      let currentUnsub: (() => void) | null = null;
+
       const execute = () => {
-        const unsubscribe = next(op).subscribe({
+        // Cancel previous subscription before creating a new one
+        currentUnsub?.();
+
+        const subscription = next(op).subscribe({
           next: observer.next,
           error(err) {
             if (err instanceof TRPCClientError && err.data?.code === 'TOO_MANY_REQUESTS') {
               if (rateLimitListener) {
-                rateLimitListener(() => {
-                  // Retry after captcha success
-                  execute();
-                });
+                rateLimitListener(() => execute());
               } else {
                 observer.error(err);
               }
@@ -40,9 +42,15 @@ export const rateLimitLink: TRPCLink<AppRouter> = () => {
           },
           complete: observer.complete,
         });
-        return unsubscribe;
+
+        currentUnsub = subscription.unsubscribe.bind(subscription);
       };
-      return execute();
+
+      execute();
+
+      return () => {
+        currentUnsub?.();
+      };
     });
   };
 };

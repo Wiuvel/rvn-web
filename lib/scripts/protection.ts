@@ -100,7 +100,6 @@ function checkExistingCookie(): boolean {
   const cookies = document.cookie.split(';');
   let hasAccess = false;
   let hasHash = false;
-  let targetPath: string | null = null;
 
   for (const cookie of cookies) {
     const [name, value] = cookie.trim().split('=');
@@ -110,19 +109,11 @@ function checkExistingCookie(): boolean {
     if (name === 'access_hash' && value && value.length === 64 && /^[a-f0-9]{64}$/.test(value)) {
       hasHash = true;
     }
-    if (name === 'target_path' && value) {
-      targetPath = decodeURIComponent(value);
-    }
   }
 
   if (hasAccess && hasHash) {
-    let redirectUrl = '/';
-    if (targetPath) {
-      redirectUrl = targetPath;
-    } else {
-      const urlParams = new URLSearchParams(window.location.search);
-      redirectUrl = (urlParams.get('redirect') || '/').trim();
-    }
+    const urlParams = new URLSearchParams(window.location.search);
+    const redirectUrl = (urlParams.get('redirect') || '/').trim();
     return safeRedirect(redirectUrl);
   }
 
@@ -361,29 +352,13 @@ async function onSuccessCallback(token: string): Promise<void> {
       return;
     }
 
-    // Токен проверен успешно, куки установлены сервером
-    // if (!(await setSecureCookie())) { ... } - удалено, так как куки теперь HttpOnly
-
     currentState = captchaStates.SUCCESS;
     updateStatusText();
 
-    const cookies = document.cookie.split(';');
-    let targetPath: string | null = null;
-
-    for (const cookie of cookies) {
-      const [name, value] = cookie.trim().split('=');
-      if (name === 'target_path' && value) {
-        targetPath = decodeURIComponent(value);
-      }
-    }
-
-    let redirectUrl = '/';
-    if (targetPath) {
-      redirectUrl = targetPath;
-    } else {
-      const urlParams = new URLSearchParams(window.location.search);
-      redirectUrl = (urlParams.get('redirect') || '/').trim();
-    }
+    // Redirect target comes from the query param set by the protection proxy.
+    // (target_path cookie is httpOnly and unreadable from JS — intentionally ignored)
+    const urlParams = new URLSearchParams(window.location.search);
+    const redirectUrl = (urlParams.get('redirect') || '/').trim();
 
     setTimeout(() => {
       safeRedirect(redirectUrl);

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persister';
@@ -17,7 +17,7 @@ const PERSIST_MAX_AGE = 24 * 60 * 60 * 1000; // 24h
 function handleTRPCError(err: unknown) {
   if (err instanceof TRPCClientError && err.data?.code === 'UNAUTHORIZED') {
     if (typeof window !== 'undefined') {
-      window.location.href = '/auth?session_expired=1';
+      window.location.href = '/auth?session_expired';
     }
     return;
   }
@@ -26,7 +26,7 @@ function handleTRPCError(err: unknown) {
   }
 }
 
-/** Link: логирование и редирект при 401 после ответа сервера */
+/** Link: error logging and redirect on 401 */
 const errorHandlerLink: TRPCLink<AppRouter> = () => {
   return ({ next, op }) => {
     return observable((observer) => {
@@ -59,16 +59,17 @@ function makeQueryClient() {
   });
 }
 
-function getPersister() {
-  if (typeof window === 'undefined') return undefined;
-  return createSyncStoragePersister({
-    storage: window.localStorage,
-  });
-}
-
 export function TRPCProvider({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(makeQueryClient);
-  const [persister] = useState(getPersister);
+  // Defer persister creation to useEffect to avoid hydration mismatch:
+  // server always renders null, client initializes after mount.
+  const [persister, setPersister] = useState<ReturnType<typeof createSyncStoragePersister> | null>(
+    null,
+  );
+
+  useEffect(() => {
+    setPersister(createSyncStoragePersister({ storage: window.localStorage }));
+  }, []);
 
   const [trpcClient] = useState(() =>
     trpc.createClient({
@@ -77,6 +78,9 @@ export function TRPCProvider({ children }: { children: React.ReactNode }) {
         rateLimitLink,
         httpBatchLink({
           url: '/api/trpc',
+          fetch(url, options) {
+            return fetch(url, { ...options, credentials: 'include' });
+          },
         }),
       ],
     }),
@@ -88,6 +92,7 @@ export function TRPCProvider({ children }: { children: React.ReactNode }) {
     </trpc.Provider>
   );
 
+  // Wrap with PersistQueryClientProvider only after client-side mount
   if (persister) {
     return (
       <PersistQueryClientProvider

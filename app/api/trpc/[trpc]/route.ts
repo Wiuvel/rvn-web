@@ -18,7 +18,11 @@ async function handler(req: Request) {
     createContext: createTRPCContext,
     onError: ({ error, path }) => {
       if (error.code === 'INTERNAL_SERVER_ERROR') {
-        logger.error(`tRPC error on '${path}'`, {
+        logger.error(`tRPC INTERNAL_SERVER_ERROR on '${path}'`, {
+          error: error.message,
+        });
+      } else if (error.code === 'FORBIDDEN') {
+        logger.warn(`tRPC FORBIDDEN on '${path}'`, {
           error: error.message,
         });
       }

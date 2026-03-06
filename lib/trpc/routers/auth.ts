@@ -57,13 +57,7 @@ export const authRouter = router({
         secure: process.env.NODE_ENV === 'production' && !isLocalhost,
         sameSite: 'strict',
       });
-      cookieStore.set('session_id', '', {
-        maxAge: 0,
-        path: '/',
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production' && !isLocalhost,
-        sameSite: 'strict',
-      });
+      // Не сбрасываем session_id для неавторизованных — сессия нужна для CSRF и повторного входа
       return { authenticated: false as const };
     }
 

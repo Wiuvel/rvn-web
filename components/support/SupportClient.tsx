@@ -706,6 +706,58 @@ export default function SupportClient({
         return;
       }
 
+      // Сообщение пришло по WS до ответа mutateAsync: привязываем к оптимистичному (isPending, тот же отправитель)
+      const optimisticMatch = activeTicketMessagesRef.current.find(
+        (m) =>
+          m.isPending &&
+          m.sender === data.message.sender_type &&
+          Math.abs(new Date(data.message.created_at).getTime() - m.timestamp.getTime()) < 60_000,
+      );
+      if (optimisticMatch) {
+        startTransition(() => {
+          setActiveTicket((prev) => {
+            if (!prev || prev.id !== data.ticketId) return prev;
+            const updatedMessages = prev.messages.map((m) =>
+              m.id === optimisticMatch.id
+                ? {
+                    id: data.message.id,
+                    text: data.message.message_text,
+                    sender: data.message.sender_type as 'user' | 'support',
+                    timestamp: new Date(data.message.created_at),
+                    isRead: data.message.is_read,
+                    isPending: false,
+                    senderData: data.message.sender,
+                    attachments:
+                      data.message.attachments &&
+                      Array.isArray(data.message.attachments) &&
+                      data.message.attachments.length > 0
+                        ? data.message.attachments.map((att: any) => ({
+                            id: att.id,
+                            file_name: att.file_name,
+                            file_type: att.file_type,
+                            file_size: att.file_size,
+                            storage_path: att.storage_path,
+                            storage_url:
+                              att.storage_url ||
+                              (att.storage_path
+                                ? `/support/files/${encodeURIComponent(att.storage_path)}`
+                                : ''),
+                            blur_hash: att.blur_hash,
+                            width: att.width,
+                            height: att.height,
+                          }))
+                        : undefined,
+                  }
+                : m,
+            );
+            activeTicketMessagesRef.current = updatedMessages;
+            saveMessagesToCache(data.ticketId, updatedMessages);
+            return { ...prev, messages: updatedMessages };
+          });
+        });
+        return;
+      }
+
       // Оптимизация: объединяем обновления состояния в один переход
       const newMessage: Message = {
         id: data.message.id,
@@ -1599,7 +1651,10 @@ export default function SupportClient({
         if (!prev) return prev;
         return {
           ...prev,
-          messages: [...(prev.messages || []), { ...optimisticMessage, _renderKey: tempId ?? undefined }],
+          messages: [
+            ...(prev.messages || []),
+            { ...optimisticMessage, _renderKey: tempId ?? undefined },
+          ],
         };
       });
       // Не добавляем tempId в loadedMessagesRef — тогда эффект автопрокрутки сработает на «новое» сообщение
@@ -1661,30 +1716,38 @@ export default function SupportClient({
         setActiveTicket((prev) => {
           if (!prev) return prev;
           const serverAttachments = data.message.attachments || [];
-          const updatedMessages = prev.messages.map((m) => {
-            if (m.id !== tempId) return m;
-            return {
-              ...m,
-              id: data.message.id,
-              isPending: false,
-              _renderKey: m._renderKey,
-              attachments:
-                serverAttachments.length > 0
-                  ? serverAttachments.map((att: any) => ({
-                      id: att.id,
-                      file_name: att.file_name,
-                      file_type: att.file_type,
-                      file_size: att.file_size,
-                      storage_path: att.storage_path,
-                      storage_url:
-                        att.storage_url || `/support/files/${encodeURIComponent(att.storage_path)}`,
-                      blur_hash: att.blur_hash,
-                      width: att.width,
-                      height: att.height,
-                    }))
-                  : m.attachments,
-            };
-          });
+          const serverMessageMerged = {
+            id: data.message.id,
+            text: optimisticMessage.text,
+            sender: 'user' as const,
+            timestamp: optimisticMessage.timestamp,
+            isRead: false,
+            isPending: false,
+            _renderKey: data.message.id,
+            senderData: userData
+              ? { id: userData.id, username: userData.username, user_id: userData.user_id }
+              : undefined,
+            attachments:
+              serverAttachments.length > 0
+                ? serverAttachments.map((att: any) => ({
+                    id: att.id,
+                    file_name: att.file_name,
+                    file_type: att.file_type,
+                    file_size: att.file_size,
+                    storage_path: att.storage_path,
+                    storage_url:
+                      att.storage_url || `/support/files/${encodeURIComponent(att.storage_path)}`,
+                    blur_hash: att.blur_hash,
+                    width: att.width,
+                    height: att.height,
+                  }))
+                : optimisticMessage.attachments,
+          };
+          // Убираем оптимистичное (tempId) и любой дубликат по data.message.id (мог прийти по WS)
+          const withoutOptimisticAndDuplicate = (prev.messages || []).filter(
+            (m) => m.id !== tempId && m.id !== data.message.id,
+          );
+          const updatedMessages = [...withoutOptimisticAndDuplicate, serverMessageMerged];
           activeTicketMessagesRef.current = updatedMessages;
           return { ...prev, messages: updatedMessages };
         });

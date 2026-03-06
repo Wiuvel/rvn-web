@@ -11,7 +11,9 @@ function AuthIsolatedClientContent() {
   const searchParams = useSearchParams();
   const retpatch = searchParams.get('retpatch') || '/dashboard/';
   const errorParam = searchParams.get('error');
-  const sessionExpiredParam = searchParams.get('session_expired') === '1';
+  const sessionExpiredParam = searchParams.get('session_expired') === 'cx';
+  const [showSessionExpired, setShowSessionExpired] = useState(sessionExpiredParam);
+  const [sessionFadeOut, setSessionFadeOut] = useState(false);
   const [preloaderVisible, setPreloaderVisible] = useState(true);
   const [blueWidth, setBlueWidth] = useState<'0%' | '100%'>('0%');
 
@@ -29,6 +31,24 @@ function AuthIsolatedClientContent() {
       clearTimeout(fillTimer);
     };
   }, []);
+
+  useEffect(() => {
+    if (!showSessionExpired || !sessionExpiredParam) return;
+    setSessionFadeOut(false);
+    const fadeTimer = setTimeout(() => {
+      setSessionFadeOut(true);
+    }, 4500);
+    const hideTimer = setTimeout(() => {
+      setShowSessionExpired(false);
+      const url = new URL(window.location.href);
+      url.searchParams.delete('session_expired');
+      window.history.replaceState(null, '', url.pathname + url.search);
+    }, 5000);
+    return () => {
+      clearTimeout(fadeTimer);
+      clearTimeout(hideTimer);
+    };
+  }, [showSessionExpired, sessionExpiredParam]);
 
   return (
     <>
@@ -108,14 +128,17 @@ function AuthIsolatedClientContent() {
       <section className="flex flex-grow items-center justify-center px-4 py-12 sm:px-6 lg:px-8">
         <ParticlesBackground />
         <div className="z-10 grid w-full max-w-5xl grid-cols-1 items-center gap-12 md:grid-cols-2">
-          {sessionExpiredParam && (
+          {showSessionExpired && (
             <div
-              className="col-span-full flex items-center gap-4 rounded-xl border border-amber-500/40 bg-amber-950/90 px-4 py-4 text-amber-100 shadow-lg backdrop-blur-sm"
+              className={`fixed left-1/2 top-24 z-[100] flex -translate-x-1/2 items-center justify-center gap-3 rounded-lg border-2 border-red-500/80 bg-neutral-900 px-3 py-2 shadow-lg transition-all duration-500 ${
+                sessionFadeOut ? '-translate-y-1 opacity-0' : 'translate-y-0 opacity-100'
+              }`}
               role="alert"
+              aria-live="polite"
             >
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-red-500/25 text-red-400">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-red-500/20">
                 <svg
-                  className="h-6 w-6"
+                  className="h-5 w-5 text-red-400"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -129,9 +152,9 @@ function AuthIsolatedClientContent() {
                   />
                 </svg>
               </div>
-              <p className="text-left text-sm font-medium sm:text-base">
-                Сессия истекла или токен недействителен. Пожалуйста, войдите снова.
-              </p>
+              <span className="text-sm font-medium leading-snug text-neutral-200">
+                Сессия истекла. Войдите снова.
+              </span>
             </div>
           )}
           <AuthForm retpatch={retpatch} initialError={errorParam || undefined} />

@@ -32,14 +32,13 @@ export async function GET(request: NextRequest) {
     // Ignore errors, proceed to logout
   }
 
-  // If authentication failed or error occurred -> clear cookies and redirect to auth
+  // If authentication failed or error occurred -> clear only token and user_data, redirect to auth
+  // session_id не трогаем: для неавторизованных его можно сохранять (CSRF, повторный вход)
   const authUrl = new URL('/auth', baseUrl);
-  authUrl.searchParams.set('session_expired', '1');
+  authUrl.searchParams.set('session_expired', 'cx');
   const response = NextResponse.redirect(authUrl);
 
-  // Clear all auth cookies explicitly
   response.cookies.set('token', '', { maxAge: 0, path: '/' });
-  response.cookies.set('session_id', '', { maxAge: 0, path: '/' });
   response.cookies.set('user_data', '', { maxAge: 0, path: '/' });
 
   return response;

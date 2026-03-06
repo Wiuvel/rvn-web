@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import Script from 'next/script';
 import { trpc } from '@/lib/trpc/client';
@@ -13,6 +13,8 @@ export default function ProtectionClient({ initialIp }: ProtectionClientProps) {
   const [isIpRevealed, setIsIpRevealed] = useState(false);
   const ipAddress = initialIp;
   const verifyMutation = trpc.protection.verify.useMutation();
+  const verifyRef = useRef(verifyMutation);
+  verifyRef.current = verifyMutation;
 
   useEffect(() => {
     (
@@ -21,7 +23,7 @@ export default function ProtectionClient({ initialIp }: ProtectionClientProps) {
       }
     ).__protectionVerify = async (token: string) => {
       try {
-        const result = await verifyMutation.mutateAsync({ captchaToken: token });
+        const result = await verifyRef.current.mutateAsync({ captchaToken: token });
         return { success: result.success, error: undefined };
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Unknown error';
@@ -49,7 +51,7 @@ export default function ProtectionClient({ initialIp }: ProtectionClientProps) {
 
           container.innerHTML = '';
 
-          const sitekey: string = '0x4AAAAAACDQkGbAxIWAKp08';
+          const sitekey: string = process.env.NEXT_PUBLIC_TURNSTILE_SITEKEY ?? '';
           const renderOptions: TurnstileRenderOptions = {
             sitekey: sitekey,
             theme: 'dark',
@@ -101,7 +103,8 @@ export default function ProtectionClient({ initialIp }: ProtectionClientProps) {
       .catch((error) => {
         console.error('Failed to load protection script:', error);
       });
-  }, [verifyMutation]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const canReveal = Boolean(ipAddress) && !isIpRevealed;
   const isIpLoading = !ipAddress;
@@ -126,7 +129,7 @@ export default function ProtectionClient({ initialIp }: ProtectionClientProps) {
     <>
       <Script
         src="https://challenges.cloudflare.com/turnstile/v0/api.js"
-        strategy="beforeInteractive"
+        strategy="afterInteractive"
         onError={(error) => {
           console.error('Failed to load Turnstile API:', error);
         }}

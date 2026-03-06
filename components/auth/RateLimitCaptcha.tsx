@@ -29,7 +29,7 @@ interface RateLimitCaptchaProps {
   onClose?: () => void;
 }
 
-const TURNSTILE_SITEKEY = '0x4AAAAAACDQkGbAxIWAKp08';
+const TURNSTILE_SITEKEY = process.env.NEXT_PUBLIC_TURNSTILE_SITEKEY ?? '';
 const SCRIPT_CHECK_INTERVAL = 100;
 const SCRIPT_CHECK_TIMEOUT = 5000;
 const RETRY_DELAY = 5000;

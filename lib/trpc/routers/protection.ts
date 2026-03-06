@@ -1,13 +1,13 @@
 import { cookies } from 'next/headers';
 import crypto from 'crypto';
 import { TRPCError } from '@trpc/server';
-import { router, publicProcedure } from '../init';
+import { router, publicProcedure, authRateLimitedProcedure } from '../init';
 import { logger } from '@/lib/utils/secure-logger';
 import { captchaBodySchema } from '@/lib/validation/api-schemas';
 
 export const protectionRouter = router({
   /** Верификация Turnstile и установка защищённых кук (аналог POST /api/protection/verify) */
-  verify: publicProcedure.input(captchaBodySchema).mutation(async ({ ctx, input }) => {
+  verify: authRateLimitedProcedure.input(captchaBodySchema).mutation(async ({ ctx, input }) => {
     const { captchaToken } = input;
 
     const secretKey = process.env.TURNSTILE_SECRET_KEY;

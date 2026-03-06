@@ -4,17 +4,17 @@ WORKDIR /app
 RUN apt-get update -qq && apt-get install -y --no-install-recommends \
     pkg-config \
     libssl-dev \
+    curl \
     && rm -rf /var/lib/apt/lists/* \
-    && rustup target add wasm32-unknown-unknown
+    && rustup target add wasm32-unknown-unknown \
+    && curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 
 COPY wasm/Cargo.toml wasm/Cargo.lock* ./wasm/
 RUN mkdir -p wasm/src && echo "fn main() {}" > wasm/src/main.rs \
     && cd wasm && cargo build --release --target wasm32-unknown-unknown || true
 
 COPY wasm/src ./wasm/src
-RUN cd wasm && cargo build --release --target wasm32-unknown-unknown \
-    && mkdir -p /app/lib/wasm/pkg \
-    && cp target/wasm32-unknown-unknown/release/*.wasm /app/lib/wasm/pkg/
+RUN cd wasm && wasm-pack build --release --target nodejs --out-dir /app/lib/wasm/pkg
 
 # ---- Stage 2: Dependencies ----
 FROM node:22-slim AS deps
