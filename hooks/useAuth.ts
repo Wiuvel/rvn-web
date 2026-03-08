@@ -142,14 +142,21 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
   const [sessionExpired, setSessionExpired] = useState(false);
 
   useLayoutEffect(() => {
-    const hadCookie = !!fallbackFromCookie;
+    const apiData = data as AuthMeResponse | undefined;
+    const isAuthenticated = apiData?.authenticated === true && !!apiData?.user_id;
     const apiSaysUnauthenticated =
-      (data as AuthMeResponse | undefined)?.authenticated === false ||
+      apiData?.authenticated === false ||
       (trpcError && (trpcError as any)?.data?.httpStatus === 401);
-    if (hadCookie && apiSaysUnauthenticated) {
+
+    if (isAuthenticated) {
+      setSessionExpired(false);
+      return;
+    }
+    const hadCookie = !!fallbackFromCookie;
+    if (hadCookie && apiSaysUnauthenticated && !isLoading) {
       setSessionExpired(true);
     }
-  }, [fallbackFromCookie, data, trpcError]);
+  }, [fallbackFromCookie, data, trpcError, isLoading]);
 
   useLayoutEffect(() => {
     if (!userData || !validateUserId || !redirectOnFail) return;

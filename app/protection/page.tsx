@@ -3,6 +3,8 @@ import { headers } from 'next/headers';
 import ProtectionClient from '@/components/protection/ProtectionClient';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 
+export const dynamic = 'force-dynamic';
+
 export default function ProtectionPage() {
   return (
     <Suspense fallback={<LoadingSpinner fullScreen />}>
