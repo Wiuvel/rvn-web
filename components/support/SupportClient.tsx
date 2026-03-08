@@ -36,7 +36,7 @@ import Header from '@/components/layout/Header';
 import { UserData } from '@/types';
 import type { Message, Ticket, UploadedFile } from '@/components/support/types';
 import type { RawTicketApi, RawMessageApi } from '@/lib/types/support-api';
-import { mapRawTicketsToUi } from '@/lib/utils/support-mappers';
+import { mapRawTicketsToUi, mapWsAttachments } from '@/lib/utils/support-mappers';
 
 // Lazy load RateLimitCaptcha для оптимизации bundle size
 // Убираем loading state, чтобы избежать показа модального окна при загрузке страницы
@@ -239,7 +239,7 @@ export default function SupportClient({
   const chatAreaRef = useRef<HTMLDivElement>(null); // Ref для области чата (для анимаций)
   const fetchingTicketIdRef = useRef<string | null>(null);
   const loadedMessagesRef = useRef<Set<string>>(new Set());
-  const initialLoadRef = useRef<boolean>(false);
+  const initialLoadRef = useRef<boolean>(true);
   const activeTicketMessagesRef = useRef<Message[]>([]); // Ref для актуальных сообщений активного тикета
   const activeTicketRef = useRef<Ticket | null>(null); // Ref для актуального activeTicket в обработчиках WebSocket (избегаем переподписок при каждом обновлении сообщений)
   activeTicketRef.current = activeTicket;
@@ -358,8 +358,10 @@ export default function SupportClient({
     if (typeof window === 'undefined') return;
 
     try {
+      // Don't cache optimistic/pending messages — they have temp IDs and may lack server data
+      const persistableMessages = messages.filter((m) => !m.isPending && !m.id.startsWith('temp-'));
       const cacheData = {
-        messages,
+        messages: persistableMessages,
         timestamp: Date.now(),
       };
       localStorage.setItem(getCacheKey(ticketId), JSON.stringify(cacheData));
@@ -389,25 +391,7 @@ export default function SupportClient({
       const messages = (cacheData.messages || []).map((msg: any) => ({
         ...msg,
         timestamp: msg.timestamp instanceof Date ? msg.timestamp : new Date(msg.timestamp),
-        // Убеждаемся, что вложения правильно обработаны
-        attachments:
-          msg.attachments && Array.isArray(msg.attachments) && msg.attachments.length > 0
-            ? msg.attachments.map((att: any) => ({
-                id: att.id,
-                file_name: att.file_name,
-                file_type: att.file_type,
-                file_size: att.file_size,
-                storage_path: att.storage_path,
-                storage_url:
-                  att.storage_url ||
-                  (att.storage_path
-                    ? `/support/files/${encodeURIComponent(att.storage_path)}`
-                    : ''),
-                blur_hash: att.blur_hash,
-                width: att.width,
-                height: att.height,
-              }))
-            : undefined,
+        attachments: mapWsAttachments(msg.attachments),
       }));
 
       return messages;
@@ -671,25 +655,7 @@ export default function SupportClient({
                     ...m,
                     isPending: false,
                     isRead: data.message.is_read,
-                    // Обновляем вложения с серверными данными (включая blur_hash, width, height)
-                    attachments:
-                      data.message.attachments && data.message.attachments.length > 0
-                        ? data.message.attachments.map((att: any) => ({
-                            id: att.id,
-                            file_name: att.file_name,
-                            file_type: att.file_type,
-                            file_size: att.file_size,
-                            storage_path: att.storage_path,
-                            storage_url:
-                              att.storage_url ||
-                              (att.storage_path
-                                ? `/support/files/${encodeURIComponent(att.storage_path)}`
-                                : ''),
-                            blur_hash: att.blur_hash,
-                            width: att.width,
-                            height: att.height,
-                          }))
-                        : m.attachments,
+                    attachments: mapWsAttachments(data.message.attachments) ?? m.attachments,
                   }
                 : m,
             );
@@ -708,7 +674,8 @@ export default function SupportClient({
         (m) =>
           m.isPending &&
           m.sender === data.message.sender_type &&
-          Math.abs(new Date(data.message.created_at).getTime() - m.timestamp.getTime()) < 60_000,
+          (m.text === data.message.message_text ||
+            Math.abs(new Date(data.message.created_at).getTime() - m.timestamp.getTime()) < 60_000),
       );
       if (optimisticMatch) {
         startTransition(() => {
@@ -723,27 +690,9 @@ export default function SupportClient({
                     timestamp: new Date(data.message.created_at),
                     isRead: data.message.is_read,
                     isPending: false,
+                    _renderKey: optimisticMatch._renderKey ?? optimisticMatch.id,
                     senderData: data.message.sender,
-                    attachments:
-                      data.message.attachments &&
-                      Array.isArray(data.message.attachments) &&
-                      data.message.attachments.length > 0
-                        ? data.message.attachments.map((att: any) => ({
-                            id: att.id,
-                            file_name: att.file_name,
-                            file_type: att.file_type,
-                            file_size: att.file_size,
-                            storage_path: att.storage_path,
-                            storage_url:
-                              att.storage_url ||
-                              (att.storage_path
-                                ? `/support/files/${encodeURIComponent(att.storage_path)}`
-                                : ''),
-                            blur_hash: att.blur_hash,
-                            width: att.width,
-                            height: att.height,
-                          }))
-                        : undefined,
+                    attachments: mapWsAttachments(data.message.attachments),
                   }
                 : m,
             );
@@ -763,27 +712,7 @@ export default function SupportClient({
         timestamp: new Date(data.message.created_at),
         isRead: data.message.is_read,
         senderData: data.message.sender,
-        // Вложения с полными метаданными (включая blur_hash, width, height)
-        attachments:
-          data.message.attachments &&
-          Array.isArray(data.message.attachments) &&
-          data.message.attachments.length > 0
-            ? data.message.attachments.map((att: any) => ({
-                id: att.id,
-                file_name: att.file_name,
-                file_type: att.file_type,
-                file_size: att.file_size,
-                storage_path: att.storage_path,
-                storage_url:
-                  att.storage_url ||
-                  (att.storage_path
-                    ? `/support/files/${encodeURIComponent(att.storage_path)}`
-                    : ''),
-                blur_hash: att.blur_hash,
-                width: att.width,
-                height: att.height,
-              }))
-            : undefined,
+        attachments: mapWsAttachments(data.message.attachments),
       };
 
       const attachments = data.message.attachments || [];
@@ -808,6 +737,8 @@ export default function SupportClient({
         // Добавляем новое сообщение
         setActiveTicket((prev) => {
           if (!prev || prev.id !== data.ticketId) return prev;
+          // Dedup: skip if message already exists (e.g. mutation response arrived first)
+          if (prev.messages.some((m) => m.id === data.message.id)) return prev;
 
           const updatedMessages = [...(prev.messages || []), newMessage];
           activeTicketMessagesRef.current = updatedMessages; // Обновляем ref сразу
@@ -1017,7 +948,8 @@ export default function SupportClient({
                   file_name: string;
                   file_type: string;
                   file_size: number;
-                  storage_url: string;
+                  storage_path?: string;
+                  storage_url?: string;
                   blur_hash?: string;
                   width?: number;
                   height?: number;
@@ -1036,7 +968,7 @@ export default function SupportClient({
                       avatar: m.sender.avatar || null,
                     }
                   : undefined,
-                attachments: m.attachments || [],
+                attachments: mapWsAttachments(m.attachments) ?? [],
               }),
             );
 
@@ -1094,16 +1026,6 @@ export default function SupportClient({
     };
     // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTicket?.id, userData, activeTicket?.status, isWebSocketConnected, socket?.connected]);
-
-  // Очистка таймера при размонтировании компонента
-  useEffect(() => {
-    return () => {
-      if (markReadTimeoutRef.current) {
-        clearTimeout(markReadTimeoutRef.current);
-        markReadTimeoutRef.current = null;
-      }
-    };
-  }, []);
 
   // Автопрокрутка к последнему сообщению только для новых сообщений (не при первой загрузке)
   useEffect(() => {
@@ -1247,7 +1169,7 @@ export default function SupportClient({
     };
 
     // Ждем загрузки всех изображений перед восстановлением позиции
-    const images = messagesContainerRef.current.querySelectorAll('img[src*="/api/support/files/"]');
+    const images = messagesContainerRef.current.querySelectorAll('img[src*="/support/files/"]');
     if (images.length === 0) {
       // Нет изображений, можно сразу скроллить
       setTimeout(performScroll, 100);
@@ -1555,7 +1477,9 @@ export default function SupportClient({
     let tempId: string | null = null;
 
     try {
-      // Получаем свежий CSRF токен напрямую с сервера (обходим React Query кеш)
+      // Invalidate cached CSRF token then fetch a fresh one so the token
+      // matches the current session_id cookie (session may have rotated after login/register).
+      await utils.auth.csrf.invalidate();
       const csrfResult = await utils.auth.csrf.fetch({ scope: 'user' });
       const csrfToken = csrfResult?.csrfToken ?? '';
       if (!csrfToken) {
@@ -1633,22 +1557,25 @@ export default function SupportClient({
                 file_name: f.fileName,
                 file_type: f.fileType,
                 file_size: f.fileSize,
-                storage_url: f.previewUrl || f.storageUrl,
-                blur_hash: f.blur_hash,
-                width: f.width,
-                height: f.height,
+                storage_url: f.storageUrl,
+                blur_hash: f.blur_hash ?? undefined,
+                width: f.width ?? undefined,
+                height: f.height ?? undefined,
               }))
             : [],
       };
 
+      const optimisticWithKey = { ...optimisticMessage, _renderKey: tempId ?? undefined };
+      // Синхронное обновление ref — WS может прийти до flush React, optimisticMatch должен найти сообщение
+      activeTicketMessagesRef.current = [
+        ...(activeTicketMessagesRef.current || []),
+        optimisticWithKey,
+      ];
       setActiveTicket((prev) => {
         if (!prev) return prev;
         return {
           ...prev,
-          messages: [
-            ...(prev.messages || []),
-            { ...optimisticMessage, _renderKey: tempId ?? undefined },
-          ],
+          messages: [...(prev.messages || []), optimisticWithKey],
         };
       });
       // Не добавляем tempId в loadedMessagesRef — тогда эффект автопрокрутки сработает на «новое» сообщение
@@ -1709,7 +1636,6 @@ export default function SupportClient({
 
         setActiveTicket((prev) => {
           if (!prev) return prev;
-          const serverAttachments = data.message.attachments || [];
           const serverMessageMerged = {
             id: data.message.id,
             text: optimisticMessage.text,
@@ -1717,32 +1643,21 @@ export default function SupportClient({
             timestamp: optimisticMessage.timestamp,
             isRead: false,
             isPending: false,
-            _renderKey: data.message.id,
+            _renderKey: tempId ?? data.message.id,
             senderData: userData
               ? { id: userData.id, username: userData.username, user_id: userData.user_id }
               : undefined,
             attachments:
-              serverAttachments.length > 0
-                ? serverAttachments.map((att: any) => ({
-                    id: att.id,
-                    file_name: att.file_name,
-                    file_type: att.file_type,
-                    file_size: att.file_size,
-                    storage_path: att.storage_path,
-                    storage_url:
-                      att.storage_url || `/support/files/${encodeURIComponent(att.storage_path)}`,
-                    blur_hash: att.blur_hash,
-                    width: att.width,
-                    height: att.height,
-                  }))
-                : optimisticMessage.attachments,
+              mapWsAttachments(data.message.attachments) ?? optimisticMessage.attachments,
           };
-          // Убираем оптимистичное (tempId) и любой дубликат по data.message.id (мог прийти по WS)
+          // Убираем оптимистичное (tempId), любой дубликат по data.message.id (мог прийти по WS),
+          // и сообщения с _renderKey === tempId (WS мог заменить id, но сохранить _renderKey)
           const withoutOptimisticAndDuplicate = (prev.messages || []).filter(
-            (m) => m.id !== tempId && m.id !== data.message.id,
+            (m) => m.id !== tempId && m.id !== data.message.id && m._renderKey !== tempId,
           );
           const updatedMessages = [...withoutOptimisticAndDuplicate, serverMessageMerged];
           activeTicketMessagesRef.current = updatedMessages;
+          saveMessagesToCache(activeTicket.id, updatedMessages);
           return { ...prev, messages: updatedMessages };
         });
 
@@ -1765,6 +1680,10 @@ export default function SupportClient({
         );
 
         markMessagesAsRead(activeTicket.id);
+
+        // Ревалидация кэша: список тикетов и сообщения тикета (чтобы после обновления страницы данные были актуальны)
+        void utils.support.tickets.list.invalidate();
+        void utils.support.tickets.get.invalidate();
       }
     } catch (error) {
       // Откат оптимистичного сообщения при ошибке
@@ -1818,6 +1737,11 @@ export default function SupportClient({
         if (fetchingTicketIdRef.current === ticketId && !restoreScroll) {
           debugStart('fetchTicketMessages', { ticketId, reason: 'duplicate_request' });
           return;
+        }
+
+        // Suppress entrance animation for batch-loaded messages
+        if (offset === 0) {
+          initialLoadRef.current = true;
         }
 
         // Загружаем кэшированные сообщения для мгновенного отображения (только для первой загрузки)
@@ -1893,26 +1817,7 @@ export default function SupportClient({
                       avatar: m.sender.avatar || null,
                     }
                   : undefined,
-                // Вложения уже правильно сформированы на сервере, используем как есть
-                // Проверяем, что вложения есть и это массив с элементами
-                attachments:
-                  m.attachments && Array.isArray(m.attachments) && m.attachments.length > 0
-                    ? m.attachments.map((att: any) => ({
-                        id: att.id,
-                        file_name: att.file_name,
-                        file_type: att.file_type,
-                        file_size: att.file_size,
-                        storage_path: att.storage_path,
-                        storage_url:
-                          att.storage_url ||
-                          (att.storage_path
-                            ? `/api/support/files/${encodeURIComponent(att.storage_path)}`
-                            : ''),
-                        blur_hash: att.blur_hash,
-                        width: att.width,
-                        height: att.height,
-                      }))
-                    : undefined,
+                attachments: mapWsAttachments(m.attachments),
               }),
             );
 
@@ -1936,11 +1841,15 @@ export default function SupportClient({
                 // Если загрузили меньше чем запросили, значит это все сообщения
                 setHasMoreMessages(mappedMessages.length >= limit);
               } else {
+                const existingIds = new Set((prev?.messages || []).map((m) => m.id));
+                const newOlderMessages = mappedMessages.filter(
+                  (m: { id: string }) => !existingIds.has(m.id),
+                );
                 finalMessages = [
-                  ...mappedMessages,
+                  ...newOlderMessages,
                   ...(prev?.messages || []),
                 ] as typeof mappedMessages;
-                setLoadedMessageCount((prev) => prev + mappedMessages.length);
+                setLoadedMessageCount((prev) => prev + newOlderMessages.length);
                 // Если загрузили меньше чем запросили, значит больше нет старых сообщений
                 setHasMoreMessages(mappedMessages.length >= limit);
               }
@@ -1972,11 +1881,12 @@ export default function SupportClient({
                 localStorage.setItem('support_last_ticket_id', ticket.id);
               }
 
-              // Устанавливаем флаг первой загрузки после небольшой задержки, чтобы сообщения успели отрендериться
+              // Reset the initial-load flag after messages have rendered so
+              // subsequent messages arriving via WS get the entrance animation.
               if (offset === 0) {
-                setTimeout(() => {
+                requestAnimationFrame(() => {
                   initialLoadRef.current = false;
-                }, 100);
+                });
               }
 
               return ticket;
@@ -2687,12 +2597,10 @@ export default function SupportClient({
           onClose={() => setShowFileUploadModal(false)}
           onUploadComplete={(files) => {
             setUploadedFiles((prev) => [...prev, ...files]);
-            // Генерируем превью для изображений
+            // Превью для изображений — используем storageUrl (blob отзывается при закрытии модалки)
             files.forEach((file) => {
               if (file.fileType.startsWith('image/')) {
-                // Если есть локальное превью (blob), сохраняем его
-                const preview = file.previewUrl || file.storageUrl;
-                setFilePreviews((prev) => new Map(prev).set(file.storageUrl, preview));
+                setFilePreviews((prev) => new Map(prev).set(file.storageUrl, file.storageUrl));
               }
             });
             setShowFileUploadModal(false);

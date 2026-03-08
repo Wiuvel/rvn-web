@@ -1,11 +1,11 @@
 /**
- * Global types for project
+ * Global types
  */
 
 import type { Server as HTTPServer } from 'http';
 
 declare global {
-  // HTTP server for initialization WebSocket server
+  /* HTTP server for initialization WebSocket server */
   var __httpServer: HTTPServer | undefined;
 }
 

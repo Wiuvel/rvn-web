@@ -37,16 +37,16 @@ export const supportTicketsQuerySchema = z.object({
     .transform((v) => v === 'true'),
 });
 
-/** Attachment item for createMessageBodySchema */
+/** Attachment item for createMessageBodySchema. Documents have blur_hash/width/height as null. */
 const attachmentItemSchema = z.object({
   storagePath: z.string(),
   storageUrl: z.string(),
   fileName: z.string(),
   fileType: z.string(),
   fileSize: z.number(),
-  blur_hash: z.string().optional(),
-  width: z.number().optional(),
-  height: z.number().optional(),
+  blur_hash: z.string().nullish(),
+  width: z.number().nullish(),
+  height: z.number().nullish(),
 });
 
 /** Create message body: POST support/tickets/[ticketId]/messages */

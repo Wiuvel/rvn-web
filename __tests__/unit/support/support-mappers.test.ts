@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   mapRawAttachmentToUi,
+  mapWsAttachmentToUi,
+  mapWsAttachments,
   mapRawMessageToUi,
   mapRawTicketToUi,
   mapRawTicketsToUi,
@@ -119,5 +121,94 @@ describe('mapRawTicketWithMessagesToUi', () => {
     expect(result.id).toBe('ticket-1');
     expect(result.messages).toHaveLength(1);
     expect(result.messages[0].text).toBe('Hello, I need help');
+  });
+});
+
+describe('mapWsAttachmentToUi', () => {
+  it('uses storage_url when provided (broadcast from tRPC)', () => {
+    const att = {
+      id: 'att-ws-1',
+      file_name: 'img.png',
+      file_type: 'image/png',
+      file_size: 1024,
+      storage_path: 'support/t1/m1/img.png',
+      storage_url: '/support/files/support%2Ft1%2Fm1%2Fimg.png',
+    };
+    const result = mapWsAttachmentToUi(att);
+    expect(result.storage_url).toBe('/support/files/support%2Ft1%2Fm1%2Fimg.png');
+  });
+
+  it('falls back to buildStorageUrl when storage_url is absent (DB has only storage_path)', () => {
+    const att = {
+      id: 'att-ws-2',
+      file_name: 'doc.pdf',
+      file_type: 'application/pdf',
+      file_size: 5000,
+      storage_path: 'support/t2/m2/doc.pdf',
+    };
+    const result = mapWsAttachmentToUi(att);
+    expect(result.storage_url).toBe(
+      '/support/files/' + encodeURIComponent('support/t2/m2/doc.pdf'),
+    );
+  });
+
+  it('returns empty storage_url when both storage_url and storage_path are missing', () => {
+    const att = {
+      id: 'att-ws-3',
+      file_name: 'nopath.txt',
+      file_type: 'text/plain',
+      file_size: 100,
+    };
+    const result = mapWsAttachmentToUi(att);
+    expect(result.storage_url).toBe('');
+  });
+
+  it('preserves blur_hash, width, height', () => {
+    const att = {
+      id: 'att-ws-4',
+      file_name: 'photo.jpg',
+      file_type: 'image/jpeg',
+      file_size: 2048,
+      storage_path: 'support/t1/m1/photo.jpg',
+      blur_hash: 'LGF5]+Yk^6#M@-5c',
+      width: 1920,
+      height: 1080,
+    };
+    const result = mapWsAttachmentToUi(att);
+    expect(result.blur_hash).toBe('LGF5]+Yk^6#M@-5c');
+    expect(result.width).toBe(1920);
+    expect(result.height).toBe(1080);
+  });
+});
+
+describe('mapWsAttachments', () => {
+  it('returns undefined for null/undefined/empty input', () => {
+    expect(mapWsAttachments(null)).toBeUndefined();
+    expect(mapWsAttachments(undefined)).toBeUndefined();
+    expect(mapWsAttachments([])).toBeUndefined();
+  });
+
+  it('maps array of WS attachments', () => {
+    const atts = [
+      {
+        id: 'a1',
+        file_name: 'f1.png',
+        file_type: 'image/png',
+        file_size: 100,
+        storage_path: 'p/f1.png',
+        storage_url: '/support/files/p%2Ff1.png',
+      },
+      {
+        id: 'a2',
+        file_name: 'f2.pdf',
+        file_type: 'application/pdf',
+        file_size: 200,
+        storage_path: 'p/f2.pdf',
+      },
+    ];
+    const result = mapWsAttachments(atts);
+    expect(result).toHaveLength(2);
+    expect(result![0].storage_url).toBe('/support/files/p%2Ff1.png');
+    expect(result![1].storage_url).toBe('/support/files/' + encodeURIComponent('p/f2.pdf'));
   });
 });

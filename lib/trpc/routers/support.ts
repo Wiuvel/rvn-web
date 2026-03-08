@@ -584,6 +584,18 @@ export const supportRouter = router({
           throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Failed to send message' });
         }
 
+        let dbAttachments: Array<{
+          id: string;
+          file_name: string;
+          file_type: string;
+          file_size: number;
+          storage_path: string;
+          storage_url: string;
+          blur_hash: string | null;
+          width: number | null;
+          height: number | null;
+        }> = [];
+
         if (attachments && attachments.length > 0) {
           const attachmentRecords = attachments.map((att) => ({
             message_id: newMessage!.id,
@@ -596,9 +608,10 @@ export const supportRouter = router({
             height: att.height || null,
           }));
 
-          const { error: attError } = await supabaseAdmin
+          const { data: insertedAtt, error: attError } = await supabaseAdmin
             .from('support_message_attachments')
-            .insert(attachmentRecords);
+            .insert(attachmentRecords)
+            .select('id, file_name, file_type, file_size, storage_path, blur_hash, width, height');
 
           if (attError) {
             logger.error('Error creating attachments', {
@@ -606,26 +619,18 @@ export const supportRouter = router({
               messageId: newMessage.id,
             });
           }
+
+          if (insertedAtt && insertedAtt.length > 0) {
+            dbAttachments = insertedAtt.map((att) => ({
+              ...att,
+              storage_url: `/support/files/${encodeURIComponent(att.storage_path)}`,
+            }));
+          }
         }
 
         if (newMessage) {
           let senderData = newMessage.sender;
           if (Array.isArray(senderData)) senderData = senderData[0] || undefined;
-
-          let attachmentsForBroadcast = undefined;
-          if (attachments && attachments.length > 0) {
-            const { data: dbAtt } = await supabaseAdmin
-              .from('support_message_attachments')
-              .select('id, file_name, file_type, file_size, storage_path, blur_hash, width, height')
-              .eq('message_id', newMessage.id);
-
-            if (dbAtt && dbAtt.length > 0) {
-              attachmentsForBroadcast = dbAtt.map((att) => ({
-                ...att,
-                storage_url: `/support/files/${encodeURIComponent(att.storage_path)}`,
-              }));
-            }
-          }
 
           const messageForBroadcast = {
             id: newMessage.id,
@@ -636,7 +641,7 @@ export const supportRouter = router({
             is_read: newMessage.is_read || false,
             created_at: newMessage.created_at,
             sender: senderData,
-            attachments: attachmentsForBroadcast,
+            attachments: dbAttachments.length > 0 ? dbAttachments : undefined,
           };
 
           try {
@@ -695,7 +700,13 @@ export const supportRouter = router({
           }
         }
 
-        return { message: newMessage, success: true };
+        return {
+          message: {
+            ...newMessage,
+            attachments: dbAttachments.length > 0 ? dbAttachments : undefined,
+          },
+          success: true,
+        };
       }),
 
     markAsRead: protectedProcedure.input(ticketIdParamSchema).mutation(async ({ ctx, input }) => {

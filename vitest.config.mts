@@ -13,6 +13,6 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     include: ['__tests__/**/*.test.ts'],
-    // Запуск по типу: npx vitest run __tests__/unit | __tests__/integration | __tests__/e2e
+    /* Launch by type: npx vitest run __tests__/unit | __tests__/integration */
   },
 });

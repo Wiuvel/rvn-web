@@ -686,16 +686,6 @@ function processMessageQueue(): void {
               },
             );
           }
-          if ('messageIds' in queuedMessage.data) {
-            io.to(`ticket:${queuedMessage.ticketId}`).emit(
-              'support:message:read',
-              queuedMessage.data as {
-                ticketId: string;
-                messageIds: string[];
-                readBy: 'user' | 'support';
-              },
-            );
-          }
           break;
         case 'comment':
           if ('profileId' in queuedMessage.data && 'comment' in queuedMessage.data) {

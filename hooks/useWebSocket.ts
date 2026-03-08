@@ -35,6 +35,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
     token,
   } = options;
   const [isConnected, setIsConnected] = useState(false);
+  const [socket, setSocket] = useState<SocketType | null>(null);
   const socketRef = useRef<SocketType | null>(null);
   const cleanupRef = useRef<(() => void) | null>(null);
   const currentTokenRef = useRef<string | undefined>(undefined);
@@ -137,6 +138,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
       });
 
       socketRef.current = socket;
+      setSocket(socket);
 
       socket.on('connect', () => {
         setIsConnected(true);
@@ -211,6 +213,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
         socket.off('error');
         socket.disconnect();
         socketRef.current = null;
+        setSocket(null);
       };
 
       cleanupRef.current = cleanup;
@@ -307,7 +310,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
   }, []);
 
   return {
-    socket: socketRef.current,
+    socket,
     isConnected,
     joinTicket,
     leaveTicket,

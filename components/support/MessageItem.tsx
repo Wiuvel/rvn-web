@@ -143,9 +143,9 @@ export default function MessageItem({
           {/* Аватар поддержки */}
           {message.sender === 'support' && (
             <div className="mb-1 flex h-8 w-8 flex-shrink-0 items-center justify-center overflow-hidden rounded-full sm:h-12 sm:w-12">
-              {message.senderData?.avatar ? (
+              {message.senderData?.avatar && getAvatarUrl(message.senderData.avatar) ? (
                 <Image
-                  src={getAvatarUrl(message.senderData.avatar) || ''}
+                  src={getAvatarUrl(message.senderData.avatar)!}
                   alt={message.senderData.username || 'Support'}
                   width={48}
                   height={48}

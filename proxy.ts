@@ -57,8 +57,8 @@ export async function proxy(request: NextRequest) {
   }
 
   /**
-   * Default response for public pages
-   * Apply security headers to all responses
+   * Default response for public pages;
+   * Apply security headers to all responses.
    */
   const response = NextResponse.next({ request: { headers: requestHeaders } });
   applySecurityHeaders(response, false);
@@ -84,7 +84,7 @@ export const config = {
       missing: [
         { type: 'header', key: 'next-router-prefetch' },
         { type: 'header', key: 'purpose', value: 'prefetch' },
-        { type: 'query', key: '_rsc' }, // RSC payload requests bypass proxy entirely.
+        { type: 'query', key: '_rsc' }, // - RSC payload requests bypass proxy entirely.
       ],
     },
   ],

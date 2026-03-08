@@ -26,15 +26,15 @@
     "@tanstack/query-sync-storage-persister": "^5.90.24",
     "@tanstack/react-query": "^5.90.21",
     "@tanstack/react-query-persist-client": "^5.90.24",
-    "@trpc/client": "^11.0.0",
-    "@trpc/react-query": "^11.0.0",
-    "@trpc/server": "^11.0.0",
+    "@trpc/client": "^11.12.0",
+    "@trpc/react-query": "^11.12.0",
+    "@trpc/server": "^11.12.0",
     "bcryptjs": "^3.0.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "gsap": "^3.14.2",
     "ioredis": "^5.9.2",
-    "lucide-react": "^0.575.0",
+    "lucide-react": "^0.577.0",
     "next": "^16.1.6",
     "ogl": "^1.0.11",
     "react": "19.2.4",
@@ -70,6 +70,6 @@
     "utf-8-validate": "^6.0.6"
   },
   "overrides": {
-    "fast-xml-parser": "5.4.1"
+    "fast-xml-parser": "5.4.2"
   }
 }

@@ -23,6 +23,7 @@ import ImageViewer from '@/components/support/ImageViewer';
 import ImageWithBlur from '@/components/support/ImageWithBlur';
 import { debugPerformanceAsync, debugStart, debugEnd, debugError } from '@/lib/utils/debug';
 import type { RawTicketApi, RawMessageApi } from '@/lib/types/support-api';
+import { mapWsAttachments } from '@/lib/utils/support-mappers';
 
 interface AuthState {
   isAuthenticated: boolean;
@@ -104,35 +105,6 @@ interface Notification {
 }
 
 // Функция-помощник для обработки вложений с формированием storage_url
-function processAttachments(
-  attachments?: Array<{
-    id: string;
-    file_name: string;
-    file_type: string;
-    file_size: number;
-    storage_url?: string;
-    storage_path?: string;
-    blur_hash?: string;
-    width?: number;
-    height?: number;
-  }>,
-): MessageAttachment[] | undefined {
-  if (!attachments || attachments.length === 0) return undefined;
-
-  return attachments.map((att) => ({
-    id: att.id,
-    file_name: att.file_name,
-    file_type: att.file_type,
-    file_size: att.file_size,
-    storage_path: att.storage_path,
-    storage_url:
-      att.storage_url ||
-      (att.storage_path ? `/support/files/${encodeURIComponent(att.storage_path)}` : ''),
-    blur_hash: att.blur_hash,
-    width: att.width,
-    height: att.height,
-  }));
-}
 
 // Компонент для анимированного сообщения
 function MessageItem({
@@ -495,7 +467,7 @@ export default function AdminSupportClient({
         is_read: m.is_read ?? false,
         created_at: m.created_at,
         sender,
-        attachments: processAttachments(m.attachments),
+        attachments: mapWsAttachments(m.attachments),
       };
     });
   });
@@ -657,8 +629,9 @@ export default function AdminSupportClient({
     if (typeof window === 'undefined') return;
 
     try {
+      const persistableMessages = messages.filter((m) => !m.isPending && !m.id.startsWith('temp-'));
       const cacheData = {
-        messages,
+        messages: persistableMessages,
         timestamp: Date.now(),
       };
       localStorage.setItem(getCacheKey(ticketId), JSON.stringify(cacheData));
@@ -687,7 +660,7 @@ export default function AdminSupportClient({
       // Обрабатываем вложения при загрузке из кэша
       const messages = (cacheData.messages || []).map((msg: any) => ({
         ...msg,
-        attachments: processAttachments(msg.attachments),
+        attachments: mapWsAttachments(msg.attachments),
       }));
 
       return messages;
@@ -1049,6 +1022,24 @@ export default function AdminSupportClient({
     if (!socket || !activeTicket || !authState.hasSupportAccess) return;
 
     const handleNewMessage = (data: { ticketId: string; message: any }) => {
+      // ALWAYS update ticket list (even if this ticket isn't currently active)
+      let lastMessageText = data.message.message_text || '';
+      if (!lastMessageText && data.message.attachments && data.message.attachments.length > 0) {
+        lastMessageText = getLastMessageLabelForAttachments(data.message.attachments);
+      } else if (lastMessageText) {
+        lastMessageText = normalizeLastMessageDisplayText(lastMessageText);
+      }
+      updateTicketInList(data.ticketId, {
+        last_message_at: data.message.created_at,
+        last_message: {
+          id: data.message.id,
+          message_text: lastMessageText,
+          sender_type: data.message.sender_type,
+          created_at: data.message.created_at,
+          is_read: data.message.is_read,
+        },
+      });
+
       if (data.ticketId !== activeTicketRef.current?.id) return;
 
       const existingMessage = messagesRef.current.find((m) => m.id === data.message.id);
@@ -1056,7 +1047,13 @@ export default function AdminSupportClient({
         if (existingMessage.isPending) {
           setMessages((prev) => {
             const updated = prev.map((m) =>
-              m.id === data.message.id ? { ...m, isPending: false } : m,
+              m.id === data.message.id
+                ? {
+                    ...m,
+                    isPending: false,
+                    attachments: mapWsAttachments(data.message.attachments) ?? m.attachments,
+                  }
+                : m,
             );
             messagesRef.current = updated;
             return updated;
@@ -1069,8 +1066,10 @@ export default function AdminSupportClient({
         (m) =>
           m.isPending &&
           m.sender_type === data.message.sender_type &&
-          Math.abs(new Date(data.message.created_at).getTime() - new Date(m.created_at).getTime()) <
-            60_000,
+          (m.message_text === data.message.message_text ||
+            Math.abs(
+              new Date(data.message.created_at).getTime() - new Date(m.created_at).getTime(),
+            ) < 60_000),
       );
       if (optimisticMatch) {
         setMessages((prev) => {
@@ -1087,24 +1086,13 @@ export default function AdminSupportClient({
                   _renderKey: optimisticMatch._renderKey,
                   isPending: false,
                   sender: data.message.sender || m.sender,
-                  attachments: processAttachments(data.message.attachments) || m.attachments,
+                  attachments: mapWsAttachments(data.message.attachments) ?? m.attachments,
                 }
               : m,
           );
           messagesRef.current = updated;
           saveMessagesToCache(data.ticketId, updated);
           return updated;
-        });
-
-        updateTicketInList(data.ticketId, {
-          last_message_at: data.message.created_at,
-          last_message: {
-            id: data.message.id,
-            message_text: data.message.message_text || '',
-            sender_type: data.message.sender_type,
-            created_at: data.message.created_at,
-            is_read: data.message.is_read,
-          },
         });
 
         markMessagesAsRead(data.ticketId);
@@ -1121,34 +1109,18 @@ export default function AdminSupportClient({
         created_at: data.message.created_at,
         _renderKey: data.message.id,
         sender: data.message.sender,
-        attachments: processAttachments(data.message.attachments),
+        attachments: mapWsAttachments(data.message.attachments),
       };
 
       setMessages((prev) => {
+        // Dedup: skip if message already exists
+        if (prev.some((m) => m.id === data.message.id)) return prev;
         const updated = [...prev, mappedMessage];
         messagesRef.current = updated;
         if (data.ticketId) {
           saveMessagesToCache(data.ticketId, updated);
         }
         return updated;
-      });
-
-      let lastMessageText = data.message.message_text || '';
-      if (!lastMessageText && data.message.attachments && data.message.attachments.length > 0) {
-        lastMessageText = getLastMessageLabelForAttachments(data.message.attachments);
-      } else if (lastMessageText) {
-        lastMessageText = normalizeLastMessageDisplayText(lastMessageText);
-      }
-
-      updateTicketInList(data.ticketId, {
-        last_message_at: data.message.created_at,
-        last_message: {
-          id: data.message.id,
-          message_text: lastMessageText,
-          sender_type: data.message.sender_type,
-          created_at: data.message.created_at,
-          is_read: data.message.is_read,
-        },
       });
 
       markMessagesAsRead(data.ticketId);
@@ -1298,7 +1270,7 @@ export default function AdminSupportClient({
         created_at: m.created_at,
         _renderKey: m.id,
         sender: m.sender,
-        attachments: processAttachments(m.attachments),
+        attachments: mapWsAttachments(m.attachments),
       }));
 
       const pendingMessages = messagesRef.current.filter(
@@ -1600,7 +1572,7 @@ export default function AdminSupportClient({
             created_at: m.created_at,
             _renderKey: m.id,
             sender: m.sender,
-            attachments: processAttachments(m.attachments),
+            attachments: mapWsAttachments(m.attachments),
           }),
         );
 
@@ -1609,12 +1581,12 @@ export default function AdminSupportClient({
         saveMessagesToCache(ticketId, mappedMessages);
 
         if (isFirstLoad) {
-          setTimeout(() => {
+          requestAnimationFrame(() => {
             isInitialMessagesLoadRef.current = false;
             if (!cachedMessages || cachedMessages.length === 0) {
               restoreScrollPosition(ticketId);
             }
-          }, 100);
+          });
         }
 
         if (data.ticket && currentTicketIdRef.current === ticketId) {
@@ -1689,11 +1661,10 @@ export default function AdminSupportClient({
         : undefined,
     };
 
-    setMessages((prev) => {
-      const updated = [...prev, optimisticMessage];
-      messagesRef.current = updated;
-      return updated;
-    });
+    // Синхронное обновление ref — WS может прийти до flush React, optimisticMatch должен найти сообщение
+    const updated = [...(messagesRef.current ?? []), optimisticMessage];
+    messagesRef.current = updated;
+    setMessages((prev) => [...prev, optimisticMessage]);
     setMessageText('');
 
     updateTicketInList(activeTicket.id, {
@@ -1719,6 +1690,9 @@ export default function AdminSupportClient({
     });
 
     try {
+      // Invalidate cached CSRF token then fetch a fresh one so the token
+      // matches the current session_id cookie (session may have rotated after login/register).
+      await utils.auth.csrf.invalidate();
       const csrfResult = await utils.auth.csrf.fetch({ scope: 'user' });
       const csrfToken = csrfResult?.csrfToken ?? '';
       if (!csrfToken) {
@@ -1754,12 +1728,12 @@ export default function AdminSupportClient({
               ? data.message.sender[0]
               : data.message.sender
             : optimisticMessage.sender,
-          attachments: processAttachments(data.message.attachments),
+          attachments: mapWsAttachments(data.message.attachments),
         };
 
         setMessages((prev) => {
           const withoutOptimisticAndDuplicate = prev.filter(
-            (m) => m.id !== tempId && m.id !== data.message.id,
+            (m) => m.id !== tempId && m.id !== data.message.id && m._renderKey !== tempId,
           );
           const updated = [...withoutOptimisticAndDuplicate, serverMessage];
           messagesRef.current = updated;
@@ -1779,6 +1753,10 @@ export default function AdminSupportClient({
         });
 
         markMessagesAsRead(activeTicket.id);
+
+        // Ревалидация кэша: список тикетов и сообщения тикета
+        void utils.support.tickets.list.invalidate();
+        void utils.support.tickets.get.invalidate();
       }
     } catch (error) {
       setMessages((prev) => {

@@ -33,6 +33,56 @@ export function mapRawAttachmentToUi(raw: RawAttachmentApi): MessageAttachment {
   };
 }
 
+/**
+ * Map attachment from WebSocket or server response (already has storage_url).
+ */
+export function mapWsAttachmentToUi(att: {
+  id: string;
+  file_name: string;
+  file_type: string;
+  file_size: number;
+  storage_path?: string;
+  storage_url?: string;
+  blur_hash?: string;
+  width?: number;
+  height?: number;
+}): MessageAttachment {
+  return {
+    id: att.id,
+    file_name: att.file_name,
+    file_type: att.file_type,
+    file_size: att.file_size,
+    storage_path: att.storage_path,
+    storage_url: att.storage_url || buildStorageUrl(att.storage_path),
+    blur_hash: att.blur_hash,
+    width: att.width,
+    height: att.height,
+  };
+}
+
+/**
+ * Map array of WS/server attachments to UI attachments. Returns undefined if empty.
+ */
+export function mapWsAttachments(
+  attachments:
+    | Array<{
+        id: string;
+        file_name: string;
+        file_type: string;
+        file_size: number;
+        storage_path?: string;
+        storage_url?: string;
+        blur_hash?: string;
+        width?: number;
+        height?: number;
+      }>
+    | undefined
+    | null,
+): MessageAttachment[] | undefined {
+  if (!attachments || !Array.isArray(attachments) || attachments.length === 0) return undefined;
+  return attachments.map(mapWsAttachmentToUi);
+}
+
 function normalizeSender(
   sender: RawMessageApi['sender'],
 ): { id: string; username: string; user_id: string; avatar?: string | null } | undefined {

@@ -3,10 +3,10 @@
  */
 
 export interface SupportWebSocketEvents {
-  // Client -> Server
-  'support:join': (data: { ticketId: string; userId: string; isSupport: boolean }) => void;
+  // Client -> Server (userId/isSupport resolved from socket.data on server)
+  'support:join': (data: { ticketId: string }) => void;
   'support:leave': (data: { ticketId: string }) => void;
-  'support:typing': (data: { ticketId: string; userId: string; isTyping: boolean }) => void;
+  'support:typing': (data: { ticketId: string; isTyping: boolean }) => void;
 
   // Server -> Client
   'support:message:new': (data: {
@@ -31,6 +31,7 @@ export interface SupportWebSocketEvents {
         file_type: string;
         file_size: number;
         storage_path: string;
+        storage_url?: string;
       }>;
     };
   }) => void;

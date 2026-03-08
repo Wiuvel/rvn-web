@@ -2,7 +2,7 @@
 name = "image-processor-wasm"
 version = "0.1.0"
 edition = "2021"
-description = "WASM image processor (resize) for Next.js media cache"
+description = "WASM Image Processor (resize)"
 license = "MIT"
 
 [lib]

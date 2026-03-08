@@ -1,6 +1,6 @@
 /**
- * Кастомный сервер для Next.js с поддержкой WebSocket
- * Запускает Next.js приложение и WebSocket сервер на одном порту
+ * A custom server for Next.js with WebSocket support;
+ * Runs a Next.js application and a WebSocket server on the same port.
  */
 
 const { createServer } = require('http');
@@ -9,7 +9,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
-// Динамический импорт logger с поддержкой TypeScript в dev режиме
+/* Dynamic logger import with TypeScript support in dev mode */
 let logger;
 const dev = process.env.NODE_ENV !== 'production';
 
@@ -66,7 +66,7 @@ if (dev) {
   }
 
   if (!loaded) {
-    // Fallback Logger
+    /* Fallback Logger */
     logger = {
       error: (msg, ctx) => console.error(`[ERROR] ${msg}`, ctx || ''),
       warn: (msg, ctx) => console.warn(`[WARN] ${msg}`, ctx || ''),
@@ -81,7 +81,7 @@ const port = parseInt(process.env.PORT || '3001', 10);
 
 let app, handle;
 
-// В Production Standalone не используем next({ dev: false }), в обход webpack
+/* In Production Standalone, we don't use next({ dev: false }), bypassing webpack */
 if (!dev) {
   const path = require('path');
   const fs = require('fs');
@@ -89,9 +89,9 @@ if (!dev) {
   const standaloneNextPath = path.join(process.cwd(), '.next/standalone/.next');
   const standaloneDir = path.join(process.cwd(), '.next/standalone');
 
-  // Проверяем, существует ли standalone директория
+  /* Checking if the standalone directory exists */
   if (fs.existsSync(standaloneDir)) {
-    // Standalone build найден - не логируем
+    /* Standalone build found - not logging */
 
     if (fs.existsSync(standaloneServerPath)) {
       try {
@@ -101,26 +101,29 @@ if (!dev) {
         if (standaloneServer && typeof standaloneServer.getRequestHandler === 'function') {
           handle = standaloneServer.getRequestHandler();
           app = { prepare: () => Promise.resolve() };
-          // Используем standalone handler - не логируем
+          /* We use a standalone handler - no logging */
         } else {
           throw new Error('Standalone server does not have getRequestHandler');
         }
       } catch (err) {
-        // Ошибка standalone - пробуем fallback
-        // Fallback к использованию Next.js из node_modules
+        /**
+         * Standalone error - trying fallback;
+         * Fallback to using Next.js from node_modules.
+         */
         throw err;
       }
     } else if (fs.existsSync(standaloneNextPath)) {
-      // Standalone сборка найдена, но нет готового server.js
-      // Используем Next.js из standalone node_modules с правильной конфигурацией
+      /**
+       * A standalone build was found, but there is no ready-made server.js;
+       * Using Next.js from standalone node_modules with the correct configuration.
+       */
       const nextPath = fs.existsSync(path.join(process.cwd(), 'node_modules/next'))
         ? path.join(process.cwd(), 'node_modules/next')
         : 'next';
 
       try {
         const next = require(nextPath);
-        // В standalone режиме Next.js должен автоматически определять режим
-        // и не загружать webpack, если он не нужен
+        /* In standalone mode, Next.js should automatically detect the mode and not load webpack if it is not needed */
         app = next({
           dev: false,
           hostname,
@@ -128,15 +131,17 @@ if (!dev) {
           dir: process.cwd(),
         });
         handle = app.getRequestHandler();
-        // Используем Next.js из standalone - не логируем
+        /* We use Next.js from standalone - no logging */
       } catch (err) {
-        // Критическая ошибка инициализации
+        /* Critical initialization error */
         throw err;
       }
     } else {
-      // Standalone директория найдена, но структура неожиданная
-      // Неожиданная структура - используем fallback
-      // Fallback: используем Next.js из node_modules
+      /**
+       * Standalone directory found, but unexpected structure;
+       * Unexpected structure - using fallback;
+       * Fallback: using Next.js from node_modules.
+       */
       const nextPath = fs.existsSync(path.join(process.cwd(), 'node_modules/next'))
         ? path.join(process.cwd(), 'node_modules/next')
         : 'next';
@@ -150,15 +155,17 @@ if (!dev) {
           dir: process.cwd(),
         });
         handle = app.getRequestHandler();
-        // Используем fallback - не логируем
+        /* We use fallback - no logging */
       } catch (err) {
-        // Критическая ошибка инициализации
+        /* Critical initialization error */
         throw err;
       }
     }
   } else {
-    // Standalone сборка не найдена - используем fallback
-    // Standalone не найден - используем fallback
+    /**
+     * Standalone build not found - using fallback;
+     * Standalone not found - using fallback.
+     */
     const nextPath = fs.existsSync(path.join(process.cwd(), 'node_modules/next'))
       ? path.join(process.cwd(), 'node_modules/next')
       : 'next';
@@ -172,26 +179,26 @@ if (!dev) {
         dir: process.cwd(),
       });
       handle = app.getRequestHandler();
-      // Используем fallback - не логируем
+      /* We use fallback - no logging */
     } catch (err) {
       console.error('❌ Failed to initialize Next.js:', err.message);
       throw new Error('Cannot initialize Next.js server: ' + err.message);
     }
   }
 } else {
-  // В dev режиме используем обычный next
+  /* In dev mode, we use the usual Nex */
   const next = require('next');
   app = next({ dev: true, hostname, port });
   handle = app.getRequestHandler();
 }
 
-// Инициализируем сервер
+/* Initializing the server */
 const initPromise = app && typeof app.prepare === 'function' ? app.prepare() : Promise.resolve();
 
 initPromise.then(() => {
   const httpServer = createServer(async (req, res) => {
     const parsedUrl = parse(req.url || '', true);
-    // WebSocket upgrade для /api/socket обрабатывает Socket.IO — не отдавать в Next.js
+    /* WebSocket upgrade for /api/socket handles Socket.IO - do not expose to Next.js */
     if (req.headers.upgrade === 'websocket' && parsedUrl.pathname?.startsWith('/api/socket')) {
       return;
     }
@@ -207,30 +214,30 @@ initPromise.then(() => {
     }
   });
 
-  // Сохраняем HTTP сервер в глобальной переменной для доступа из API routes
+  /* Store the HTTP server in a global variable for access from the routes API */
   global.__httpServer = httpServer;
 
-  // Инициализируем WebSocket сервер
+  /* Initializing the WebSocket server */
   const initWebSocket = async () => {
     try {
       const fs = require('fs');
       const path = require('path');
       const cwd = process.cwd();
 
-      // Список возможных путей для поиска модуля (production)
+      /* List of possible paths to search for a module (production) */
       const possiblePaths = [
-        // Standalone режим (production Docker) - файлы копируются в корень
+        /* Standalone mode (production Docker) - files are copied to the root */
         path.join(cwd, 'lib/websocket/server.js'),
-        // Production build - скомпилированные файлы
+        /* Production build - compiled files */
         path.join(cwd, '.next/server/chunks/lib/websocket/server.js'),
         path.join(cwd, '.next/server/app/lib/websocket/server.js'),
         path.join(cwd, '.next/server/lib/websocket/server.js'),
-        // Относительные пути
+        /* Relative paths */
         './lib/websocket/server.js',
         './.next/server/chunks/lib/websocket/server.js',
       ];
 
-      // В production пробуем загрузить напрямую
+      /* In production, we try to load directly */
       if (!dev) {
         for (const modulePath of possiblePaths) {
           try {
@@ -239,6 +246,7 @@ initPromise.then(() => {
               const websocketModule = require(modulePath);
               if (websocketModule && websocketModule.initWebSocketServer) {
                 websocketModule.initWebSocketServer(httpServer);
+                logger.info('WebSocket: Initialized (direct module)');
                 return true;
               }
             }
@@ -247,7 +255,7 @@ initPromise.then(() => {
           }
         }
 
-        // Если не удалось загрузить напрямую, пробуем через API route
+        /* If you can't download it directly, try using the API route */
         try {
           const http = require('http');
           const initUrl = `http://localhost:${port}/api/websocket/init`;
@@ -262,8 +270,10 @@ initPromise.then(() => {
                 try {
                   const result = JSON.parse(data);
                   if (result.initialized) {
+                    logger.info('WebSocket: Initialized (via /api/websocket/init)');
                     resolve(true);
                   } else {
+                    logger.warn('WebSocket: /api/websocket/init returned not initialized');
                     resolve(false);
                   }
                 } catch (e) {
@@ -272,12 +282,16 @@ initPromise.then(() => {
               });
             });
 
-            req.on('error', () => {
+            req.on('error', (err) => {
+              logger.warn('WebSocket: /api/websocket/init request failed', {
+                error: err instanceof Error ? err.message : 'Unknown',
+              });
               resolve(false);
             });
 
             req.setTimeout(5000, () => {
               req.destroy();
+              logger.warn('WebSocket: /api/websocket/init timed out');
               resolve(false);
             });
           });
@@ -286,10 +300,10 @@ initPromise.then(() => {
         }
       }
 
-      // В dev режиме используем API route для инициализации
+      /* In dev mode, we use the API route for initialization */
       if (dev) {
         try {
-          // Делаем HTTP запрос к API route для инициализации
+          /* We make an HTTP request to the API route to initialize */
           const http = require('http');
           const initUrl = `http://localhost:${port}/api/websocket/init`;
 
@@ -303,8 +317,10 @@ initPromise.then(() => {
                 try {
                   const result = JSON.parse(data);
                   if (result.initialized) {
+                    logger.info('WebSocket: Initialized (via /api/websocket/init)');
                     resolve(true);
                   } else {
+                    logger.warn('WebSocket: /api/websocket/init returned not initialized');
                     resolve(false);
                   }
                 } catch (e) {
@@ -313,12 +329,16 @@ initPromise.then(() => {
               });
             });
 
-            req.on('error', () => {
+            req.on('error', (err) => {
+              logger.warn('WebSocket: /api/websocket/init request failed', {
+                error: err instanceof Error ? err.message : 'Unknown',
+              });
               resolve(false);
             });
 
             req.setTimeout(5000, () => {
               req.destroy();
+              logger.warn('WebSocket: /api/websocket/init timed out');
               resolve(false);
             });
           });
@@ -342,23 +362,23 @@ initPromise.then(() => {
       const protocol = 'http';
       const localUrl = `${protocol}://localhost:${port}`;
 
-      // Получаем все сетевые интерфейсы для отображения доступных IP
+      /* We get all network interfaces to display available IPs */
       const networkInterfaces = os.networkInterfaces();
       const addresses = [];
       const seenAddresses = new Set();
 
-      // Приоритет интерфейсов (предпочитаем Ethernet и Wi-Fi)
+      /* Interface priority (we prefer Ethernet and Wi-Fi) */
       const interfacePriority = ['eth0', 'en0', 'wlan0', 'Wi-Fi', 'Ethernet'];
 
-      // Сначала собираем все адреса с приоритетами
+      /* First, we collect all addresses with priorities */
       const allAddresses = [];
       Object.keys(networkInterfaces).forEach((interfaceName) => {
         const interfaces = networkInterfaces[interfaceName];
         if (interfaces) {
           interfaces.forEach((iface) => {
-            // Показываем только IPv4 адреса, исключая внутренние
+            /* We show only IPv4 addresses, excluding internal ones */
             if (iface.family === 'IPv4' && !iface.internal) {
-              // Проверяем, содержит ли имя интерфейса приоритетное значение
+              /*  Check if the interface name contains a priority value */
               const priority = interfacePriority.findIndex((p) => interfaceName.includes(p));
               allAddresses.push({
                 address: `${protocol}://${iface.address}:${port}`,
@@ -370,7 +390,7 @@ initPromise.then(() => {
         }
       });
 
-      // Сортируем по приоритету и убираем дубликаты
+      /* Sort by priority and remove duplicates */
       allAddresses.sort((a, b) => a.priority - b.priority);
       allAddresses.forEach((item) => {
         if (!seenAddresses.has(item.address)) {
@@ -379,7 +399,7 @@ initPromise.then(() => {
         }
       });
 
-      // Показываем только первый (наиболее приоритетный) адрес
+      /* We show only the first (highest priority) address */
       const primaryAddress = addresses.length > 0 ? addresses[0] : localUrl;
 
       logger.info('Server: Ready.', {
@@ -389,40 +409,41 @@ initPromise.then(() => {
         hostname,
       });
 
-      // Проверка подключения к Redis
+      /* Checking the connection to Redis */
       const checkRedis = async () => {
         let redisUrl = process.env.REDIS_URL;
 
         if (!redisUrl) {
-          logger.warn('Redis: REDIS_URL not set', {
-            status: 'not_configured',
-            message: 'Redis URL is not configured in environment variables',
-          });
+          logger.warn('Redis: REDIS_URL not set');
           return;
         }
 
-        // Исправляем URL если пароль содержит специальные символы (например +)
-        // Формат: redis://:password@host:port
+        /**
+         * Correct the URL if the password contains special characters (for example +);
+         * Format: redis://:password@host:port.
+         */
         try {
           const passwordMatch = redisUrl.match(/redis:\/\/:([^@]+)@/);
           if (passwordMatch && passwordMatch[1]) {
             const password = passwordMatch[1];
-            // Если пароль содержит + и не закодирован (нет %)
+            /* Если пароль содержит + и не закодирован (нет %) */
             if (password.includes('+') && !password.includes('%')) {
               const encodedPassword = encodeURIComponent(password);
               redisUrl = redisUrl.replace(`:${password}@`, `:${encodedPassword}@`);
             }
           }
         } catch (e) {
-          // Игнорируем ошибки парсинга URL
+          /* Ignoring URL parsing errors */
         }
 
-        // Маскируем пароль в логах
+        /* Masking the password in logs */
         const maskedUrl = redisUrl.replace(/:[^:@]+@/, ':****@');
 
         try {
-          // Используем существующий модуль Redis, который правильно настроен
-          // Этот модуль уже включен в standalone сборку через outputFileTracingIncludes
+          /**
+           * We use an existing Redis module that is properly configured;
+           * This module is already included in the standalone build via outputFileTracingIncludes.
+           */
           let redisModule;
           let moduleError = null;
           const redisPaths = [
@@ -445,7 +466,7 @@ initPromise.then(() => {
                   }
                 } catch (requireError) {
                   moduleError = requireError;
-                  // Продолжаем поиск
+                  /* Let's continue the search */
                   continue;
                 }
               }
@@ -456,10 +477,10 @@ initPromise.then(() => {
           }
 
           if (!redisModule || !redisModule.getRedisClient) {
-            // Пробуем загрузить ioredis напрямую как fallback
+            /* Let's try loading ioredis directly as a fallback */
             try {
               const Redis = require('ioredis');
-              // Если ioredis доступен, создаем клиент напрямую
+              /* If ioredis is available, create the client directly */
               const testClient = new Redis(redisUrl, {
                 maxRetriesPerRequest: 1,
                 retryStrategy: () => null,
@@ -469,7 +490,7 @@ initPromise.then(() => {
                 showFriendlyErrorStack: true,
               });
 
-              // Используем прямой клиент для проверки
+              /* We use a direct client for verification */
               const pingResult = await Promise.race([
                 testClient.ping(),
                 new Promise((_, reject) =>
@@ -483,11 +504,8 @@ initPromise.then(() => {
                   const testValue = await testClient.get('server:health:check');
 
                   if (testValue === 'ok') {
-                    logger.info('Redis: Connected and operational (direct ioredis)', {
+                    logger.info(`Redis: Connected (direct ioredis, ${maskedUrl})`, {
                       status: 'connected',
-                      ping: 'ok',
-                      operations: 'ok',
-                      url: maskedUrl,
                     });
                   }
                 } catch (opError) {
@@ -504,7 +522,7 @@ initPromise.then(() => {
               try {
                 await testClient.quit();
               } catch {
-                // Игнорируем ошибки при закрытии
+                /* Ignoring errors when closing */
               }
               return;
             } catch (ioredisError) {
@@ -520,7 +538,7 @@ initPromise.then(() => {
             }
           }
 
-          // Используем существующий модуль
+          /* Using an existing module */
           const testClient = redisModule.getRedisClient();
 
           if (!testClient) {
@@ -532,25 +550,20 @@ initPromise.then(() => {
             return;
           }
 
-          // Проверяем подключение с таймаутом
+          /* Checking the connection with a timeout */
           const pingResult = await Promise.race([
             testClient.ping(),
             new Promise((_, reject) => setTimeout(() => reject(new Error('Ping timeout')), 3000)),
           ]);
 
           if (pingResult === 'PONG') {
-            // Дополнительная проверка SET/GET
+            /* Additional SET/GET check */
             try {
               await testClient.set('server:health:check', 'ok', 'EX', 10);
               const testValue = await testClient.get('server:health:check');
 
               if (testValue === 'ok') {
-                logger.info('Redis: Connected and operational', {
-                  status: 'connected',
-                  ping: 'ok',
-                  operations: 'ok',
-                  url: maskedUrl,
-                });
+                logger.info(`Redis: Connected (${maskedUrl})`, { status: 'connected' });
               } else {
                 logger.warn('Redis: Connected but operations failed', {
                   status: 'connected',
@@ -612,7 +625,6 @@ initPromise.then(() => {
         }
       };
 
-      // Выполняем проверку Redis после небольшой задержки
       setTimeout(() => {
         checkRedis();
       }, 500);

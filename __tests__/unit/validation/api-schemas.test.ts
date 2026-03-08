@@ -74,6 +74,69 @@ describe('createMessageBodySchema', () => {
     expect(createMessageBodySchema.safeParse({ message: '' }).success).toBe(false);
     expect(createMessageBodySchema.safeParse({}).success).toBe(false);
   });
+  it('принимает сообщение с вложениями без текста', () => {
+    const result = createMessageBodySchema.safeParse({
+      attachments: [
+        {
+          storagePath: 'support/t1/m1/photo.png',
+          storageUrl: '/support/files/support%2Ft1%2Fm1%2Fphoto.png',
+          fileName: 'photo.png',
+          fileType: 'image/png',
+          fileSize: 2048,
+        },
+      ],
+    });
+    expect(result.success).toBe(true);
+  });
+  it('принимает сообщение с текстом и вложениями', () => {
+    const result = createMessageBodySchema.safeParse({
+      message: 'Check this file',
+      attachments: [
+        {
+          storagePath: 'support/t1/m1/doc.pdf',
+          storageUrl: '/support/files/support%2Ft1%2Fm1%2Fdoc.pdf',
+          fileName: 'doc.pdf',
+          fileType: 'application/pdf',
+          fileSize: 5000,
+        },
+      ],
+    });
+    expect(result.success).toBe(true);
+  });
+  it('принимает вложения с blur_hash, width, height (image metadata)', () => {
+    const result = createMessageBodySchema.safeParse({
+      attachments: [
+        {
+          storagePath: 'support/t1/m1/img.jpg',
+          storageUrl: '/support/files/support%2Ft1%2Fm1%2Fimg.jpg',
+          fileName: 'img.jpg',
+          fileType: 'image/jpeg',
+          fileSize: 3000,
+          blur_hash: 'LGF5]+Yk^6#M@-5c',
+          width: 1920,
+          height: 1080,
+        },
+      ],
+    });
+    expect(result.success).toBe(true);
+  });
+  it('принимает вложения без blur_hash/width/height (documents)', () => {
+    const result = createMessageBodySchema.safeParse({
+      attachments: [
+        {
+          storagePath: 'support/t1/m1/file.txt',
+          storageUrl: '/support/files/support%2Ft1%2Fm1%2Ffile.txt',
+          fileName: 'file.txt',
+          fileType: 'text/plain',
+          fileSize: 100,
+          blur_hash: null,
+          width: null,
+          height: null,
+        },
+      ],
+    });
+    expect(result.success).toBe(true);
+  });
 });
 
 describe('updateTicketBodySchema', () => {
