@@ -6,12 +6,29 @@ import Script from 'next/script';
 import { trpc } from '@/lib/trpc/client';
 
 interface ProtectionClientProps {
-  initialIp: string | null;
+  initialIp?: string | null;
 }
 
-export default function ProtectionClient({ initialIp }: ProtectionClientProps) {
+export default function ProtectionClient({ initialIp = null }: ProtectionClientProps) {
   const [isIpRevealed, setIsIpRevealed] = useState(false);
-  const ipAddress = initialIp;
+  const [ipAddress, setIpAddress] = useState<string | null>(initialIp);
+
+  useEffect(() => {
+    if (initialIp != null) {
+      setIpAddress(initialIp);
+      return;
+    }
+    let cancelled = false;
+    fetch('/api/request-ip')
+      .then((r) => r.json())
+      .then((data: { ip?: string | null }) => {
+        if (!cancelled && data.ip != null) setIpAddress(data.ip);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [initialIp]);
   const verifyMutation = trpc.protection.verify.useMutation();
   const verifyRef = useRef(verifyMutation);
   verifyRef.current = verifyMutation;
