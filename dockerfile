@@ -18,9 +18,10 @@ RUN cd wasm && wasm-pack build --release --target nodejs --out-dir /app/lib/wasm
 
 # ---- Stage 2: Dependencies ----
 FROM node:22-slim AS deps
+RUN corepack enable && corepack prepare pnpm@10.32.1 --activate
 WORKDIR /app
-COPY package.json package-lock.json ./
-RUN npm ci
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
 
 # ---- Stage 3: Builder ----
 FROM node:22-slim AS builder
@@ -28,7 +29,7 @@ WORKDIR /app
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/package.json ./package.json
-COPY --from=deps /app/package-lock.json ./package-lock.json
+COPY --from=deps /app/pnpm-lock.yaml ./pnpm-lock.yaml
 
 COPY . .
 COPY --from=wasm /app/lib/wasm/pkg ./lib/wasm/pkg
@@ -39,10 +40,13 @@ ENV NODE_OPTIONS="--max-old-space-size=1536"
 
 ARG NEXT_PUBLIC_SUPABASE_URL
 ARG NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+ARG NEXT_PUBLIC_TURNSTILE_SITEKEY
 ENV NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
 ENV NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY}
+ENV NEXT_PUBLIC_TURNSTILE_SITEKEY=${NEXT_PUBLIC_TURNSTILE_SITEKEY}
 
-RUN npm run build
+RUN corepack enable && corepack prepare pnpm@10.32.1 --activate
+RUN pnpm run build
 
 # ---- Stage 4: Runner ----
 FROM node:22-slim AS runner

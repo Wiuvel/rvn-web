@@ -1,6 +1,6 @@
 import { Suspense } from 'react';
 import { redirect } from 'next/navigation';
-import { cookies, headers } from 'next/headers';
+import { cookies } from 'next/headers';
 import { checkAuth } from '@/lib/auth/helper';
 import { hasUserRole } from '@/lib/auth/user-roles';
 import DashboardClient from '@/components/dashboard/DashboardClient';
@@ -16,11 +16,10 @@ export default function DashboardPage({ params }: { params: Promise<{ user_id: s
 
 async function DashboardContent({ params }: { params: Promise<{ user_id: string }> }) {
   const { user_id } = await params;
-  const headersList = await headers();
   const cookieStore = await cookies();
   const token = cookieStore.get('token')?.value;
 
-  const authResult = await checkAuth({ headers: headersList }, { readOnly: true });
+  const authResult = await checkAuth(undefined, { readOnly: true });
 
   if (!authResult.isAuthenticated || !authResult.user) {
     if (token) {

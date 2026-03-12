@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 
 /**
- * Возвращает IP запроса из заголовков (для страницы /protection без динамического рендера).
+ * Returns the IP request from the headers (for the /protection page without a dynamic renderer)
  */
 export async function GET(request: NextRequest) {
   const forwardedFor = request.headers.get('x-forwarded-for');

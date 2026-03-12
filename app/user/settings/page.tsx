@@ -1,5 +1,5 @@
 import { Suspense } from 'react';
-import { cookies, headers } from 'next/headers';
+import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { checkAuth } from '@/lib/auth/helper';
 import { supabaseAdmin } from '@/lib/database/supabase';
@@ -18,8 +18,7 @@ export default function SettingsPage() {
 }
 
 async function SettingsContent() {
-  const headersList = await headers();
-  const auth = await checkAuth({ headers: headersList }, { readOnly: true });
+  const auth = await checkAuth(undefined, { readOnly: true });
   const cookieStore = await cookies();
   const token = cookieStore.get('token')?.value;
 

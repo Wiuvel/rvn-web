@@ -612,7 +612,7 @@ initPromise.then(() => {
           } else if (errorMessage.includes('Cannot find module')) {
             logger.warn('Redis: ioredis module not found', {
               status: 'error',
-              message: 'ioredis package is not installed. Run: npm install ioredis',
+              message: 'ioredis package is not installed.',
               url: maskedUrl,
             });
           } else {
