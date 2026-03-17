@@ -10,7 +10,7 @@ import {
   broadcastTicketUpdate,
   broadcastTicketAssignment,
   broadcastNewMessage,
-} from '@/lib/websocket/server';
+} from '@/lib/websocket/client';
 import { isValidUUID } from '@/lib/utils/uuid-validation';
 import { cached } from '@/lib/database/cache';
 import { logger } from '@/lib/utils/secure-logger';

@@ -1,8 +1,11 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { trpc } from '@/lib/trpc/client';
+import { useAuth } from '@/hooks/useAuth';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { useFadeIn, useStaggeredFadeIn } from '@/hooks/useGSAP';
 import { getGradientClasses, getAvatarUrl, getBannerUrl } from '@/lib/utils/avatar-gradients';
 import { APP_VERSION } from '@/lib/utils/constants';
@@ -130,12 +133,38 @@ function QuickAction({
 }
 
 interface DashboardClientProps {
-  initialUserData: UserData;
+  userId: string;
 }
 
-export default function DashboardClient({ initialUserData }: DashboardClientProps) {
+export default function DashboardClient({ userId }: DashboardClientProps) {
+  const utils = trpc.useUtils();
+  const { userData: authData, loading } = useAuth({
+    requireAuth: true,
+    redirectOnFail: '/auth',
+    validateUserId: userId,
+    redirectOnTimeout: '/auth',
+  });
+
+  const [avatarOverride, setAvatarOverride] = useState<string | null>(null);
+  const [bannerOverride, setBannerOverride] = useState<string | null>(null);
+
+  const userData = useMemo<UserData | null>(() => {
+    if (!authData) return null;
+    return {
+      id: authData.id,
+      user_id: authData.user_id,
+      username: authData.username,
+      created_at: authData.created_at,
+      last_login: authData.last_login,
+      avatar: avatarOverride ?? authData.avatar,
+      banner: bannerOverride ?? authData.banner,
+      isSupport: authData.isSupport,
+      isAdmin: authData.isAdmin,
+      balance: authData.balance,
+      pex: authData.pex as 'u' | 's' | 'a',
+    };
+  }, [authData, avatarOverride, bannerOverride]);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [userData, setUserData] = useState<UserData>(initialUserData);
 
   const [currentYear] = useState(() => new Date().getFullYear());
   const [showAvatarModal, setShowAvatarModal] = useState(false);
@@ -197,6 +226,10 @@ export default function DashboardClient({ initialUserData }: DashboardClientProp
       };
     }
   }, [userMenuOpen]);
+
+  if (loading || !userData) {
+    return <LoadingSpinner fullScreen />;
+  }
 
   return (
     <div className="dashboard-page">
@@ -488,13 +521,9 @@ export default function DashboardClient({ initialUserData }: DashboardClientProp
         onClose={() => setShowAvatarModal(false)}
         onUploadComplete={(avatarPath) => {
           setAvatarLoading(true);
-          if (userData) {
-            setUserData({
-              ...userData,
-              avatar: avatarPath,
-            });
-          }
+          setAvatarOverride(avatarPath);
           setShowAvatarModal(false);
+          void utils.auth.me.invalidate();
         }}
         currentAvatarUrl={userData ? getAvatarUrl(userData.avatar) : null}
       />
@@ -503,13 +532,9 @@ export default function DashboardClient({ initialUserData }: DashboardClientProp
         isOpen={showBannerModal}
         onClose={() => setShowBannerModal(false)}
         onUploadComplete={(bannerPath) => {
-          if (userData) {
-            setUserData({
-              ...userData,
-              banner: bannerPath,
-            });
-          }
+          setBannerOverride(bannerPath);
           setShowBannerModal(false);
+          void utils.auth.me.invalidate();
         }}
         currentBannerUrl={userData ? getBannerUrl(userData.banner) : null}
       />

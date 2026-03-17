@@ -60,6 +60,39 @@ export async function register() {
       );
     }
 
+    /* Redis check */
+    try {
+      const redisUrl = process.env.REDIS_URL;
+      if (redisUrl) {
+        const { getRedisClient } = await import('./lib/database/redis');
+        const client = getRedisClient();
+        if (client) {
+          const start = Date.now();
+          const pong = await Promise.race([
+            client.ping(),
+            new Promise<never>((_, reject) =>
+              setTimeout(() => reject(new Error('Ping timeout')), 3000),
+            ),
+          ]);
+          const ms = Date.now() - start;
+          const maskedUrl = redisUrl.replace(/:[^:@]+@/, ':****@');
+          if (pong === 'PONG') {
+            console.log(`[startup] Redis: ready (${maskedUrl}, ping: ${ms}ms)`);
+          } else {
+            console.log(`[startup] Redis: unexpected response (${pong})`);
+          }
+        } else {
+          console.log('[startup] Redis: client creation failed');
+        }
+      } else {
+        console.log('[startup] Redis: not configured (missing REDIS_URL)');
+      }
+    } catch (err) {
+      console.log(
+        `[startup] Redis: unavailable (${err instanceof Error ? err.message : 'unknown error'})`,
+      );
+    }
+
     /* Supabase Database check */
     try {
       const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;

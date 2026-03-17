@@ -1,13 +1,14 @@
 'use client';
 
 import { trpc } from '@/lib/trpc/client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Header from '@/components/layout/Header';
 import { Monitor, Smartphone, Trash2, Clock, Globe, Lock, Key } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { passwordChangeSchema, PasswordChangeFormData } from '@/lib/validation/schemas';
-import { UserData } from '@/types';
+import { useAuth } from '@/hooks/useAuth';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
 
 interface Device {
   id: string;
@@ -41,13 +42,24 @@ function formatDeviceName(deviceName: string): string {
   return deviceName;
 }
 
-interface SettingsClientProps {
-  userData: UserData;
-  initialDevices: Device[];
-}
+export default function SettingsClient() {
+  const { userData, loading: authLoading } = useAuth({
+    requireAuth: true,
+    redirectOnFail: '/auth',
+  });
 
-export default function SettingsClient({ userData, initialDevices }: SettingsClientProps) {
-  const [devices, setDevices] = useState<Device[]>(initialDevices);
+  const { data: devicesData, isLoading: devicesLoading } = trpc.auth.devices.useQuery(undefined, {
+    enabled: !!userData,
+  });
+
+  const [devices, setDevices] = useState<Device[]>([]);
+
+  useEffect(() => {
+    if (devicesData?.devices) {
+      setDevices(devicesData.devices);
+    }
+  }, [devicesData]);
+
   const revokeDeviceMutation = trpc.auth.revokeDevice.useMutation();
   const changePasswordMutation = trpc.auth.changePassword.useMutation();
 
@@ -98,6 +110,10 @@ export default function SettingsClient({ userData, initialDevices }: SettingsCli
       setIsChangingPassword(false);
     }
   };
+
+  if (authLoading || !userData || devicesLoading) {
+    return <LoadingSpinner fullScreen />;
+  }
 
   return (
     <div className="min-h-screen bg-neutral-950 text-white selection:bg-primary-500/30">

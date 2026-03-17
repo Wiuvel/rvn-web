@@ -74,7 +74,7 @@ export interface UseAuthReturn {
   sessionExpired: boolean;
 }
 
-const STALE_TIME = 5 * 60 * 1000; // 5 minutes
+const STALE_TIME = 60 * 1000; // 60 seconds — roles can change at any time
 
 export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
   const {
@@ -106,7 +106,7 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
     enabled: shouldFetch,
     staleTime: STALE_TIME,
     placeholderData: (fallbackFromCookie ?? undefined) as any,
-    refetchOnWindowFocus: false,
+    refetchOnWindowFocus: !lightweight,
     retry: (failureCount, error) => {
       if ((error as any)?.data?.httpStatus === 401) return false;
       return failureCount < 2;

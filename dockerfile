@@ -41,9 +41,11 @@ ENV NODE_OPTIONS="--max-old-space-size=1536"
 ARG NEXT_PUBLIC_SUPABASE_URL
 ARG NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
 ARG NEXT_PUBLIC_TURNSTILE_SITEKEY
+ARG NEXT_PUBLIC_WS_URL
 ENV NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
 ENV NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY}
 ENV NEXT_PUBLIC_TURNSTILE_SITEKEY=${NEXT_PUBLIC_TURNSTILE_SITEKEY}
+ENV NEXT_PUBLIC_WS_URL=${NEXT_PUBLIC_WS_URL}
 
 RUN corepack enable && corepack prepare pnpm@10.32.1 --activate
 RUN pnpm run build
@@ -62,9 +64,7 @@ RUN groupadd --system --gid 1001 nodejs \
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
-COPY --from=builder --chown=nextjs:nodejs /app/server.js ./
 
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/next ./node_modules/next
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/ioredis ./node_modules/ioredis
 COPY --from=wasm --chown=nextjs:nodejs /app/lib/wasm/pkg ./lib/wasm/pkg
 

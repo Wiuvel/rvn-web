@@ -42,9 +42,7 @@ export function useAdminRoles(
         const updated = prev.map((u) => (u.id === user.id ? { ...u, roles: updatedRoles } : u));
         return sortUsersByRole(updated, sortDirection);
       });
-    } catch {
-      // Silent error
-    }
+    } catch {}
   };
 
   const handleGrantRole = async (role: 'support' | 'admin') => {
@@ -55,6 +53,7 @@ export function useAdminRoles(
 
     try {
       await grantMutation.mutateAsync({ userId: selectedUser.id, role });
+      void utils.auth.me.invalidate();
       setUserRoles((prev) => [...prev, role]);
       setUsers((prev) => {
         const updated = prev.map((user) =>
@@ -83,6 +82,7 @@ export function useAdminRoles(
 
     try {
       await revokeMutation.mutateAsync({ userId: selectedUser.id, role });
+      void utils.auth.me.invalidate();
       setUserRoles((prev) => prev.filter((r) => r !== role));
       setUsers((prev) => {
         const updated = prev.map((user) =>

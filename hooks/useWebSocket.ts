@@ -113,7 +113,8 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
         return;
       }
 
-      // Create a fresh Socket.IO connection using the current origin or the env var NEXT_PUBLIC_WS_URL.
+      // Connect to the external WebSocket server via NEXT_PUBLIC_WS_URL env var.
+      // Falls back to current origin for backwards compatibility during migration.
       const wsUrl =
         process.env.NEXT_PUBLIC_WS_URL ||
         (typeof window !== 'undefined' ? window.location.origin : '');
@@ -123,7 +124,6 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
       const authToken = token;
 
       const socket = io(wsUrl, {
-        path: '/api/socket',
         transports: ['websocket', 'polling'],
         reconnection: true,
         reconnectionDelay: 1000,
@@ -174,7 +174,6 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
           message: error.message,
           type: error.name,
           url: wsUrl,
-          path: '/api/socket',
         });
 
         // Detect and handle auth failures early to avoid reconnect loops with an invalid token.

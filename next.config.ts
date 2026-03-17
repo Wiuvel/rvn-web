@@ -9,7 +9,6 @@ const nextConfig: NextConfig = {
   trailingSlash: false,
   outputFileTracingRoot: process.cwd(),
   outputFileTracingIncludes: {
-    '/lib/websocket/**/*': ['./lib/websocket/**/*'],
     '/lib/database/redis': ['./lib/database/redis.ts'],
     '/lib/wasm/pkg': ['./lib/wasm/pkg/*'],
   },

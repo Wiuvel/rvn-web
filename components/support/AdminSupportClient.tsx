@@ -22,7 +22,7 @@ import { FileText } from 'lucide-react';
 import ImageViewer from '@/components/support/ImageViewer';
 import ImageWithBlur from '@/components/support/ImageWithBlur';
 import { debugPerformanceAsync, debugStart, debugEnd, debugError } from '@/lib/utils/debug';
-import type { RawTicketApi, RawMessageApi } from '@/lib/types/support-api';
+import type { RawTicketApi } from '@/lib/types/support-api';
 import { mapWsAttachments } from '@/lib/utils/support-mappers';
 
 interface AuthState {
@@ -368,109 +368,84 @@ function MessageItem({
   );
 }
 
-interface AdminSupportClientProps {
-  initialAuthState: AuthState;
-  initialWsToken?: string;
-  initialTickets: RawTicketApi[];
-  initialActiveTicket?: RawTicketApi | null;
-  initialMessages?: RawMessageApi[];
-}
-
-const EMPTY_RAW_TICKETS: RawTicketApi[] = [];
-const EMPTY_RAW_MESSAGES: RawMessageApi[] = [];
 const CACHE_PREFIX = 'support_panel_messages_';
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 минут
 
-export default function AdminSupportClient({
-  initialAuthState,
-  initialWsToken,
-  initialTickets = EMPTY_RAW_TICKETS,
-  initialActiveTicket = null,
-  initialMessages = EMPTY_RAW_MESSAGES,
-}: AdminSupportClientProps) {
-  const [authState] = useState<AuthState>(initialAuthState);
-  const [loading] = useState(false);
-  const [tickets, setTickets] = useState<Ticket[]>(() => {
-    return initialTickets.map((t) => {
-      const lm = t.last_message;
-      const lastMessage: Ticket['last_message'] =
-        lm == null
-          ? null
-          : {
-              id: lm.id,
-              message_text: lm.message_text,
-              sender_type: lm.sender_type ?? 'user',
-              created_at: lm.created_at,
-              is_read: lm.is_read ?? false,
-            };
-      return {
-        id: t.id,
-        subject: t.subject,
-        status: t.status,
-        priority: t.priority || 'normal',
-        created_at: t.created_at,
-        updated_at: t.updated_at ?? t.created_at,
-        last_message_at: t.last_message_at ?? t.updated_at ?? t.created_at,
-        closed_at: t.closed_at,
-        user_id: t.user_id,
-        user: t.user,
-        assigned_to: t.assigned_to,
-        assigned_user: t.assigned_user,
-        last_message: lastMessage,
-      };
-    });
-  });
-  const [activeTicket, setActiveTicket] = useState<Ticket | null>(() => {
-    if (!initialActiveTicket) return null;
-    const lm = initialActiveTicket.last_message;
-    const lastMessage: Ticket['last_message'] =
-      lm == null
-        ? null
-        : {
-            id: lm.id,
-            message_text: lm.message_text,
-            sender_type: lm.sender_type ?? 'user',
-            created_at: lm.created_at,
-            is_read: lm.is_read ?? false,
-          };
-    return {
-      id: initialActiveTicket.id,
-      subject: initialActiveTicket.subject,
-      status: initialActiveTicket.status,
-      priority: initialActiveTicket.priority || 'normal',
-      created_at: initialActiveTicket.created_at,
-      updated_at: initialActiveTicket.updated_at ?? initialActiveTicket.created_at,
-      last_message_at:
-        initialActiveTicket.last_message_at ??
-        initialActiveTicket.updated_at ??
-        initialActiveTicket.created_at,
-      closed_at: initialActiveTicket.closed_at,
-      user_id: initialActiveTicket.user_id,
-      user: initialActiveTicket.user,
-      assigned_to: initialActiveTicket.assigned_to,
-      assigned_user: initialActiveTicket.assigned_user,
-      last_message: lastMessage,
-    };
-  });
+function mapRawTicketToUi(t: RawTicketApi): Ticket {
+  const lm = t.last_message;
+  const lastMessage: Ticket['last_message'] =
+    lm == null
+      ? null
+      : {
+          id: lm.id,
+          message_text: lm.message_text,
+          sender_type: lm.sender_type ?? 'user',
+          created_at: lm.created_at,
+          is_read: lm.is_read ?? false,
+        };
+  return {
+    id: t.id,
+    subject: t.subject,
+    status: t.status,
+    priority: t.priority || 'normal',
+    created_at: t.created_at,
+    updated_at: t.updated_at ?? t.created_at,
+    last_message_at: t.last_message_at ?? t.updated_at ?? t.created_at,
+    closed_at: t.closed_at,
+    user_id: t.user_id,
+    user: t.user,
+    assigned_to: t.assigned_to,
+    assigned_user: t.assigned_user,
+    last_message: lastMessage,
+  };
+}
 
-  const [messages, setMessages] = useState<Message[]>(() => {
-    if (!initialMessages || initialMessages.length === 0) return [];
-    return initialMessages.map((m) => {
-      const s = m.sender;
-      const sender = s == null ? undefined : Array.isArray(s) ? s[0] : s;
-      return {
-        id: m.id,
-        ticket_id: m.ticket_id,
-        sender_id: m.sender_id,
-        sender_type: m.sender_type,
-        message_text: m.message_text,
-        is_read: m.is_read ?? false,
-        created_at: m.created_at,
-        sender,
-        attachments: mapWsAttachments(m.attachments),
+export default function AdminSupportClient() {
+  const utils = trpc.useUtils();
+  // Load auth state from tRPC — always fresh on mount
+  const { data: supportCheckData, isLoading: authLoading } = trpc.support.check.useQuery(
+    undefined,
+    { staleTime: 0, refetchOnMount: 'always' },
+  );
+
+  const authState: AuthState = supportCheckData?.isAuthenticated
+    ? {
+        isAuthenticated: true,
+        hasSupportAccess: supportCheckData.hasSupportAccess ?? false,
+        username: supportCheckData.username ?? null,
+        userId: supportCheckData.userId ?? null,
+        user_id: supportCheckData.user_id ?? null,
+      }
+    : {
+        isAuthenticated: false,
+        hasSupportAccess: false,
+        username: null,
+        userId: null,
+        user_id: null,
       };
-    });
-  });
+
+  const wsToken = supportCheckData?.isAuthenticated ? supportCheckData.token : undefined;
+
+  // Load initial tickets from tRPC
+  const { data: ticketsRaw, isLoading: ticketsInitLoading } = trpc.support.tickets.list.useQuery(
+    { statuses: 'open,pending' },
+    { enabled: authState.hasSupportAccess },
+  );
+
+  const [loading] = useState(false);
+  const [tickets, setTickets] = useState<Ticket[]>([]);
+  const ticketsInitialized = useRef(false);
+
+  useEffect(() => {
+    if (ticketsRaw && !ticketsInitialized.current) {
+      ticketsInitialized.current = true;
+      const raw = (ticketsRaw as any).tickets ?? ticketsRaw;
+      setTickets((Array.isArray(raw) ? raw : []).map(mapRawTicketToUi));
+    }
+  }, [ticketsRaw]);
+
+  const [activeTicket, setActiveTicket] = useState<Ticket | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [messageText, setMessageText] = useState('');
   const [ticketsLoading, setTicketsLoading] = useState(false);
   const [messagesLoading, setMessagesLoading] = useState(false);
@@ -844,8 +819,6 @@ export default function AdminSupportClient({
     };
   }, [messages, activeTicket?.id]);
 
-  // tRPC utils for imperative fetching & cache invalidation
-  const utils = trpc.useUtils();
   const updateTicketMutation = trpc.support.tickets.update.useMutation();
   const sendMessageMutation = trpc.support.tickets.sendMessage.useMutation();
   const markAsReadMutation = trpc.support.tickets.markAsRead.useMutation();
@@ -924,7 +897,7 @@ export default function AdminSupportClient({
   // ВАЖНО: token установлен как httpOnly cookie, поэтому JavaScript не может его прочитать из cookies
   // Токен получается из API ответа и хранится только в памяти компонента (React state)
   // НЕ сохраняем токен в localStorage/sessionStorage для безопасности
-  const [wsToken] = useState<string | undefined>(initialWsToken);
+  // wsToken is derived from supportCheckData above
 
   // Инициализация WebSocket
   const { socket, isConnected } = useWebSocket({
@@ -2073,8 +2046,8 @@ export default function AdminSupportClient({
     });
   })();
 
-  if (loading) {
-    return <LoadingSpinner />;
+  if (loading || authLoading || ticketsInitLoading) {
+    return <LoadingSpinner fullScreen />;
   }
 
   if (!authState.hasSupportAccess) {
@@ -2102,21 +2075,29 @@ export default function AdminSupportClient({
               У вас нет доступа к данной странице. Возможно произошла ошибка или вы не авторизованы
               в системе.
             </p>
-            <Link
-              href="/ui/panel"
-              prefetch={false}
-              className="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700"
-            >
-              <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M10 19l-7-7m0 0l7-7m-7 7h18"
-                />
-              </svg>
-              Вернуться к выбору панели
-            </Link>
+            <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+              <button
+                onClick={() => void utils.support.check.invalidate()}
+                className="inline-flex items-center rounded-lg bg-neutral-700 px-4 py-2 text-white transition-colors hover:bg-neutral-600"
+              >
+                Повторить
+              </button>
+              <Link
+                href="/ui/panel"
+                prefetch={false}
+                className="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700"
+              >
+                <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M10 19l-7-7m0 0l7-7m-7 7h18"
+                  />
+                </svg>
+                Вернуться к выбору панели
+              </Link>
+            </div>
           </div>
         </div>
       </div>

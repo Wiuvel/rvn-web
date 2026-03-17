@@ -4,7 +4,7 @@ import { TRPCError } from '@trpc/server';
 import { router, publicProcedure, protectedProcedure } from '../init';
 import { supabaseAdmin } from '@/lib/database/supabase';
 import { hasUserRole } from '@/lib/auth/user-roles';
-import { broadcastNewComment } from '@/lib/websocket/server';
+import { broadcastNewComment } from '@/lib/websocket/client';
 import { logger } from '@/lib/utils/secure-logger';
 import { createCommentBodySchema, userIdParamSchema } from '@/lib/validation/api-schemas';
 

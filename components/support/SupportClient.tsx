@@ -33,9 +33,9 @@ import CreateTicketForm from '@/components/support/CreateTicketForm';
 import { PanelLeftClose, PanelLeft, Plus } from 'lucide-react';
 import ImageViewer from '@/components/support/ImageViewer';
 import Header from '@/components/layout/Header';
-import { UserData } from '@/types';
+import { useAuth } from '@/hooks/useAuth';
 import type { Message, Ticket, UploadedFile } from '@/components/support/types';
-import type { RawTicketApi, RawMessageApi } from '@/lib/types/support-api';
+import type { RawTicketApi } from '@/lib/types/support-api';
 import { mapRawTicketsToUi, mapWsAttachments } from '@/lib/utils/support-mappers';
 
 // Lazy load RateLimitCaptcha для оптимизации bundle size
@@ -44,32 +44,23 @@ const RateLimitCaptcha = dynamic(() => import('@/components/auth/RateLimitCaptch
   ssr: false,
 });
 
-interface SupportClientProps {
-  initialUserData: UserData | null;
-  initialTickets: RawTicketApi[];
-  initialActiveTicket?: RawTicketApi | null;
-  initialMessages?: RawMessageApi[];
-}
-
-const EMPTY_TICKETS: RawTicketApi[] = [];
-const EMPTY_MESSAGES: RawMessageApi[] = [];
-
 function mapApiTicketsToState(rawTickets: RawTicketApi[]): Ticket[] {
   return mapRawTicketsToUi(rawTickets);
 }
 
-export default function SupportClient({
-  initialUserData,
-  initialTickets = EMPTY_TICKETS,
-  initialActiveTicket = null,
-  initialMessages = EMPTY_MESSAGES,
-}: SupportClientProps) {
-  const { state, dispatch } = useSupportState(
-    initialUserData,
-    initialTickets,
-    initialActiveTicket,
-    initialMessages,
-  );
+export default function SupportClient() {
+  const { userData: authUserData } = useAuth({
+    requireAuth: false,
+  });
+
+  const { state, dispatch } = useSupportState(null, [], null, []);
+
+  // Sync auth data into support state
+  useEffect(() => {
+    if (authUserData) {
+      dispatch({ type: 'SET_USER_DATA', payload: authUserData });
+    }
+  }, [authUserData, dispatch]);
 
   // Ref for accessing current state in callbacks/effects without triggering re-renders
   const stateRef = useRef(state);
@@ -764,6 +755,9 @@ export default function SupportClient({
           ),
         );
       });
+
+      // Инвалидируем tRPC кэш, чтобы при следующем fetch данные были актуальны
+      void utils.support.tickets.get.invalidate();
 
       // Отмечаем сообщение как прочитанное
       markMessagesAsRead(data.ticketId);
