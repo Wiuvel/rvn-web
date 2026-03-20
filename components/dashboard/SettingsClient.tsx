@@ -43,6 +43,7 @@ function formatDeviceName(deviceName: string): string {
 }
 
 export default function SettingsClient() {
+  const utils = trpc.useUtils();
   const { userData, loading: authLoading } = useAuth({
     requireAuth: true,
     redirectOnFail: '/auth',
@@ -83,6 +84,7 @@ export default function SettingsClient() {
     try {
       await revokeDeviceMutation.mutateAsync({ deviceId });
       setDevices(devices.filter((d) => d.id !== deviceId));
+      void utils.auth.devices.invalidate();
     } catch (error) {
       console.error('Error revoking device', error);
       alert('Ошибка при завершении сеанса');
@@ -103,6 +105,7 @@ export default function SettingsClient() {
       setPasswordSuccess('Пароль успешно изменен. Другие сессии завершены.');
       reset();
       setDevices(devices.filter((d) => d.is_current));
+      void utils.auth.devices.invalidate();
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Произошла ошибка при смене пароля';
       setPasswordError(message);

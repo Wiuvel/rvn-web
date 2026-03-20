@@ -21,6 +21,7 @@
 | `support:message:read` | `{ ticketId, messageIds[], readBy }` | Messages marked as read |
 | `support:error` | `{ message, code? }` | Error notification |
 | `profile:comment:new` | `{ profileId, comment }` | New comment on profile |
+| `system:notification` | `{ message, type? }` | System notification (broadcast to all connected clients) |
 
 ## Rooms
 
@@ -49,3 +50,4 @@ Used by rvn-web to push events through the WS server. All require `x-internal-ap
 | `POST /broadcast/support/ticket-assigned` | `support:ticket:assigned` |
 | `POST /broadcast/support/message-read` | `support:message:read` |
 | `POST /broadcast/profile/comment` | `profile:comment:new` |
+| `POST /broadcast/system` | `system:notification` |

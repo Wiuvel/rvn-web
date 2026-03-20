@@ -2,8 +2,9 @@
  * Redis клиент для хранения аналитики и кэширования
  */
 
-import Redis from 'ioredis';
+import Redis, { RedisOptions } from 'ioredis';
 import { logger } from '@/lib/utils/secure-logger';
+import fs from 'fs';
 
 let redis: Redis | null = null;
 
@@ -34,7 +35,8 @@ export function getRedisClient(): Redis | null {
   }
 
   try {
-    redis = new Redis(redisUrl, {
+    const isTls = redisUrl.startsWith('rediss://');
+    const options: RedisOptions = {
       maxRetriesPerRequest: 3,
       retryStrategy: (times) => {
         if (times > 3) {
@@ -56,7 +58,22 @@ export function getRedisClient(): Redis | null {
       },
       enableReadyCheck: true,
       lazyConnect: false,
-    });
+    };
+
+    if (isTls) {
+      options.tls = {
+        rejectUnauthorized: true,
+      };
+
+      const certPath = process.env.REDIS_CERT_PATH || '/app/certs/ca.pem';
+      if (fs.existsSync(certPath)) {
+        options.tls.ca = [fs.readFileSync(certPath)];
+      } else if (process.env.REDIS_CERT_PATH) {
+        logger.warn(`Redis TLS certificate not found at ${certPath}`);
+      }
+    }
+
+    redis = new Redis(redisUrl, options);
 
     // Автоматические события подключения не логируются
 

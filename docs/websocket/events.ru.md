@@ -21,6 +21,7 @@
 | `support:message:read` | `{ ticketId, messageIds[], readBy }` | Сообщения отмечены как прочитанные |
 | `support:error` | `{ message, code? }` | Уведомление об ошибке |
 | `profile:comment:new` | `{ profileId, comment }` | Новый комментарий в профиле |
+| `system:notification` | `{ message, type? }` | Системное уведомление (рассылается всем подключенным клиентам) |
 
 ## Комнаты
 
@@ -49,3 +50,4 @@
 | `POST /broadcast/support/ticket-assigned` | `support:ticket:assigned` |
 | `POST /broadcast/support/message-read` | `support:message:read` |
 | `POST /broadcast/profile/comment` | `profile:comment:new` |
+| `POST /broadcast/system` | `system:notification` |
