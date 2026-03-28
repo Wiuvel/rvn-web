@@ -1,6 +1,7 @@
 # ---- Stage 1: WASM Builder ----
 FROM rust:1-slim-bookworm AS wasm
 WORKDIR /app
+
 RUN apt-get update -qq && apt-get install -y --no-install-recommends \
     pkg-config \
     libssl-dev \
@@ -18,14 +19,19 @@ RUN cd wasm && wasm-pack build --release --target nodejs --out-dir /app/lib/wasm
 
 # ---- Stage 2: Dependencies ----
 FROM node:22-slim AS deps
-RUN corepack enable && corepack prepare pnpm@10.33.0 --activate
 WORKDIR /app
+
+RUN corepack enable && corepack prepare pnpm@10.33.0 --activate
+
 COPY package.json pnpm-lock.yaml ./
-RUN pnpm install --frozen-lockfile
+
+RUN pnpm install --frozen-lockfile --node-linker=hoisted
 
 # ---- Stage 3: Builder ----
 FROM node:22-slim AS builder
 WORKDIR /app
+
+RUN corepack enable && corepack prepare pnpm@10.33.0 --activate
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/package.json ./package.json
@@ -43,7 +49,6 @@ ARG NEXT_PUBLIC_WS_URL
 ENV NEXT_PUBLIC_TURNSTILE_SITEKEY=${NEXT_PUBLIC_TURNSTILE_SITEKEY}
 ENV NEXT_PUBLIC_WS_URL=${NEXT_PUBLIC_WS_URL}
 
-# Download MaxMind Database (GeoLite)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     ca-certificates \
@@ -53,14 +58,7 @@ RUN mkdir -p data && \
     wget -q -O data/GeoLite2-City.mmdb \
       "https://github.com/P3TERX/GeoLite.mmdb/raw/download/GeoLite2-City.mmdb"
 
-RUN corepack enable && corepack prepare pnpm@10.33.0 --activate
-RUN pnpm run build
-
-# Resolve maxmind subdeps from pnpm symlink store into real directories for COPY
-RUN for dep in mmdb-lib tiny-lru; do \
-      real=$(node -e "console.log(require.resolve('$dep/package.json').replace('/package.json',''))"); \
-      rm -rf "node_modules/$dep" && cp -rL "$real" "node_modules/$dep"; \
-    done
+RUN pnpm build
 
 # ---- Stage 4: Runner ----
 FROM node:22-slim AS runner
@@ -76,18 +74,10 @@ RUN groupadd --system --gid 1001 nodejs \
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
-
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/ioredis ./node_modules/ioredis
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/maxmind ./node_modules/maxmind
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/mmdb-lib ./node_modules/mmdb-lib
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/tiny-lru ./node_modules/tiny-lru
 COPY --from=wasm --chown=nextjs:nodejs /app/lib/wasm/pkg ./lib/wasm/pkg
-
-RUN if [ -d .next/standalone/node_modules ]; then cp -r .next/standalone/node_modules/* ./node_modules/ 2>/dev/null || true; fi
-
-# Copy MaxMind database if it was downloaded during build (dir always exists, may be empty)
 COPY --from=builder --chown=nextjs:nodejs /app/data ./data
 
 USER nextjs
 EXPOSE 3001
+
 CMD ["node", "server.js"]
