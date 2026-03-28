@@ -20,47 +20,47 @@ export async function OPTIONS() {
 async function isTrustedDeveloper(
   email: string | null | undefined,
   username: string,
-  supabaseAdmin: any,
+  db: any,
 ): Promise<boolean> {
-  if (!supabaseAdmin) {
+  if (!db) {
     return false;
   }
+
+  const { trustedGithubDevelopers } = await import('@/lib/database/schema');
+  const { eq } = await import('drizzle-orm');
 
   // Check by email first (preferred method)
   if (email) {
     const normalizedEmail = email.toLowerCase().trim();
-    const { data: emailMatch, error: emailError } = await supabaseAdmin
-      .from('trusted_github_developers')
-      .select('id')
-      .eq('email', normalizedEmail)
-      .limit(1)
-      .maybeSingle();
+    try {
+      const rows = await db
+        .select({ id: trustedGithubDevelopers.id })
+        .from(trustedGithubDevelopers)
+        .where(eq(trustedGithubDevelopers.email, normalizedEmail))
+        .limit(1);
 
-    // If error is not a "not found" error, log it
-    if (emailError && emailError.code !== 'PGRST116') {
-      console.error('Error checking trusted developer by email:', emailError);
-    }
-
-    if (emailMatch) {
-      return true;
+      if (rows[0]) {
+        return true;
+      }
+    } catch (err) {
+      console.error('Error checking trusted developer by email:', err);
     }
   }
 
   // Check by username
   const normalizedUsername = username.toLowerCase().trim();
-  const { data: usernameMatch, error: usernameError } = await supabaseAdmin
-    .from('trusted_github_developers')
-    .select('id')
-    .eq('github_username', normalizedUsername)
-    .limit(1)
-    .maybeSingle();
+  try {
+    const rows = await db
+      .select({ id: trustedGithubDevelopers.id })
+      .from(trustedGithubDevelopers)
+      .where(eq(trustedGithubDevelopers.githubUsername, normalizedUsername))
+      .limit(1);
 
-  // If error is not a "not found" error, log it
-  if (usernameError && usernameError.code !== 'PGRST116') {
-    console.error('Error checking trusted developer by username:', usernameError);
+    return !!rows[0];
+  } catch (err) {
+    console.error('Error checking trusted developer by username:', err);
+    return false;
   }
-
-  return !!usernameMatch;
 }
 
 // Handle GitHub OAuth callback for admin panel
@@ -213,17 +213,18 @@ export async function GET(request: NextRequest) {
     }
 
     // Check if admin exists with this GitHub username
-    // We need to import supabaseAdmin to check directly
-    const { supabaseAdmin } = await import('@/lib/database/supabase');
+    const { db } = await import('@/lib/database/db');
+    const { admins } = await import('@/lib/database/schema');
+    const { eq } = await import('drizzle-orm');
 
-    if (!supabaseAdmin) {
+    if (!db) {
       logger.error('OAuth: Database not configured.');
       const errorUrl = getErrorRedirectUrl('internal_error', origin, isPopup);
       return setCorsHeaders(NextResponse.redirect(errorUrl));
     }
 
     // Check if user is a trusted developer (by email or username) from database
-    const isTrusted = await isTrustedDeveloper(email, githubUsername, supabaseAdmin);
+    const isTrusted = await isTrustedDeveloper(email, githubUsername, db);
     if (!isTrusted) {
       logger.warn('OAuth: Untrusted GitHub developer attempted admin login.', {
         username: githubUsername,
@@ -235,48 +236,51 @@ export async function GET(request: NextRequest) {
 
     // Check if admin exists with this username
     // If not, create it automatically (for trusted developers)
-    let { data: admin, error: adminError } = await supabaseAdmin
-      .from('admins')
-      .select('*')
-      .eq('username', githubUsername)
-      .maybeSingle();
+    let admin: (typeof adminRows)[0] | undefined;
+    const adminRows = await db
+      .select()
+      .from(admins)
+      .where(eq(admins.username, githubUsername))
+      .limit(1);
 
-    // Log non-"not found" errors
-    if (adminError && adminError.code !== 'PGRST116') {
-      logger.error('OAuth: Error checking admin existence.', {
-        username: githubUsername,
-        email: email || 'not provided',
-        error: adminError.message,
-      });
-    }
+    admin = adminRows[0];
 
     // If admin doesn't exist, create it automatically
     if (!admin) {
-      const { data: newAdmin, error: createError } = await supabaseAdmin
-        .from('admins')
-        .insert({
-          username: githubUsername,
-          password_hash: null, // No password for GitHub OAuth admins
-          is_root: false, // Only Root admin is created via login/password
-        })
-        .select()
-        .single();
+      try {
+        const [newAdmin] = await db
+          .insert(admins)
+          .values({
+            username: githubUsername,
+            passwordHash: null, // No password for GitHub OAuth admins
+            isRoot: false, // Only Root admin is created via login/password
+          })
+          .returning();
 
-      if (createError || !newAdmin) {
+        if (!newAdmin) {
+          logger.error('OAuth: Failed to create admin for trusted developer.', {
+            username: githubUsername,
+            email: email || 'not provided',
+            error: 'Insert returned no result',
+          });
+          const errorUrl = getErrorRedirectUrl('internal_error', origin, isPopup);
+          return setCorsHeaders(NextResponse.redirect(errorUrl));
+        }
+
+        admin = newAdmin;
+        logger.info('OAuth: Admin created automatically for trusted developer.', {
+          username: githubUsername,
+          email: email || 'not provided',
+        });
+      } catch (createError) {
         logger.error('OAuth: Failed to create admin for trusted developer.', {
           username: githubUsername,
           email: email || 'not provided',
-          error: createError?.message || 'Unknown error',
+          error: createError instanceof Error ? createError.message : 'Unknown error',
         });
         const errorUrl = getErrorRedirectUrl('internal_error', origin, isPopup);
         return setCorsHeaders(NextResponse.redirect(errorUrl));
       }
-
-      admin = newAdmin;
-      logger.info('OAuth: Admin created automatically for trusted developer.', {
-        username: githubUsername,
-        email: email || 'not provided',
-      });
     }
 
     // Create admin session

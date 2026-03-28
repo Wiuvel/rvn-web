@@ -13,13 +13,15 @@ import {
 import { hasUserRole } from '@/lib/auth/user-roles';
 import { generateCSRFToken, verifyCSRFToken, revokeCSRFToken } from '@/lib/security/csrf';
 import { generateSessionId } from '@/lib/utils/index';
-import { supabaseAdmin } from '@/lib/database/supabase';
+import { db } from '@/lib/database/db';
+import { admins, users, userDevices } from '@/lib/database/schema';
+import { eq, desc } from 'drizzle-orm';
 import { SessionManager } from '@/lib/auth/session-manager';
 import { sanitizeInput } from '@/lib/security/sanitize';
 import { logger } from '@/lib/utils/secure-logger';
 import { SESSION_TIMEOUT } from '@/lib/utils/constants';
 import { createHash, randomBytes } from 'crypto';
-import bcrypt from 'bcryptjs';
+import { hash as argon2Hash, verify as argon2Verify } from '@node-rs/argon2';
 import { passwordChangeSchema } from '@/lib/validation/schemas';
 import { deviceIdParamSchema } from '@/lib/validation/api-schemas';
 import { appConfig } from '@/lib/utils/config';
@@ -93,11 +95,11 @@ export const authRouter = router({
     return {
       authenticated: true as const,
       id: user.id,
-      user_id: user.user_id,
+      user_id: user.userId,
       username: user.username,
       token: currentToken,
-      created_at: user.created_at,
-      last_login: user.last_login,
+      created_at: user.createdAt,
+      last_login: user.lastLogin,
       avatar: user.avatar,
       banner: user.banner || null,
       isSupport,
@@ -220,7 +222,7 @@ export const authRouter = router({
         cookieStore.set(
           USER_DATA_COOKIE_NAME,
           createUserDataCookie({
-            user_id: user.user_id,
+            user_id: user.userId,
             username: user.username,
             avatar: user.avatar ?? null,
             banner: user.banner ?? null,
@@ -229,7 +231,7 @@ export const authRouter = router({
           getUserDataCookieOptions(isLocalhost),
         );
 
-        return { message: 'Login successful', user_id: user.user_id };
+        return { message: 'Login successful', user_id: user.userId };
       }
 
       // Admin scope
@@ -243,17 +245,16 @@ export const authRouter = router({
 
       const token = randomBytes(32).toString('hex');
 
-      if (!supabaseAdmin) {
+      if (!db) {
         throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database not configured' });
       }
 
-      const { error: updateError } = await supabaseAdmin
-        .from('admins')
-        .update({ token })
-        .eq('id', result.admin.id);
-
-      if (updateError) {
-        logger.error('Failed to update admin token', { error: updateError.message });
+      try {
+        await db.update(admins).set({ token }).where(eq(admins.id, result.admin.id));
+      } catch (error) {
+        logger.error('Failed to update admin token', {
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
         throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Internal server error' });
       }
 
@@ -387,7 +388,7 @@ export const authRouter = router({
       cookieStore.set(
         USER_DATA_COOKIE_NAME,
         createUserDataCookie({
-          user_id: user.user_id,
+          user_id: user.userId,
           username: user.username,
           avatar: user.avatar ?? null,
           banner: user.banner ?? null,
@@ -396,7 +397,7 @@ export const authRouter = router({
         getUserDataCookieOptions(isLocalhost),
       );
 
-      return { message: 'User created successfully', user_id: user.user_id };
+      return { message: 'User created successfully', user_id: user.userId };
     }),
 
   logout: publicProcedure
@@ -436,37 +437,40 @@ export const authRouter = router({
     }),
 
   devices: protectedProcedure.query(async ({ ctx }) => {
-    if (!supabaseAdmin) {
+    if (!db) {
       throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database error' });
     }
 
-    const { data: devices, error } = await supabaseAdmin
-      .from('user_devices')
-      .select('*')
-      .eq('user_id', ctx.user.id)
-      .order('last_active', { ascending: false });
+    try {
+      const devices = await db
+        .select()
+        .from(userDevices)
+        .where(eq(userDevices.userId, ctx.user.id))
+        .orderBy(desc(userDevices.lastActive));
 
-    if (error) {
-      logger.error('Failed to fetch devices', { error: error.message, userId: ctx.user.id });
+      const currentToken = (await cookies()).get('token')?.value;
+      const currentTokenHash = currentToken
+        ? createHash('sha256').update(currentToken).digest('hex')
+        : null;
+
+      const devicesWithCurrent = devices.map((d) => ({
+        id: d.id,
+        device_name: d.deviceName,
+        ip_address: d.ipAddress,
+        location: d.location,
+        last_active: d.lastActive,
+        created_at: d.createdAt,
+        is_current: d.tokenHash === currentTokenHash,
+      }));
+
+      return { devices: devicesWithCurrent };
+    } catch (error) {
+      logger.error('Failed to fetch devices', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        userId: ctx.user.id,
+      });
       throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Failed to fetch devices' });
     }
-
-    const currentToken = (await cookies()).get('token')?.value;
-    const currentTokenHash = currentToken
-      ? createHash('sha256').update(currentToken).digest('hex')
-      : null;
-
-    const devicesWithCurrent = devices.map((d: any) => ({
-      id: d.id,
-      device_name: d.device_name,
-      ip_address: d.ip_address,
-      location: d.location,
-      last_active: d.last_active,
-      created_at: d.created_at,
-      is_current: d.token_hash === currentTokenHash,
-    }));
-
-    return { devices: devicesWithCurrent };
   }),
 
   revokeDevice: protectedProcedure.input(deviceIdParamSchema).mutation(async ({ ctx, input }) => {
@@ -477,59 +481,61 @@ export const authRouter = router({
   changePassword: protectedProcedure
     .input(passwordChangeSchema)
     .mutation(async ({ ctx, input }) => {
-      if (!supabaseAdmin) {
+      if (!db) {
         throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database not configured' });
       }
 
       const user = ctx.user;
       const { oldPassword, newPassword } = input;
 
-      const { data: userData, error: fetchError } = await supabaseAdmin
-        .from('users')
-        .select('password_hash')
-        .eq('id', user.id)
-        .single();
+      try {
+        const rows = await db
+          .select({ passwordHash: users.passwordHash })
+          .from(users)
+          .where(eq(users.id, user.id))
+          .limit(1);
+        const userData = rows[0];
 
-      if (fetchError || !userData) {
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Failed to verify password',
+        if (!userData) {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to verify password',
+          });
+        }
+
+        if (!userData.passwordHash) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Cannot change password for OAuth account',
+          });
+        }
+
+        const isValidPassword = await argon2Verify(userData.passwordHash, oldPassword);
+        if (!isValidPassword) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: 'Неверный текущий пароль' });
+        }
+
+        const newPasswordHash = await argon2Hash(newPassword, {
+          memoryCost: 8192,
+          timeCost: 2,
+          parallelism: 1,
         });
-      }
 
-      if (!userData.password_hash) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: 'Cannot change password for OAuth account',
-        });
-      }
+        await db.update(users).set({ passwordHash: newPasswordHash }).where(eq(users.id, user.id));
 
-      const isValidPassword = await bcrypt.compare(oldPassword, userData.password_hash);
-      if (!isValidPassword) {
-        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Неверный текущий пароль' });
-      }
+        const currentToken = (await cookies()).get('token')?.value;
+        if (currentToken) {
+          await SessionManager.revokeOtherDevices(user.id, currentToken);
+        }
 
-      const salt = await bcrypt.genSalt(10);
-      const newPasswordHash = await bcrypt.hash(newPassword, salt);
-
-      const { error: updateError } = await supabaseAdmin
-        .from('users')
-        .update({ password_hash: newPasswordHash, updated_at: new Date().toISOString() })
-        .eq('id', user.id);
-
-      if (updateError) {
+        logger.info('Password changed successfully', { userId: user.id });
+        return { message: 'Password changed successfully' };
+      } catch (error) {
+        if (error instanceof TRPCError) throw error;
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: 'Failed to update password',
         });
       }
-
-      const currentToken = (await cookies()).get('token')?.value;
-      if (currentToken) {
-        await SessionManager.revokeOtherDevices(user.id, currentToken);
-      }
-
-      logger.info('Password changed successfully', { userId: user.id });
-      return { message: 'Password changed successfully' };
     }),
 });

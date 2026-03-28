@@ -3,21 +3,37 @@
 import { trpc } from '@/lib/trpc/client';
 import { useState, useEffect } from 'react';
 import Header from '@/components/layout/Header';
-import { Monitor, Smartphone, Trash2, Clock, Globe, Lock, Key } from 'lucide-react';
+import {
+  Monitor,
+  Smartphone,
+  Clock,
+  Globe,
+  Lock,
+  Key,
+  ShieldCheck,
+  Shield,
+  Cpu,
+  Activity,
+  ShieldAlert,
+  LogOut,
+  Radio,
+} from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { passwordChangeSchema, PasswordChangeFormData } from '@/lib/validation/schemas';
 import { useAuth } from '@/hooks/useAuth';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import { useStaggeredFadeIn } from '@/hooks/useGSAP';
+import clsx from 'clsx';
 
 interface Device {
   id: string;
-  device_name: string;
-  ip_address: string;
+  deviceName: string;
+  ipAddress: string | null;
   location: string | null;
-  last_active: string;
-  created_at: string;
-  is_current: boolean;
+  lastActive: string;
+  createdAt: string;
+  isCurrent: boolean;
 }
 
 // Helper to format relative time
@@ -43,6 +59,7 @@ function formatDeviceName(deviceName: string): string {
 }
 
 export default function SettingsClient() {
+  const containerRef = useStaggeredFadeIn(0.1, 0.08);
   const utils = trpc.useUtils();
   const { userData, loading: authLoading } = useAuth({
     requireAuth: true,
@@ -57,7 +74,16 @@ export default function SettingsClient() {
 
   useEffect(() => {
     if (devicesData?.devices) {
-      setDevices(devicesData.devices);
+      const mappedDevices = devicesData.devices.map((d) => ({
+        id: d.id,
+        deviceName: d.device_name,
+        ipAddress: d.ip_address,
+        location: d.location,
+        lastActive: d.last_active,
+        createdAt: d.created_at,
+        isCurrent: d.is_current,
+      }));
+      setDevices(mappedDevices);
     }
   }, [devicesData]);
 
@@ -73,9 +99,10 @@ export default function SettingsClient() {
     register,
     handleSubmit,
     reset,
-    formState: { errors },
+    formState: { errors, isValid, isDirty },
   } = useForm<PasswordChangeFormData>({
     resolver: zodResolver(passwordChangeSchema),
+    mode: 'onChange',
   });
 
   const revokeDevice = async (deviceId: string) => {
@@ -104,7 +131,7 @@ export default function SettingsClient() {
       });
       setPasswordSuccess('Пароль успешно изменен. Другие сессии завершены.');
       reset();
-      setDevices(devices.filter((d) => d.is_current));
+      setDevices(devices.filter((d) => d.isCurrent));
       void utils.auth.devices.invalidate();
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Произошла ошибка при смене пароля';
@@ -122,234 +149,337 @@ export default function SettingsClient() {
     <div className="min-h-screen bg-neutral-950 text-white selection:bg-primary-500/30">
       <Header />
 
-      <main className="relative overflow-hidden pb-16 pt-6 lg:pt-32">
-        {/* Background effects from dashboard */}
-        <svg
-          className="absolute inset-0 -z-10 h-full w-full opacity-20"
-          xmlns="http://www.w3.org/2000/svg"
-          preserveAspectRatio="none"
-          aria-hidden="true"
-        >
-          <defs>
-            <radialGradient id="dash-grad" cx="50%" cy="50%" r="75%" fx="50%" fy="50%">
-              <stop offset="0%" stopColor="#16a3ff" stopOpacity="0.18" />
-              <stop offset="100%" stopColor="transparent" stopOpacity="0" />
-            </radialGradient>
-          </defs>
-          <rect width="100%" height="100%" fill="url(#dash-grad)" />
-          <g stroke="rgba(255,255,255,0.04)" strokeWidth="1">
-            <line x1="0" y1="25%" x2="100%" y2="25%" />
-            <line x1="0" y1="50%" x2="100%" y2="50%" />
-            <line x1="0" y1="75%" x2="100%" y2="75%" />
-          </g>
-        </svg>
-        <div className="pointer-events-none absolute -right-20 -top-32 -z-10 h-80 w-80 rounded-full bg-primary-500/10 blur-3xl"></div>
-        <div className="pointer-events-none absolute -bottom-24 -left-24 -z-10 h-72 w-72 rounded-full bg-white/5 blur-[100px]"></div>
-
+      <main className="relative pb-24 pt-24 lg:pt-32">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="mb-8">
-            <p className="text-neutral-400">Управление безопасностью и активными сессиями</p>
+          {/* Header section */}
+          <div className="mb-12 flex flex-col items-center text-center lg:items-start lg:text-left">
+            <h1 className="bg-gradient-to-br from-white via-neutral-200 to-neutral-500 bg-clip-text text-4xl font-bold tracking-tight text-transparent sm:text-5xl">
+              Настройки аккаунта
+            </h1>
+            <p className="mt-4 text-lg text-neutral-400">
+              Управление безопасностью, активными сессиями и личными данными
+            </p>
           </div>
 
-          <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
-            {/* Password Change Section */}
-            <section className="h-fit rounded-2xl border border-neutral-800 bg-neutral-900/50 p-6 backdrop-blur-sm">
-              <div className="mb-6 flex items-center gap-3">
-                <div>
-                  <h2 className="text-xl font-semibold">Безопасность</h2>
-                  <p className="text-sm text-neutral-400">Смена пароля и защита</p>
-                </div>
-              </div>
-
-              <form onSubmit={handleSubmit(onChangePassword)} className="w-full space-y-4">
-                {/* Hidden username for accessibility and password managers (see [DOM] warning) */}
-                <input
-                  type="text"
-                  name="username"
-                  defaultValue={userData.username}
-                  autoComplete="username"
-                  tabIndex={-1}
-                  className="pointer-events-none absolute -left-[9999px] h-px w-px opacity-0"
-                  aria-hidden="true"
-                />
-                <div>
-                  <label
-                    htmlFor="old-password"
-                    className="mb-1.5 block text-sm font-medium text-neutral-300"
-                  >
-                    Текущий пароль
-                  </label>
-                  <div className="relative">
-                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500">
-                      <Lock className="h-4 w-4" />
+          <div ref={containerRef} className="grid grid-cols-1 gap-6 lg:grid-cols-12 lg:gap-8">
+            {/* LEFT COLUMN: Profile & Password */}
+            <div className="flex flex-col gap-6 lg:col-span-4">
+              {/* Profile Card */}
+              <section className="group relative overflow-hidden rounded-3xl border border-neutral-800/60 bg-neutral-900/40 p-[1px] shadow-2xl transition-all duration-500 hover:shadow-primary-500/10">
+                <div className="absolute inset-0 bg-gradient-to-br from-primary-500/20 via-transparent to-purple-500/20 opacity-30 transition-opacity duration-500 group-hover:opacity-60"></div>
+                <div className="relative h-full w-full rounded-[23px] bg-neutral-950/80 p-6 backdrop-blur-xl">
+                  <div className="mb-6 flex flex-col items-center text-center">
+                    <h2 className="text-xl font-bold text-white">{userData.username}</h2>
+                    <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-primary-500/20 bg-primary-500/10 px-3 py-1.5 text-xs font-medium text-primary-400 backdrop-blur-md">
+                      <ShieldCheck className="h-4 w-4" />
+                      Защита активна
                     </div>
+                  </div>
+
+                  <div className="space-y-4 border-t border-neutral-800/60 pt-6">
+                    <div className="flex items-center justify-between rounded-xl bg-neutral-900/50 px-4 py-3">
+                      <span className="text-sm text-neutral-400">Роль</span>
+                      <span className="font-medium capitalize text-white">
+                        {userData.isAdmin
+                          ? 'Администратор'
+                          : userData.isSupport
+                            ? 'Поддержка'
+                            : 'Пользователь'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between rounded-xl bg-neutral-900/50 px-4 py-3">
+                      <span className="text-sm text-neutral-400">ID</span>
+                      <span className="font-mono text-xs text-neutral-500">
+                        {userData.user_id.split('-')[0]}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between rounded-xl bg-neutral-900/50 px-4 py-3">
+                      <span className="text-sm text-neutral-400">Активных сессий</span>
+                      <span className="flex items-center gap-1.5 font-medium text-white">
+                        <Activity className="h-4 w-4 text-primary-400" />
+                        {devices.length}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              {/* Password Change Card */}
+              <section className="group relative overflow-hidden rounded-3xl border border-neutral-800/60 bg-neutral-900/40 p-[1px] shadow-2xl transition-all duration-500 hover:shadow-primary-500/10">
+                <div className="absolute inset-0 bg-gradient-to-br from-neutral-800 to-neutral-900 opacity-50"></div>
+                <div className="relative h-full w-full rounded-[23px] bg-neutral-950/80 p-6 backdrop-blur-xl">
+                  <div className="mb-6 flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-500/10 text-primary-400">
+                      <Lock className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-semibold text-white">Смена пароля</h2>
+                      <p className="text-xs text-neutral-400">Обновите ключ доступа</p>
+                    </div>
+                  </div>
+
+                  <form onSubmit={handleSubmit(onChangePassword)} className="w-full space-y-5">
                     <input
-                      id="old-password"
-                      type="password"
-                      autoComplete="current-password"
-                      {...register('oldPassword')}
-                      className="w-full rounded-xl border border-neutral-800 bg-neutral-950/50 py-2.5 pl-10 pr-4 outline-none transition-all focus:border-primary-500/50 focus:ring-2 focus:ring-primary-500/20"
-                      placeholder="••••••••"
+                      type="text"
+                      name="username"
+                      defaultValue={userData.username}
+                      autoComplete="username"
+                      tabIndex={-1}
+                      className="pointer-events-none absolute -left-[9999px] h-px w-px opacity-0"
+                      aria-hidden="true"
                     />
-                  </div>
-                  {errors.oldPassword && (
-                    <p className="mt-1 text-sm text-red-400">{errors.oldPassword.message}</p>
-                  )}
-                </div>
 
-                <div className="space-y-4">
-                  <div>
-                    <label
-                      htmlFor="new-password"
-                      className="mb-1.5 block text-sm font-medium text-neutral-300"
-                    >
-                      Новый пароль
-                    </label>
-                    <div className="relative">
-                      <div className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500">
-                        <Key className="h-4 w-4" />
-                      </div>
-                      <input
-                        id="new-password"
-                        type="password"
-                        autoComplete="new-password"
-                        {...register('newPassword')}
-                        className="w-full rounded-xl border border-neutral-800 bg-neutral-950/50 py-2.5 pl-10 pr-4 outline-none transition-all focus:border-primary-500/50 focus:ring-2 focus:ring-primary-500/20"
-                        placeholder="••••••••"
-                      />
-                    </div>
-                    {errors.newPassword && (
-                      <p className="mt-1 text-sm text-red-400">{errors.newPassword.message}</p>
-                    )}
-                  </div>
-                  <div>
-                    <label
-                      htmlFor="confirm-new-password"
-                      className="mb-1.5 block text-sm font-medium text-neutral-300"
-                    >
-                      Повторите пароль
-                    </label>
-                    <div className="relative">
-                      <div className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500">
-                        <Key className="h-4 w-4" />
-                      </div>
-                      <input
-                        id="confirm-new-password"
-                        type="password"
-                        autoComplete="new-password"
-                        {...register('confirmNewPassword')}
-                        className="w-full rounded-xl border border-neutral-800 bg-neutral-950/50 py-2.5 pl-10 pr-4 outline-none transition-all focus:border-primary-500/50 focus:ring-2 focus:ring-primary-500/20"
-                        placeholder="••••••••"
-                      />
-                    </div>
-                    {errors.confirmNewPassword && (
-                      <p className="mt-1 text-sm text-red-400">
-                        {errors.confirmNewPassword.message}
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                {passwordError && (
-                  <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-400">
-                    {passwordError}
-                  </div>
-                )}
-
-                {passwordSuccess && (
-                  <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-3 text-sm text-emerald-400">
-                    {passwordSuccess}
-                  </div>
-                )}
-
-                <button
-                  type="submit"
-                  disabled={isChangingPassword}
-                  className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-primary-600 px-6 py-2.5 font-medium text-white transition-all hover:bg-primary-500 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {isChangingPassword ? (
-                    <>
-                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                      Сохранение...
-                    </>
-                  ) : (
-                    'Обновить пароль'
-                  )}
-                </button>
-              </form>
-            </section>
-
-            {/* Active Sessions Section */}
-            <section className="rounded-2xl border border-neutral-800 bg-neutral-900/50 p-6 backdrop-blur-sm lg:col-span-2">
-              <div className="mb-6 flex items-center gap-3">
-                <div>
-                  <h2 className="text-xl font-semibold">Активные сессии</h2>
-                  <p className="text-sm text-neutral-400">Устройства, имеющие доступ к аккаунту</p>
-                </div>
-              </div>
-
-              {error ? (
-                <div className="py-4 text-center text-red-400">{error}</div>
-              ) : (
-                <div className="space-y-4">
-                  {devices.map((device) => (
-                    <div
-                      key={device.id}
-                      className="flex flex-col items-start justify-between gap-4 rounded-xl border border-neutral-800 bg-neutral-950/50 p-4 transition-colors hover:border-neutral-700 sm:flex-row sm:items-center"
-                    >
-                      <div className="flex items-center gap-4">
-                        <div className="rounded-lg bg-neutral-800/50 p-3 text-neutral-400">
-                          {device.device_name.toLowerCase().includes('mobile') ||
-                          device.device_name.toLowerCase().includes('android') ||
-                          device.device_name.toLowerCase().includes('iphone') ? (
-                            <Smartphone className="h-6 w-6" />
-                          ) : (
-                            <Monitor className="h-6 w-6" />
-                          )}
+                    <div className="space-y-4">
+                      <div>
+                        <label
+                          htmlFor="old-password"
+                          className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-neutral-400"
+                        >
+                          Текущий пароль
+                        </label>
+                        <div className="group/input relative">
+                          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500 transition-colors group-focus-within/input:text-primary-400">
+                            <Key className="h-4 w-4" />
+                          </div>
+                          <input
+                            id="old-password"
+                            type="password"
+                            autoComplete="current-password"
+                            {...register('oldPassword')}
+                            className="w-full rounded-xl border border-neutral-800 bg-neutral-900/50 py-3 pl-10 pr-4 text-sm outline-none transition-all focus:border-primary-500/50 focus:bg-neutral-900 focus:ring-4 focus:ring-primary-500/10"
+                            placeholder="••••••••"
+                          />
                         </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h3 className="font-medium text-white">
-                              {formatDeviceName(device.device_name)}
-                            </h3>
-                            {device.is_current && (
-                              <span className="rounded-full border border-primary-500/20 bg-primary-500/20 px-2 py-0.5 text-xs font-medium text-primary-400">
-                                Это устройство
-                              </span>
+                        {errors.oldPassword && (
+                          <p className="mt-1.5 text-xs text-red-400">
+                            {errors.oldPassword.message}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="my-2 h-px w-full bg-gradient-to-r from-transparent via-neutral-800 to-transparent"></div>
+
+                      <div>
+                        <label
+                          htmlFor="new-password"
+                          className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-neutral-400"
+                        >
+                          Новый пароль
+                        </label>
+                        <div className="group/input relative">
+                          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500 transition-colors group-focus-within/input:text-primary-400">
+                            <Shield className="h-4 w-4" />
+                          </div>
+                          <input
+                            id="new-password"
+                            type="password"
+                            autoComplete="new-password"
+                            {...register('newPassword')}
+                            className="w-full rounded-xl border border-neutral-800 bg-neutral-900/50 py-3 pl-10 pr-4 text-sm outline-none transition-all focus:border-primary-500/50 focus:bg-neutral-900 focus:ring-4 focus:ring-primary-500/10"
+                            placeholder="••••••••"
+                          />
+                        </div>
+                        {errors.newPassword && (
+                          <p className="mt-1.5 text-xs text-red-400">
+                            {errors.newPassword.message}
+                          </p>
+                        )}
+                      </div>
+
+                      <div>
+                        <label
+                          htmlFor="confirm-new-password"
+                          className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-neutral-400"
+                        >
+                          Повторите пароль
+                        </label>
+                        <div className="group/input relative">
+                          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500 transition-colors group-focus-within/input:text-primary-400">
+                            <ShieldCheck className="h-4 w-4" />
+                          </div>
+                          <input
+                            id="confirm-new-password"
+                            type="password"
+                            autoComplete="new-password"
+                            {...register('confirmNewPassword')}
+                            className="w-full rounded-xl border border-neutral-800 bg-neutral-900/50 py-3 pl-10 pr-4 text-sm outline-none transition-all focus:border-primary-500/50 focus:bg-neutral-900 focus:ring-4 focus:ring-primary-500/10"
+                            placeholder="••••••••"
+                          />
+                        </div>
+                        {errors.confirmNewPassword && (
+                          <p className="mt-1.5 text-xs text-red-400">
+                            {errors.confirmNewPassword.message}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {passwordError && (
+                      <div className="flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-400">
+                        <ShieldAlert className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                        <p>{passwordError}</p>
+                      </div>
+                    )}
+
+                    {passwordSuccess && (
+                      <div className="flex items-start gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-3 text-sm text-emerald-400">
+                        <ShieldCheck className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                        <p>{passwordSuccess}</p>
+                      </div>
+                    )}
+
+                    <button
+                      type="submit"
+                      disabled={isChangingPassword || !isValid || !isDirty}
+                      className="group/btn relative mt-4 flex w-full items-center justify-center gap-2 overflow-hidden rounded-xl bg-white px-6 py-3 text-sm font-semibold text-neutral-950 transition-all hover:bg-neutral-200 disabled:opacity-50"
+                    >
+                      {isChangingPassword ? (
+                        <>
+                          <div className="h-4 w-4 animate-spin rounded-full border-2 border-neutral-950/30 border-t-neutral-950" />
+                          Сохранение...
+                        </>
+                      ) : (
+                        <>
+                          Обновить пароль
+                          <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/40 to-transparent transition-transform duration-1000 group-hover/btn:translate-x-full"></div>
+                        </>
+                      )}
+                    </button>
+                  </form>
+                </div>
+              </section>
+            </div>
+
+            {/* RIGHT COLUMN: Active Sessions */}
+            <div className="flex flex-col lg:col-span-8">
+              <section className="relative flex h-full flex-col overflow-hidden rounded-3xl border border-neutral-800/60 bg-neutral-900/40 p-[1px] shadow-2xl">
+                <div className="absolute inset-0 bg-gradient-to-b from-neutral-800/50 to-neutral-950/50 opacity-50"></div>
+                <div className="relative flex h-full w-full flex-col rounded-[23px] bg-neutral-950/80 p-6 backdrop-blur-xl sm:p-8">
+                  <div className="mb-8 flex flex-col gap-4 border-b border-neutral-800/60 pb-6 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-500/10 text-blue-400 shadow-[0_0_30px_rgba(59,130,246,0.15)]">
+                        <Radio className="h-6 w-6" />
+                      </div>
+                      <div>
+                        <h2 className="text-xl font-semibold text-white">Активные сессии</h2>
+                        <p className="mt-1 text-sm text-neutral-400">
+                          Устройства, имеющие доступ к вашему аккаунту на сайте
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex h-9 items-center justify-center rounded-full border border-neutral-800 bg-neutral-900/80 px-4 text-sm font-medium text-neutral-300">
+                      Всего: {devices.length}
+                    </div>
+                  </div>
+
+                  {error ? (
+                    <div className="flex items-center justify-center rounded-2xl border border-red-500/20 bg-red-500/5 py-12 text-red-400">
+                      <ShieldAlert className="mr-2 h-5 w-5" />
+                      {error}
+                    </div>
+                  ) : (
+                    <div className="flex-1 space-y-3 overflow-y-auto pr-2">
+                      {devices.map((device) => {
+                        const isMobile =
+                          device.deviceName.toLowerCase().includes('mobile') ||
+                          device.deviceName.toLowerCase().includes('android') ||
+                          device.deviceName.toLowerCase().includes('iphone');
+
+                        return (
+                          <div
+                            key={device.id}
+                            className={clsx(
+                              'group relative flex flex-col items-start justify-between gap-4 overflow-hidden rounded-2xl border p-5 transition-all duration-300 sm:flex-row sm:items-center',
+                              device.isCurrent
+                                ? 'border-primary-500/30 bg-primary-500/5 shadow-[0_0_30px_-10px_rgba(22,163,255,0.15)]'
+                                : 'border-neutral-800/60 bg-neutral-900/30 hover:border-neutral-700 hover:bg-neutral-800/50',
+                            )}
+                          >
+                            {/* Hover Gradient */}
+                            {!device.isCurrent && (
+                              <div className="absolute inset-0 bg-gradient-to-r from-white/[0.02] to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100"></div>
+                            )}
+
+                            <div className="relative z-10 flex items-center gap-4">
+                              <div
+                                className={clsx(
+                                  'flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl transition-colors',
+                                  device.isCurrent
+                                    ? 'bg-primary-500/20 text-primary-400'
+                                    : 'bg-neutral-800/80 text-neutral-400 group-hover:text-neutral-300',
+                                )}
+                              >
+                                {isMobile ? (
+                                  <Smartphone className="h-6 w-6" />
+                                ) : (
+                                  <Monitor className="h-6 w-6" />
+                                )}
+                              </div>
+
+                              <div>
+                                <div className="flex items-center gap-2.5">
+                                  <h3
+                                    className={clsx(
+                                      'font-semibold',
+                                      device.isCurrent ? 'text-primary-100' : 'text-neutral-200',
+                                    )}
+                                  >
+                                    {formatDeviceName(device.deviceName)}
+                                  </h3>
+                                  {device.isCurrent && (
+                                    <span className="relative flex items-center gap-1.5 rounded-full border border-primary-500/30 bg-primary-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary-400">
+                                      <span className="relative flex h-1.5 w-1.5">
+                                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary-400 opacity-75"></span>
+                                        <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-primary-500"></span>
+                                      </span>
+                                      Текущий
+                                    </span>
+                                  )}
+                                </div>
+
+                                <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-neutral-500">
+                                  <div className="flex items-center gap-1.5">
+                                    <Globe className="h-3.5 w-3.5 opacity-70" />
+                                    <span>{device.ipAddress}</span>
+                                    {device.location && (
+                                      <>
+                                        <span className="h-1 w-1 rounded-full bg-neutral-700"></span>
+                                        <span>{device.location}</span>
+                                      </>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-1.5">
+                                    <Clock className="h-3.5 w-3.5 opacity-70" />
+                                    <span>{formatRelativeTime(device.lastActive)}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            {!device.isCurrent && (
+                              <button
+                                onClick={() => revokeDevice(device.id)}
+                                className="relative z-10 flex w-full items-center justify-center gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-2.5 text-sm font-medium text-red-400 transition-all hover:bg-red-500 hover:text-white sm:w-auto sm:opacity-0 sm:group-hover:opacity-100"
+                              >
+                                <LogOut className="h-4 w-4" />
+                                Выйти
+                              </button>
                             )}
                           </div>
-                          <div className="mt-1 flex flex-col gap-x-4 gap-y-1 text-sm text-neutral-500 sm:flex-row sm:items-center">
-                            <div className="flex items-center gap-1.5">
-                              <Globe className="h-3.5 w-3.5" />
-                              {device.ip_address}
-                              {device.location ? ` • ${device.location}` : ''}
-                            </div>
-                            <div className="flex items-center gap-1.5">
-                              <Clock className="h-3.5 w-3.5" />
-                              Активность: {formatRelativeTime(device.last_active)}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
+                        );
+                      })}
 
-                      {!device.is_current && (
-                        <button
-                          onClick={() => revokeDevice(device.id)}
-                          className="flex items-center gap-2 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm font-medium text-red-400 transition-colors hover:bg-red-500/20"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                          Завершить
-                        </button>
+                      {devices.length === 0 && (
+                        <div className="flex flex-col items-center justify-center py-16 text-neutral-500">
+                          <Cpu className="mb-4 h-12 w-12 opacity-20" />
+                          <p>Нет активных сессий.</p>
+                        </div>
                       )}
                     </div>
-                  ))}
-
-                  {devices.length === 0 && (
-                    <div className="py-8 text-center text-neutral-500">Нет активных сессий.</div>
                   )}
                 </div>
-              )}
-            </section>
+              </section>
+            </div>
           </div>
         </div>
       </main>

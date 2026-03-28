@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/database/supabase';
+import { db } from '@/lib/database/db';
+import { supportTickets } from '@/lib/database/schema';
+import { eq } from 'drizzle-orm';
 
 export async function POST(req: NextRequest) {
   const apiKey = req.headers.get('x-internal-api-key');
@@ -23,21 +25,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ allowed: true });
     }
 
-    if (!supabaseAdmin) {
+    if (!db) {
       return NextResponse.json({ allowed: false });
     }
 
-    const { data: ticket, error } = await supabaseAdmin
-      .from('support_tickets')
-      .select('id, user_id')
-      .eq('id', ticketId)
-      .single();
+    const rows = await db
+      .select({ id: supportTickets.id, userId: supportTickets.userId })
+      .from(supportTickets)
+      .where(eq(supportTickets.id, ticketId))
+      .limit(1);
 
-    if (error || !ticket) {
+    const ticket = rows[0];
+    if (!ticket) {
       return NextResponse.json({ allowed: false });
     }
 
-    return NextResponse.json({ allowed: ticket.user_id === userId });
+    return NextResponse.json({ allowed: ticket.userId === userId });
   } catch (error) {
     console.error('[internal/verify-ticket-access] Error:', error);
     return NextResponse.json({ allowed: false }, { status: 500 });

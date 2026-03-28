@@ -25,7 +25,7 @@ export interface MessageAttachment {
 export interface MessageSender {
   id: string;
   username: string;
-  user_id: string;
+  user_id: string | null;
   avatar?: string | null;
 }
 

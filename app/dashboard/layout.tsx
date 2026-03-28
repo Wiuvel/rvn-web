@@ -19,9 +19,5 @@ export default function DashboardLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  return (
-    <>
-      <div className="dashboard-layout">{children}</div>
-    </>
-  );
+  return <>{children}</>;
 }

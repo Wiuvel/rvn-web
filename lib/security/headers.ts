@@ -28,18 +28,6 @@ export function isValidOrigin(origin: string): boolean {
  * @returns CSP header string
  */
 export function generateCSPHeader(isDev: boolean): string {
-  // Extract domain from NEXT_PUBLIC_SUPABASE_URL
-  let supabaseDomain = 'supabase.co';
-  try {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    if (supabaseUrl) {
-      const url = new URL(supabaseUrl);
-      supabaseDomain = url.hostname;
-    }
-  } catch {
-    supabaseDomain = 'supabase.co';
-  }
-
   const turnstileDomain = 'challenges.cloudflare.com';
 
   // Base domains for CSP
@@ -55,9 +43,9 @@ export function generateCSPHeader(isDev: boolean): string {
     `default-src ${baseDomains}${localhost};`,
     `script-src 'self' 'unsafe-eval' 'unsafe-inline' ${baseDomains} https://${turnstileDomain}${localhost};`,
     `style-src 'self' 'unsafe-inline' ${baseDomains}${localhost};`,
-    `img-src 'self' blob: data: https://${supabaseDomain} ${baseDomains} *${localhost};`,
+    `img-src 'self' blob: data: ${baseDomains} *${localhost};`,
     `font-src 'self' ${baseDomains}${localhost};`,
-    `connect-src 'self' https://${turnstileDomain} https://${supabaseDomain} ${baseDomains} *${localhost};`,
+    `connect-src 'self' https://${turnstileDomain} ${baseDomains} *${localhost};`,
     `frame-src 'self' https://${turnstileDomain} ${baseDomains}${localhost};`,
     `child-src 'self' https://${turnstileDomain} ${baseDomains}${localhost};`,
     `object-src 'none';`,

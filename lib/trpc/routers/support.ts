@@ -3,7 +3,15 @@ import { TRPCError } from '@trpc/server';
 import { router, publicProcedure, protectedProcedure, supportProcedure } from '../init';
 import { checkAuth } from '@/lib/auth/helper';
 import { hasUserRole, batchHasUserRole } from '@/lib/auth/user-roles';
-import { supabaseAdmin } from '@/lib/database/supabase';
+import { db } from '@/lib/database/db';
+import {
+  supportTickets,
+  supportMessages,
+  supportMessageAttachments,
+  users,
+} from '@/lib/database/schema';
+import { eq, and, ne, desc, asc, inArray, count } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import { messageRateLimit } from '@/lib/security/rate-limit';
 import { verifyCSRFToken } from '@/lib/security/csrf';
 import {
@@ -35,6 +43,32 @@ import {
   invalidateTicketCaches,
 } from '../helpers/support';
 
+function remapTicketRow(row: any) {
+  return {
+    id: row.id,
+    user_id: row.userId,
+    assigned_to: row.assignedTo,
+    status: row.status,
+    priority: row.priority,
+    subject: row.subject,
+    last_message_at: row.lastMessageAt,
+    closed_at: row.closedAt,
+    created_at: row.createdAt,
+    updated_at: row.updatedAt,
+    user: row.userName
+      ? { id: row.userId, username: row.userName, user_id: row.userUserId, avatar: row.userAvatar }
+      : null,
+    assigned_user: row.assignedUserName
+      ? {
+          id: row.assignedTo,
+          username: row.assignedUserName,
+          user_id: row.assignedUserUserId,
+          avatar: row.assignedUserAvatar,
+        }
+      : null,
+  };
+}
+
 export const supportRouter = router({
   check: publicProcedure.query(async ({ ctx }) => {
     const authResult = await checkAuth(ctx.req);
@@ -58,7 +92,7 @@ export const supportRouter = router({
         hasSupportAccess: false,
         username: user.username,
         userId: user.id,
-        user_id: user.user_id,
+        user_id: user.userId,
         token: currentToken,
         error: 'Database not configured',
       };
@@ -69,14 +103,14 @@ export const supportRouter = router({
       hasSupportAccess,
       username: user.username,
       userId: user.id,
-      user_id: user.user_id,
+      user_id: user.userId,
       token: currentToken,
     };
   }),
 
   tickets: router({
     list: protectedProcedure.input(supportTicketsQuerySchema).query(async ({ ctx, input }) => {
-      if (!supabaseAdmin) {
+      if (!db) {
         throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database error' });
       }
 
@@ -84,39 +118,60 @@ export const supportRouter = router({
       const isSupport = await hasUserRole(user.id, 'support');
       const { status, statuses, forUser } = input;
 
-      let query = supabaseAdmin
-        .from('support_tickets')
-        .select(
-          `*,
-            user:users!support_tickets_user_id_fkey(id, username, user_id, avatar),
-            assigned_user:users!support_tickets_assigned_to_fkey(id, username, user_id, avatar)`,
-        )
-        .order('last_message_at', { ascending: false });
-
-      if (forUser || !isSupport) {
-        query = query.eq('user_id', user.id);
-      }
-
-      if (statuses) {
-        const statusArray = statuses
-          .split(',')
-          .map((s) => s.trim())
-          .filter((s) => ['open', 'closed', 'pending'].includes(s));
-        if (statusArray.length > 0) {
-          query = query.in('status', statusArray);
-        }
-      } else if (status && status !== 'all' && ['open', 'closed', 'pending'].includes(status)) {
-        query = query.eq('status', status);
-      }
-
       const cacheKey = `tickets:${user.id}:${isSupport ? 'support' : 'user'}:${status || 'all'}:${forUser ? 'forUser' : 'all'}`;
 
       const tickets = await cached(
         cacheKey,
         async () => {
-          const { data, error } = await query;
-          if (error) throw new Error(`Error fetching tickets: ${error.message}`);
-          return data || [];
+          const ticketUser = alias(users, 'ticketUser');
+          const assignedUser = alias(users, 'assignedUser');
+
+          const conditions: any[] = [];
+
+          if (forUser || !isSupport) {
+            conditions.push(eq(supportTickets.userId, user.id));
+          }
+
+          if (statuses) {
+            const statusArray = statuses
+              .split(',')
+              .map((s) => s.trim())
+              .filter((s) => ['open', 'closed', 'pending'].includes(s));
+            if (statusArray.length > 0) {
+              conditions.push(inArray(supportTickets.status, statusArray));
+            }
+          } else if (status && status !== 'all' && ['open', 'closed', 'pending'].includes(status)) {
+            conditions.push(eq(supportTickets.status, status));
+          }
+
+          const rows = await db!
+            .select({
+              id: supportTickets.id,
+              userId: supportTickets.userId,
+              assignedTo: supportTickets.assignedTo,
+              status: supportTickets.status,
+              priority: supportTickets.priority,
+              subject: supportTickets.subject,
+              lastMessageAt: supportTickets.lastMessageAt,
+              closedAt: supportTickets.closedAt,
+              createdAt: supportTickets.createdAt,
+              updatedAt: supportTickets.updatedAt,
+              // user fields
+              userName: ticketUser.username,
+              userUserId: ticketUser.userId,
+              userAvatar: ticketUser.avatar,
+              // assigned user fields
+              assignedUserName: assignedUser.username,
+              assignedUserUserId: assignedUser.userId,
+              assignedUserAvatar: assignedUser.avatar,
+            })
+            .from(supportTickets)
+            .leftJoin(ticketUser, eq(supportTickets.userId, ticketUser.id))
+            .leftJoin(assignedUser, eq(supportTickets.assignedTo, assignedUser.id))
+            .where(conditions.length > 0 ? and(...conditions) : undefined)
+            .orderBy(desc(supportTickets.lastMessageAt));
+
+          return rows.map(remapTicketRow);
         },
         30,
       );
@@ -126,7 +181,10 @@ export const supportRouter = router({
       }
 
       const ticketIds = tickets.map((t: any) => t.id);
-      const lastMessagesMap = await resolveLastMessagesForTickets(ticketIds, tickets as any);
+      const lastMessagesMap = await resolveLastMessagesForTickets(
+        ticketIds,
+        tickets.map((t: any) => ({ id: t.id, userId: t.user_id })),
+      );
 
       const ticketsWithLastMessage = tickets.map((ticket: any) => ({
         ...ticket,
@@ -137,7 +195,7 @@ export const supportRouter = router({
     }),
 
     create: protectedProcedure.input(createTicketBodySchema).mutation(async ({ ctx, input }) => {
-      if (!supabaseAdmin) {
+      if (!db) {
         throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database error' });
       }
 
@@ -152,47 +210,109 @@ export const supportRouter = router({
 
       const { subject, message } = input;
 
-      const { count, error: countError } = await supabaseAdmin
-        .from('support_tickets')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .in('status', ['open', 'pending']);
+      const [countResult] = await db
+        .select({ count: count() })
+        .from(supportTickets)
+        .where(
+          and(
+            eq(supportTickets.userId, user.id),
+            inArray(supportTickets.status, ['open', 'pending']),
+          ),
+        );
 
-      if (countError) {
-        logger.error('Error counting tickets', { error: countError.message, userId: user.id });
-      }
-
-      if ((count || 0) >= MAX_TICKETS_PER_USER) {
+      if (countResult && (countResult.count || 0) >= MAX_TICKETS_PER_USER) {
         throw new TRPCError({ code: 'BAD_REQUEST', message: ERROR_MAXIMUM_TICKET_LIMIT_REACHED });
       }
 
-      const { data: ticketData, error: rpcError } = await supabaseAdmin.rpc(
-        'create_ticket_with_message',
-        { p_user_id: user.id, p_subject: subject, p_message_text: message },
-      );
+      let ticketId: string;
+      try {
+        const result = await db.transaction(async (tx) => {
+          const [ticket] = await tx
+            .insert(supportTickets)
+            .values({
+              userId: user.id,
+              subject,
+              status: 'open',
+            })
+            .returning({ id: supportTickets.id, createdAt: supportTickets.createdAt });
 
-      if (rpcError || !ticketData || ticketData.length === 0) {
+          const [msg] = await tx
+            .insert(supportMessages)
+            .values({
+              ticketId: ticket.id,
+              senderId: user.id,
+              messageText: message,
+              senderType: 'user',
+            })
+            .returning({ id: supportMessages.id, createdAt: supportMessages.createdAt });
+
+          return {
+            ticketId: ticket.id,
+            ticketCreatedAt: ticket.createdAt,
+            messageId: msg.id,
+            messageCreatedAt: msg.createdAt,
+          };
+        });
+
+        ticketId = result.ticketId;
+      } catch (err) {
         logger.error('Error creating ticket', {
-          error: rpcError?.message,
+          error: err instanceof Error ? err.message : 'Unknown error',
           userId: user.id,
         });
         throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Failed to create ticket' });
       }
 
-      const ticketId = ticketData[0].ticket_id;
+      // Fetch the created ticket with user info
+      const ticketUser = alias(users, 'ticketUser');
+      const ticketRows = await db
+        .select({
+          id: supportTickets.id,
+          userId: supportTickets.userId,
+          assignedTo: supportTickets.assignedTo,
+          status: supportTickets.status,
+          priority: supportTickets.priority,
+          subject: supportTickets.subject,
+          lastMessageAt: supportTickets.lastMessageAt,
+          closedAt: supportTickets.closedAt,
+          createdAt: supportTickets.createdAt,
+          updatedAt: supportTickets.updatedAt,
+          userName: ticketUser.username,
+          userUserId: ticketUser.userId,
+          userAvatar: ticketUser.avatar,
+        })
+        .from(supportTickets)
+        .leftJoin(ticketUser, eq(supportTickets.userId, ticketUser.id))
+        .where(eq(supportTickets.id, ticketId));
 
-      const { data: ticket, error: ticketError } = await supabaseAdmin
-        .from('support_tickets')
-        .select(`*, user:users!support_tickets_user_id_fkey(id, username, user_id, avatar)`)
-        .eq('id', ticketId)
-        .single();
-
-      if (ticketError || !ticket) {
+      const ticket = ticketRows[0];
+      if (!ticket) {
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: 'Failed to fetch created ticket',
         });
       }
+
+      const mappedTicket = {
+        id: ticket.id,
+        user_id: ticket.userId,
+        assigned_to: ticket.assignedTo,
+        status: ticket.status,
+        priority: ticket.priority,
+        subject: ticket.subject,
+        last_message_at: ticket.lastMessageAt,
+        closed_at: ticket.closedAt,
+        created_at: ticket.createdAt,
+        updated_at: ticket.updatedAt,
+        user: ticket.userName
+          ? {
+              id: ticket.userId,
+              username: ticket.userName,
+              user_id: ticket.userUserId,
+              avatar: ticket.userAvatar,
+            }
+          : null,
+      };
 
       invalidateTicketCaches(user.id);
 
@@ -200,12 +320,12 @@ export const supportRouter = router({
         const { trackTicketCreated, trackMessageSent } =
           await import('@/lib/analytics/support-analytics');
         await Promise.all([
-          trackTicketCreated(ticket.id, user.id, ticket.status),
-          trackMessageSent(ticket.id, user.id, 'user'),
+          trackTicketCreated(mappedTicket.id, user.id, mappedTicket.status),
+          trackMessageSent(mappedTicket.id, user.id, 'user'),
         ]);
       } catch {}
 
-      return { ticket, success: true };
+      return { ticket: mappedTicket, success: true };
     }),
 
     get: protectedProcedure
@@ -219,7 +339,7 @@ export const supportRouter = router({
         }),
       )
       .query(async ({ ctx, input }) => {
-        if (!supabaseAdmin) {
+        if (!db) {
           throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database error' });
         }
 
@@ -231,73 +351,133 @@ export const supportRouter = router({
           throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid ticket ID' });
         }
 
-        const { data: ticket, error: ticketError } = await supabaseAdmin
-          .from('support_tickets')
-          .select(
-            `*,
-            user:users!support_tickets_user_id_fkey(id, username, user_id, avatar),
-            assigned_user:users!support_tickets_assigned_to_fkey(id, username, user_id, avatar)`,
-          )
-          .eq('id', ticketId)
-          .single();
+        // Fetch ticket with user and assigned_user
+        const ticketUser = alias(users, 'ticketUser');
+        const assignedUser = alias(users, 'assignedUser');
 
-        if (ticketError || !ticket) {
+        const ticketRows = await db
+          .select({
+            id: supportTickets.id,
+            userId: supportTickets.userId,
+            assignedTo: supportTickets.assignedTo,
+            status: supportTickets.status,
+            priority: supportTickets.priority,
+            subject: supportTickets.subject,
+            lastMessageAt: supportTickets.lastMessageAt,
+            closedAt: supportTickets.closedAt,
+            createdAt: supportTickets.createdAt,
+            updatedAt: supportTickets.updatedAt,
+            userName: ticketUser.username,
+            userUserId: ticketUser.userId,
+            userAvatar: ticketUser.avatar,
+            assignedUserName: assignedUser.username,
+            assignedUserUserId: assignedUser.userId,
+            assignedUserAvatar: assignedUser.avatar,
+          })
+          .from(supportTickets)
+          .leftJoin(ticketUser, eq(supportTickets.userId, ticketUser.id))
+          .leftJoin(assignedUser, eq(supportTickets.assignedTo, assignedUser.id))
+          .where(eq(supportTickets.id, ticketId));
+
+        const ticketRow = ticketRows[0];
+        if (!ticketRow) {
           throw new TRPCError({ code: 'NOT_FOUND', message: 'Ticket not found' });
         }
+
+        const ticket = remapTicketRow(ticketRow);
 
         if (!isSupport && ticket.user_id !== user.id) {
           throw new TRPCError({ code: 'FORBIDDEN', message: 'Access denied' });
         }
 
-        const { data: messages, error: messagesError } = await supabaseAdmin
-          .from('support_messages')
-          .select(
-            `*,
-            sender:users!support_messages_sender_id_fkey(id, username, user_id, avatar),
-            attachments:support_message_attachments(id, file_name, file_type, file_size, storage_path, blur_hash, width, height)`,
-          )
-          .eq('ticket_id', ticketId)
-          .order('created_at', { ascending: true })
-          .range(offset, offset + limit - 1);
+        // Fetch messages with sender
+        const messageRows = await db
+          .select({
+            id: supportMessages.id,
+            ticketId: supportMessages.ticketId,
+            senderId: supportMessages.senderId,
+            messageText: supportMessages.messageText,
+            senderType: supportMessages.senderType,
+            isRead: supportMessages.isRead,
+            createdAt: supportMessages.createdAt,
+            senderUsername: users.username,
+            senderUserId: users.userId,
+            senderAvatar: users.avatar,
+          })
+          .from(supportMessages)
+          .leftJoin(users, eq(supportMessages.senderId, users.id))
+          .where(eq(supportMessages.ticketId, ticketId))
+          .orderBy(asc(supportMessages.createdAt))
+          .limit(limit)
+          .offset(offset);
 
-        if (messagesError) {
-          logger.error('Error fetching messages', { error: messagesError.message, ticketId });
-          return { ticket, messages: [] };
+        // Fetch attachments for all messages
+        const messageIds = messageRows.map((m) => m.id);
+        const allAttachments =
+          messageIds.length > 0
+            ? await db
+                .select()
+                .from(supportMessageAttachments)
+                .where(inArray(supportMessageAttachments.messageId, messageIds))
+            : [];
+
+        const attachmentsByMessageId = new Map<string, typeof allAttachments>();
+        for (const att of allAttachments) {
+          const list = attachmentsByMessageId.get(att.messageId) || [];
+          list.push(att);
+          attachmentsByMessageId.set(att.messageId, list);
         }
 
-        const messagesNeedingRoles = (messages || []).filter((m: any) => !m.sender_type);
-        const uniqueSenderIds = Array.from(
-          new Set(messagesNeedingRoles.map((m: any) => m.sender_id)),
-        );
+        const messagesNeedingRoles = messageRows.filter((m) => !m.senderType);
+        const uniqueSenderIds = Array.from(new Set(messagesNeedingRoles.map((m) => m.senderId)));
         const senderRolesMap =
           uniqueSenderIds.length > 0
             ? await batchHasUserRole(uniqueSenderIds, 'support')
             : new Map<string, boolean>();
 
-        const messagesWithSenderType = (messages || []).map((msg: any) => {
-          const senderType = resolveSenderType(msg, ticket.user_id, senderRolesMap);
+        const messagesWithSenderType = messageRows.map((msg) => {
+          const senderType = resolveSenderType(
+            { sender_id: msg.senderId, sender_type: msg.senderType },
+            ticket.user_id,
+            senderRolesMap,
+          );
 
+          const msgAttachments = attachmentsByMessageId.get(msg.id);
           let attachments = undefined;
-          if (msg.attachments) {
-            const attArray = Array.isArray(msg.attachments) ? msg.attachments : [msg.attachments];
-            if (attArray.length > 0) {
-              attachments = attArray.map((att: any) => ({
-                id: att.id,
-                file_name: att.file_name,
-                file_type: att.file_type,
-                file_size: att.file_size,
-                storage_path: att.storage_path,
-                storage_url: att.storage_path
-                  ? `/support/files/${encodeURIComponent(att.storage_path)}`
-                  : '',
-                blur_hash: att.blur_hash,
-                width: att.width,
-                height: att.height,
-              }));
-            }
+          if (msgAttachments && msgAttachments.length > 0) {
+            attachments = msgAttachments.map((att) => ({
+              id: att.id,
+              file_name: att.fileName,
+              file_type: att.fileType,
+              file_size: att.fileSize,
+              storage_path: att.storagePath,
+              storage_url: att.storagePath
+                ? `/support/files/${encodeURIComponent(att.storagePath)}`
+                : '',
+              blur_hash: att.blurHash,
+              width: att.width,
+              height: att.height,
+            }));
           }
 
-          return { ...msg, sender_type: senderType, attachments };
+          return {
+            id: msg.id,
+            ticket_id: msg.ticketId,
+            sender_id: msg.senderId,
+            message_text: msg.messageText,
+            sender_type: senderType,
+            is_read: msg.isRead,
+            created_at: msg.createdAt,
+            sender: msg.senderUsername
+              ? {
+                  id: msg.senderId,
+                  username: msg.senderUsername,
+                  user_id: msg.senderUserId,
+                  avatar: msg.senderAvatar,
+                }
+              : null,
+            attachments,
+          };
         });
 
         return { ticket, messages: messagesWithSenderType };
@@ -306,7 +486,7 @@ export const supportRouter = router({
     update: supportProcedure
       .input(ticketIdParamSchema.merge(updateTicketBodySchema))
       .mutation(async ({ ctx, input }) => {
-        if (!supabaseAdmin) {
+        if (!db) {
           throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database error' });
         }
 
@@ -318,18 +498,22 @@ export const supportRouter = router({
           throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid ticket ID' });
         }
 
-        const { data: currentTicket } = await supabaseAdmin
-          .from('support_tickets')
-          .select('status, assigned_to, user_id')
-          .eq('id', ticketId)
-          .single();
+        const currentTicketRows = await db
+          .select({
+            status: supportTickets.status,
+            assignedTo: supportTickets.assignedTo,
+            userId: supportTickets.userId,
+          })
+          .from(supportTickets)
+          .where(eq(supportTickets.id, ticketId));
 
+        const currentTicket = currentTicketRows[0];
         if (!currentTicket) {
           throw new TRPCError({ code: 'NOT_FOUND', message: 'Ticket not found' });
         }
 
         const oldStatus = currentTicket.status;
-        const oldAssignedTo = currentTicket.assigned_to;
+        const oldAssignedTo = currentTicket.assignedTo;
 
         if (status && oldStatus !== status) {
           const allowedTransitions: Record<string, string[]> = {
@@ -364,10 +548,10 @@ export const supportRouter = router({
         const updateData: Record<string, any> = {};
         if (status && ['open', 'closed', 'pending'].includes(status)) {
           updateData.status = status;
-          if (status === 'closed') updateData.closed_at = new Date().toISOString();
-          else if (oldStatus === 'closed') updateData.closed_at = null;
+          if (status === 'closed') updateData.closedAt = new Date().toISOString();
+          else if (oldStatus === 'closed') updateData.closedAt = null;
         }
-        if (assignedTo !== undefined) updateData.assigned_to = assignedTo || null;
+        if (assignedTo !== undefined) updateData.assignedTo = assignedTo || null;
         if (priority && ['low', 'normal', 'high', 'urgent'].includes(priority))
           updateData.priority = priority;
 
@@ -375,33 +559,65 @@ export const supportRouter = router({
           throw new TRPCError({ code: 'BAD_REQUEST', message: 'No valid update data' });
         }
 
-        const { data: ticket, error } = await supabaseAdmin
-          .from('support_tickets')
-          .update(updateData)
-          .eq('id', ticketId)
-          .select(
-            `*,
-            user:users!support_tickets_user_id_fkey(id, username, user_id),
-            assigned_user:users!support_tickets_assigned_to_fkey(id, username, user_id, avatar)`,
-          )
-          .single();
+        // Update ticket and fetch with joins
+        let updatedTicketRows;
+        try {
+          await db.update(supportTickets).set(updateData).where(eq(supportTickets.id, ticketId));
 
-        if (error) {
-          logger.error('Error updating ticket', { error: error.message, ticketId });
+          const ticketUserAlias = alias(users, 'ticketUser');
+          const assignedUserAlias = alias(users, 'assignedUser');
+
+          updatedTicketRows = await db
+            .select({
+              id: supportTickets.id,
+              userId: supportTickets.userId,
+              assignedTo: supportTickets.assignedTo,
+              status: supportTickets.status,
+              priority: supportTickets.priority,
+              subject: supportTickets.subject,
+              lastMessageAt: supportTickets.lastMessageAt,
+              closedAt: supportTickets.closedAt,
+              createdAt: supportTickets.createdAt,
+              updatedAt: supportTickets.updatedAt,
+              userName: ticketUserAlias.username,
+              userUserId: ticketUserAlias.userId,
+              userAvatar: ticketUserAlias.avatar,
+              assignedUserName: assignedUserAlias.username,
+              assignedUserUserId: assignedUserAlias.userId,
+              assignedUserAvatar: assignedUserAlias.avatar,
+            })
+            .from(supportTickets)
+            .leftJoin(ticketUserAlias, eq(supportTickets.userId, ticketUserAlias.id))
+            .leftJoin(assignedUserAlias, eq(supportTickets.assignedTo, assignedUserAlias.id))
+            .where(eq(supportTickets.id, ticketId));
+        } catch (err) {
+          logger.error('Error updating ticket', {
+            error: err instanceof Error ? err.message : 'Unknown error',
+            ticketId,
+          });
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
             message: 'Failed to update ticket',
           });
         }
 
+        const ticketRow = updatedTicketRows[0];
+        const ticket = ticketRow ? remapTicketRow(ticketRow) : null;
+
         if (ticket) {
           invalidateTicketCaches(ticket.user_id);
 
           broadcastTicketUpdate(ticketId, {
             id: ticketId,
-            status: ticket.status,
-            updated_at: ticket.updated_at,
-            closed_at: ticket.closed_at || null,
+            status: ticket.status as 'open' | 'closed' | 'pending',
+            updated_at:
+              ticket.updated_at instanceof Date
+                ? ticket.updated_at.toISOString()
+                : ticket.updated_at,
+            closed_at:
+              ticket.closed_at instanceof Date
+                ? ticket.closed_at.toISOString()
+                : ticket.closed_at || null,
           });
 
           if (assignedTo !== undefined && assignedTo !== oldAssignedTo) {
@@ -432,25 +648,56 @@ export const supportRouter = router({
             messageText = `Статус обращения изменен на [${statusNames[status] || status}]`;
           }
 
-          const { data: statusMessage, error: messageError } = await supabaseAdmin
-            .from('support_messages')
-            .insert({
-              ticket_id: ticketId,
-              sender_id: user.id,
-              message_text: messageText,
-            })
-            .select(
-              `*, sender:users!support_messages_sender_id_fkey(id, username, user_id, avatar)`,
-            )
-            .single();
+          try {
+            const [statusMessage] = await db!
+              .insert(supportMessages)
+              .values({
+                ticketId,
+                senderId: user.id,
+                messageText,
+              })
+              .returning();
 
-          if (messageError) {
+            if (statusMessage) {
+              // Fetch sender info for broadcast
+              const senderRows = await db!
+                .select({
+                  id: users.id,
+                  username: users.username,
+                  userId: users.userId,
+                  avatar: users.avatar,
+                })
+                .from(users)
+                .where(eq(users.id, user.id));
+
+              const sender = senderRows[0] || null;
+
+              broadcastNewMessage(ticketId, {
+                id: statusMessage.id,
+                ticket_id: statusMessage.ticketId,
+                sender_id: statusMessage.senderId,
+                sender_type: 'support' as const,
+                message_text: statusMessage.messageText,
+                is_read: statusMessage.isRead,
+                created_at:
+                  statusMessage.createdAt instanceof Date
+                    ? statusMessage.createdAt.toISOString()
+                    : statusMessage.createdAt,
+                sender: sender
+                  ? {
+                      id: sender.id,
+                      username: sender.username,
+                      user_id: sender.userId,
+                      avatar: sender.avatar,
+                    }
+                  : undefined,
+              });
+            }
+          } catch (err) {
             logger.error('Error creating status change message', {
-              error: messageError.message,
+              error: err instanceof Error ? err.message : 'Unknown error',
               ticketId,
             });
-          } else if (statusMessage) {
-            broadcastNewMessage(ticketId, statusMessage);
           }
         }
 
@@ -460,7 +707,7 @@ export const supportRouter = router({
     sendMessage: protectedProcedure
       .input(ticketIdParamSchema.merge(createMessageBodySchema))
       .mutation(async ({ ctx, input }) => {
-        if (!supabaseAdmin) {
+        if (!db) {
           throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database error' });
         }
 
@@ -477,8 +724,6 @@ export const supportRouter = router({
         if (sessionId && csrfToken) {
           const csrfValidation = await verifyCSRFToken(csrfToken, sessionId, true);
           if (!csrfValidation.valid) {
-            // Логируем причину, но не блокируем отправку сообщения:
-            // пользователь уже аутентифицирован, поверх этого есть rate limit.
             logger.warn('CSRF validation failed for support.tickets.sendMessage', {
               userId: user.id,
               sessionId: sessionId.slice(0, 8),
@@ -493,21 +738,25 @@ export const supportRouter = router({
           throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid ticket ID' });
         }
 
-        const { data: ticket, error: ticketError } = await supabaseAdmin
-          .from('support_tickets')
-          .select('id, user_id, status')
-          .eq('id', ticketId)
-          .single();
+        const ticketRows = await db
+          .select({
+            id: supportTickets.id,
+            userId: supportTickets.userId,
+            status: supportTickets.status,
+          })
+          .from(supportTickets)
+          .where(eq(supportTickets.id, ticketId));
 
-        if (ticketError || !ticket) {
+        const ticket = ticketRows[0];
+        if (!ticket) {
           throw new TRPCError({ code: 'NOT_FOUND', message: 'Ticket not found' });
         }
 
-        if (!isSupport && ticket.user_id !== user.id) {
+        if (!isSupport && ticket.userId !== user.id) {
           throw new TRPCError({ code: 'FORBIDDEN', message: 'Access denied' });
         }
 
-        if (isSupport && ticket.user_id === user.id) {
+        if (isSupport && ticket.userId === user.id) {
           throw new TRPCError({
             code: 'FORBIDDEN',
             message: 'Сотрудники поддержки не могут отправлять сообщения в свои старые тикеты.',
@@ -522,67 +771,88 @@ export const supportRouter = router({
         }
 
         if (isSupport && ticket.status === 'closed') {
-          const { data: updatedTicket } = await supabaseAdmin
-            .from('support_tickets')
-            .update({ status: 'open', closed_at: null })
-            .eq('id', ticketId)
-            .select('status, updated_at, closed_at')
-            .single();
+          const updatedRows = await db
+            .update(supportTickets)
+            .set({ status: 'open', closedAt: null })
+            .where(eq(supportTickets.id, ticketId))
+            .returning({
+              status: supportTickets.status,
+              updatedAt: supportTickets.updatedAt,
+              closedAt: supportTickets.closedAt,
+            });
 
+          const updatedTicket = updatedRows[0];
           if (updatedTicket) {
             broadcastTicketUpdate(ticketId, {
               id: ticketId,
-              status: updatedTicket.status,
-              updated_at: updatedTicket.updated_at,
-              closed_at: updatedTicket.closed_at,
+              status: updatedTicket.status as 'open' | 'closed' | 'pending',
+              updated_at:
+                updatedTicket.updatedAt instanceof Date
+                  ? updatedTicket.updatedAt.toISOString()
+                  : updatedTicket.updatedAt,
+              closed_at:
+                updatedTicket.closedAt instanceof Date
+                  ? updatedTicket.closedAt.toISOString()
+                  : (updatedTicket.closedAt ?? null),
             });
           }
         }
 
-        const messageData: {
-          ticket_id: string;
-          sender_id: string;
-          message_text: string;
-          sender_type?: 'support' | 'user';
-        } = {
-          ticket_id: ticketId,
-          sender_id: user.id,
-          message_text:
-            message && typeof message === 'string' && message.trim() ? message.trim() : '',
-          sender_type: isSupport ? 'support' : 'user',
-        };
+        const messageText =
+          message && typeof message === 'string' && message.trim() ? message.trim() : '';
 
-        let { data: newMessage, error: messageError } = await supabaseAdmin
-          .from('support_messages')
-          .insert(messageData)
-          .select(`*, sender:users!support_messages_sender_id_fkey(id, username, user_id, avatar)`)
-          .single();
-
-        if (
-          messageError &&
-          (messageError.message?.toLowerCase().includes('sender_type') ||
-            messageError.code === '42703' ||
-            messageError.code === 'PGRST116')
-        ) {
-          const { ticket_id, sender_id, message_text } = messageData;
-          const fallback = await supabaseAdmin
-            .from('support_messages')
-            .insert({ ticket_id, sender_id, message_text })
-            .select(
-              `*, sender:users!support_messages_sender_id_fkey(id, username, user_id, avatar)`,
-            )
-            .single();
-          newMessage = fallback.data;
-          messageError = fallback.error;
+        let newMessage;
+        try {
+          const [inserted] = await db
+            .insert(supportMessages)
+            .values({
+              ticketId,
+              senderId: user.id,
+              messageText,
+              senderType: isSupport ? 'support' : 'user',
+            })
+            .returning();
+          newMessage = inserted;
+        } catch {
+          // Fallback: try without senderType if column issue
+          try {
+            const [inserted] = await db
+              .insert(supportMessages)
+              .values({
+                ticketId,
+                senderId: user.id,
+                messageText,
+              })
+              .returning();
+            newMessage = inserted;
+          } catch (fallbackErr) {
+            logger.error('Error creating message', {
+              error: fallbackErr instanceof Error ? fallbackErr.message : 'Unknown error',
+              ticketId,
+            });
+            throw new TRPCError({
+              code: 'INTERNAL_SERVER_ERROR',
+              message: 'Failed to send message',
+            });
+          }
         }
 
-        if (messageError || !newMessage) {
-          logger.error('Error creating message', {
-            error: messageError?.message,
-            ticketId,
-          });
+        if (!newMessage) {
           throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Failed to send message' });
         }
+
+        // Fetch sender info
+        const senderRows = await db
+          .select({
+            id: users.id,
+            username: users.username,
+            userId: users.userId,
+            avatar: users.avatar,
+          })
+          .from(users)
+          .where(eq(users.id, user.id));
+
+        const senderData = senderRows[0] || null;
 
         let dbAttachments: Array<{
           id: string;
@@ -598,55 +868,78 @@ export const supportRouter = router({
 
         if (attachments && attachments.length > 0) {
           const attachmentRecords = attachments.map((att) => ({
-            message_id: newMessage!.id,
-            file_name: att.fileName,
-            file_type: att.fileType,
-            file_size: att.fileSize,
-            storage_path: att.storagePath,
-            blur_hash: att.blur_hash || null,
+            messageId: newMessage!.id,
+            fileName: att.fileName,
+            fileType: att.fileType,
+            fileSize: att.fileSize,
+            storagePath: att.storagePath,
+            blurHash: att.blur_hash || null,
             width: att.width || null,
             height: att.height || null,
           }));
 
-          const { data: insertedAtt, error: attError } = await supabaseAdmin
-            .from('support_message_attachments')
-            .insert(attachmentRecords)
-            .select('id, file_name, file_type, file_size, storage_path, blur_hash, width, height');
+          try {
+            const insertedAtt = await db
+              .insert(supportMessageAttachments)
+              .values(attachmentRecords)
+              .returning({
+                id: supportMessageAttachments.id,
+                fileName: supportMessageAttachments.fileName,
+                fileType: supportMessageAttachments.fileType,
+                fileSize: supportMessageAttachments.fileSize,
+                storagePath: supportMessageAttachments.storagePath,
+                blurHash: supportMessageAttachments.blurHash,
+                width: supportMessageAttachments.width,
+                height: supportMessageAttachments.height,
+              });
 
-          if (attError) {
+            if (insertedAtt && insertedAtt.length > 0) {
+              dbAttachments = insertedAtt.map((att) => ({
+                id: att.id,
+                file_name: att.fileName,
+                file_type: att.fileType,
+                file_size: att.fileSize,
+                storage_path: att.storagePath,
+                storage_url: `/support/files/${encodeURIComponent(att.storagePath)}`,
+                blur_hash: att.blurHash,
+                width: att.width,
+                height: att.height,
+              }));
+            }
+          } catch (attErr) {
             logger.error('Error creating attachments', {
-              error: attError.message,
+              error: attErr instanceof Error ? attErr.message : 'Unknown error',
               messageId: newMessage.id,
             });
-          }
-
-          if (insertedAtt && insertedAtt.length > 0) {
-            dbAttachments = insertedAtt.map((att) => ({
-              ...att,
-              storage_url: `/support/files/${encodeURIComponent(att.storage_path)}`,
-            }));
           }
         }
 
         if (newMessage) {
-          let senderData = newMessage.sender;
-          if (Array.isArray(senderData)) senderData = senderData[0] || undefined;
-
           const messageForBroadcast = {
             id: newMessage.id,
-            ticket_id: newMessage.ticket_id,
-            sender_id: newMessage.sender_id,
+            ticket_id: newMessage.ticketId,
+            sender_id: newMessage.senderId,
             sender_type: (isSupport ? 'support' : 'user') as 'user' | 'support',
-            message_text: newMessage.message_text || '',
-            is_read: newMessage.is_read || false,
-            created_at: newMessage.created_at,
-            sender: senderData,
+            message_text: newMessage.messageText || '',
+            is_read: newMessage.isRead || false,
+            created_at:
+              newMessage.createdAt instanceof Date
+                ? newMessage.createdAt.toISOString()
+                : newMessage.createdAt,
+            sender: senderData
+              ? {
+                  id: senderData.id,
+                  username: senderData.username,
+                  user_id: senderData.userId,
+                  avatar: senderData.avatar,
+                }
+              : undefined,
             attachments: dbAttachments.length > 0 ? dbAttachments : undefined,
           };
 
           try {
             const { trackMessageSent } = await import('@/lib/analytics/support-analytics');
-            await trackMessageSent(ticketId, newMessage.sender_id, messageForBroadcast.sender_type);
+            await trackMessageSent(ticketId, newMessage.senderId, messageForBroadcast.sender_type);
           } catch {}
 
           try {
@@ -658,22 +951,22 @@ export const supportRouter = router({
             });
           }
 
-          invalidateTicketCaches(ticket.user_id);
+          invalidateTicketCaches(ticket.userId);
         }
 
         if (!isSupport) {
-          const { data: existingMessages } = await supabaseAdmin
-            .from('support_messages')
-            .select('sender_id')
-            .eq('ticket_id', ticketId)
+          const existingMessages = await db
+            .select({ senderId: supportMessages.senderId })
+            .from(supportMessages)
+            .where(eq(supportMessages.ticketId, ticketId))
             .limit(10);
 
           let hasSupportMessage = false;
           if (existingMessages && existingMessages.length > 0) {
-            const senderIds = Array.from(new Set(existingMessages.map((m) => m.sender_id)));
+            const senderIds = Array.from(new Set(existingMessages.map((m) => m.senderId)));
             const rolesMap = await batchHasUserRole(senderIds, 'support');
             for (const m of existingMessages) {
-              if (rolesMap.get(m.sender_id)) {
+              if (rolesMap.get(m.senderId)) {
                 hasSupportMessage = true;
                 break;
               }
@@ -683,18 +976,22 @@ export const supportRouter = router({
           if (!hasSupportMessage) {
             const SYSTEM_MESSAGE_TEXT =
               'Спасибо за ваше обращение. Мы получили ваш запрос и ответим в ближайшее время.';
-            const { data: existing } = await supabaseAdmin
-              .from('support_messages')
-              .select('id')
-              .eq('ticket_id', ticketId)
-              .eq('message_text', SYSTEM_MESSAGE_TEXT)
+            const existing = await db
+              .select({ id: supportMessages.id })
+              .from(supportMessages)
+              .where(
+                and(
+                  eq(supportMessages.ticketId, ticketId),
+                  eq(supportMessages.messageText, SYSTEM_MESSAGE_TEXT),
+                ),
+              )
               .limit(1);
 
             if (!existing || existing.length === 0) {
-              await supabaseAdmin.from('support_messages').insert({
-                ticket_id: ticketId,
-                sender_id: user.id,
-                message_text: SYSTEM_MESSAGE_TEXT,
+              await db.insert(supportMessages).values({
+                ticketId,
+                senderId: user.id,
+                messageText: SYSTEM_MESSAGE_TEXT,
               });
             }
           }
@@ -702,7 +999,21 @@ export const supportRouter = router({
 
         return {
           message: {
-            ...newMessage,
+            id: newMessage.id,
+            ticket_id: newMessage.ticketId,
+            sender_id: newMessage.senderId,
+            message_text: newMessage.messageText,
+            sender_type: (isSupport ? 'support' : 'user') as 'user' | 'support',
+            is_read: newMessage.isRead,
+            created_at: newMessage.createdAt,
+            sender: senderData
+              ? {
+                  id: senderData.id,
+                  username: senderData.username,
+                  user_id: senderData.userId,
+                  avatar: senderData.avatar,
+                }
+              : undefined,
             attachments: dbAttachments.length > 0 ? dbAttachments : undefined,
           },
           success: true,
@@ -710,7 +1021,7 @@ export const supportRouter = router({
       }),
 
     markAsRead: protectedProcedure.input(ticketIdParamSchema).mutation(async ({ ctx, input }) => {
-      if (!supabaseAdmin) {
+      if (!db) {
         throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database error' });
       }
 
@@ -721,30 +1032,37 @@ export const supportRouter = router({
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid ticket ID' });
       }
 
-      const { data: ticket } = await supabaseAdmin
-        .from('support_tickets')
-        .select('id, user_id')
-        .eq('id', ticketId)
-        .single();
+      const ticketRows = await db
+        .select({ id: supportTickets.id, userId: supportTickets.userId })
+        .from(supportTickets)
+        .where(eq(supportTickets.id, ticketId));
 
+      const ticket = ticketRows[0];
       if (!ticket) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Ticket not found' });
       }
 
       const isSupport = await hasUserRole(user.id, 'support');
-      if (!isSupport && ticket.user_id !== user.id) {
+      if (!isSupport && ticket.userId !== user.id) {
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Access denied' });
       }
 
-      const { error } = await supabaseAdmin
-        .from('support_messages')
-        .update({ is_read: true })
-        .eq('ticket_id', ticketId)
-        .neq('sender_id', user.id)
-        .eq('is_read', false);
-
-      if (error) {
-        logger.error('Error marking messages as read', { error: error.message, ticketId });
+      try {
+        await db
+          .update(supportMessages)
+          .set({ isRead: true })
+          .where(
+            and(
+              eq(supportMessages.ticketId, ticketId),
+              ne(supportMessages.senderId, user.id),
+              eq(supportMessages.isRead, false),
+            ),
+          );
+      } catch (err) {
+        logger.error('Error marking messages as read', {
+          error: err instanceof Error ? err.message : 'Unknown error',
+          ticketId,
+        });
         throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Failed to mark as read' });
       }
 

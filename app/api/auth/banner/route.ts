@@ -14,7 +14,9 @@ import {
   ERROR_NOT_AUTHENTICATED,
   ERROR_TOO_MANY_REQUESTS,
 } from '@/lib/utils/constants';
-import { supabaseAdmin } from '@/lib/database/supabase';
+import { db } from '@/lib/database/db';
+import { users } from '@/lib/database/schema';
+import { eq } from 'drizzle-orm';
 import {
   uploadAvatarToS3,
   deleteFileFromS3,
@@ -121,22 +123,22 @@ export async function POST(request: NextRequest) {
     }
 
     // Получаем текущий баннер пользователя для удаления
-    if (!supabaseAdmin) {
-      logger.error('Supabase admin client not available');
+    if (!db) {
+      logger.error('Database client not available');
       return setCorsHeaders(
         NextResponse.json({ error: ERROR_INTERNAL_SERVER_ERROR }, { status: 500 }),
       );
     }
 
-    const { data: currentUser, error: userError } = await supabaseAdmin
-      .from('users')
-      .select('banner')
-      .eq('id', user.id)
-      .single();
+    const userRows = await db
+      .select({ banner: users.banner })
+      .from(users)
+      .where(eq(users.id, user.id))
+      .limit(1);
 
-    if (userError || !currentUser) {
+    const currentUser = userRows[0];
+    if (!currentUser) {
       logger.error('Error fetching current user banner', {
-        error: userError,
         userId: user.id,
       });
       return setCorsHeaders(
@@ -168,27 +170,9 @@ export async function POST(request: NextRequest) {
 
     // Обновляем баннер в базе данных
     const newBannerPath = `s3:${storagePath}`;
-    if (!supabaseAdmin) {
-      logger.error('Supabase admin client not available');
-      // Пытаемся удалить загруженный файл из S3 при ошибке
-      try {
-        await deleteFileFromS3(storagePath);
-      } catch (deleteError) {
-        logger.error('Error deleting uploaded banner after DB connection failure', {
-          error: deleteError,
-        });
-      }
-      return setCorsHeaders(
-        NextResponse.json({ error: ERROR_INTERNAL_SERVER_ERROR }, { status: 500 }),
-      );
-    }
-
-    const { error: updateError } = await supabaseAdmin
-      .from('users')
-      .update({ banner: newBannerPath })
-      .eq('id', user.id);
-
-    if (updateError) {
+    try {
+      await db.update(users).set({ banner: newBannerPath }).where(eq(users.id, user.id));
+    } catch (updateError) {
       logger.error('Error updating banner in database', {
         error: updateError,
         userId: user.id,
@@ -248,13 +232,13 @@ export async function POST(request: NextRequest) {
     const pex = currentData?.pex || 'u';
 
     const userDataValue = createUserDataCookie({
-      user_id: user.user_id,
+      user_id: user.userId,
       username: user.username,
       avatar: user.avatar ?? null,
       banner: newBannerPath,
       pex,
     });
-    revalidateTag(`user-profile:${user.user_id}`, 'max');
+    revalidateTag(`user-profile:${user.userId}`, 'max');
 
     const response = NextResponse.json({
       success: true,

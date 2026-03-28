@@ -6,9 +6,9 @@ import { trpc } from '@/lib/trpc/client';
 interface TrustedDeveloper {
   id: string;
   email: string | null;
-  github_username: string;
-  created_at: string;
-  updated_at: string;
+  githubUsername: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export default function TrustedDevelopersSettings() {
@@ -316,7 +316,7 @@ export default function TrustedDevelopersSettings() {
                 <div className="mb-4 flex items-start justify-between">
                   <div className="flex flex-1 items-center gap-3">
                     <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500/20 to-blue-600/20 text-lg font-bold text-blue-400 shadow-lg shadow-blue-500/10">
-                      {developer.github_username.charAt(0).toUpperCase()}
+                      {developer.githubUsername.charAt(0).toUpperCase()}
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="mb-1 flex items-center gap-2">
@@ -332,7 +332,7 @@ export default function TrustedDevelopersSettings() {
                           />
                         </svg>
                         <div className="truncate font-semibold text-white">
-                          {developer.github_username}
+                          {developer.githubUsername}
                         </div>
                       </div>
                       {developer.email ? (
@@ -398,7 +398,7 @@ export default function TrustedDevelopersSettings() {
                       d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
                     />
                   </svg>
-                  <span>Добавлен: {formatDate(developer.created_at)}</span>
+                  <span>Добавлен: {formatDate(developer.createdAt)}</span>
                 </div>
               </div>
             ))}

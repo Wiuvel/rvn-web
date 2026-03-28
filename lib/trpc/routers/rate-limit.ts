@@ -13,7 +13,7 @@ export const rateLimitRouter = router({
     const isAuthenticated = cookieStore.get('user_authenticated')?.value === 'true';
 
     if (!isAuthenticated) {
-      throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Not authenticated' });
+      throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Требуется авторизация' });
     }
 
     const secretKey = process.env.TURNSTILE_SECRET_KEY;
@@ -23,7 +23,7 @@ export const rateLimitRouter = router({
       });
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',
-        message: 'CAPTCHA service not configured',
+        message: 'Сервис проверки недоступен',
       });
     }
 
@@ -52,16 +52,16 @@ export const rateLimitRouter = router({
         errors: errorCodes,
       });
 
-      let errorMessage = 'CAPTCHA verification failed';
+      let errorMessage = 'Проверка не пройдена';
       if (errorCodes.includes('invalid-input-secret')) {
         logger.error('Turnstile secret key is invalid', {
           ip: ctx.headers.get('x-forwarded-for'),
         });
-        errorMessage = 'CAPTCHA service configuration error';
+        errorMessage = 'Сервис проверки недоступен';
       } else if (errorCodes.includes('invalid-input-response')) {
-        errorMessage = 'CAPTCHA verification failed: Invalid token';
+        errorMessage = 'Неверный токен проверки';
       } else if (errorCodes.includes('timeout-or-duplicate')) {
-        errorMessage = 'CAPTCHA verification failed: Token expired or already used';
+        errorMessage = 'Токен истек, попробуйте снова';
       }
 
       throw new TRPCError({ code: 'BAD_REQUEST', message: errorMessage });

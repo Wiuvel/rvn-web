@@ -30,7 +30,7 @@ import ChatHeader from '@/components/support/ChatHeader';
 import MessageItem from '@/components/support/MessageItem';
 import TicketListItem from '@/components/support/TicketListItem';
 import CreateTicketForm from '@/components/support/CreateTicketForm';
-import { PanelLeftClose, PanelLeft, Plus } from 'lucide-react';
+import { PanelLeftClose, PanelLeft, Plus, Ticket as TicketIcon } from 'lucide-react';
 import ImageViewer from '@/components/support/ImageViewer';
 import Header from '@/components/layout/Header';
 import { useAuth } from '@/hooks/useAuth';
@@ -936,7 +936,12 @@ export default function SupportClient() {
                 sender_type: string;
                 created_at: string;
                 is_read: boolean;
-                sender?: { id: string; username: string; user_id: string; avatar?: string | null };
+                sender?: {
+                  id: string;
+                  username: string;
+                  user_id: string | null;
+                  avatar?: string | null;
+                } | null;
                 attachments?: Array<{
                   id: string;
                   file_name: string;
@@ -944,9 +949,9 @@ export default function SupportClient() {
                   file_size: number;
                   storage_path?: string;
                   storage_url?: string;
-                  blur_hash?: string;
-                  width?: number;
-                  height?: number;
+                  blur_hash?: string | null;
+                  width?: number | null;
+                  height?: number | null;
                 }>;
               }) => ({
                 id: m.id,
@@ -1374,7 +1379,12 @@ export default function SupportClient() {
                 sender_type: string;
                 created_at: string;
                 is_read: boolean;
-                sender?: { id: string; username: string; user_id: string; avatar?: string | null };
+                sender?: {
+                  id: string;
+                  username: string;
+                  user_id: string | null;
+                  avatar?: string | null;
+                } | null;
                 attachments?: Array<{
                   id: string;
                   file_name: string;
@@ -1785,7 +1795,12 @@ export default function SupportClient() {
                 sender_type: string;
                 created_at: string;
                 is_read: boolean;
-                sender?: { id: string; username: string; user_id: string; avatar?: string | null };
+                sender?: {
+                  id: string;
+                  username: string;
+                  user_id: string | null;
+                  avatar?: string | null;
+                } | null;
                 attachments?: Array<{
                   id: string;
                   file_name: string;
@@ -1793,9 +1808,9 @@ export default function SupportClient() {
                   file_size: number;
                   storage_url: string;
                   storage_path?: string;
-                  blur_hash?: string;
-                  width?: number;
-                  height?: number;
+                  blur_hash?: string | null;
+                  width?: number | null;
+                  height?: number | null;
                 }>;
               }) => ({
                 id: m.id,
@@ -2048,14 +2063,18 @@ export default function SupportClient() {
   }
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-neutral-950 text-neutral-100">
-      <Header />
+    <div className="flex h-dvh flex-col overflow-hidden bg-neutral-950 text-neutral-100">
+      <div className="hidden lg:block">
+        <Header />
+      </div>
 
       {/* Main Content */}
-      <main className="min-h-0 flex-1 overflow-hidden pb-4 pt-4 lg:pt-32">
+      <main
+        className={`min-h-0 flex-1 overflow-hidden pt-4 lg:pt-32 ${activeTicket ? 'pb-0.5 sm:pb-4' : 'pb-4'}`}
+      >
         <div className="mx-auto flex h-full max-w-7xl flex-col overflow-hidden px-3 sm:px-4 lg:px-8">
-          <div className="mb-4 hidden sm:mb-6 sm:block">
-            <p className="text-xs text-neutral-400 sm:text-sm">
+          <div className="mb-4 hidden lg:mb-8 lg:block">
+            <p className="text-lg text-neutral-400">
               Обратитесь в службу поддержки. Создайте новое обращение или выберите существующее для
               продолжения диалога.
             </p>
@@ -2138,7 +2157,7 @@ export default function SupportClient() {
               <div
                 className={`flex min-w-[300px] flex-1 flex-col overflow-hidden rounded-2xl border border-white/10 bg-neutral-900 p-2 sm:p-4 ${sidebarCollapsed ? 'lg:hidden' : ''}`}
               >
-                <div className="mb-2 flex flex-shrink-0 items-center justify-between gap-2 sm:mb-4">
+                <div className="mb-2 flex flex-shrink-0 items-center justify-between gap-2 pl-1 sm:mb-4 sm:pl-0">
                   <div className="flex min-w-0 flex-1 items-center gap-2">
                     <button
                       type="button"
@@ -2159,6 +2178,7 @@ export default function SupportClient() {
                         <PanelLeftClose className="h-5 w-5" />
                       )}
                     </button>
+                    <TicketIcon className="h-5 w-5 flex-shrink-0 text-neutral-400 sm:hidden" />
                     <h2 className="truncate text-base font-semibold sm:text-lg">Мои тикеты</h2>
                   </div>
                   <div className="flex flex-shrink-0 items-center gap-1">
@@ -2171,7 +2191,7 @@ export default function SupportClient() {
                         setShowNewTicketForm(!showNewTicketForm);
                       }}
                       disabled={activeTicketsCount >= MAX_TICKETS_PER_USER || isSupport}
-                      className="rounded-lg bg-primary-500 px-3 py-1.5 text-sm text-white transition-colors hover:bg-primary-400 disabled:bg-neutral-700 disabled:text-neutral-500"
+                      className="hidden rounded-lg bg-primary-500 px-3 py-1.5 text-sm text-white transition-colors hover:bg-primary-400 disabled:bg-neutral-700 disabled:text-neutral-500 lg:block"
                       title={
                         isSupport ? 'Создание тикетов недоступно для сотрудников поддержки' : ''
                       }
@@ -2259,6 +2279,26 @@ export default function SupportClient() {
                     </div>
                   )}
                 </div>
+
+                {/* Mobile "+" button below ticket list */}
+                {!isSupport && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (activeTicketsCount >= MAX_TICKETS_PER_USER) {
+                        alert('Вы можете создать максимум 2 активных обращения');
+                        return;
+                      }
+                      setShowNewTicketForm(!showNewTicketForm);
+                    }}
+                    disabled={activeTicketsCount >= MAX_TICKETS_PER_USER}
+                    className="mx-auto mt-2 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-primary-500 text-white transition-colors hover:bg-primary-400 disabled:bg-neutral-700 disabled:text-neutral-500 lg:hidden"
+                    title="Создать тикет"
+                    aria-label="Создать тикет"
+                  >
+                    <Plus className="h-5 w-5" />
+                  </button>
+                )}
               </div>
             </div>
 
@@ -2283,7 +2323,7 @@ export default function SupportClient() {
 
                       <div
                         ref={messagesContainerRef}
-                        className="support-chat-messages relative min-h-0 flex-1 overflow-y-auto"
+                        className="support-chat-messages relative min-h-0 flex-1 overflow-y-auto pb-14 lg:pb-0"
                       >
                         {ticketsLoading && (
                           <div className="absolute right-4 top-4 z-10 flex items-center gap-2 text-sm text-neutral-400">
@@ -2350,7 +2390,9 @@ export default function SupportClient() {
                           </div>
                         </div>
                       </div>
+                    </div>
 
+                    <div className="fixed bottom-[60px] left-0 right-0 z-[1001] border-t border-white/[0.08] bg-neutral-950/95 backdrop-blur-xl lg:static lg:border-t-0 lg:bg-neutral-900 lg:backdrop-blur-none">
                       <MessageInput
                         messageText={messageText}
                         onMessageChange={setMessageText}
@@ -2425,19 +2467,19 @@ export default function SupportClient() {
       {notification.show && (
         <div
           ref={notificationRef}
-          className="fixed bottom-4 left-2 right-2 z-[1000] max-w-sm sm:left-4 sm:right-auto sm:max-w-none"
+          className="fixed left-3 right-3 top-6 z-[1000] mx-auto max-w-xs sm:bottom-4 sm:left-4 sm:right-auto sm:top-auto sm:mx-0 sm:max-w-sm"
         >
           <div
-            className={`rounded-lg border px-3 py-2 shadow-xl backdrop-blur-xl sm:rounded-xl sm:px-4 sm:py-3 ${
+            className={`rounded-md border px-2.5 py-1.5 shadow-xl backdrop-blur-xl sm:rounded-xl sm:px-4 sm:py-3 ${
               notification.type === 'error'
                 ? 'border-red-400/50 bg-red-500/90 text-white'
                 : 'border-blue-400/50 bg-blue-500/90 text-white'
             }`}
           >
-            <div className="flex items-start gap-2">
+            <div className="flex items-start gap-1.5 sm:gap-2">
               {notification.type === 'error' ? (
                 <svg
-                  className="mt-0.5 h-4 w-4 flex-shrink-0 sm:h-5 sm:w-5"
+                  className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 sm:h-5 sm:w-5"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -2451,7 +2493,7 @@ export default function SupportClient() {
                 </svg>
               ) : (
                 <svg
-                  className="mt-0.5 h-4 w-4 flex-shrink-0 sm:h-5 sm:w-5"
+                  className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 sm:h-5 sm:w-5"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -2464,7 +2506,9 @@ export default function SupportClient() {
                   />
                 </svg>
               )}
-              <p className="break-words text-xs font-medium sm:text-sm">{notification.message}</p>
+              <p className="break-words text-[11px] font-medium leading-tight sm:text-sm sm:leading-normal">
+                {notification.message}
+              </p>
             </div>
           </div>
         </div>

@@ -54,14 +54,6 @@ export const protectionRouter = router({
       throw new TRPCError({ code: 'BAD_REQUEST', message: errorMessage });
     }
 
-    const ip =
-      ctx.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-      ctx.headers.get('x-real-ip') ||
-      'unknown';
-    const userAgent = ctx.headers.get('user-agent') || '';
-    const data = `${ip}|${userAgent}`;
-    const signature = crypto.createHmac('sha256', secretKey).update(data).digest('hex');
-
     const cookieStore = await cookies();
     const cookieOptions = {
       maxAge: 12 * 60 * 60, // 12 часов
@@ -71,9 +63,9 @@ export const protectionRouter = router({
       path: '/',
     };
 
-    cookieStore.set('access_granted', 'true', cookieOptions);
-    cookieStore.set('access_hash', signature, cookieOptions);
-    cookieStore.set('access_time', Date.now().toString(), cookieOptions);
+    const payload = Buffer.from(JSON.stringify({ t: Date.now() })).toString('base64url');
+    const tokenHmac = crypto.createHmac('sha256', secretKey).update(payload).digest('hex');
+    cookieStore.set('access_token', `${payload}.${tokenHmac}`, cookieOptions);
 
     return { success: true, verified: true };
   }),

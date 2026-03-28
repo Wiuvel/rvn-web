@@ -8,7 +8,9 @@ import {
 import { checkAuth } from '@/lib/auth/helper';
 import { setCorsHeaders, handleCorsPreflight } from '@/lib/security/cors';
 import { generalRateLimit } from '@/lib/security/rate-limit';
-import { supabaseAdmin } from '@/lib/database/supabase';
+import { db } from '@/lib/database/db';
+import { supportTickets } from '@/lib/database/schema';
+import { eq } from 'drizzle-orm';
 import { generateThumbhash } from '@/lib/wasm/image-processor';
 
 const MAX_FILES_PER_REQUEST = 2; // Максимум 2 файла за раз
@@ -46,22 +48,27 @@ export async function POST(request: NextRequest) {
     }
 
     // Проверяем, что тикет существует и принадлежит пользователю
-    if (!supabaseAdmin) {
+    if (!db) {
       return setCorsHeaders(NextResponse.json({ error: 'INTERNAL_SERVER_ERROR' }, { status: 500 }));
     }
 
-    const { data: ticket, error: ticketError } = await supabaseAdmin
-      .from('support_tickets')
-      .select('id, user_id, status')
-      .eq('id', ticketId)
-      .single();
+    const ticketRows = await db
+      .select({
+        id: supportTickets.id,
+        userId: supportTickets.userId,
+        status: supportTickets.status,
+      })
+      .from(supportTickets)
+      .where(eq(supportTickets.id, ticketId))
+      .limit(1);
 
-    if (ticketError || !ticket) {
+    const ticket = ticketRows[0];
+    if (!ticket) {
       return setCorsHeaders(NextResponse.json({ error: 'TICKET_NOT_FOUND' }, { status: 404 }));
     }
 
     // Проверяем права доступа
-    if (ticket.user_id !== user.id) {
+    if (ticket.userId !== user.id) {
       return setCorsHeaders(NextResponse.json({ error: 'ACCESS_DENIED' }, { status: 403 }));
     }
 

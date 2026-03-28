@@ -149,7 +149,7 @@ export default function Header({ variant = 'main' }: HeaderProps = {}) {
           >
             Поддержка
           </Link>
-          <span className="cursor-not-allowed text-neutral-500">Wiki</span>
+          <span className="text-neutral-500">Wiki</span>
         </>
       );
     }

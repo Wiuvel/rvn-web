@@ -6,11 +6,7 @@ import { z } from 'zod';
  */
 const envSchema = z
   .object({
-    SUPABASE_URL: z.string().url('SUPABASE_URL must be a valid URL'),
-    SUPABASE_PUBLISHABLE_KEY: z
-      .string()
-      .min(20, 'SUPABASE_PUBLISHABLE_KEY must be at least 20 characters'),
-    SUPABASE_SECRET_KEY: z.string().min(20, 'SUPABASE_SECRET_KEY must be at least 20 characters'),
+    DATABASE_URL: z.string().min(10, 'DATABASE_URL must be a valid PostgreSQL connection string'),
 
     CSRF_SECRET: z
       .string()
@@ -125,13 +121,9 @@ export function validateEnv(): Env {
     return validatedEnv;
   }
 
-  const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-
   try {
     validatedEnv = envSchema.parse({
-      SUPABASE_URL: supabaseUrl,
-      SUPABASE_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
-      SUPABASE_SECRET_KEY: process.env.SUPABASE_SECRET_KEY,
+      DATABASE_URL: process.env.DATABASE_URL,
       CSRF_SECRET: process.env.CSRF_SECRET,
       TURNSTILE_SECRET_KEY: process.env.TURNSTILE_SECRET_KEY,
       ALLOWED_ORIGINS: process.env.ALLOWED_ORIGINS,

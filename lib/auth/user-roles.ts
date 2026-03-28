@@ -2,7 +2,9 @@
  * Утилиты для работы с ролями пользователей
  */
 
-import { supabaseAdmin } from '../database/supabase';
+import { db } from '../database/db';
+import { userRoles } from '../database/schema';
+import { eq, and, isNull, inArray, desc } from 'drizzle-orm';
 import { logger } from '../utils/secure-logger';
 import { cached, cache } from '../database/cache';
 
@@ -10,14 +12,14 @@ export type UserRole = 'user' | 'support' | 'admin';
 
 export interface UserRoleRecord {
   id: string;
-  user_id: string;
+  userId: string;
   role: UserRole;
-  granted_by: string | null;
-  granted_at: string;
-  revoked_at: string | null;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
+  grantedBy: string | null;
+  grantedAt: Date;
+  revokedAt: Date | null;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 /**
@@ -31,30 +33,23 @@ export async function hasUserRole(userId: string, role: UserRole): Promise<boole
     cacheKey,
     async () => {
       try {
-        if (!supabaseAdmin) {
+        if (!db) {
           return false;
         }
 
-        const { data, error } = await supabaseAdmin
-          .from('user_roles')
-          .select('id')
-          .eq('user_id', userId)
-          .eq('role', role)
-          .eq('is_active', true)
-          .is('revoked_at', null)
-          .limit(1)
-          .maybeSingle();
-
-        if (error) {
-          // PGRST116 - No rows returned
-          if (error.code !== 'PGRST116') {
-            logger.error('Error checking user role', {
-              error: error.message,
-              code: error.code,
-            });
-          }
-          return false;
-        }
+        const rows = await db
+          .select({ id: userRoles.id })
+          .from(userRoles)
+          .where(
+            and(
+              eq(userRoles.userId, userId),
+              eq(userRoles.role, role),
+              eq(userRoles.isActive, true),
+              isNull(userRoles.revokedAt),
+            ),
+          )
+          .limit(1);
+        const data = rows[0] ?? null;
 
         return !!data;
       } catch (error) {
@@ -106,7 +101,7 @@ export async function batchHasUserRole(
   }
 
   try {
-    if (!supabaseAdmin) {
+    if (!db) {
       // Если БД недоступна, все false
       for (const userId of uncachedUserIds) {
         result.set(userId, false);
@@ -115,31 +110,20 @@ export async function batchHasUserRole(
     }
 
     // Выполняем один batch запрос для всех некэшированных пользователей
-    const { data, error } = await supabaseAdmin
-      .from('user_roles')
-      .select('user_id')
-      .in('user_id', uncachedUserIds)
-      .eq('role', role)
-      .eq('is_active', true)
-      .is('revoked_at', null);
-
-    if (error) {
-      // PGRST116 - No rows returned - это нормально
-      if (error.code !== 'PGRST116') {
-        logger.error('Error batch checking user roles', {
-          error: error.message,
-          code: error.code,
-        });
-      }
-      // При ошибке все false
-      for (const userId of uncachedUserIds) {
-        result.set(userId, false);
-      }
-      return result;
-    }
+    const data = await db
+      .select({ userId: userRoles.userId })
+      .from(userRoles)
+      .where(
+        and(
+          inArray(userRoles.userId, uncachedUserIds),
+          eq(userRoles.role, role),
+          eq(userRoles.isActive, true),
+          isNull(userRoles.revokedAt),
+        ),
+      );
 
     // Создаем Set для быстрой проверки
-    const usersWithRole = new Set((data || []).map((r) => r.user_id));
+    const usersWithRole = new Set((data || []).map((r) => r.userId));
 
     // Заполняем результат и кэш
     for (const userId of uncachedUserIds) {
@@ -168,23 +152,20 @@ export async function batchHasUserRole(
  */
 export async function getUserRoles(userId: string): Promise<UserRole[]> {
   try {
-    if (!supabaseAdmin) {
+    if (!db) {
       return ['user']; // By default, all users have the 'user' role
     }
 
-    const { data, error } = await supabaseAdmin
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', userId)
-      .eq('is_active', true)
-      .is('revoked_at', null);
-
-    if (error) {
-      if (error.code !== 'PGRST116') {
-        // Ошибка получения ролей не критична
-      }
-      return ['user'];
-    }
+    const data = await db
+      .select({ role: userRoles.role })
+      .from(userRoles)
+      .where(
+        and(
+          eq(userRoles.userId, userId),
+          eq(userRoles.isActive, true),
+          isNull(userRoles.revokedAt),
+        ),
+      );
 
     const roles = data?.map((r) => r.role as UserRole) || [];
     // Всегда добавляем роль 'user', если её нет
@@ -212,7 +193,7 @@ export async function grantUserRole(
   grantedBy: string, // Admin ID
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    if (!supabaseAdmin) {
+    if (!db) {
       return { success: false, error: 'Database not configured' };
     }
 
@@ -221,24 +202,13 @@ export async function grantUserRole(
     }
 
     // ИСПРАВЛЕНО: Проверяем напрямую в БД, минуя кэш, чтобы избежать race condition
-    const { data: existingRoles, error: checkError } = await supabaseAdmin
-      .from('user_roles')
-      .select('id, is_active')
-      .eq('user_id', userId)
-      .eq('role', role);
-
-    if (checkError && checkError.code !== 'PGRST116') {
-      logger.error('Error checking existing roles', {
-        error: checkError.message,
-        code: checkError.code,
-        userId,
-        role,
-      });
-      return { success: false, error: 'Failed to check existing role' };
-    }
+    const existingRoles = await db
+      .select({ id: userRoles.id, isActive: userRoles.isActive })
+      .from(userRoles)
+      .where(and(eq(userRoles.userId, userId), eq(userRoles.role, role)));
 
     // Проверяем, есть ли уже активная роль
-    const hasActiveRole = existingRoles?.some((r) => r.is_active === true) || false;
+    const hasActiveRole = existingRoles?.some((r) => r.isActive === true) || false;
     if (hasActiveRole) {
       // Инвалидируем кэш на всякий случай
       cache.delete(`user_role:${userId}:${role}`);
@@ -248,43 +218,32 @@ export async function grantUserRole(
     // ИСПРАВЛЕНО: Очищаем все дубликаты (неактивные записи) перед созданием новой
     if (existingRoles && existingRoles.length > 0) {
       // Обновляем самую последнюю неактивную запись (если есть)
-      const inactiveRoles = existingRoles.filter((r) => r.is_active === false);
+      const inactiveRoles = existingRoles.filter((r) => r.isActive === false);
       if (inactiveRoles.length > 0) {
         // Берем последнюю по ID (самую новую)
         const latestInactive = inactiveRoles.sort((a, b) => b.id.localeCompare(a.id))[0];
 
-        const { error: updateError } = await supabaseAdmin
-          .from('user_roles')
-          .update({
-            is_active: true,
-            revoked_at: null,
-            granted_by: grantedBy,
-            granted_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
+        await db
+          .update(userRoles)
+          .set({
+            isActive: true,
+            revokedAt: null,
+            grantedBy: grantedBy,
+            grantedAt: new Date(),
           })
-          .eq('id', latestInactive.id);
-
-        if (updateError) {
-          logger.error('Error reactivating role', {
-            error: updateError.message,
-            code: updateError.code,
-            userId,
-            role,
-          });
-          return { success: false, error: 'Failed to reactivate role' };
-        }
+          .where(eq(userRoles.id, latestInactive.id));
 
         // Удаляем остальные дубликаты (если есть)
         if (inactiveRoles.length > 1) {
           const idsToDelete = inactiveRoles.slice(1).map((r) => r.id);
-          await supabaseAdmin.from('user_roles').delete().in('id', idsToDelete);
+          await db.delete(userRoles).where(inArray(userRoles.id, idsToDelete));
         }
       } else {
         // Если все записи активны (не должно быть, но на всякий случай)
         // Удаляем все кроме первой
         if (existingRoles.length > 1) {
           const idsToDelete = existingRoles.slice(1).map((r) => r.id);
-          await supabaseAdmin.from('user_roles').delete().in('id', idsToDelete);
+          await db.delete(userRoles).where(inArray(userRoles.id, idsToDelete));
         }
         // Инвалидируем кэш
         cache.delete(`user_role:${userId}:${role}`);
@@ -292,23 +251,22 @@ export async function grantUserRole(
       }
     } else {
       // Создаем новую запись, если нет существующих
-      const { error: insertError } = await supabaseAdmin.from('user_roles').insert({
-        user_id: userId,
-        role,
-        granted_by: grantedBy,
-        is_active: true,
-      });
-
-      if (insertError) {
+      try {
+        await db.insert(userRoles).values({
+          userId,
+          role,
+          grantedBy,
+          isActive: true,
+        });
+      } catch (insertError) {
         // Если ошибка уникальности - значит роль уже есть (race condition)
-        if (insertError.code === '23505') {
+        if ((insertError as any).code === '23505') {
           cache.delete(`user_role:${userId}:${role}`);
           return { success: false, error: 'User already has this role' };
         }
 
         logger.error('Error granting user role', {
-          error: insertError.message,
-          code: insertError.code,
+          error: insertError instanceof Error ? insertError.message : 'Unknown error',
           userId,
           role,
           grantedBy,
@@ -344,7 +302,7 @@ export async function revokeUserRole(
   role: UserRole,
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    if (!supabaseAdmin) {
+    if (!db) {
       return { success: false, error: 'Database not configured' };
     }
 
@@ -353,22 +311,12 @@ export async function revokeUserRole(
     }
 
     // ИСПРАВЛЕНО: Получаем все активные записи для этой роли
-    const { data: activeRoles, error: fetchError } = await supabaseAdmin
-      .from('user_roles')
-      .select('id')
-      .eq('user_id', userId)
-      .eq('role', role)
-      .eq('is_active', true);
-
-    if (fetchError && fetchError.code !== 'PGRST116') {
-      logger.error('Error fetching active roles', {
-        error: fetchError.message,
-        code: fetchError.code,
-        userId,
-        role,
-      });
-      return { success: false, error: 'Failed to fetch roles' };
-    }
+    const activeRoles = await db
+      .select({ id: userRoles.id })
+      .from(userRoles)
+      .where(
+        and(eq(userRoles.userId, userId), eq(userRoles.role, role), eq(userRoles.isActive, true)),
+      );
 
     // Если нет активных ролей, ничего не делаем
     if (!activeRoles || activeRoles.length === 0) {
@@ -384,36 +332,21 @@ export async function revokeUserRole(
     const deleteRoleIds = sortedRoles.slice(1).map((r) => r.id);
 
     // Обновляем последнюю запись
-    const { error: updateError } = await supabaseAdmin
-      .from('user_roles')
-      .update({
-        is_active: false,
-        revoked_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+    await db
+      .update(userRoles)
+      .set({
+        isActive: false,
+        revokedAt: new Date(),
       })
-      .eq('id', keepRoleId);
-
-    if (updateError) {
-      logger.error('Error revoking user role', {
-        error: updateError.message,
-        code: updateError.code,
-        userId,
-        role,
-      });
-      return { success: false, error: 'Failed to revoke role' };
-    }
+      .where(eq(userRoles.id, keepRoleId));
 
     // Удаляем дубликаты (если есть)
     if (deleteRoleIds.length > 0) {
-      const { error: deleteError } = await supabaseAdmin
-        .from('user_roles')
-        .delete()
-        .in('id', deleteRoleIds);
-
-      if (deleteError) {
+      try {
+        await db.delete(userRoles).where(inArray(userRoles.id, deleteRoleIds));
+      } catch (deleteError) {
         logger.error('Error deleting duplicate roles', {
-          error: deleteError.message,
-          code: deleteError.code,
+          error: deleteError instanceof Error ? deleteError.message : 'Unknown error',
           userId,
           role,
         });
@@ -443,26 +376,17 @@ export async function revokeUserRole(
  */
 export async function getUsersByRole(role: UserRole): Promise<UserRoleRecord[]> {
   try {
-    if (!supabaseAdmin) {
+    if (!db) {
       return [];
     }
 
-    const { data, error } = await supabaseAdmin
-      .from('user_roles')
-      .select('*')
-      .eq('role', role)
-      .eq('is_active', true)
-      .is('revoked_at', null)
-      .order('granted_at', { ascending: false });
-
-    if (error) {
-      logger.error('Error fetching users by role', {
-        error: error.message,
-        code: error.code,
-        role,
-      });
-      return [];
-    }
+    const data = await db
+      .select()
+      .from(userRoles)
+      .where(
+        and(eq(userRoles.role, role), eq(userRoles.isActive, true), isNull(userRoles.revokedAt)),
+      )
+      .orderBy(desc(userRoles.grantedAt));
 
     return (data || []) as UserRoleRecord[];
   } catch (error) {

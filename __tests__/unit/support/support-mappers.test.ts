@@ -85,7 +85,7 @@ describe('mapRawMessageToUi', () => {
     expect(result.attachments).toHaveLength(1);
   });
 
-  it('нормализует sender из массива (Supabase relation)', () => {
+  it('нормализует sender из массива (relation)', () => {
     const msg: RawMessageApi = { ...sampleMessage, sender: [sampleSender] };
     const result = mapRawMessageToUi(msg);
     expect(result.senderData?.username).toBe('testuser');

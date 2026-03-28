@@ -10,8 +10,11 @@ import { generateSessionId as generateSessionIdUtil } from '../utils/index';
 import { logger } from '../utils/secure-logger';
 import { getSessionStore, type SessionData } from './session-store';
 import { getEnv } from '../validation/env-validation';
-import { supabaseAdmin } from '../database/supabase';
+import { db } from '../database/db';
+import { userDevices } from '../database/schema';
+import { eq, and, ne } from 'drizzle-orm';
 import { computeDeviceFpHash } from './device-fingerprint.server';
+import { resolveAndStoreLocation } from '../utils/geolocation';
 
 export type { SessionData };
 
@@ -58,77 +61,75 @@ export class SessionManager {
     const token = generateSessionIdUtil();
     const tokenHash = computeTokenHash(token);
     const deviceName = this.parseDeviceName(userAgent);
-    const now = new Date().toISOString();
+    const now = new Date();
 
-    if (!supabaseAdmin) {
+    if (!db) {
       return token;
     }
 
     if (fpid) {
       const deviceFpHash = computeDeviceFpHash(userAgent, ipAddress, fpid);
-      const { data: existing } = await supabaseAdmin
-        .from('user_devices')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('device_fp_hash', deviceFpHash)
-        .maybeSingle();
+      const rows = await db
+        .select({ id: userDevices.id })
+        .from(userDevices)
+        .where(and(eq(userDevices.userId, userId), eq(userDevices.deviceFpHash, deviceFpHash)));
+      const existing = rows[0] ?? null;
 
       if (existing) {
-        const { error } = await supabaseAdmin
-          .from('user_devices')
-          .update({
-            token_hash: tokenHash,
-            last_active: now,
-            ip_address: ipAddress,
-          })
-          .eq('id', existing.id);
+        try {
+          await db
+            .update(userDevices)
+            .set({
+              tokenHash,
+              lastActive: now,
+              ipAddress,
+            })
+            .where(eq(userDevices.id, existing.id));
 
-        if (error) {
+          resolveAndStoreLocation(existing.id, ipAddress);
+          return token;
+        } catch (error) {
           logger.warn('Failed to update device on grouping', {
-            error: error.message,
+            error: error instanceof Error ? error.message : String(error),
             userId,
             deviceId: existing.id,
           });
-        } else {
-          return token;
         }
       }
 
-      const { error } = await supabaseAdmin.from('user_devices').insert({
-        user_id: userId,
-        token_hash: tokenHash,
-        device_name: deviceName,
-        ip_address: ipAddress,
-        last_active: now,
-        device_fp_hash: deviceFpHash,
-      });
-
-      if (error) {
-        if (error.code === '42703' || error.message?.includes('device_fp_hash')) {
-          await supabaseAdmin.from('user_devices').insert({
-            user_id: userId,
-            token_hash: tokenHash,
-            device_name: deviceName,
-            ip_address: ipAddress,
-            last_active: now,
-          });
-        } else {
-          logger.error('Failed to register device', { error: error.message, userId });
-        }
+      try {
+        const [inserted] = await db.insert(userDevices).values({
+          userId,
+          tokenHash,
+          deviceName,
+          ipAddress,
+          lastActive: now,
+          deviceFpHash,
+        }).returning({ id: userDevices.id });
+        if (inserted) resolveAndStoreLocation(inserted.id, ipAddress);
+      } catch (error) {
+        logger.error('Failed to register device', {
+          error: error instanceof Error ? error.message : String(error),
+          userId,
+        });
       }
       return token;
     }
 
-    const { error } = await supabaseAdmin.from('user_devices').insert({
-      user_id: userId,
-      token_hash: tokenHash,
-      device_name: deviceName,
-      ip_address: ipAddress,
-      last_active: now,
-    });
-
-    if (error) {
-      logger.error('Failed to register device', { error: error.message, userId });
+    try {
+      const [inserted] = await db.insert(userDevices).values({
+        userId,
+        tokenHash,
+        deviceName,
+        ipAddress,
+        lastActive: now,
+      }).returning({ id: userDevices.id });
+      if (inserted) resolveAndStoreLocation(inserted.id, ipAddress);
+    } catch (error) {
+      logger.error('Failed to register device', {
+        error: error instanceof Error ? error.message : String(error),
+        userId,
+      });
     }
 
     return token;
@@ -138,33 +139,32 @@ export class SessionManager {
    * Удаляет устройство по токену
    */
   static async revokeDevice(token: string): Promise<void> {
-    if (!supabaseAdmin) return;
+    if (!db) return;
     const tokenHash = computeTokenHash(token);
-    await supabaseAdmin.from('user_devices').delete().eq('token_hash', tokenHash);
+    await db.delete(userDevices).where(eq(userDevices.tokenHash, tokenHash));
   }
 
   /**
    * Удаляет устройство по ID (для UI)
    */
   static async revokeDeviceById(deviceId: string, userId: string): Promise<void> {
-    if (!supabaseAdmin) return;
-    // RLS should handle permission check, but good to be explicit
-    await supabaseAdmin.from('user_devices').delete().eq('id', deviceId).eq('user_id', userId);
+    if (!db) return;
+    await db
+      .delete(userDevices)
+      .where(and(eq(userDevices.id, deviceId), eq(userDevices.userId, userId)));
   }
 
   /**
    * Удаляет все устройства пользователя кроме текущего
    */
   static async revokeOtherDevices(userId: string, currentToken: string): Promise<void> {
-    if (!supabaseAdmin) return;
+    if (!db) return;
     const currentTokenHash = computeTokenHash(currentToken);
 
     // Удаляем все устройства пользователя, кроме того, чей хеш совпадает с текущим
-    await supabaseAdmin
-      .from('user_devices')
-      .delete()
-      .eq('user_id', userId)
-      .neq('token_hash', currentTokenHash);
+    await db
+      .delete(userDevices)
+      .where(and(eq(userDevices.userId, userId), ne(userDevices.tokenHash, currentTokenHash)));
   }
 
   static parseDeviceName(userAgent: string): string {
@@ -224,15 +224,21 @@ export class SessionManager {
     await store.set(sessionId, data, SESSION_TIMEOUT);
 
     // Если это пользователь и есть токен, обновляем last_active в БД
-    if (userType === 'user' && token && supabaseAdmin) {
+    if (userType === 'user' && token && db) {
       const tokenHash = computeTokenHash(token);
       // Не блокируем создание сессии ожиданием БД
-      supabaseAdmin
-        .from('user_devices')
-        .update({ last_active: new Date().toISOString(), ip_address: ipAddress })
-        .eq('token_hash', tokenHash)
-        .then(({ error }) => {
-          if (error) logger.warn('Failed to update device last_active', { error: error.message });
+      db.update(userDevices)
+        .set({ lastActive: new Date(), ipAddress })
+        .where(eq(userDevices.tokenHash, tokenHash))
+        .returning({ id: userDevices.id })
+        .then((rows) => {
+          const device = rows[0];
+          if (device) resolveAndStoreLocation(device.id, ipAddress);
+        })
+        .catch((error) => {
+          logger.warn('Failed to update device last_active', {
+            error: error instanceof Error ? error.message : String(error),
+          });
         });
     }
 

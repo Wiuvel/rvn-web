@@ -25,7 +25,7 @@ export async function setUserDataCookie(user: User, isLocalhost: boolean): Promi
   const isSupport = await hasUserRole(user.id, 'support');
 
   const payload = {
-    user_id: user.user_id,
+    user_id: user.userId,
     username: user.username,
     avatar: user.avatar ?? null,
     banner: user.banner ?? null,

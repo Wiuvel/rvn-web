@@ -232,32 +232,10 @@ export default function DashboardClient({ userId }: DashboardClientProps) {
   }
 
   return (
-    <div className="dashboard-page">
+    <div className="min-h-screen bg-neutral-950 text-white selection:bg-primary-500/30">
       <Header />
 
-      <main className="relative overflow-hidden pb-16 pt-4 lg:pt-32">
-        <svg
-          className="absolute inset-0 -z-10 h-full w-full opacity-20"
-          xmlns="http://www.w3.org/2000/svg"
-          preserveAspectRatio="none"
-          aria-hidden="true"
-        >
-          <defs>
-            <radialGradient id="dash-grad" cx="50%" cy="50%" r="75%" fx="50%" fy="50%">
-              <stop offset="0%" stopColor="#16a3ff" stopOpacity="0.18" />
-              <stop offset="100%" stopColor="transparent" stopOpacity="0" />
-            </radialGradient>
-          </defs>
-          <rect width="100%" height="100%" fill="url(#dash-grad)" />
-          <g stroke="rgba(255,255,255,0.04)" strokeWidth="1">
-            <line x1="0" y1="25%" x2="100%" y2="25%" />
-            <line x1="0" y1="50%" x2="100%" y2="50%" />
-            <line x1="0" y1="75%" x2="100%" y2="75%" />
-          </g>
-        </svg>
-        <div className="pointer-events-none absolute -right-20 -top-32 -z-10 h-80 w-80 rounded-full bg-primary-500/10 blur-3xl"></div>
-        <div className="pointer-events-none absolute -bottom-24 -left-24 -z-10 h-72 w-72 rounded-full bg-white/5 blur-[100px]"></div>
-
+      <main className="relative pb-16 pt-6 lg:pt-32">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div ref={heroRef} className="relative mb-8">
             <div className="relative h-40 overflow-hidden rounded-xl border border-neutral-800 sm:h-48 md:h-56 lg:h-64">
@@ -450,7 +428,7 @@ export default function DashboardClient({ userId }: DashboardClientProps) {
                     href="/#pricing"
                     variant="primary"
                   />
-                  <QuickAction icon={Smartphone} label="Мои устройства" href="/user/settings" />
+                  <QuickAction icon={Smartphone} label="Мои устройства" href="/user/devices" />
                   <QuickAction
                     icon={HeadphonesIcon}
                     label="Связаться с поддержкой"

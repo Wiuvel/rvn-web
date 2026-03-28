@@ -49,7 +49,7 @@ export interface RawTicketApi {
 }
 
 /**
- * Raw message from API or Supabase. Supabase relations can return arrays.
+ * Raw message from API. Relations can return arrays.
  */
 export interface RawMessageApi {
   id: string;
@@ -59,7 +59,7 @@ export interface RawMessageApi {
   message_text: string;
   created_at: string;
   is_read?: boolean;
-  /** Supabase relation may return array or single object */
+  /** Relation may return array or single object */
   sender?: RawSupportUser | RawSupportUser[];
   attachments?: RawAttachmentApi[];
 }

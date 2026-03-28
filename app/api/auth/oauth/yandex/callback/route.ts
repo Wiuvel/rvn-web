@@ -153,7 +153,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Check user activity
-    if (!user.is_active) {
+    if (!user.isActive) {
       const errorUrl = getErrorRedirectUrl('account_disabled', origin, isPopup);
       return setCorsHeaders(NextResponse.redirect(errorUrl));
     }
@@ -187,78 +187,37 @@ export async function GET(request: NextRequest) {
 
     const redirectUrl = isPopup
       ? new URL(
-          `/auth/oauth-handler?provider=yandex&success=true&user_id=${user.user_id}&popup=true`,
+          `/auth/oauth-handler?provider=yandex&success=true&user_id=${user.userId}&popup=true`,
           origin,
         )
-      : new URL(`/dashboard/${user.user_id}`, origin);
+      : new URL(`/dashboard/${user.userId}`, origin);
     const response = NextResponse.redirect(redirectUrl);
 
     // Clear FPID cookie after use (OAuth only)
     response.cookies.set('rvn_fpid', '', { maxAge: 0, path: '/' });
 
-    // Copy protection cookies from request if they exist, or set temporary ones
-    const accessGranted = request.cookies.get('access_granted')?.value;
-    const accessHash = request.cookies.get('access_hash')?.value;
-    const accessTime = request.cookies.get('access_time')?.value;
+    // Copy protection cookie from request if it exists, or set a temporary one
+    const existingAccessToken = request.cookies.get('access_token')?.value;
 
     const cookieDomain = getCookieDomain(hostname);
 
-    if (accessGranted && accessHash) {
-      response.cookies.set('access_granted', accessGranted, {
+    if (existingAccessToken) {
+      response.cookies.set('access_token', existingAccessToken, {
         maxAge: 60 * 60 * 2,
-        httpOnly: false,
+        httpOnly: true,
         secure: process.env.NODE_ENV === 'production' && !isLocalhost,
         sameSite: 'lax',
         path: '/',
         ...(cookieDomain && { domain: cookieDomain }),
       });
-
-      response.cookies.set('access_hash', accessHash, {
-        maxAge: 60 * 60 * 2,
-        httpOnly: false,
-        secure: process.env.NODE_ENV === 'production' && !isLocalhost,
-        sameSite: 'lax',
-        path: '/',
-        ...(cookieDomain && { domain: cookieDomain }),
-      });
-
-      if (accessTime) {
-        response.cookies.set('access_time', accessTime, {
-          maxAge: 60 * 60 * 2,
-          httpOnly: false,
-          secure: process.env.NODE_ENV === 'production' && !isLocalhost,
-          sameSite: 'lax',
-          path: '/',
-          ...(cookieDomain && { domain: cookieDomain }),
-        });
-      }
     } else {
-      const { createHash } = await import('crypto');
-      const tempHash = createHash('sha256')
-        .update(`${user.id}-${Date.now()}-oauth-temp`)
-        .digest('hex');
-
-      response.cookies.set('access_granted', 'true', {
+      const { createHmac } = await import('crypto');
+      const secretKey = process.env.TURNSTILE_SECRET_KEY || '';
+      const payload = Buffer.from(JSON.stringify({ t: Date.now() })).toString('base64url');
+      const hmac = createHmac('sha256', secretKey).update(payload).digest('hex');
+      response.cookies.set('access_token', `${payload}.${hmac}`, {
         maxAge: 60 * 60 * 2,
-        httpOnly: false,
-        secure: process.env.NODE_ENV === 'production' && !isLocalhost,
-        sameSite: 'lax',
-        path: '/',
-        ...(cookieDomain && { domain: cookieDomain }),
-      });
-
-      response.cookies.set('access_hash', tempHash, {
-        maxAge: 60 * 60 * 2,
-        httpOnly: false,
-        secure: process.env.NODE_ENV === 'production' && !isLocalhost,
-        sameSite: 'lax',
-        path: '/',
-        ...(cookieDomain && { domain: cookieDomain }),
-      });
-
-      response.cookies.set('access_time', Date.now().toString(), {
-        maxAge: 60 * 60 * 2,
-        httpOnly: false,
+        httpOnly: true,
         secure: process.env.NODE_ENV === 'production' && !isLocalhost,
         sameSite: 'lax',
         path: '/',
@@ -281,7 +240,7 @@ export async function GET(request: NextRequest) {
     response.cookies.set(
       USER_DATA_COOKIE_NAME,
       createUserDataCookie({
-        user_id: user.user_id,
+        user_id: user.userId,
         username: user.username,
         avatar: user.avatar ?? null,
         banner: user.banner ?? null,

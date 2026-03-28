@@ -15,37 +15,24 @@ export function timingSafeCompare(a: string, b: string): boolean {
 }
 
 /**
- * Constant-time password verification
+ * Constant-time password verification using Argon2id
  */
-export function timingSafePasswordVerify(password: string, hash: string): Promise<boolean> {
-  return new Promise((resolve) => {
-    // Always perform the same operations regardless of password validity
-    const startTime = process.hrtime.bigint();
+export async function timingSafePasswordVerify(password: string, hash: string): Promise<boolean> {
+  const startTime = process.hrtime.bigint();
 
-    // Simulate bcrypt timing to prevent timing attacks
-    const timingBuffer = Buffer.alloc(1024);
-    for (let i = 0; i < 1000; i++) {
-      timingBuffer.fill(i);
-    }
+  const { verify } = await import('@node-rs/argon2');
+  const result = await verify(hash, password);
 
-    // Now do the actual verification
-    import('bcryptjs')
-      .then((bcrypt) => {
-        return bcrypt.default.compare(password, hash);
-      })
-      .then((result: boolean) => {
-        // Add constant delay to prevent timing analysis
-        const endTime = process.hrtime.bigint();
-        const elapsed = Number(endTime - startTime);
-        const minDelay = 100; // Minimum 100ms delay
+  // Add constant delay to prevent timing analysis
+  const endTime = process.hrtime.bigint();
+  const elapsed = Number(endTime - startTime);
+  const minDelay = 100; // Minimum 100ms delay
 
-        if (elapsed < minDelay) {
-          setTimeout(() => resolve(result), minDelay - elapsed);
-        } else {
-          resolve(result);
-        }
-      });
-  });
+  if (elapsed < minDelay) {
+    await new Promise((resolve) => setTimeout(resolve, minDelay - elapsed));
+  }
+
+  return result;
 }
 
 /**

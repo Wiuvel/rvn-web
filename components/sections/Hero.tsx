@@ -127,75 +127,79 @@ export default function HeroSection() {
             </div>
           </div>
           <div className="order-2 mx-auto hidden w-full max-w-md justify-center sm:flex lg:order-1 lg:mx-0 lg:ml-auto lg:justify-end">
-            <div className="relative isolate w-full">
-              {/* Glow строго сзади: z-0, карточка поверх z-10 */}
+            <div className="relative isolate w-full" style={{ zIndex: 0 }}>
+              {/* Glow строго сзади: z-[-1] */}
               <div
-                className="pointer-events-none absolute -inset-4 z-0 rounded-full bg-gradient-to-br from-primary-500/20 to-transparent blur-2xl md:-inset-8 md:blur-3xl"
+                className="pointer-events-none absolute -inset-4 z-[-1] rounded-full bg-gradient-to-br from-primary-500/20 to-transparent blur-2xl md:-inset-8 md:blur-3xl"
                 aria-hidden="true"
               />
-              <Card className="glass-card-no-flicker relative z-10 border-neutral-800/50 bg-neutral-900/60 shadow-2xl shadow-black/20 backdrop-blur-md">
-                <CardHeader className="p-4 md:p-6">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-medium text-white">
-                      {connected ? 'Сеанс защищён' : 'Подключение…'}
-                    </span>
-                    <Badge
-                      variant={connected ? 'default' : 'secondary'}
-                      className={`${connected ? 'border-green-500/25 bg-green-500/15 text-green-400 hover:!bg-green-500/15' : 'border-yellow-500/25 bg-yellow-500/15 text-yellow-400 hover:!bg-yellow-500/15'} flex items-center gap-1.5 backdrop-blur-sm`}
-                    >
-                      <span
-                        className={`h-2 w-2 rounded-full ${connected ? 'pulse-ring bg-green-400' : 'bg-yellow-400'}`}
-                      ></span>
-                      {connected ? 'Подключено' : 'Проверка'}
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent className="p-4 pt-0 md:p-6">
-                  <div className="grid grid-cols-2 gap-3 md:gap-4">
-                    <div className="rounded-xl border border-neutral-800/70 bg-neutral-950/50 p-3 md:p-4">
-                      <div className="text-xs text-neutral-500">Макс. скорость</div>
-                      <div className="mt-1 text-xl font-semibold text-white md:text-2xl">
-                        1 Гбит/с
-                      </div>
-                    </div>
-                    <div className="rounded-xl border border-neutral-800/70 bg-neutral-950/50 p-3 md:p-4">
-                      <div className="text-xs text-neutral-500">Пинг</div>
-                      <div
-                        className={`mt-1 text-xl font-semibold md:text-2xl ${getPingColor(ping)}`}
+
+              {/* Отдельный контекст наложения для карточки с z-10 */}
+              <div className="relative z-10">
+                <Card className="glass-card-no-flicker border-neutral-800/50 bg-neutral-900/60 shadow-2xl shadow-black/20 backdrop-blur-md">
+                  <CardHeader className="p-4 md:p-6">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-medium text-white">
+                        {connected ? 'Сеанс защищён' : 'Подключение…'}
+                      </span>
+                      <Badge
+                        variant={connected ? 'default' : 'secondary'}
+                        className={`${connected ? 'border-green-500/25 bg-green-500/15 text-green-400 hover:!bg-green-500/15' : 'border-yellow-500/25 bg-yellow-500/15 text-yellow-400 hover:!bg-yellow-500/15'} flex items-center gap-1.5 backdrop-blur-sm`}
                       >
-                        {connected ? `${Math.round(ping)} ms` : '– ms'}
+                        <span
+                          className={`h-2 w-2 rounded-full ${connected ? 'pulse-ring bg-green-400' : 'bg-yellow-400'}`}
+                        ></span>
+                        {connected ? 'Подключено' : 'Проверка'}
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-4 pt-0 md:p-6">
+                    <div className="grid grid-cols-2 gap-3 md:gap-4">
+                      <div className="rounded-xl border border-neutral-800/70 bg-neutral-950/50 p-3 md:p-4">
+                        <div className="text-xs text-neutral-500">Макс. скорость</div>
+                        <div className="mt-1 text-xl font-semibold text-white md:text-2xl">
+                          1 Гбит/с
+                        </div>
+                      </div>
+                      <div className="rounded-xl border border-neutral-800/70 bg-neutral-950/50 p-3 md:p-4">
+                        <div className="text-xs text-neutral-500">Пинг</div>
+                        <div
+                          className={`mt-1 text-xl font-semibold md:text-2xl ${getPingColor(ping)}`}
+                        >
+                          {connected ? `${Math.round(ping)} ms` : '– ms'}
+                        </div>
+                      </div>
+                      <div className="col-span-2 rounded-xl border border-neutral-800/70 bg-neutral-950/50 p-3 md:p-4">
+                        <div className="text-xs text-neutral-500">Текущий сервер</div>
+                        {!connected ? (
+                          <div className="mt-1 flex animate-pulse items-center gap-2 text-neutral-500">
+                            <span>Выбор сервера…</span>
+                          </div>
+                        ) : serverInfo ? (
+                          <div className="mt-1 flex items-center gap-2">
+                            <Image
+                              src={serverInfo.flag}
+                              alt={serverInfo.country}
+                              width={24}
+                              height={16}
+                              className="h-4 w-6 rounded-sm border border-neutral-700"
+                            />
+                            <span className="text-sm font-medium text-white md:text-base">
+                              {serverInfo.country} · {serverInfo.code}
+                            </span>
+                          </div>
+                        ) : null}
                       </div>
                     </div>
-                    <div className="col-span-2 rounded-xl border border-neutral-800/70 bg-neutral-950/50 p-3 md:p-4">
-                      <div className="text-xs text-neutral-500">Текущий сервер</div>
-                      {!connected ? (
-                        <div className="mt-1 flex animate-pulse items-center gap-2 text-neutral-500">
-                          <span>Выбор сервера…</span>
-                        </div>
-                      ) : serverInfo ? (
-                        <div className="mt-1 flex items-center gap-2">
-                          <Image
-                            src={serverInfo.flag}
-                            alt={serverInfo.country}
-                            width={24}
-                            height={16}
-                            className="h-4 w-6 rounded-sm border border-neutral-700"
-                          />
-                          <span className="text-sm font-medium text-white md:text-base">
-                            {serverInfo.country} · {serverInfo.code}
-                          </span>
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
-                  <Button
-                    className="mt-4 w-full bg-white text-neutral-900 transition-all duration-300 hover:bg-white/90 hover:shadow-glow md:mt-6"
-                    disabled
-                  >
-                    Отключить
-                  </Button>
-                </CardContent>
-              </Card>
+                    <Button
+                      className="mt-4 w-full bg-white text-neutral-900 transition-all duration-300 hover:bg-white/90 hover:shadow-glow md:mt-6"
+                      disabled
+                    >
+                      Отключить
+                    </Button>
+                  </CardContent>
+                </Card>
+              </div>
             </div>
           </div>
         </div>

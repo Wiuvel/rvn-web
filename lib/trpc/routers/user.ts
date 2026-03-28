@@ -2,7 +2,9 @@ import { z } from 'zod';
 import { revalidateTag } from 'next/cache';
 import { TRPCError } from '@trpc/server';
 import { router, publicProcedure, protectedProcedure } from '../init';
-import { supabaseAdmin } from '@/lib/database/supabase';
+import { db } from '@/lib/database/db';
+import { users, profileComments } from '@/lib/database/schema';
+import { eq, asc } from 'drizzle-orm';
 import { hasUserRole } from '@/lib/auth/user-roles';
 import { broadcastNewComment } from '@/lib/websocket/client';
 import { logger } from '@/lib/utils/secure-logger';
@@ -26,109 +28,111 @@ type CommentResponse = {
 
 export const userRouter = router({
   profile: publicProcedure.input(userIdParamSchema).query(async ({ input }) => {
-    if (!supabaseAdmin) {
+    if (!db) {
       throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database connection failed' });
     }
 
-    const { data: user, error } = await supabaseAdmin
-      .from('users')
-      .select('id, user_id, username, created_at, avatar, banner')
-      .eq('user_id', input.user_id)
-      .single();
+    try {
+      const rows = await db
+        .select({
+          id: users.id,
+          userId: users.userId,
+          username: users.username,
+          createdAt: users.createdAt,
+          avatar: users.avatar,
+          banner: users.banner,
+        })
+        .from(users)
+        .where(eq(users.userId, input.user_id))
+        .limit(1);
+      const user = rows[0];
 
-    if (error || !user) {
+      if (!user) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'User not found' });
+      }
+
+      const [isSupport, isAdmin] = await Promise.all([
+        hasUserRole(user.id, 'support'),
+        hasUserRole(user.id, 'admin'),
+      ]);
+
+      return {
+        id: user.id,
+        user_id: user.userId,
+        username: user.username,
+        created_at: user.createdAt,
+        avatar: user.avatar,
+        banner: user.banner,
+        isSupport,
+        isAdmin,
+      };
+    } catch (error) {
+      if (error instanceof TRPCError) throw error;
       throw new TRPCError({ code: 'NOT_FOUND', message: 'User not found' });
     }
-
-    const [isSupport, isAdmin] = await Promise.all([
-      hasUserRole(user.id, 'support'),
-      hasUserRole(user.id, 'admin'),
-    ]);
-
-    return {
-      id: user.id,
-      user_id: user.user_id,
-      username: user.username,
-      created_at: user.created_at,
-      avatar: user.avatar,
-      banner: user.banner,
-      isSupport,
-      isAdmin,
-    };
   }),
 
   comments: router({
     list: publicProcedure.input(userIdParamSchema).query(async ({ input }) => {
-      if (!supabaseAdmin) {
+      if (!db) {
         throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database unavailable' });
       }
 
-      const { data: profileOwner, error: profileError } = await supabaseAdmin
-        .from('users')
-        .select('id')
-        .eq('user_id', input.user_id)
-        .single();
+      try {
+        const profileOwnerRows = await db
+          .select({ id: users.id })
+          .from(users)
+          .where(eq(users.userId, input.user_id))
+          .limit(1);
+        const profileOwner = profileOwnerRows[0];
 
-      if (profileError || !profileOwner) {
-        throw new TRPCError({ code: 'NOT_FOUND', message: 'Profile not found' });
-      }
+        if (!profileOwner) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Profile not found' });
+        }
 
-      const { data: comments, error: commentsError } = await supabaseAdmin
-        .from('profile_comments')
-        .select(
-          `
-            id,
-            profile_id,
-            author_id,
-            parent_id,
-            content,
-            is_pinned,
-            created_at,
-            users!profile_comments_author_id_fkey (
-              id,
-              user_id,
-              username,
-              avatar
-            )
-          `,
-        )
-        .eq('profile_id', profileOwner.id)
-        .order('created_at', { ascending: true });
+        const commentRows = await db
+          .select({
+            id: profileComments.id,
+            profileId: profileComments.profileId,
+            authorId: profileComments.authorId,
+            parentId: profileComments.parentId,
+            content: profileComments.content,
+            isPinned: profileComments.isPinned,
+            createdAt: profileComments.createdAt,
+            authorUuid: users.id,
+            authorUserId: users.userId,
+            authorUsername: users.username,
+            authorAvatar: users.avatar,
+          })
+          .from(profileComments)
+          .leftJoin(users, eq(profileComments.authorId, users.id))
+          .where(eq(profileComments.profileId, profileOwner.id))
+          .orderBy(asc(profileComments.createdAt));
 
-      if (commentsError) {
-        logger.error('Error fetching comments', { error: commentsError.message });
+        const formattedComments: CommentResponse[] = commentRows.map((c) => ({
+          id: c.id,
+          profile_id: c.profileId,
+          author_id: c.authorId,
+          parent_id: c.parentId ?? null,
+          content: c.content,
+          is_pinned: c.isPinned ?? false,
+          created_at: c.createdAt instanceof Date ? c.createdAt.toISOString() : String(c.createdAt),
+          author: {
+            id: c.authorUuid ?? '',
+            username: c.authorUsername ?? '',
+            user_id: c.authorUserId ?? '',
+            avatar: c.authorAvatar ?? null,
+          },
+        }));
+
+        return formattedComments;
+      } catch (error) {
+        if (error instanceof TRPCError) throw error;
+        logger.error('Error fetching comments', {
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
         throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Failed to fetch comments' });
       }
-
-      const formattedComments: CommentResponse[] = (comments || []).map(
-        (c: Record<string, unknown>) => {
-          const usersRel = c.users;
-          const authorData = Array.isArray(usersRel) ? usersRel[0] : usersRel;
-          const a = authorData as {
-            id: string;
-            username: string;
-            user_id: string;
-            avatar?: string | null;
-          } | null;
-          return {
-            id: c.id as string,
-            profile_id: c.profile_id as string,
-            author_id: c.author_id as string,
-            parent_id: (c.parent_id ?? null) as string | null | undefined,
-            content: c.content as string,
-            is_pinned: c.is_pinned as boolean,
-            created_at: c.created_at as string,
-            author: {
-              id: a?.id ?? '',
-              username: a?.username ?? '',
-              user_id: a?.user_id ?? '',
-              avatar: a?.avatar ?? null,
-            },
-          };
-        },
-      );
-
-      return formattedComments;
     }),
 
     create: protectedProcedure
@@ -138,72 +142,77 @@ export const userRouter = router({
         }),
       )
       .mutation(async ({ ctx, input }) => {
-        if (!supabaseAdmin) {
+        if (!db) {
           throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database unavailable' });
         }
 
-        const { data: profileOwner, error: profileError } = await supabaseAdmin
-          .from('users')
-          .select('id')
-          .eq('user_id', input.user_id)
-          .single();
+        try {
+          const profileOwnerRows = await db
+            .select({ id: users.id })
+            .from(users)
+            .where(eq(users.userId, input.user_id))
+            .limit(1);
+          const profileOwner = profileOwnerRows[0];
 
-        if (profileError || !profileOwner) {
-          throw new TRPCError({ code: 'NOT_FOUND', message: 'Profile not found' });
-        }
+          if (!profileOwner) {
+            throw new TRPCError({ code: 'NOT_FOUND', message: 'Profile not found' });
+          }
 
-        const author = ctx.user;
+          const author = ctx.user;
 
-        const { data: insertedComment, error: insertError } = await supabaseAdmin
-          .from('profile_comments')
-          .insert({
-            profile_id: profileOwner.id,
-            author_id: author.id,
-            parent_id: input.parent_id || null,
-            content: input.content.trim(),
-          })
-          .select()
-          .single();
+          const [insertedComment] = await db
+            .insert(profileComments)
+            .values({
+              profileId: profileOwner.id,
+              authorId: author.id,
+              parentId: input.parent_id || null,
+              content: input.content.trim(),
+            })
+            .returning();
 
-        if (insertError) {
-          if (insertError.message.includes('Достигнут лимит комментариев')) {
+          const fullComment: CommentResponse = {
+            id: insertedComment.id,
+            profile_id: insertedComment.profileId,
+            author_id: insertedComment.authorId,
+            parent_id: insertedComment.parentId,
+            content: insertedComment.content,
+            is_pinned: insertedComment.isPinned ?? false,
+            created_at:
+              insertedComment.createdAt instanceof Date
+                ? insertedComment.createdAt.toISOString()
+                : String(insertedComment.createdAt),
+            author: {
+              id: author.id,
+              username: author.username,
+              user_id: author.userId,
+              avatar: author.avatar,
+            },
+          };
+
+          revalidateTag(`user-profile:${input.user_id}`, 'max');
+
+          try {
+            broadcastNewComment(profileOwner.id, fullComment);
+          } catch (wsError) {
+            logger.error('Error broadcasting comment', { error: wsError });
+          }
+
+          return fullComment;
+        } catch (error) {
+          if (error instanceof TRPCError) throw error;
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          if (errorMessage.includes('Достигнут лимит комментариев')) {
             throw new TRPCError({
               code: 'FORBIDDEN',
               message: 'Достигнут лимит комментариев (максимум 3 на профиль)',
             });
           }
-          logger.error('Error inserting comment', { error: insertError.message });
+          logger.error('Error inserting comment', { error: errorMessage });
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
             message: 'Failed to post comment',
           });
         }
-
-        const fullComment: CommentResponse = {
-          id: insertedComment.id,
-          profile_id: insertedComment.profile_id,
-          author_id: insertedComment.author_id,
-          parent_id: insertedComment.parent_id,
-          content: insertedComment.content,
-          is_pinned: insertedComment.is_pinned,
-          created_at: insertedComment.created_at,
-          author: {
-            id: author.id,
-            username: author.username,
-            user_id: author.user_id,
-            avatar: author.avatar,
-          },
-        };
-
-        revalidateTag(`user-profile:${input.user_id}`, 'max');
-
-        try {
-          broadcastNewComment(profileOwner.id, fullComment);
-        } catch (wsError) {
-          logger.error('Error broadcasting comment', { error: wsError });
-        }
-
-        return fullComment;
       }),
   }),
 });

@@ -48,7 +48,7 @@ interface Ticket {
     username: string;
     user_id: string;
     avatar?: string | null;
-  };
+  } | null;
   assigned_to?: string | null;
   assigned_user?: {
     id: string;
@@ -73,9 +73,9 @@ interface MessageAttachment {
   file_size: number;
   storage_url: string;
   storage_path?: string;
-  blur_hash?: string;
-  width?: number;
-  height?: number;
+  blur_hash?: string | null;
+  width?: number | null;
+  height?: number | null;
 }
 
 interface Message {
@@ -92,9 +92,9 @@ interface Message {
   sender?: {
     id: string;
     username: string;
-    user_id: string;
+    user_id: string | null;
     avatar?: string | null;
-  };
+  } | null;
   attachments?: MessageAttachment[];
 }
 
@@ -297,9 +297,9 @@ function MessageItem({
                                 alt={attachment.file_name}
                                 className="rounded-lg"
                                 isRead={message.is_read}
-                                blurHash={attachment.blur_hash}
-                                width={attachment.width}
-                                height={attachment.height}
+                                blurHash={attachment.blur_hash ?? undefined}
+                                width={attachment.width ?? undefined}
+                                height={attachment.height ?? undefined}
                               />
                             </button>
                           ))}
@@ -1526,7 +1526,12 @@ export default function AdminSupportClient() {
             sender_type: string;
             created_at: string;
             is_read: boolean;
-            sender?: { id: string; username: string; user_id: string; avatar?: string | null };
+            sender?: {
+              id: string;
+              username: string;
+              user_id: string | null;
+              avatar?: string | null;
+            } | null;
             attachments?: Array<{
               id: string;
               file_name: string;
@@ -1800,24 +1805,25 @@ export default function AdminSupportClient() {
         status: 'pending',
       });
 
-      if (data.ticket) {
+      const ticket = data.ticket;
+      if (ticket) {
         if (activeTicket?.id === ticketId) {
           setActiveTicket((prev) => {
             if (prev && prev.id === ticketId) {
               return {
                 ...prev,
-                assigned_to: data.ticket.assigned_to || null,
-                assigned_user: data.ticket.assigned_user || null,
-                status: data.ticket.status || 'pending',
+                assigned_to: ticket.assigned_to || null,
+                assigned_user: ticket.assigned_user || null,
+                status: ticket.status || 'pending',
               };
             }
             return prev;
           });
         }
         updateTicketInList(ticketId, {
-          assigned_to: data.ticket.assigned_to || null,
-          assigned_user: data.ticket.assigned_user || null,
-          status: data.ticket.status || 'pending',
+          assigned_to: ticket.assigned_to || null,
+          assigned_user: ticket.assigned_user || null,
+          status: ticket.status || 'pending',
         });
 
         if (activeTicket?.id === ticketId) {

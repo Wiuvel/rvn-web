@@ -1,49 +1,51 @@
-# WebSocket Events Reference
+# Справочник WebSocket событий
 
-## Client → Server
+> **[English version](events.en.md)**
 
-| Event | Payload | Description |
+## Клиент → Сервер
+
+| Событие | Payload | Описание |
 |---|---|---|
-| `support:join` | `{ ticketId: string }` | Join a support ticket room |
-| `support:leave` | `{ ticketId: string }` | Leave a support ticket room |
-| `support:typing` | `{ ticketId: string, isTyping: boolean }` | Typing indicator (rate-limited: 1s interval, 10/min) |
-| `profile:join` | `{ profileId: string }` | Join a profile comments room |
-| `profile:leave` | `{ profileId: string }` | Leave a profile comments room |
+| `support:join` | `{ ticketId: string }` | Войти в комнату тикета |
+| `support:leave` | `{ ticketId: string }` | Покинуть комнату тикета |
+| `support:typing` | `{ ticketId: string, isTyping: boolean }` | Индикатор набора текста (лимит: 1с интервал, 10/мин) |
+| `profile:join` | `{ profileId: string }` | Войти в комнату комментариев профиля |
+| `profile:leave` | `{ profileId: string }` | Покинуть комнату комментариев профиля |
 
-## Server → Client
+## Сервер → Клиент
 
-| Event | Payload | Description |
+| Событие | Payload | Описание |
 |---|---|---|
-| `support:message:new` | `{ ticketId, message }` | New message in ticket |
-| `support:ticket:updated` | `{ ticketId, ticket }` | Ticket status/metadata changed |
-| `support:ticket:assigned` | `{ ticketId, assignedTo, assignedUser }` | Ticket assigned to support agent |
-| `support:typing:status` | `{ ticketId, userId, username, isTyping }` | Someone is typing in ticket |
-| `support:message:read` | `{ ticketId, messageIds[], readBy }` | Messages marked as read |
-| `support:error` | `{ message, code? }` | Error notification |
-| `profile:comment:new` | `{ profileId, comment }` | New comment on profile |
-| `system:notification` | `{ message, type? }` | System notification (broadcast to all connected clients) |
+| `support:message:new` | `{ ticketId, message }` | Новое сообщение в тикете |
+| `support:ticket:updated` | `{ ticketId, ticket }` | Изменение статуса/метаданных тикета |
+| `support:ticket:assigned` | `{ ticketId, assignedTo, assignedUser }` | Тикет назначен агенту поддержки |
+| `support:typing:status` | `{ ticketId, userId, username, isTyping }` | Кто-то печатает в тикете |
+| `support:message:read` | `{ ticketId, messageIds[], readBy }` | Сообщения отмечены как прочитанные |
+| `support:error` | `{ message, code? }` | Уведомление об ошибке |
+| `profile:comment:new` | `{ profileId, comment }` | Новый комментарий в профиле |
+| `system:notification` | `{ message, type? }` | Системное уведомление (рассылается всем подключенным клиентам) |
 
-## Rooms
+## Комнаты
 
-- `ticket:{ticketId}` — Support ticket room. Users can join only their own tickets; support staff can join any.
-- `profile:{profileId}` — Profile comments room. Any authenticated user can join.
+- `ticket:{ticketId}` — Комната тикета. Пользователи могут входить только в свои тикеты; поддержка — в любой.
+- `profile:{profileId}` — Комната комментариев профиля. Любой аутентифицированный пользователь.
 
-## Error Codes
+## Коды ошибок
 
-| Code | Description |
+| Код | Описание |
 |---|---|
-| `INVALID_DATA` | Missing or malformed payload |
-| `INVALID_TICKET_ID` | Ticket ID is not a valid UUID |
-| `TICKET_NOT_FOUND` | Ticket does not exist |
-| `ACCESS_DENIED` | User has no access to this ticket |
-| `VALIDATION_ERROR` | Server error during access check |
-| `SERVICE_UNAVAILABLE` | Auth service unreachable |
+| `INVALID_DATA` | Отсутствует или некорректный payload |
+| `INVALID_TICKET_ID` | Ticket ID не является валидным UUID |
+| `TICKET_NOT_FOUND` | Тикет не существует |
+| `ACCESS_DENIED` | Нет доступа к этому тикету |
+| `VALIDATION_ERROR` | Ошибка сервера при проверке доступа |
+| `SERVICE_UNAVAILABLE` | Auth-сервис недоступен |
 
-## Broadcast REST Endpoints (internal)
+## Broadcast REST эндпоинты
 
-Used by rvn-web to push events through the WS server. All require `x-internal-api-key` header.
+Используются rvn-web для отправки событий через WS-сервер. Все требуют заголовок `x-internal-api-key`.
 
-| Endpoint | Emits |
+| Эндпоинт | Эмитит |
 |---|---|
 | `POST /broadcast/support/message` | `support:message:new` |
 | `POST /broadcast/support/ticket-update` | `support:ticket:updated` |

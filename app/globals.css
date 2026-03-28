@@ -19,56 +19,6 @@ body {
   -ms-overflow-style: none;
 }
 
-.dashboard-layout {
-  font-family:
-    var(--font-exo2),
-    -apple-system,
-    system-ui,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    'Helvetica Neue',
-    Arial,
-    sans-serif;
-}
-
-.dashboard-layout * {
-  font-family: inherit;
-}
-
-.dashboard-layout h1,
-.dashboard-layout h2,
-.dashboard-layout h3,
-.dashboard-layout h4,
-.dashboard-layout h5,
-.dashboard-layout h6 {
-  font-family:
-    var(--font-exo2),
-    -apple-system,
-    system-ui,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    'Helvetica Neue',
-    Arial,
-    sans-serif;
-  font-weight: 600;
-}
-
-.dashboard-layout p,
-.dashboard-layout span,
-.dashboard-layout div,
-.dashboard-layout a,
-.dashboard-layout button {
-  font-family:
-    var(--font-exo2),
-    -apple-system,
-    system-ui,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    'Helvetica Neue',
-    Arial,
-    sans-serif;
-}
-
 /* Font loading теперь обрабатывается через next/font в app/fonts.ts */
 /* @font-face декларации удалены, так как next/font автоматически генерирует оптимизированные @font-face */
 
@@ -495,10 +445,10 @@ a {
 
 /* Glass-карточки с glow: выносим карточку на отдельный слой, чтобы не было мерцания при отрисовке backdrop-blur */
 .glass-card-no-flicker {
-  transform: translate3d(0, 0, 0);
+  transform: translateZ(0);
   backface-visibility: hidden;
-  perspective: 1000px;
-  will-change: transform, opacity;
+  will-change: transform, opacity, backdrop-filter;
+  isolation: isolate;
 }
 
 .shadow-glow {

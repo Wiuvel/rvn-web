@@ -19,10 +19,7 @@
 }
 
 .protection-page {
-  background:
-    radial-gradient(circle at 20% 30%, rgba(99, 102, 241, 0.08) 0%, transparent 50%),
-    radial-gradient(circle at 80% 70%, rgba(236, 72, 153, 0.06) 0%, transparent 50%),
-    linear-gradient(135deg, #0a0a0a 0%, #111111 50%, #0c0c0c 100%);
+  background: #000000;
   color: var(--text-primary);
   min-height: 100vh;
   display: flex;
@@ -41,20 +38,6 @@
   overflow-x: hidden;
   padding: 1rem;
   position: relative;
-}
-
-.protection-page::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background:
-    radial-gradient(circle at 10% 20%, rgba(99, 102, 241, 0.03) 0%, transparent 40%),
-    radial-gradient(circle at 90% 80%, rgba(236, 72, 153, 0.02) 0%, transparent 40%);
-  pointer-events: none;
-  z-index: -1;
 }
 
 .center-container {
@@ -230,8 +213,8 @@
   gap: 8px;
   color: #a3b0c2;
   font-size: 12px;
-  background: rgba(0, 0, 0, 0.4);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(23, 23, 23, 0.95);
+  border: 1px solid rgba(64, 64, 64, 0.5);
   padding: 6px 10px;
   border-radius: 999px;
   backdrop-filter: blur(6px);
@@ -297,7 +280,8 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(38, 38, 38, 0.8);
+  border: 1px solid rgba(82, 82, 82, 0.6);
   border-radius: 999px;
   padding: 3px 8px;
   font-family: 'Exo 2', 'SFMono-Regular', 'Menlo', monospace;
@@ -311,7 +295,7 @@
 }
 
 .cloudflare-badge .ip-label {
-  color: rgba(255, 255, 255, 0.7);
+  color: rgba(163, 163, 163, 0.9);
   font-size: 10px;
 }
 
@@ -342,7 +326,7 @@
 }
 
 .cloudflare-badge .ip-value {
-  color: #ffffff;
+  color: #d4d4d4;
   font-size: 11px;
   transition: filter 0.3s ease;
 }
@@ -356,7 +340,7 @@
 }
 
 .cloudflare-badge[role='button']:hover {
-  border-color: rgba(255, 255, 255, 0.12);
+  border-color: rgba(96, 96, 96, 0.7);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
   transform: translateX(-50%) translateY(-1px);
 }

@@ -1,6 +1,8 @@
 import { cacheLife, cacheTag } from 'next/cache';
 import { hasUserRole } from '@/lib/auth/user-roles';
-import { supabaseAdmin } from '@/lib/database/supabase';
+import { db } from '@/lib/database/db';
+import { users, profileComments } from '@/lib/database/schema';
+import { eq, asc } from 'drizzle-orm';
 import PublicProfileClient, { PublicUserData } from '@/components/profile/PublicProfileClient';
 
 export default async function PublicProfilePage({
@@ -14,18 +16,27 @@ export default async function PublicProfilePage({
   const { user_id } = await params;
   cacheTag(`user-profile:${user_id}`);
 
-  if (!user_id || !supabaseAdmin) {
+  if (!user_id || !db) {
     return <PublicProfileClient userData={null} error={true} />;
   }
 
   try {
-    const { data: user, error } = await supabaseAdmin
-      .from('users')
-      .select('id, user_id, username, created_at, avatar, banner')
-      .eq('user_id', user_id)
-      .single();
+    const userRows = await db
+      .select({
+        id: users.id,
+        userId: users.userId,
+        username: users.username,
+        createdAt: users.createdAt,
+        avatar: users.avatar,
+        banner: users.banner,
+      })
+      .from(users)
+      .where(eq(users.userId, user_id))
+      .limit(1);
 
-    if (error || !user) {
+    const user = userRows[0];
+
+    if (!user) {
       return <PublicProfileClient userData={null} error={true} />;
     }
 
@@ -34,56 +45,46 @@ export default async function PublicProfilePage({
       hasUserRole(user.id, 'admin'),
     ]);
 
-    const { data: commentsData, error: commentsError } = await supabaseAdmin
-      .from('profile_comments')
-      .select(
-        `
-        id,
-        profile_id,
-        author_id,
-        parent_id,
-        content,
-        is_pinned,
-        created_at,
-        users!profile_comments_author_id_fkey (
-          id,
-          user_id,
-          username,
-          avatar
-        )
-      `,
-      )
-      .eq('profile_id', user.id)
-      .order('created_at', { ascending: true });
+    const commentRows = await db
+      .select({
+        id: profileComments.id,
+        profileId: profileComments.profileId,
+        authorId: profileComments.authorId,
+        parentId: profileComments.parentId,
+        content: profileComments.content,
+        isPinned: profileComments.isPinned,
+        createdAt: profileComments.createdAt,
+        authorUuid: users.id,
+        authorUserId: users.userId,
+        authorUsername: users.username,
+        authorAvatar: users.avatar,
+      })
+      .from(profileComments)
+      .leftJoin(users, eq(profileComments.authorId, users.id))
+      .where(eq(profileComments.profileId, user.id))
+      .orderBy(asc(profileComments.createdAt));
 
-    if (commentsError) {
-      console.error('Error fetching comments:', commentsError);
-    }
-
-    const comments = (commentsData || []).map((c: any) => {
-      const author = Array.isArray(c.users) ? c.users[0] : c.users;
-      return {
-        id: c.id,
-        profile_id: c.profile_id,
-        author_id: c.author_id,
-        parent_id: c.parent_id,
-        content: c.content,
-        is_pinned: c.is_pinned,
-        created_at: c.created_at,
-        author: {
-          id: author?.id || '',
-          username: author?.username || '',
-          user_id: author?.user_id || '',
-          avatar: author?.avatar,
-        },
-      };
-    });
+    const comments = commentRows.map((c) => ({
+      id: c.id,
+      profile_id: c.profileId,
+      author_id: c.authorId,
+      parent_id: c.parentId,
+      content: c.content,
+      is_pinned: c.isPinned ?? false,
+      created_at: c.createdAt.toISOString(),
+      author: {
+        id: c.authorUuid || '',
+        username: c.authorUsername || '',
+        user_id: c.authorUserId || '',
+        avatar: c.authorAvatar,
+      },
+    }));
 
     const userData: PublicUserData = {
       id: user.id,
-      user_id: user.user_id,
+      user_id: user.userId,
       username: user.username,
-      created_at: user.created_at,
+      created_at: user.createdAt.toISOString(),
       avatar: user.avatar,
       banner: user.banner,
       isSupport,

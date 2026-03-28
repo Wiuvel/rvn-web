@@ -26,8 +26,8 @@ function isValidReturnTo(path: string): boolean {
 
 function AuthIsolatedClientContent() {
   const searchParams = useSearchParams();
-  const rawReturnTo = searchParams.get('return_to') || '/dashboard/';
-  const return_to = isValidReturnTo(rawReturnTo) ? rawReturnTo : '/dashboard/';
+  const rawReturnTo = searchParams.get('return_to');
+  const return_to = rawReturnTo && isValidReturnTo(rawReturnTo) ? rawReturnTo : undefined;
   const errorParam = searchParams.get('error');
   const modeParam = searchParams.get('mode') as 'login' | 'register' | null;
   const mode = modeParam === 'register' ? 'register' : undefined;

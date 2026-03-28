@@ -103,12 +103,11 @@ export async function handleProtection(
     return null;
   }
 
-  const accessGranted = request.cookies.get('access_granted')?.value === 'true';
-  const accessHash = request.cookies.get('access_hash')?.value;
+  const accessToken = request.cookies.get('access_token')?.value;
 
   /** Protection page itself - allow access, but redirect if already protected */
   if (pathname === '/protection' || pathname.startsWith('/protection/')) {
-    if (accessGranted && accessHash) {
+    if (accessToken) {
       const response = NextResponse.redirect(new URL('/', request.url));
       applySecurityHeaders(response, false);
       return response;
@@ -132,45 +131,37 @@ export async function handleProtection(
     return null;
   }
 
-  /** User has protection cookies - validate and allow access */
-  if (accessGranted && accessHash) {
-    // Валидация hash: HMAC-SHA256(IP|UserAgent, Secret)
-    // Это гарантирует, что кука была выдана сервером и привязана к текущему пользователю
+  /** User has protection cookie - validate and allow access */
+  if (accessToken) {
     const secretKey = process.env.TURNSTILE_SECRET_KEY;
+    if (!secretKey) return null;
 
-    // Если ключ не настроен или это старый формат хеша (64 символа, но не подпись) - требуем перепроверку
-    // Но для плавного перехода пока поддерживаем старый формат, если он валиден (TODO: удалить позже)
-    if (accessHash.length === 64 && /^[a-f0-9]{64}$/i.test(accessHash)) {
-      if (!secretKey) return null; // Fallback если нет ключа
+    try {
+      const dotIndex = accessToken.indexOf('.');
+      if (dotIndex > 0) {
+        const payload = accessToken.substring(0, dotIndex);
+        const hmac = accessToken.substring(dotIndex + 1);
 
-      try {
-        const ip =
-          request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-          request.headers.get('x-real-ip') ||
-          'unknown';
-        const userAgent = request.headers.get('user-agent') || '';
-        const data = `${ip}|${userAgent}`;
-
-        // Web Crypto API для Edge Runtime
+        // Verify HMAC using Web Crypto API (Edge Runtime compatible)
         const encoder = new TextEncoder();
-        const msgData = encoder.encode(data);
-
-        // Use cached key for performance optimization
         const key = await getHmacKey(secretKey);
+        const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(payload));
+        const signatureHex = Array.from(new Uint8Array(signature))
+          .map((b) => b.toString(16).padStart(2, '0'))
+          .join('');
 
-        const signature = await crypto.subtle.sign('HMAC', key, msgData);
-        const signatureArray = Array.from(new Uint8Array(signature));
-        const signatureHex = signatureArray.map((b) => b.toString(16).padStart(2, '0')).join('');
-
-        if (signatureHex === accessHash) {
-          return null; // Подпись верна
+        if (signatureHex === hmac) {
+          // Verify timestamp < 12 hours
+          const decoded = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')));
+          const age = Date.now() - decoded.t;
+          if (age < 12 * 60 * 60 * 1000) {
+            return null; // Valid
+          }
         }
-      } catch {
-        // Ошибка проверки подписи - считаем невалидным
       }
+    } catch {
+      // Invalid cookie - fall through to protection check
     }
-    // Невалидный hash - считаем что куки подделаны или устарели, требуем повторную проверку
-    // Продолжаем выполнение для редиректа на страницу защиты
   }
 
   /**

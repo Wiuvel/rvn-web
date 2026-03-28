@@ -53,7 +53,7 @@ interface AuthFormProps {
   mode?: 'login' | 'register';
 }
 
-export default function AuthForm({ return_to = '/dashboard/', initialError, mode }: AuthFormProps) {
+export default function AuthForm({ return_to, initialError, mode }: AuthFormProps) {
   const { state, dispatch } = useAuthForm(mode);
 
   const [showRateLimitCaptcha, setShowRateLimitCaptcha] = useState(false);
@@ -151,7 +151,15 @@ export default function AuthForm({ return_to = '/dashboard/', initialError, mode
       });
 
       markFpidSent();
-      window.location.href = `/dashboard/${'user_id' in result ? result.user_id : ''}`;
+      const userId = 'user_id' in result ? result.user_id : '';
+      const safeReturnTo =
+        return_to &&
+        return_to !== '/dashboard/' &&
+        return_to.startsWith('/') &&
+        !return_to.startsWith('//')
+          ? return_to
+          : `/dashboard/${userId}`;
+      window.location.href = safeReturnTo;
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Ошибка регистрации';
       dispatch({ type: 'SET_GLOBAL_ERROR', payload: escapeHtml(translateError(message)) });

@@ -93,46 +93,33 @@ export async function register() {
       );
     }
 
-    /* Supabase Database check */
+    /* GeoIP check */
     try {
-      const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-      const supabaseKey =
-        process.env.SUPABASE_SECRET_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-
-      if (supabaseUrl && supabaseKey) {
-        const { supabaseAdmin, supabase } = await import('./lib/database/supabase');
-        const client = supabaseAdmin || supabase;
-
-        if (client) {
-          const start = Date.now();
-          const { error } = await client
-            .from('support_tickets')
-            .select('id', { count: 'exact', head: true });
-          const ms = Date.now() - start;
-          const maskedUrl = supabaseUrl.replace(
-            /^(https?:\/\/)(.+)/,
-            (_, proto: string, rest: string) => {
-              const parts = rest.split('.');
-              return parts.length > 2
-                ? `${proto}***.${parts.slice(-2).join('.')}`
-                : `${proto}${rest}`;
-            },
-          );
-
-          if (!error) {
-            console.log(`[startup] Database: ready (${maskedUrl}, ping: ${ms}ms)`);
-          } else {
-            console.log(`[startup] Database: query failed (${error.message})`);
-          }
-        } else {
-          console.log('[startup] Database: client creation failed (check API keys)');
-        }
+      const { checkGeoReady } = await import('./lib/utils/geolocation');
+      const geo = await checkGeoReady();
+      if (geo?.source === 'maxmind') {
+        console.log(`[startup] GeoIP: MaxMind ready (${geo.dbPath})`);
       } else {
-        const missing = [
-          !supabaseUrl && 'SUPABASE_URL',
-          !supabaseKey && 'SUPABASE_SECRET_KEY',
-        ].filter(Boolean);
-        console.log(`[startup] Database: not configured (missing: ${missing.join(', ')})`);
+        console.log('[startup] GeoIP: ip-api.com fallback (no .mmdb found)');
+      }
+    } catch (err) {
+      console.log(
+        `[startup] GeoIP: unavailable (${err instanceof Error ? err.message : 'unknown error'})`,
+      );
+    }
+
+    /* Database check (Drizzle) */
+    try {
+      const { db } = await import('./lib/database/db');
+      const { sql } = await import('drizzle-orm');
+
+      if (db) {
+        const start = Date.now();
+        await db.execute(sql`SELECT 1`);
+        const ms = Date.now() - start;
+        console.log(`[startup] Database: ready (ping: ${ms}ms)`);
+      } else {
+        console.log('[startup] Database: client creation failed');
       }
     } catch (err) {
       console.log(

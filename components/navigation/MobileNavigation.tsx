@@ -431,10 +431,7 @@ export default function MobileNavigation() {
           />
 
           {/* Center Logo Button */}
-          <Link
-            href="/"
-            className="-mt-4 flex h-[52px] w-[52px] items-center justify-center rounded-2xl bg-primary-500 shadow-[0_0_20px_rgba(22,163,255,0.35)] transition-all hover:shadow-[0_0_28px_rgba(22,163,255,0.55)] active:scale-90"
-          >
+          <div className="-mt-4 flex h-[52px] w-[52px] items-center justify-center rounded-2xl bg-primary-500 shadow-[0_0_20px_rgba(22,163,255,0.35)]">
             <Image
               src={getStaticUrl('/static/logo.svg')}
               alt="RVN"
@@ -442,7 +439,7 @@ export default function MobileNavigation() {
               height={28}
               className="h-6 w-6"
             />
-          </Link>
+          </div>
 
           <NavItem
             href="/support"

@@ -32,13 +32,37 @@ interface RateLimitCaptchaProps {
 const TURNSTILE_SITEKEY = process.env.NEXT_PUBLIC_TURNSTILE_SITEKEY ?? '';
 const SCRIPT_CHECK_INTERVAL = 100;
 const SCRIPT_CHECK_TIMEOUT = 5000;
-const RETRY_DELAY = 5000;
+const RETRY_DELAY = 3000;
+
+/** Нормализует серверные ошибки в короткие пользовательские сообщения */
+function normalizeError(message: string): string {
+  if (message.includes('Not authenticated') || message.includes('UNAUTHORIZED')) {
+    return 'Требуется авторизация';
+  }
+  if (
+    message.includes('CAPTCHA service not configured') ||
+    message.includes('configuration error')
+  ) {
+    return 'Сервис проверки недоступен';
+  }
+  if (message.includes('Token expired') || message.includes('timeout-or-duplicate')) {
+    return 'Токен истек, попробуйте снова';
+  }
+  if (message.includes('Invalid token') || message.includes('invalid-input-response')) {
+    return 'Неверный токен проверки';
+  }
+  if (message.includes('CAPTCHA verification failed')) {
+    return 'Проверка не пройдена';
+  }
+  return 'Ошибка соединения';
+}
 
 export default function RateLimitCaptcha({ isOpen, onSuccess, onClose }: RateLimitCaptchaProps) {
   const clearMutation = trpc.rateLimit.clear.useMutation();
   const [isScriptLoaded, setIsScriptLoaded] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isFinalError, setIsFinalError] = useState(false);
   const widgetIdRef = useRef<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const isProcessingRef = useRef(false);
@@ -46,6 +70,7 @@ export default function RateLimitCaptcha({ isOpen, onSuccess, onClose }: RateLim
   const isOpenRef = useRef(isOpen);
   const onSuccessRef = useRef(onSuccess);
   const isScriptLoadedRef = useRef(isScriptLoaded);
+  const retriedRef = useRef(false);
 
   useEffect(() => {
     isOpenRef.current = isOpen;
@@ -81,8 +106,6 @@ export default function RateLimitCaptcha({ isOpen, onSuccess, onClose }: RateLim
     };
   }, []);
 
-  // Reset state when modal opens - Removed as component is conditionally rendered
-
   // Remove widget on cleanup
   const removeWidget = useCallback(() => {
     if (widgetIdRef.current && window.turnstile) {
@@ -97,15 +120,26 @@ export default function RateLimitCaptcha({ isOpen, onSuccess, onClose }: RateLim
 
   const loadCaptchaRef = useRef<() => void>(() => {});
 
-  // Reload captcha after error
-  const reloadCaptcha = useCallback(() => {
-    removeWidget();
-    setTimeout(() => {
-      if (isOpenRef.current && isScriptLoadedRef.current && !isProcessingRef.current) {
-        loadCaptchaRef.current();
+  // Reload captcha once after error, then show final error
+  const reloadCaptcha = useCallback(
+    (errorMsg: string) => {
+      if (retriedRef.current) {
+        setError(errorMsg);
+        setIsFinalError(true);
+        return;
       }
-    }, RETRY_DELAY);
-  }, [removeWidget]);
+
+      retriedRef.current = true;
+      removeWidget();
+      setTimeout(() => {
+        if (isOpenRef.current && isScriptLoadedRef.current && !isProcessingRef.current) {
+          setError(null);
+          loadCaptchaRef.current();
+        }
+      }, RETRY_DELAY);
+    },
+    [removeWidget],
+  );
 
   // Load and render captcha
   const loadCaptcha = useCallback(() => {
@@ -138,31 +172,30 @@ export default function RateLimitCaptcha({ isOpen, onSuccess, onClose }: RateLim
               setIsVerifying(false);
               isProcessingRef.current = false;
               tokenSentRef.current = false;
-              setError('Ошибка очистки лимитов');
-              reloadCaptcha();
+              reloadCaptcha('Не удалось снять ограничение');
             }
           } catch (err) {
             setIsVerifying(false);
             isProcessingRef.current = false;
             tokenSentRef.current = false;
-            const message = err instanceof Error ? err.message : 'Ошибка соединения с сервером';
-            setError(message);
-            reloadCaptcha();
+            const message =
+              err instanceof Error ? normalizeError(err.message) : 'Ошибка соединения';
+            reloadCaptcha(message);
           }
         },
         'error-callback': () => {
           if (!isOpenRef.current) return;
-          setError('Ошибка загрузки капчи');
           setIsVerifying(false);
           isProcessingRef.current = false;
-          reloadCaptcha();
+          reloadCaptcha('Ошибка загрузки проверки');
         },
       });
 
       widgetIdRef.current = widgetId;
     } catch (error) {
       console.error('Error rendering Turnstile:', error);
-      setError('Ошибка инициализации капчи');
+      setError('Ошибка инициализации проверки');
+      setIsFinalError(true);
       isProcessingRef.current = false;
     }
   }, [removeWidget, reloadCaptcha, clearMutation]);
@@ -204,7 +237,7 @@ export default function RateLimitCaptcha({ isOpen, onSuccess, onClose }: RateLim
           <div className="mb-6 text-center">
             <h2 className="mb-2 text-xl font-bold text-white sm:text-2xl">Ограничение запросов</h2>
             <p className="text-sm text-neutral-400 sm:text-base">
-              Пожалуйста, пройдите проверку, чтобы продолжить
+              Пройдите проверку, чтобы продолжить
             </p>
           </div>
 
@@ -214,9 +247,11 @@ export default function RateLimitCaptcha({ isOpen, onSuccess, onClose }: RateLim
             </div>
           )}
 
-          <div className="mb-4 flex justify-center">
-            <div ref={containerRef} id="rate-limit-captcha-container" />
-          </div>
+          {!isFinalError && (
+            <div className="mb-4 flex justify-center">
+              <div ref={containerRef} id="rate-limit-captcha-container" />
+            </div>
+          )}
 
           {onClose && (
             <button

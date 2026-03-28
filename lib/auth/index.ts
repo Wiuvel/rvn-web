@@ -1,15 +1,23 @@
 import { randomBytes, createHash } from 'crypto';
-import bcrypt from 'bcryptjs';
-import { supabaseAdmin, Admin } from '../database/supabase';
+import { hash as argon2Hash } from '@node-rs/argon2';
+import { db } from '../database/db';
+import { admins, users, userDevices } from '../database/schema';
+import type { Admin } from '../database/schema';
+import { eq, and, ilike } from 'drizzle-orm';
 import { logger } from '../utils/secure-logger';
 import { timingSafePasswordVerify, addRandomDelay } from '../security/timing-safe';
 import { ERROR_DATABASE_NOT_CONFIGURED } from '../utils/constants';
 import { generateRandomAvatar } from '../utils/avatar-gradients';
 
-// Hash password with bcrypt
+export type { Admin };
+
+// Hash password with Argon2id (OWASP 2025 recommended)
 export async function hashPassword(password: string): Promise<string> {
-  const saltRounds = 12;
-  return await bcrypt.hash(password, saltRounds);
+  return await argon2Hash(password, {
+    memoryCost: 8192,
+    timeCost: 2,
+    parallelism: 1,
+  });
 }
 
 // Verify password with timing-safe comparison
@@ -22,65 +30,37 @@ export async function createAdmin(
   password: string,
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    if (!supabaseAdmin) {
-      logger.error('Database not configured', {
-        hasSupabaseUrl: !!process.env.SUPABASE_URL || !!process.env.NEXT_PUBLIC_SUPABASE_URL,
-        hasServiceKey: !!process.env.SUPABASE_SECRET_KEY,
-      });
+    if (!db) {
+      logger.error('Database not configured');
       return { success: false, error: ERROR_DATABASE_NOT_CONFIGURED };
     }
 
-    const { data: existingAdmin, error: checkError } = await supabaseAdmin
-      .from('admins')
-      .select('id')
-      .eq('username', username)
-      .maybeSingle();
+    const existingRows = await db
+      .select({ id: admins.id })
+      .from(admins)
+      .where(eq(admins.username, username))
+      .limit(1);
 
-    if (checkError && checkError.code !== 'PGRST116') {
-      logger.error('Error checking existing admin', {
-        error: checkError.message,
-        code: checkError.code,
-      });
-      return { success: false, error: 'Database ERROR' };
-    }
-
-    if (existingAdmin) {
+    if (existingRows[0]) {
       return { success: false, error: 'Администратор с таким именем уже существует' };
     }
 
     // Check if any root admin exists
-    const { data: rootAdmin, error: rootCheckError } = await supabaseAdmin
-      .from('admins')
-      .select('id')
-      .eq('is_root', true)
-      .limit(1)
-      .maybeSingle();
-
-    if (rootCheckError && rootCheckError.code !== 'PGRST116') {
-      logger.error('Error checking root admin', {
-        error: rootCheckError.message,
-        code: rootCheckError.code,
-      });
-      return { success: false, error: 'Database ERROR' };
-    }
+    const rootRows = await db
+      .select({ id: admins.id })
+      .from(admins)
+      .where(eq(admins.isRoot, true))
+      .limit(1);
 
     // If no root admin exists, this will be the root admin
-    const isRoot = !rootAdmin;
+    const isRoot = !rootRows[0];
 
     const passwordHash = await hashPassword(password);
-    const { error: insertError } = await supabaseAdmin.from('admins').insert({
+    await db.insert(admins).values({
       username,
-      password_hash: passwordHash,
-      is_root: isRoot,
+      passwordHash,
+      isRoot,
     });
-
-    if (insertError) {
-      logger.error('Error creating admin', {
-        error: insertError.message,
-        code: insertError.code,
-      });
-      return { success: false, error: 'Не удалось создать аккаунт' };
-    }
 
     return { success: true };
   } catch (error) {
@@ -96,35 +76,24 @@ export async function authenticateAdmin(
   password: string,
 ): Promise<{ success: boolean; admin?: Admin; error?: string }> {
   try {
-    if (!supabaseAdmin) {
-      logger.error('Database not configured', {
-        hasSupabaseUrl: !!process.env.SUPABASE_URL || !!process.env.NEXT_PUBLIC_SUPABASE_URL,
-        hasServiceKey: !!process.env.SUPABASE_SECRET_KEY,
-      });
+    if (!db) {
+      logger.error('Database not configured');
       return { success: false, error: ERROR_DATABASE_NOT_CONFIGURED };
     }
 
     // Always perform the same operations to prevent timing attacks
-    const { data: admin, error: fetchError } = await supabaseAdmin
-      .from('admins')
-      .select('*')
-      .eq('username', username)
-      .single();
+    const rows = await db.select().from(admins).where(eq(admins.username, username)).limit(1);
+    const admin = rows[0];
 
     // Always add random delay regardless of result
     await addRandomDelay(50, 150);
-
-    if (fetchError) {
-      // Не логируем ошибки аутентификации для безопасности
-      return { success: false, error: 'Invalid credentials' };
-    }
 
     if (!admin) {
       return { success: false, error: 'Invalid credentials' };
     }
 
     // Use timing-safe password verification
-    const isValidPassword = await verifyPassword(password, admin.password_hash);
+    const isValidPassword = await verifyPassword(password, admin.passwordHash!);
 
     if (!isValidPassword) {
       return { success: false, error: 'Invalid credentials' };
@@ -141,21 +110,12 @@ export async function authenticateAdmin(
 
 export async function checkAdminExists(): Promise<boolean> {
   try {
-    if (!supabaseAdmin) {
+    if (!db) {
       return false;
     }
 
-    const { data, error } = await supabaseAdmin.from('admins').select('id').limit(1);
-
-    if (error) {
-      logger.error('Error checking admin existence', {
-        error: error.message,
-        code: error.code,
-      });
-      return false;
-    }
-
-    return data && data.length > 0;
+    const rows = await db.select({ id: admins.id }).from(admins).limit(1);
+    return rows.length > 0;
   } catch (error) {
     logger.error('Unexpected error checking admin existence', {
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -167,37 +127,23 @@ export async function checkAdminExists(): Promise<boolean> {
 // User authentication types and functions
 export interface User {
   id: string;
-  user_id: string;
+  userId: string;
   username: string;
-  password_hash: string | null;
+  passwordHash: string | null;
   avatar?: string | null;
   banner?: string | null;
-  token: string;
-  is_active: boolean;
-  last_login?: string;
-  created_at: string;
-  updated_at: string;
+  isActive: boolean;
+  lastLogin?: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
   balance?: number;
 }
 
-/** Base64url alphabet (без +, /, =) */
-const BASE64URL_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
-
-/** Генерирует auth token: 15 символов base64url (crypto random) */
-export function generateAuthToken(): string {
-  const bytes = randomBytes(15);
-  let result = '';
-  for (let i = 0; i < 15; i++) {
-    result += BASE64URL_ALPHABET[bytes[i]! % 64];
-  }
-  return result;
-}
-
-/** Генерирует user_id: 6 цифр (000000–999999) */
+/** Генерирует user_id: 7 цифр (0000000–9999999) */
 export function generateUserId(): string {
   const bytes = randomBytes(4);
-  const num = bytes.readUInt32BE(0) % 1000000;
-  return num.toString().padStart(6, '0');
+  const num = bytes.readUInt32BE(0) % 10000000;
+  return num.toString().padStart(7, '0');
 }
 
 // Create new user account
@@ -206,11 +152,8 @@ export async function createUser(
   password: string,
 ): Promise<{ success: boolean; user?: User; error?: string }> {
   try {
-    if (!supabaseAdmin) {
-      logger.error('Database not configured', {
-        hasSupabaseUrl: !!process.env.SUPABASE_URL || !!process.env.NEXT_PUBLIC_SUPABASE_URL,
-        hasServiceKey: !!process.env.SUPABASE_SECRET_KEY,
-      });
+    if (!db) {
+      logger.error('Database not configured');
       return { success: false, error: ERROR_DATABASE_NOT_CONFIGURED };
     }
 
@@ -218,45 +161,34 @@ export async function createUser(
     const normalizedUsername = username.toLowerCase();
 
     // Check if user exists (case-insensitive)
-    const { data: existingUsers, error: checkError } = await supabaseAdmin
-      .from('users')
-      .select('id, username')
-      .ilike('username', normalizedUsername);
-
-    if (checkError) {
-      logger.error('Error checking existing user', {
-        error: checkError.message,
-        code: checkError.code,
-      });
-      return { success: false, error: 'Database ERROR' };
-    }
+    const existingUsers = await db
+      .select({ id: users.id, username: users.username })
+      .from(users)
+      .where(ilike(users.username, normalizedUsername));
 
     // Check exact match (case-insensitive)
-    const existingUser = existingUsers?.find(
-      (u: { username: string }) => u.username.toLowerCase() === normalizedUsername,
-    );
+    const existingUser = existingUsers.find((u) => u.username.toLowerCase() === normalizedUsername);
 
     if (existingUser) {
       return { success: false, error: 'User with this username already exists' };
     }
 
     const passwordHash = await hashPassword(password);
-    const authToken = generateAuthToken();
-    let userId = generateUserId();
+    let visibleUserId = generateUserId();
 
     let retryCount = 0;
     while (retryCount < 10) {
-      const { data: existingUserId } = await supabaseAdmin
-        .from('users')
-        .select('id')
-        .eq('user_id', userId)
-        .single();
+      const idRows = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.userId, visibleUserId))
+        .limit(1);
 
-      if (!existingUserId) {
+      if (!idRows[0]) {
         break;
       }
 
-      userId = generateUserId();
+      visibleUserId = generateUserId();
       retryCount++;
     }
 
@@ -264,23 +196,17 @@ export async function createUser(
     const avatar = generateRandomAvatar();
 
     // Save username in original case, but check by lowercase
-    const { data: newUser, error: insertError } = await supabaseAdmin
-      .from('users')
-      .insert({
-        user_id: userId,
+    const [newUser] = await db
+      .insert(users)
+      .values({
+        userId: visibleUserId,
         username: username,
-        password_hash: passwordHash,
-        token: authToken,
-        avatar: avatar,
+        passwordHash,
+        avatar,
       })
-      .select()
-      .single();
+      .returning();
 
-    if (insertError) {
-      logger.error('Error creating user', {
-        error: insertError.message,
-        code: insertError.code,
-      });
+    if (!newUser) {
       return { success: false, error: 'Failed to create account' };
     }
 
@@ -299,11 +225,8 @@ export async function authenticateUser(
   password: string,
 ): Promise<{ success: boolean; user?: User; error?: string }> {
   try {
-    if (!supabaseAdmin) {
-      logger.error('Database not configured', {
-        hasSupabaseUrl: !!process.env.SUPABASE_URL || !!process.env.NEXT_PUBLIC_SUPABASE_URL,
-        hasServiceKey: !!process.env.SUPABASE_SECRET_KEY,
-      });
+    if (!db) {
+      logger.error('Database not configured');
       return { success: false, error: ERROR_DATABASE_NOT_CONFIGURED };
     }
 
@@ -311,32 +234,24 @@ export async function authenticateUser(
     const normalizedUsername = username.toLowerCase();
 
     // Always perform same operations to prevent timing attacks
-    const { data: users, error: fetchError } = await supabaseAdmin
-      .from('users')
-      .select('*')
-      .ilike('username', normalizedUsername);
+    const userRows = await db.select().from(users).where(ilike(users.username, normalizedUsername));
 
     // Always add random delay regardless of result
     await addRandomDelay(50, 150);
 
-    if (fetchError) {
-      // Не логируем ошибки аутентификации для безопасности
-      return { success: false, error: 'Invalid credentials' };
-    }
-
     // Find exact match (case-insensitive)
-    const user = users?.find((u: User) => u.username.toLowerCase() === normalizedUsername) || null;
+    const user = userRows.find((u) => u.username.toLowerCase() === normalizedUsername) || null;
 
     if (!user) {
       return { success: false, error: 'Invalid credentials' };
     }
 
-    if (!user.is_active) {
+    if (!user.isActive) {
       return { success: false, error: 'Account is disabled' };
     }
 
     // OAuth users don't have passwords - they can't login with username/password
-    if (!user.password_hash) {
+    if (!user.passwordHash) {
       return {
         success: false,
         error: 'This account uses OAuth authentication. Please sign in with your OAuth provider.',
@@ -344,17 +259,14 @@ export async function authenticateUser(
     }
 
     // Verify password with timing-safe comparison
-    const isValidPassword = await verifyPassword(password, user.password_hash);
+    const isValidPassword = await verifyPassword(password, user.passwordHash);
 
     if (!isValidPassword) {
       return { success: false, error: 'Invalid credentials' };
     }
 
     // Update last login timestamp
-    await supabaseAdmin
-      .from('users')
-      .update({ last_login: new Date().toISOString() })
-      .eq('id', user.id);
+    await db.update(users).set({ lastLogin: new Date() }).where(eq(users.id, user.id));
 
     return { success: true, user: user as User };
   } catch (error) {
@@ -367,33 +279,32 @@ export async function authenticateUser(
 
 export async function getUserByToken(authToken: string): Promise<User | null> {
   try {
-    if (!supabaseAdmin) {
+    if (!db) {
       return null;
     }
 
     const tokenHash = createHash('sha256').update(authToken).digest('hex');
 
     // Check user_devices first
-    const { data: device, error: deviceError } = await supabaseAdmin
-      .from('user_devices')
-      .select('user_id')
-      .eq('token_hash', tokenHash)
-      .single();
+    const deviceRows = await db
+      .select({ userId: userDevices.userId })
+      .from(userDevices)
+      .where(eq(userDevices.tokenHash, tokenHash))
+      .limit(1);
 
-    if (deviceError || !device) {
-      // Legacy support: check users table directly (optional, can be removed)
-      // For now, let's keep it STRICT as per "Update auth logic... to use 'user_devices' table"
+    const device = deviceRows[0];
+    if (!device) {
       return null;
     }
 
-    const { data: user, error } = await supabaseAdmin
-      .from('users')
-      .select('*')
-      .eq('id', device.user_id)
-      .eq('is_active', true)
-      .single();
+    const userRows = await db
+      .select()
+      .from(users)
+      .where(and(eq(users.id, device.userId), eq(users.isActive, true)))
+      .limit(1);
 
-    if (error || !user) {
+    const user = userRows[0];
+    if (!user) {
       return null;
     }
 
@@ -403,18 +314,18 @@ export async function getUserByToken(authToken: string): Promise<User | null> {
   }
 }
 
-export async function getUserById(userId: string): Promise<User | null> {
+export async function getUserById(visibleUserId: string): Promise<User | null> {
   try {
-    if (!supabaseAdmin) return null;
+    if (!db) return null;
 
-    const { data: user, error } = await supabaseAdmin
-      .from('users')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('is_active', true)
-      .single();
+    const userRows = await db
+      .select()
+      .from(users)
+      .where(and(eq(users.userId, visibleUserId), eq(users.isActive, true)))
+      .limit(1);
 
-    if (error || !user) return null;
+    const user = userRows[0];
+    if (!user) return null;
     return user as User;
   } catch (error) {
     logger.error('Error getting user by id', {
@@ -430,28 +341,19 @@ export async function getUserById(userId: string): Promise<User | null> {
 // For Google: user@gmail.com -> user
 export async function getUserByEmail(email: string): Promise<User | null> {
   try {
-    if (!supabaseAdmin) {
-      // Не логируем - это нормальная ситуация при отсутствии конфигурации
+    if (!db) {
       return null;
     }
 
     // Extract username from email (before @)
     const username = email.split('@')[0];
 
-    const { data: users, error } = await supabaseAdmin
-      .from('users')
-      .select('*')
-      .ilike('username', username);
+    const userRows = await db.select().from(users).where(ilike(users.username, username!));
 
-    if (error) {
-      logger.error('Error fetching user by email', { error: error.message, code: error.code });
+    if (userRows.length === 0) {
       return null;
     }
-
-    if (!users || users.length === 0) {
-      return null;
-    }
-    return users[0] as User;
+    return userRows[0] as User;
   } catch (error) {
     logger.error('Exception in getUserByEmail', {
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -467,7 +369,7 @@ export async function createUserFromOAuth(
   avatarUrl?: string,
 ): Promise<{ success: boolean; user?: User; error?: string }> {
   try {
-    if (!supabaseAdmin) {
+    if (!db) {
       logger.error('Database not configured');
       return { success: false, error: ERROR_DATABASE_NOT_CONFIGURED };
     }
@@ -478,7 +380,7 @@ export async function createUserFromOAuth(
     }
 
     // Use preferred username or extract from email
-    let username = preferredUsername || email.split('@')[0];
+    let username = preferredUsername || email.split('@')[0]!;
 
     // Sanitize username: remove invalid characters, limit length
     // Only allow alphanumeric, underscore, and hyphen
@@ -501,22 +403,12 @@ export async function createUserFromOAuth(
     const normalizedUsername = username.toLowerCase();
 
     // Check if username is already taken, if so, generate unique one
-    const { data: existingUsers, error: checkError } = await supabaseAdmin
-      .from('users')
-      .select('id, username')
-      .ilike('username', normalizedUsername);
+    const existingUsers = await db
+      .select({ id: users.id, username: users.username })
+      .from(users)
+      .where(ilike(users.username, normalizedUsername));
 
-    if (checkError) {
-      logger.error('Error checking existing user', {
-        error: checkError.message,
-        code: checkError.code,
-      });
-      return { success: false, error: 'Database ERROR' };
-    }
-
-    const existingUser = existingUsers?.find(
-      (u: { username: string }) => u.username.toLowerCase() === normalizedUsername,
-    );
+    const existingUser = existingUsers.find((u) => u.username.toLowerCase() === normalizedUsername);
 
     // If username is taken, append random suffix
     if (existingUser) {
@@ -525,12 +417,12 @@ export async function createUserFromOAuth(
       let uniqueUsername = `${baseUsername}_${suffix}`;
 
       while (suffix < 100) {
-        const { data: checkUsers } = await supabaseAdmin
-          .from('users')
-          .select('id')
-          .ilike('username', uniqueUsername.toLowerCase());
+        const checkRows = await db
+          .select({ id: users.id })
+          .from(users)
+          .where(ilike(users.username, uniqueUsername.toLowerCase()));
 
-        if (!checkUsers || checkUsers.length === 0) {
+        if (checkRows.length === 0) {
           username = uniqueUsername;
           break;
         }
@@ -546,32 +438,29 @@ export async function createUserFromOAuth(
     }
 
     // Generate unique user_id
-    let userId = generateUserId();
+    let visibleUserId = generateUserId();
     let retryCount = 0;
     while (retryCount < 10) {
-      const { data: existingUserId } = await supabaseAdmin
-        .from('users')
-        .select('id')
-        .eq('user_id', userId)
-        .single();
+      const idRows = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.userId, visibleUserId))
+        .limit(1);
 
-      if (!existingUserId) {
+      if (!idRows[0]) {
         break;
       }
 
-      userId = generateUserId();
+      visibleUserId = generateUserId();
       retryCount++;
     }
-
-    // Generate auth token and avatar
-    const authToken = generateAuthToken();
 
     // Попытка загрузить аватар из OAuth провайдера
     let avatar: string = generateRandomAvatar(); // Fallback на случайный градиент
     if (avatarUrl) {
       try {
         const { uploadAvatarFromUrl } = await import('@/lib/storage/s3-client');
-        const uploadedAvatarPath = await uploadAvatarFromUrl(avatarUrl, userId);
+        const uploadedAvatarPath = await uploadAvatarFromUrl(avatarUrl, visibleUserId);
         if (uploadedAvatarPath) {
           // Сохраняем путь к файлу в S3 в формате `s3:avatars/userId/timestamp.ext`
           avatar = `s3:${uploadedAvatarPath}`;
@@ -588,26 +477,16 @@ export async function createUserFromOAuth(
     // OAuth users don't need password - set password_hash to null
     // This distinguishes OAuth users from password-based users
 
-    const { data: newUser, error: insertError } = await supabaseAdmin
-      .from('users')
-      .insert({
-        user_id: userId,
+    const [newUser] = await db
+      .insert(users)
+      .values({
+        userId: visibleUserId,
         username: username,
-        password_hash: null, // OAuth users don't have passwords
-        token: authToken,
+        passwordHash: null,
         avatar: avatar,
-        is_active: true,
+        isActive: true,
       })
-      .select()
-      .single();
-
-    if (insertError) {
-      logger.error('Error creating user from OAuth', {
-        error: insertError.message,
-        code: insertError.code,
-      });
-      return { success: false, error: `Failed to create account: ${insertError.message}` };
-    }
+      .returning();
 
     if (!newUser) {
       logger.error('User creation returned null');

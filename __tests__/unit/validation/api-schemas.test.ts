@@ -210,7 +210,7 @@ describe('UUID param schemas', () => {
   it('ticketIdParamSchema, userIdParamSchema, deviceIdParamSchema', () => {
     expect(ticketIdParamSchema.safeParse({ ticketId: VALID_UUID }).success).toBe(true);
     expect(ticketIdParamSchema.safeParse({ ticketId: INVALID_UUID }).success).toBe(false);
-    expect(userIdParamSchema.safeParse({ user_id: '123456' }).success).toBe(true);
+    expect(userIdParamSchema.safeParse({ user_id: '1234567' }).success).toBe(true);
     expect(deviceIdParamSchema.safeParse({ deviceId: VALID_UUID }).success).toBe(true);
     expect(trustedDeveloperIdQuerySchema.safeParse({ id: VALID_UUID }).success).toBe(true);
   });

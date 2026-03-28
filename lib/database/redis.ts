@@ -4,7 +4,6 @@
 
 import Redis, { RedisOptions } from 'ioredis';
 import { logger } from '@/lib/utils/secure-logger';
-import fs from 'fs';
 
 let redis: Redis | null = null;
 
@@ -65,11 +64,20 @@ export function getRedisClient(): Redis | null {
         rejectUnauthorized: true,
       };
 
-      const certPath = process.env.REDIS_CERT_PATH || '/app/certs/ca.pem';
-      if (fs.existsSync(certPath)) {
-        options.tls.ca = [fs.readFileSync(certPath)];
-      } else if (process.env.REDIS_CERT_PATH) {
-        logger.warn(`Redis TLS certificate not found at ${certPath}`);
+      const certPath = process.env.REDIS_CERT_PATH;
+      try {
+        if (certPath) {
+          // eslint-disable-next-line @typescript-eslint/no-require-imports
+          const fs = require('fs');
+          if (fs.existsSync(certPath)) {
+            const certContent = fs.readFileSync(certPath);
+            options.tls.ca = [certContent];
+          } else {
+            logger.warn(`Redis TLS certificate not found at ${certPath}`);
+          }
+        }
+      } catch (e) {
+        logger.warn(`Failed to read Redis TLS certificate at ${certPath}`, { error: e });
       }
     }
 

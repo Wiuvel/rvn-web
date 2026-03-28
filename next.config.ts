@@ -9,8 +9,7 @@ const nextConfig: NextConfig = {
   trailingSlash: false,
   outputFileTracingRoot: process.cwd(),
   outputFileTracingIncludes: {
-    '/lib/database/redis': ['./lib/database/redis.ts'],
-    '/lib/wasm/pkg': ['./lib/wasm/pkg/*'],
+    '/lib/wasm/pkg': ['./lib/wasm/pkg/**/*'],
   },
   serverExternalPackages: ['ioredis'],
   devIndicators: {

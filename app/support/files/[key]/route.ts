@@ -17,7 +17,9 @@ import {
   ERROR_TOO_MANY_REQUESTS,
   ERROR_ACCESS_DENIED,
 } from '@/lib/utils/constants';
-import { supabaseAdmin } from '@/lib/database/supabase';
+import { db } from '@/lib/database/db';
+import { supportTickets, supportMessages, supportMessageAttachments } from '@/lib/database/schema';
+import { eq, and } from 'drizzle-orm';
 import { getS3Client, getObjectAsBuffer } from '@/lib/storage/s3-client';
 import { getMediaFromCache, setMediaCache } from '@/lib/storage/media-cache';
 import { processImage } from '@/lib/wasm/image-processor';
@@ -79,24 +81,25 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     // Проверяем доступ к тикету
-    if (!supabaseAdmin) {
+    if (!db) {
       return setCorsHeaders(
         NextResponse.json({ error: ERROR_INTERNAL_SERVER_ERROR }, { status: 500 }),
       );
     }
 
-    const { data: ticket, error: ticketError } = await supabaseAdmin
-      .from('support_tickets')
-      .select('id, user_id')
-      .eq('id', ticketId)
-      .single();
+    const ticketRows = await db
+      .select({ id: supportTickets.id, userId: supportTickets.userId })
+      .from(supportTickets)
+      .where(eq(supportTickets.id, ticketId))
+      .limit(1);
 
-    if (ticketError || !ticket) {
+    const ticket = ticketRows[0];
+    if (!ticket) {
       return setCorsHeaders(NextResponse.json({ error: 'Ticket not found' }, { status: 404 }));
     }
 
     // Проверяем права доступа: пользователь может видеть только свои тикеты, поддержка - все
-    if (!isSupport && ticket.user_id !== user.id) {
+    if (!isSupport && ticket.userId !== user.id) {
       return setCorsHeaders(NextResponse.json({ error: ERROR_ACCESS_DENIED }, { status: 403 }));
     }
 
@@ -106,22 +109,32 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     if (messageId && isValidUUID(messageId)) {
       // Проверяем, что файл привязан к сообщению в тикете
-      const { data: attachment, error: attachmentError } = await supabaseAdmin
-        .from('support_message_attachments')
-        .select('id, message_id, storage_path')
-        .eq('storage_path', decodedKey)
-        .single();
+      const attachmentRows = await db
+        .select({
+          id: supportMessageAttachments.id,
+          messageId: supportMessageAttachments.messageId,
+          storagePath: supportMessageAttachments.storagePath,
+        })
+        .from(supportMessageAttachments)
+        .where(eq(supportMessageAttachments.storagePath, decodedKey))
+        .limit(1);
 
-      if (!attachmentError && attachment) {
+      const attachment = attachmentRows[0];
+      if (attachment) {
         // Проверяем, что сообщение принадлежит тикету
-        const { data: message, error: messageError } = await supabaseAdmin
-          .from('support_messages')
-          .select('id, ticket_id')
-          .eq('id', attachment.message_id)
-          .eq('ticket_id', ticketId)
-          .single();
+        const messageRows = await db
+          .select({ id: supportMessages.id, ticketId: supportMessages.ticketId })
+          .from(supportMessages)
+          .where(
+            and(
+              eq(supportMessages.id, attachment.messageId),
+              eq(supportMessages.ticketId, ticketId),
+            ),
+          )
+          .limit(1);
 
-        if (messageError || !message) {
+        const message = messageRows[0];
+        if (!message) {
           return setCorsHeaders(
             NextResponse.json({ error: 'File not found in ticket' }, { status: 404 }),
           );

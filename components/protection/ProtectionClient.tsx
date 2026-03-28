@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import Script from 'next/script';
 import { trpc } from '@/lib/trpc/client';
+import { useQuery } from '@tanstack/react-query';
 
 interface ProtectionClientProps {
   initialIp?: string | null;
@@ -11,24 +12,22 @@ interface ProtectionClientProps {
 
 export default function ProtectionClient({ initialIp = null }: ProtectionClientProps) {
   const [isIpRevealed, setIsIpRevealed] = useState(false);
-  const [ipAddress, setIpAddress] = useState<string | null>(initialIp);
 
-  useEffect(() => {
-    if (initialIp != null) {
-      setIpAddress(initialIp);
-      return;
-    }
-    let cancelled = false;
-    fetch('/api/request-ip')
-      .then((r) => r.json())
-      .then((data: { ip?: string | null }) => {
-        if (!cancelled && data.ip != null) setIpAddress(data.ip);
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [initialIp]);
+  // Используем react-query вместо fetch внутри useEffect
+  const { data: ipData } = useQuery({
+    queryKey: ['client-ip'],
+    queryFn: async () => {
+      if (initialIp) return { ip: initialIp };
+      const res = await fetch('/api/request-ip');
+      if (!res.ok) throw new Error('Failed to fetch IP');
+      return res.json() as Promise<{ ip?: string | null }>;
+    },
+    staleTime: Infinity, // IP вряд ли изменится во время одной сессии проверки
+    enabled: true,
+  });
+
+  const ipAddress = ipData?.ip || initialIp;
+
   const verifyMutation = trpc.protection.verify.useMutation();
   const verifyRef = useRef(verifyMutation);
   verifyRef.current = verifyMutation;

@@ -512,12 +512,12 @@ export default function AdminPanelContent({ teamCount }: AdminPanelContentProps)
                                 {user.username}
                               </p>
                               <span className="user-muted">
-                                {user.is_active ? 'Активен' : 'Отключен'}
+                                {user.isActive ? 'Активен' : 'Отключен'}
                               </span>
                             </div>
                             <div>
                               <p className={`user-primary tracking-wide ${getUsernameColor()}`}>
-                                {user.user_id}
+                                {user.userId}
                               </p>
                               <span className="user-muted">Идентификатор</span>
                             </div>
@@ -573,8 +573,8 @@ export default function AdminPanelContent({ teamCount }: AdminPanelContentProps)
                               })()}
                             </div>
                             <div>
-                              <span className="user-date" title={user.created_at}>
-                                {formatDateShort(user.created_at)}
+                              <span className="user-date" title={user.createdAt}>
+                                {formatDateShort(user.createdAt)}
                               </span>
                             </div>
                             <div className="flex items-center space-x-2">
@@ -663,7 +663,7 @@ export default function AdminPanelContent({ teamCount }: AdminPanelContentProps)
                 </div>
                 <div>
                   <div className="font-medium text-white">{selectedUser.username}</div>
-                  <div className="text-xs text-neutral-500">{selectedUser.user_id}</div>
+                  <div className="text-xs text-neutral-500">{selectedUser.userId}</div>
                 </div>
               </div>
 

@@ -98,20 +98,23 @@ function checkExistingCookie(): boolean {
   }
 
   const cookies = document.cookie.split(';');
-  let hasAccess = false;
-  let hasHash = false;
+  let hasAccessToken = false;
 
   for (const cookie of cookies) {
-    const [name, value] = cookie.trim().split('=');
-    if (name === 'access_granted' && value === 'true') {
-      hasAccess = true;
-    }
-    if (name === 'access_hash' && value && value.length === 64 && /^[a-f0-9]{64}$/.test(value)) {
-      hasHash = true;
+    const [name, ...valueParts] = cookie.trim().split('=');
+    const value = valueParts.join('=');
+    if (name === 'access_token' && value) {
+      const dotIndex = value.indexOf('.');
+      if (dotIndex > 0) {
+        const hmacPart = value.substring(dotIndex + 1);
+        if (hmacPart.length === 64 && /^[a-f0-9]{64}$/.test(hmacPart)) {
+          hasAccessToken = true;
+        }
+      }
     }
   }
 
-  if (hasAccess && hasHash) {
+  if (hasAccessToken) {
     const urlParams = new URLSearchParams(window.location.search);
     const redirectUrl = (urlParams.get('redirect') || '/').trim();
     return safeRedirect(redirectUrl);

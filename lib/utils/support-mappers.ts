@@ -43,9 +43,9 @@ export function mapWsAttachmentToUi(att: {
   file_size: number;
   storage_path?: string;
   storage_url?: string;
-  blur_hash?: string;
-  width?: number;
-  height?: number;
+  blur_hash?: string | null;
+  width?: number | null;
+  height?: number | null;
 }): MessageAttachment {
   return {
     id: att.id,
@@ -54,9 +54,9 @@ export function mapWsAttachmentToUi(att: {
     file_size: att.file_size,
     storage_path: att.storage_path,
     storage_url: att.storage_url || buildStorageUrl(att.storage_path),
-    blur_hash: att.blur_hash,
-    width: att.width,
-    height: att.height,
+    blur_hash: att.blur_hash ?? undefined,
+    width: att.width ?? undefined,
+    height: att.height ?? undefined,
   };
 }
 
@@ -72,9 +72,9 @@ export function mapWsAttachments(
         file_size: number;
         storage_path?: string;
         storage_url?: string;
-        blur_hash?: string;
-        width?: number;
-        height?: number;
+        blur_hash?: string | null;
+        width?: number | null;
+        height?: number | null;
       }>
     | undefined
     | null,

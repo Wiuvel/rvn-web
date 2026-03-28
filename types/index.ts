@@ -98,11 +98,11 @@ export interface AdminUsersResponse extends ApiResponse {
 
 export interface PanelUser {
   id: string;
-  user_id: string;
+  userId: string;
   username: string;
-  created_at: string;
-  last_login?: string | null;
-  is_active: boolean;
+  createdAt: string;
+  lastLogin?: string | null;
+  isActive: boolean;
   token?: string;
   roles?: string[];
 }
