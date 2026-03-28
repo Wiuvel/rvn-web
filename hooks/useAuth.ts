@@ -152,11 +152,17 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
       setSessionExpired(false);
       return;
     }
+
+    // Only mark session as expired if:
+    // 1. User had a valid cookie (was authenticated)
+    // 2. API explicitly returned 401/unauthenticated
+    // 3. Not currently loading
+    // 4. We actually attempted to fetch (shouldFetch = true)
     const hadCookie = !!fallbackFromCookie;
-    if (hadCookie && apiSaysUnauthenticated && !isLoading) {
+    if (hadCookie && apiSaysUnauthenticated && !isLoading && shouldFetch) {
       setSessionExpired(true);
     }
-  }, [fallbackFromCookie, data, trpcError, isLoading]);
+  }, [fallbackFromCookie, data, trpcError, isLoading, shouldFetch]);
 
   useLayoutEffect(() => {
     if (!userData || !validateUserId || !redirectOnFail) return;
