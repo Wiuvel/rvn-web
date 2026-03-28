@@ -56,11 +56,10 @@ RUN mkdir -p data && \
 RUN corepack enable && corepack prepare pnpm@10.33.0 --activate
 RUN pnpm run build
 
-# Ensure maxmind subdeps are at top level for COPY in runner stage
+# Resolve maxmind subdeps from pnpm symlink store into real directories for COPY
 RUN for dep in mmdb-lib tiny-lru; do \
-      if [ ! -d "node_modules/$dep" ] && [ -d "node_modules/maxmind/node_modules/$dep" ]; then \
-        cp -r "node_modules/maxmind/node_modules/$dep" "node_modules/$dep"; \
-      fi; \
+      real=$(node -e "console.log(require.resolve('$dep/package.json').replace('/package.json',''))"); \
+      rm -rf "node_modules/$dep" && cp -rL "$real" "node_modules/$dep"; \
     done
 
 # ---- Stage 4: Runner ----
