@@ -87,7 +87,7 @@ async function lookupViaIpApi(ip: string): Promise<string | null> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 3000);
 
-    const res = await fetch(`http://ip-api.com/json/${ip}?fields=status,country,city`, {
+    const res = await fetch(`http://ip-api.com/json/${ip}?fields=status,country,city&lang=ru`, {
       signal: controller.signal,
     });
     clearTimeout(timeout);
@@ -125,7 +125,10 @@ export async function lookupIP(ip: string): Promise<string | null> {
     try {
       const result = reader.get(ip);
       if (result) {
-        const location = formatLocation(result.city?.names?.en, result.country?.names?.en);
+        const location = formatLocation(
+          result.city?.names?.ru || result.city?.names?.en,
+          result.country?.names?.ru || result.country?.names?.en,
+        );
         cacheSet(ip, location);
         return location;
       }
@@ -146,10 +149,7 @@ export function resolveAndStoreLocation(deviceId: string, ipAddress: string): vo
   lookupIP(ipAddress)
     .then((location) => {
       if (!location || !db) return;
-      return db
-        .update(userDevices)
-        .set({ location })
-        .where(eq(userDevices.id, deviceId));
+      return db.update(userDevices).set({ location }).where(eq(userDevices.id, deviceId));
     })
     .catch((error) => {
       logger.warn('Failed to resolve device location', {
@@ -163,14 +163,25 @@ export function resolveAndStoreLocation(deviceId: string, ipAddress: string): vo
  * Eagerly load MaxMind DB and report status. Used by instrumentation.ts.
  * Returns 'maxmind' | 'ip-api' | null.
  */
-export async function checkGeoReady(): Promise<{ source: 'maxmind' | 'ip-api'; dbPath?: string } | null> {
+export async function checkGeoReady(): Promise<{
+  source: 'maxmind' | 'ip-api';
+  dbPath?: string;
+} | null> {
   const reader = await getMaxMindReader();
   if (reader) {
-    return { source: 'maxmind', dbPath: process.env.MAXMIND_DB_PATH || './data/GeoLite2-City.mmdb' };
+    return {
+      source: 'maxmind',
+      dbPath: process.env.MAXMIND_DB_PATH || './data/GeoLite2-City.mmdb',
+    };
   }
   // ip-api.com is always available as fallback (no pre-check needed)
   return { source: 'ip-api' };
 }
 
 // Exported for testing
-export { isPrivateIP as _isPrivateIP, formatLocation as _formatLocation, cache as _cache, cacheSet as _cacheSet };
+export {
+  isPrivateIP as _isPrivateIP,
+  formatLocation as _formatLocation,
+  cache as _cache,
+  cacheSet as _cacheSet,
+};

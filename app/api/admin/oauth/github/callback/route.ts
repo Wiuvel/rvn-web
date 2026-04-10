@@ -10,6 +10,11 @@ import { domains } from '@/lib/utils';
 
 const ADMIN_SESSION_COOKIE = 'admin_sid';
 
+/**
+ * Handles CORS preflight requests for the OAuth endpoint
+ *
+ * @returns Response with CORS headers
+ */
 export async function OPTIONS() {
   return handleCorsPreflight();
 }
@@ -29,7 +34,7 @@ async function isTrustedDeveloper(
   const { trustedGithubDevelopers } = await import('@/lib/database/schema');
   const { eq } = await import('drizzle-orm');
 
-  // Check by email first (preferred method)
+  /* Check by email first (preferred method) */
   if (email) {
     const normalizedEmail = email.toLowerCase().trim();
     try {
@@ -47,7 +52,7 @@ async function isTrustedDeveloper(
     }
   }
 
-  // Check by username
+  /*  Check by username */
   const normalizedUsername = username.toLowerCase().trim();
   try {
     const rows = await db
@@ -63,13 +68,26 @@ async function isTrustedDeveloper(
   }
 }
 
-// Handle GitHub OAuth callback for admin panel
+/**
+ * Handle GitHub OAuth callback for admin panel
+ *
+ * @param request - Next.js request object with OAuth parameters
+ * @returns Redirect response to admin panel or error page
+ *
+ * @remarks
+ * - Validates CSRF state token
+ * - Exchanges code for access token
+ * - Fetches GitHub user info
+ * - Checks if user is a trusted developer
+ * - Auto-creates admin account for trusted developers
+ * - Creates session and sets cookies
+ */
 export async function GET(request: NextRequest) {
   try {
     const env = getEnv();
     const origin = domains.mainUrl.endsWith('/') ? domains.mainUrl.slice(0, -1) : domains.mainUrl;
 
-    // Get state early to determine if this is a popup request
+    /* Get state early to determine if this is a popup request */
     const { searchParams } = request.nextUrl;
     const state = searchParams.get('state');
     const storedState = request.cookies.get('admin_oauth_state')?.value;
@@ -85,38 +103,38 @@ export async function GET(request: NextRequest) {
       isPopup = true;
     }
 
-    // Rate limiting
+    /* Rate limiting */
     const rateLimitResult = await authRateLimit.check(request);
     if (!rateLimitResult.allowed) {
       const errorUrl = getErrorRedirectUrl('rate_limit', origin, isPopup);
       return setCorsHeaders(NextResponse.redirect(errorUrl));
     }
 
-    // Check GitHub OAuth credentials
+    /* Check GitHub OAuth credentials */
     if (!env.GITHUB_CLIENT_ID || !env.GITHUB_CLIENT_SECRET) {
       logger.error('OAuth: GitHub not configured.');
       const errorUrl = getErrorRedirectUrl('oauth_not_configured', origin, isPopup);
       return setCorsHeaders(NextResponse.redirect(errorUrl));
     }
 
-    // Get OAuth parameters
+    /* Get OAuth parameters */
     const code = searchParams.get('code');
     const githubError = searchParams.get('error');
 
-    // Check for GitHub errors
+    /* Check for GitHub errors */
     if (githubError) {
       const errorCode = GOOGLE_ERROR_MAP[githubError] || 'oauth_denied';
       const errorUrl = getErrorRedirectUrl(errorCode, origin, isPopup);
       return setCorsHeaders(NextResponse.redirect(errorUrl));
     }
 
-    // Validate required parameters
+    /* Validate required parameters */
     if (!code || !state) {
       const errorUrl = getErrorRedirectUrl('invalid_request', origin, isPopup);
       return setCorsHeaders(NextResponse.redirect(errorUrl));
     }
 
-    // Verify CSRF state token
+    /* Verify CSRF state token */
     const cleanState = isPopup ? state.split(':')[0] : state;
     const cleanStoredState = storedState?.includes(':popup')
       ? storedState.split(':')[0]
@@ -129,7 +147,7 @@ export async function GET(request: NextRequest) {
 
     const redirectUri = `${origin}/api/admin/oauth/github/callback`;
 
-    // Exchange authorization code for access token
+    /* Exchange authorization code for access token */
     const tokenResponse = await fetch('https://github.com/login/oauth/access_token', {
       method: 'POST',
       headers: {
@@ -161,7 +179,7 @@ export async function GET(request: NextRequest) {
       return setCorsHeaders(NextResponse.redirect(errorUrl));
     }
 
-    // Fetch user info from GitHub
+    /* Fetch user info from GitHub */
     const userInfoResponse = await fetch('https://api.github.com/user', {
       headers: {
         Authorization: `Bearer ${access_token}`,
@@ -186,10 +204,10 @@ export async function GET(request: NextRequest) {
       return setCorsHeaders(NextResponse.redirect(errorUrl));
     }
 
-    // Get email if not provided in user info
+    /* Get email if not provided in user info */
     let email = githubEmail;
     if (!email) {
-      // Try to fetch email from GitHub API
+      /* Try to fetch email from GitHub API */
       const emailResponse = await fetch('https://api.github.com/user/emails', {
         headers: {
           Authorization: `Bearer ${access_token}`,
@@ -203,7 +221,7 @@ export async function GET(request: NextRequest) {
         if (primaryEmail && primaryEmail.verified) {
           email = primaryEmail.email;
         } else if (emails.length > 0) {
-          // Use first verified email if no primary email found
+          /* Use first verified email if no primary email found */
           const verifiedEmail = emails.find((e: { verified: boolean }) => e.verified);
           if (verifiedEmail) {
             email = verifiedEmail.email;
@@ -212,7 +230,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Check if admin exists with this GitHub username
+    /* Check if admin exists with this GitHub username */
     const { db } = await import('@/lib/database/db');
     const { admins } = await import('@/lib/database/schema');
     const { eq } = await import('drizzle-orm');
@@ -223,7 +241,7 @@ export async function GET(request: NextRequest) {
       return setCorsHeaders(NextResponse.redirect(errorUrl));
     }
 
-    // Check if user is a trusted developer (by email or username) from database
+    /* Check if user is a trusted developer (by email or username) from database */
     const isTrusted = await isTrustedDeveloper(email, githubUsername, db);
     if (!isTrusted) {
       logger.warn('OAuth: Untrusted GitHub developer attempted admin login.', {
@@ -234,8 +252,8 @@ export async function GET(request: NextRequest) {
       return setCorsHeaders(NextResponse.redirect(errorUrl));
     }
 
-    // Check if admin exists with this username
-    // If not, create it automatically (for trusted developers)
+    /* Check if admin exists with this username */
+    /* If not, create it automatically (for trusted developers) */
     let admin: (typeof adminRows)[0] | undefined;
     const adminRows = await db
       .select()
@@ -245,15 +263,15 @@ export async function GET(request: NextRequest) {
 
     admin = adminRows[0];
 
-    // If admin doesn't exist, create it automatically
+    /* If admin doesn't exist, create it automatically */
     if (!admin) {
       try {
         const [newAdmin] = await db
           .insert(admins)
           .values({
             username: githubUsername,
-            passwordHash: null, // No password for GitHub OAuth admins
-            isRoot: false, // Only Root admin is created via login/password
+            passwordHash: null,
+            isRoot: false,
           })
           .returning();
 
@@ -283,13 +301,13 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Create admin session
+    /* Create admin session */
     const ipAddress = request.headers.get('x-forwarded-for') || 'unknown';
     const userAgent = request.headers.get('user-agent') || 'unknown';
     const hostname = request.nextUrl.hostname;
     const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
 
-    // Destroy old session if exists
+    /* Destroy old session if exists */
     const oldSessionId = request.cookies.get(ADMIN_SESSION_COOKIE)?.value;
     if (oldSessionId) {
       await SessionManager.destroySession(oldSessionId);
@@ -306,8 +324,8 @@ export async function GET(request: NextRequest) {
 
     await SessionManager.setSessionCookie(sessionId, isLocalhost, ADMIN_SESSION_COOKIE);
 
-    // Create redirect response
-    // For popup, redirect to a handler page that will communicate with parent
+    /* Create redirect response */
+    /* For popup, redirect to a handler page that will communicate with parent */
     const redirectUrl = isPopup
       ? new URL(
           `/ui/panel/admin/oauth-handler?success=true&username=${encodeURIComponent(githubUsername)}&popup=true`,
@@ -316,9 +334,9 @@ export async function GET(request: NextRequest) {
       : new URL(`/ui/panel/admin`, origin);
     const response = NextResponse.redirect(redirectUrl);
 
-    // Set admin authentication cookies
+    /* Set admin authentication cookies */
     const cookieOptions = {
-      maxAge: 60 * 60 * 6, // 6 hours
+      maxAge: 60 * 60 * 6,
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production' && !isLocalhost,
       sameSite: 'strict' as const,

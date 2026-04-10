@@ -23,10 +23,12 @@
 | `support:message:read` | `{ ticketId, messageIds[], readBy }` | Messages marked as read |
 | `support:error` | `{ message, code? }` | Error notification |
 | `profile:comment:new` | `{ profileId, comment }` | New comment on profile |
+| `notification:new` | `{ notification }` | New user notification (targeted to `user:{userId}` room) |
 | `system:notification` | `{ message, type? }` | System notification (broadcast to all connected clients) |
 
 ## Rooms
 
+- `user:{userId}` — Personal user room. Auto-joined on connection. Used for notifications.
 - `ticket:{ticketId}` — Support ticket room. Users can join only their own tickets; support staff can join any.
 - `profile:{profileId}` — Profile comments room. Any authenticated user can join.
 
@@ -52,4 +54,5 @@ Used by rvn-web to push events through the WS server. All require `x-internal-ap
 | `POST /broadcast/support/ticket-assigned` | `support:ticket:assigned` |
 | `POST /broadcast/support/message-read` | `support:message:read` |
 | `POST /broadcast/profile/comment` | `profile:comment:new` |
+| `POST /broadcast/notification` | `notification:new` (to `user:{userId}` room) |
 | `POST /broadcast/system` | `system:notification` |

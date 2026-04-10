@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, memo } from 'react';
 import Image from 'next/image';
 import { gsap } from 'gsap';
 import { FileText } from 'lucide-react';
@@ -27,7 +27,7 @@ const SYSTEM_MESSAGE_TEXT =
  * Individual message bubble component with support for text, images, and documents.
  * Handles both user and support messages with different styling.
  */
-export default function MessageItem({
+function MessageItem({
   message,
   showDate,
   userData,
@@ -264,3 +264,5 @@ export default function MessageItem({
     </div>
   );
 }
+
+export default memo(MessageItem);

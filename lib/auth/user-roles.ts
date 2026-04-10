@@ -147,6 +147,53 @@ export async function batchHasUserRole(
   return result;
 }
 
+/** Batch-fetches all active roles for multiple users (single SQL query) */
+export async function batchGetUserRoles(userIds: string[]): Promise<Map<string, UserRole[]>> {
+  const result = new Map<string, UserRole[]>();
+  if (userIds.length === 0) return result;
+
+  const uniqueIds = Array.from(new Set(userIds));
+
+  try {
+    if (!db) {
+      for (const id of uniqueIds) result.set(id, ['user']);
+      return result;
+    }
+
+    const data = await db
+      .select({ userId: userRoles.userId, role: userRoles.role })
+      .from(userRoles)
+      .where(
+        and(
+          inArray(userRoles.userId, uniqueIds),
+          eq(userRoles.isActive, true),
+          isNull(userRoles.revokedAt),
+        ),
+      );
+
+    /* Group roles by userId */
+    for (const row of data || []) {
+      const roles = result.get(row.userId) ?? [];
+      roles.push(row.role as UserRole);
+      result.set(row.userId, roles);
+    }
+
+    /* Ensure every user has at least 'user' role */
+    for (const id of uniqueIds) {
+      const roles = result.get(id) ?? [];
+      if (!roles.includes('user')) roles.push('user');
+      result.set(id, roles);
+    }
+  } catch (error) {
+    logger.error('Unexpected error batch fetching user roles', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+    for (const id of uniqueIds) result.set(id, ['user']);
+  }
+
+  return result;
+}
+
 /**
  * Gets all active roles for a user
  */

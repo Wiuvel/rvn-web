@@ -2,12 +2,17 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock dependencies before importing
 vi.mock('@/lib/utils/secure-logger', () => ({
-  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+  logger: {
+    info: vi.fn<() => void>(),
+    warn: vi.fn<() => void>(),
+    error: vi.fn<() => void>(),
+    debug: vi.fn<() => void>(),
+  },
 }));
 
 vi.mock('@/lib/database/db', () => ({ db: null }));
 vi.mock('@/lib/database/schema', () => ({ userDevices: {} }));
-vi.mock('drizzle-orm', () => ({ eq: vi.fn() }));
+vi.mock('drizzle-orm', () => ({ eq: vi.fn<() => void>() }));
 
 import {
   lookupIP,
@@ -42,15 +47,12 @@ describe('geolocation', () => {
       expect(_isPrivateIP(ip)).toBe(true);
     });
 
-    it.each([
-      '8.8.8.8',
-      '1.1.1.1',
-      '203.0.113.1',
-      '172.15.0.1',
-      '172.32.0.1',
-    ])('returns false for public IP %s', (ip) => {
-      expect(_isPrivateIP(ip)).toBe(false);
-    });
+    it.each(['8.8.8.8', '1.1.1.1', '203.0.113.1', '172.15.0.1', '172.32.0.1'])(
+      'returns false for public IP %s',
+      (ip) => {
+        expect(_isPrivateIP(ip)).toBe(false);
+      },
+    );
   });
 
   describe('_formatLocation', () => {

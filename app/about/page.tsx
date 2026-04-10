@@ -7,7 +7,7 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner';
 
 const MOBILE_BREAKPOINT_PX = 768;
 
-// Heavy WebGL effect — load client-side only; disabled on mobile
+/* Heavy WebGL effect — load client-side only; disabled on mobile */
 const LightRays = dynamic(() => import('@/components/LightRays'), {
   ssr: false,
   loading: () => <div className="absolute inset-0" aria-hidden="true" />,
@@ -120,9 +120,9 @@ export default function AboutPage() {
           <div className="rounded-2xl border border-white/10 bg-neutral-900/50 p-6 backdrop-blur-sm sm:p-8">
             <h2 className="mb-4 text-2xl font-bold text-white sm:text-3xl">Roadmap</h2>
             <div className="relative">
-              {/* Цепочка Roadmap */}
+              {/* Roadmap Chain */}
               <div className="space-y-8">
-                {/* Первый этап */}
+                {/* First stage */}
                 <div className="relative flex items-start gap-4">
                   <div className="relative z-10 flex-shrink-0">
                     <div className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-primary-500 bg-primary-500/20">
@@ -133,11 +133,11 @@ export default function AboutPage() {
                     <div className="mb-1 text-lg font-semibold text-primary-400">2026 Q1</div>
                     <div className="text-neutral-300">Запуск проекта и базового функционала</div>
                   </div>
-                  {/* Линия соединения */}
+                  {/* Connection line */}
                   <div className="absolute left-6 top-12 h-8 w-0.5 bg-gradient-to-b from-primary-500/50 to-primary-500/20"></div>
                 </div>
 
-                {/* Второй этап */}
+                {/* Second stage */}
                 <div className="relative flex items-start gap-4">
                   <div className="relative z-10 flex-shrink-0">
                     <div className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-primary-500/50 bg-primary-500/10">

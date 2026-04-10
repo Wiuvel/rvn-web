@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, memo } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { trpc } from '@/lib/trpc/client';
@@ -107,7 +107,7 @@ interface Notification {
 // Функция-помощник для обработки вложений с формированием storage_url
 
 // Компонент для анимированного сообщения
-function MessageItem({
+const MessageItem = memo(function MessageItem({
   message,
   showDate,
   isSystemMessage,
@@ -366,7 +366,7 @@ function MessageItem({
       )}
     </div>
   );
-}
+});
 
 const CACHE_PREFIX = 'support_panel_messages_';
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 минут
@@ -449,6 +449,9 @@ export default function AdminSupportClient() {
   const [messageText, setMessageText] = useState('');
   const [ticketsLoading, setTicketsLoading] = useState(false);
   const [messagesLoading, setMessagesLoading] = useState(false);
+  const [hasMoreMessages, setHasMoreMessages] = useState(false);
+  const [isLoadingOlderMessages, setIsLoadingOlderMessages] = useState(false);
+  const loadedMessageCountRef = useRef(0);
   const [statusFilter, setStatusFilter] = useState<'active' | 'archive'>('active');
   const [skeletonCount, setSkeletonCount] = useState<number | null>(() => {
     // Загружаем из localStorage или используем 3 по умолчанию
@@ -574,6 +577,7 @@ export default function AdminSupportClient() {
 
   const rateLimitRetryRef = useRef<(() => void) | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesTopRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const markReadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const currentTicketIdRef = useRef<string | null>(null);
@@ -1508,9 +1512,10 @@ export default function AdminSupportClient() {
       setMessagesLoading(true);
       try {
         debugStart('fetchMessages', { ticketId });
+        const MESSAGES_LIMIT = 50;
         const data = await utils.support.tickets.get.fetch({
           ticketId,
-          limit: 100,
+          limit: MESSAGES_LIMIT,
           offset: 0,
         });
 
@@ -1555,6 +1560,8 @@ export default function AdminSupportClient() {
         );
 
         setMessages(mappedMessages);
+        loadedMessageCountRef.current = mappedMessages.length;
+        setHasMoreMessages(mappedMessages.length >= MESSAGES_LIMIT);
 
         saveMessagesToCache(ticketId, mappedMessages);
 
@@ -1613,6 +1620,100 @@ export default function AdminSupportClient() {
       }
     });
   };
+
+  // Загрузка старых сообщений при прокрутке вверх
+  const loadOlderMessages = useCallback(async () => {
+    const ticket = activeTicketRef.current;
+    if (!ticket || isLoadingOlderMessages || !hasMoreMessages) return;
+
+    setIsLoadingOlderMessages(true);
+    try {
+      const currentScrollTop = messagesContainerRef.current?.scrollTop || 0;
+      const currentScrollHeight = messagesContainerRef.current?.scrollHeight || 0;
+      const OLDER_LIMIT = 25;
+
+      const data = await utils.support.tickets.get.fetch({
+        ticketId: ticket.id,
+        limit: OLDER_LIMIT,
+        offset: loadedMessageCountRef.current,
+      });
+
+      if (currentTicketIdRef.current !== ticket.id) return;
+
+      const olderMessages: Message[] = (data.messages || []).map(
+        (m: {
+          id: string;
+          message_text: string;
+          sender_type: string;
+          created_at: string;
+          is_read: boolean;
+          sender?: {
+            id: string;
+            username: string;
+            user_id: string | null;
+            avatar?: string | null;
+          } | null;
+          attachments?: Array<{
+            id: string;
+            file_name: string;
+            file_type: string;
+            file_size: number;
+            storage_url?: string;
+            storage_path?: string;
+          }>;
+        }) => ({
+          id: m.id,
+          ticket_id: ticket.id,
+          sender_id: m.sender?.id || '',
+          sender_type: m.sender_type as 'user' | 'support',
+          message_text: m.message_text,
+          is_read: m.is_read,
+          created_at: m.created_at,
+          _renderKey: m.id,
+          sender: m.sender,
+          attachments: mapWsAttachments(m.attachments),
+        }),
+      );
+
+      setMessages((prev) => [...olderMessages, ...prev]);
+      loadedMessageCountRef.current += olderMessages.length;
+      setHasMoreMessages(olderMessages.length >= OLDER_LIMIT);
+
+      // Восстанавливаем позицию скролла после добавления старых сообщений
+      requestAnimationFrame(() => {
+        if (messagesContainerRef.current) {
+          const newScrollHeight = messagesContainerRef.current.scrollHeight;
+          const scrollDiff = newScrollHeight - currentScrollHeight;
+          messagesContainerRef.current.scrollTop = currentScrollTop + scrollDiff;
+        }
+      });
+    } catch {
+      // Молча прекращаем пагинацию
+    } finally {
+      setIsLoadingOlderMessages(false);
+    }
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTicket?.id, isLoadingOlderMessages, hasMoreMessages]);
+
+  // Intersection Observer для загрузки старых сообщений
+  useEffect(() => {
+    if (!messagesTopRef.current || !activeTicket?.id || !hasMoreMessages) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting && !isLoadingOlderMessages && hasMoreMessages) {
+            loadOlderMessages();
+          }
+        });
+      },
+      { rootMargin: '100px' },
+    );
+
+    observer.observe(messagesTopRef.current);
+
+    return () => observer.disconnect();
+  }, [activeTicket?.id, hasMoreMessages, isLoadingOlderMessages, loadOlderMessages]);
 
   const handleSendMessage = async () => {
     if (!activeTicket || !messageText.trim()) return;
@@ -2158,6 +2259,8 @@ export default function AdminSupportClient() {
                 // Очищаем активный тикет и список тикетов при переключении
                 setActiveTicket(null);
                 setMessages([]);
+                setHasMoreMessages(false);
+                loadedMessageCountRef.current = 0;
                 setTickets([]); // Очищаем список для устранения глитча
                 currentTicketIdRef.current = null;
                 setArchiveSearchQuery(''); // Очищаем поиск при переключении
@@ -2189,6 +2292,8 @@ export default function AdminSupportClient() {
                 // Очищаем активный тикет и список тикетов при переключении
                 setActiveTicket(null);
                 setMessages([]);
+                setHasMoreMessages(false);
+                loadedMessageCountRef.current = 0;
                 setTickets([]); // Очищаем список для устранения глитча
                 currentTicketIdRef.current = null;
                 setArchiveSearchQuery(''); // Очищаем поиск при переключении
@@ -2655,78 +2760,86 @@ export default function AdminSupportClient() {
                   ) : messages.length === 0 ? (
                     <div className="py-8 text-center text-sm text-neutral-400">Нет сообщений</div>
                   ) : (
-                    messages.map((message, index) => {
-                      // Проверяем, является ли сообщение системным (автоматическим или о смене статуса)
-                      const SYSTEM_MESSAGE_TEXT =
-                        'Спасибо за ваше обращение. Мы получили ваш запрос и ответим в ближайшее время.';
-                      const messageText = message.message_text || '';
-                      const isStatusChangeMessage =
-                        messageText.includes('Статус тикета изменен') ||
-                        messageText.includes('Ваше обращение приняли в обработку') ||
-                        messageText.includes('Ваше обращение было закрыто');
-                      // Системное сообщение определяется по тексту, независимо от sender_type
-                      // Используем trim() для надежного сравнения
-                      const isSystemMessage =
-                        messageText.trim() === SYSTEM_MESSAGE_TEXT.trim() || isStatusChangeMessage;
+                    <>
+                      {hasMoreMessages && (
+                        <div ref={messagesTopRef} className="flex justify-center py-2">
+                          {isLoadingOlderMessages && <div className="spinner h-5 w-5"></div>}
+                        </div>
+                      )}
+                      {messages.map((message, index) => {
+                        // Проверяем, является ли сообщение системным (автоматическим или о смене статуса)
+                        const SYSTEM_MESSAGE_TEXT =
+                          'Спасибо за ваше обращение. Мы получили ваш запрос и ответим в ближайшее время.';
+                        const messageText = message.message_text || '';
+                        const isStatusChangeMessage =
+                          messageText.includes('Статус тикета изменен') ||
+                          messageText.includes('Ваше обращение приняли в обработку') ||
+                          messageText.includes('Ваше обращение было закрыто');
+                        // Системное сообщение определяется по тексту, независимо от sender_type
+                        // Используем trim() для надежного сравнения
+                        const isSystemMessage =
+                          messageText.trim() === SYSTEM_MESSAGE_TEXT.trim() ||
+                          isStatusChangeMessage;
 
-                      // Показываем дату если это первое сообщение или дата изменилась
-                      const showDate =
-                        index === 0 ||
-                        new Date(message.created_at).getDate() !==
-                          new Date(messages[index - 1].created_at).getDate();
+                        // Показываем дату если это первое сообщение или дата изменилась
+                        const showDate =
+                          index === 0 ||
+                          new Date(message.created_at).getDate() !==
+                            new Date(messages[index - 1].created_at).getDate();
 
-                      const formatTime = (dateString: string) => {
-                        return new Intl.DateTimeFormat('ru-RU', {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        }).format(new Date(dateString));
-                      };
+                        const formatTime = (dateString: string) => {
+                          return new Intl.DateTimeFormat('ru-RU', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          }).format(new Date(dateString));
+                        };
 
-                      const formatMessageDate = (dateString: string) => {
-                        const today = new Date();
-                        today.setHours(0, 0, 0, 0);
-                        const messageDate = new Date(dateString);
-                        messageDate.setHours(0, 0, 0, 0);
-                        const diffTime = today.getTime() - messageDate.getTime();
-                        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+                        const formatMessageDate = (dateString: string) => {
+                          const today = new Date();
+                          today.setHours(0, 0, 0, 0);
+                          const messageDate = new Date(dateString);
+                          messageDate.setHours(0, 0, 0, 0);
+                          const diffTime = today.getTime() - messageDate.getTime();
+                          const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
 
-                        if (diffDays === 0) {
-                          return 'Сегодня';
-                        } else if (diffDays === 1) {
-                          return 'Вчера';
-                        } else {
-                          return messageDate.toLocaleDateString('ru-RU', {
-                            day: 'numeric',
-                            month: 'long',
-                          });
-                        }
-                      };
+                          if (diffDays === 0) {
+                            return 'Сегодня';
+                          } else if (diffDays === 1) {
+                            return 'Вчера';
+                          } else {
+                            return messageDate.toLocaleDateString('ru-RU', {
+                              day: 'numeric',
+                              month: 'long',
+                            });
+                          }
+                        };
 
-                      // Перевернутая логика: саппорт слева, пользователь справа
-                      // Fallback: если sender_type не определен, определяем по sender_id
-                      // (в админ-панели текущий пользователь всегда саппорт)
-                      const senderType =
-                        message.sender_type || (authState.hasSupportAccess ? 'support' : 'user');
-                      const isSupport = senderType === 'support' && !isSystemMessage;
-                      const isUser = senderType === 'user';
+                        // Перевернутая логика: саппорт слева, пользователь справа
+                        // Fallback: если sender_type не определен, определяем по sender_id
+                        // (в админ-панели текущий пользователь всегда саппорт)
+                        const senderType =
+                          message.sender_type || (authState.hasSupportAccess ? 'support' : 'user');
+                        const isSupport = senderType === 'support' && !isSystemMessage;
+                        const isUser = senderType === 'user';
 
-                      return (
-                        <MessageItem
-                          key={message._renderKey ?? message.id}
-                          message={message}
-                          showDate={showDate}
-                          isSystemMessage={isSystemMessage}
-                          isSupport={isSupport}
-                          isUser={isUser}
-                          formatDate={formatMessageDate}
-                          formatTime={formatTime}
-                          getInitial={getInitial}
-                          isInitialLoad={isInitialMessagesLoadRef.current}
-                          onImageClick={(url, alt) => setViewingImage({ url, alt })}
-                          formatFileSize={formatFileSize}
-                        />
-                      );
-                    })
+                        return (
+                          <MessageItem
+                            key={message._renderKey ?? message.id}
+                            message={message}
+                            showDate={showDate}
+                            isSystemMessage={isSystemMessage}
+                            isSupport={isSupport}
+                            isUser={isUser}
+                            formatDate={formatMessageDate}
+                            formatTime={formatTime}
+                            getInitial={getInitial}
+                            isInitialLoad={isInitialMessagesLoadRef.current}
+                            onImageClick={(url, alt) => setViewingImage({ url, alt })}
+                            formatFileSize={formatFileSize}
+                          />
+                        );
+                      })}
+                    </>
                   )}
                   <div ref={messagesEndRef} />
                 </div>

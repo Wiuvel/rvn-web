@@ -9,6 +9,7 @@ import HomeStructuredData from '@/components/seo/HomeStructuredData';
 import { domains, getStaticUrl } from '@/lib/utils';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { TRPCProvider } from '@/components/providers/TRPCProvider';
+import { WebSocketProvider } from '@/components/providers/WebSocketProvider';
 
 import SessionExpiredModal from '@/components/auth/SessionExpiredModal';
 
@@ -48,12 +49,14 @@ export default function RootLayout({
         className={`relative h-full bg-neutral-950 text-neutral-100 antialiased ${exo2.className}`}
       >
         <TRPCProvider>
-          <HomeStructuredData />
-          <SmoothScroll />
-          <Suspense fallback={<LoadingSpinner fullScreen />}>
-            <SessionExpiredModal />
-            <ConditionalLayout>{children}</ConditionalLayout>
-          </Suspense>
+          <WebSocketProvider>
+            <HomeStructuredData />
+            <SmoothScroll />
+            <Suspense fallback={<LoadingSpinner fullScreen />}>
+              <SessionExpiredModal />
+              <ConditionalLayout>{children}</ConditionalLayout>
+            </Suspense>
+          </WebSocketProvider>
         </TRPCProvider>
       </body>
     </html>

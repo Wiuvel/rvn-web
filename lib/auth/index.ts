@@ -8,6 +8,7 @@ import { logger } from '../utils/secure-logger';
 import { timingSafePasswordVerify, addRandomDelay } from '../security/timing-safe';
 import { ERROR_DATABASE_NOT_CONFIGURED } from '../utils/constants';
 import { generateRandomAvatar } from '../utils/avatar-gradients';
+import { getRedisClient } from '../database/redis';
 
 export type { Admin };
 
@@ -277,6 +278,10 @@ export async function authenticateUser(
   }
 }
 
+/**
+ * Resolves a user by auth token.
+ * Uses Redis cache (5m TTL) with DB fallback.
+ */
 export async function getUserByToken(authToken: string): Promise<User | null> {
   try {
     if (!db) {
@@ -284,8 +289,22 @@ export async function getUserByToken(authToken: string): Promise<User | null> {
     }
 
     const tokenHash = createHash('sha256').update(authToken).digest('hex');
+    const redisCacheKey = `auth:user:${tokenHash}`;
 
-    // Check user_devices first
+    /* Check Redis cache first */
+    const redis = getRedisClient();
+    if (redis) {
+      try {
+        const cachedUser = await redis.get(redisCacheKey);
+        if (cachedUser) {
+          return JSON.parse(cachedUser) as User;
+        }
+      } catch {
+        /* Redis unavailable — fallback to DB */
+      }
+    }
+
+    /* Query DB: device → user */
     const deviceRows = await db
       .select({ userId: userDevices.userId })
       .from(userDevices)
@@ -308,9 +327,30 @@ export async function getUserByToken(authToken: string): Promise<User | null> {
       return null;
     }
 
+    /* Write to Redis (5m TTL) */
+    if (redis) {
+      try {
+        await redis.set(redisCacheKey, JSON.stringify(user), 'EX', 300);
+      } catch {
+        /* Ignore write errors */
+      }
+    }
+
     return user as User;
   } catch {
     return null;
+  }
+}
+
+/** Invalidates Redis cache for a specific auth token */
+export async function invalidateUserTokenCache(authToken: string): Promise<void> {
+  const redis = getRedisClient();
+  if (!redis) return;
+  try {
+    const tokenHash = createHash('sha256').update(authToken).digest('hex');
+    await redis.del(`auth:user:${tokenHash}`);
+  } catch {
+    /* Ignore errors */
   }
 }
 

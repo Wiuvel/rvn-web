@@ -8,11 +8,18 @@ import { SessionManager } from '@/lib/auth/session-manager';
 import { db } from '@/lib/database/db';
 import { admins, users, userRoles, trustedGithubDevelopers } from '@/lib/database/schema';
 import { eq, and, or, ilike, inArray, isNull, desc } from 'drizzle-orm';
-import { getUserRoles, getUsersByRole, grantUserRole, revokeUserRole } from '@/lib/auth/user-roles';
+import {
+  getUserRoles,
+  batchGetUserRoles,
+  getUsersByRole,
+  grantUserRole,
+  revokeUserRole,
+} from '@/lib/auth/user-roles';
 import type { UserRole } from '@/lib/auth/user-roles';
 import { getSupportAnalytics } from '@/lib/analytics/support-analytics';
 import { getMaintenanceConfig, setMaintenanceConfig } from '@/lib/utils/maintenance';
 import { logger } from '@/lib/utils/secure-logger';
+import { cache, cached } from '@/lib/database/cache';
 import {
   adminUsersQuerySchema,
   grantRoleBodySchema,
@@ -142,26 +149,12 @@ export const adminRouter = router({
           .orderBy(order === 'asc' ? users.createdAt : desc(users.createdAt))
           .limit(limit);
 
-        const usersWithRoles = await Promise.allSettled(
-          data.map(async (user) => {
-            try {
-              const rolesPromise = getUserRoles(user.id);
-              const timeoutPromise = new Promise<UserRole[]>((_, reject) => {
-                setTimeout(() => reject(new Error('Timeout')), 2000);
-              });
-              const roles = await Promise.race([rolesPromise, timeoutPromise]);
-              return { ...user, roles };
-            } catch {
-              return { ...user, roles: ['user'] as UserRole[] };
-            }
-          }),
-        ).then((results) =>
-          results.map((result, index) =>
-            result.status === 'fulfilled'
-              ? result.value
-              : { ...data[index], roles: ['user'] as UserRole[] },
-          ),
-        );
+        // Batch запрос ролей (1 SQL вместо N)
+        const rolesMap = await batchGetUserRoles(data.map((u) => u.id));
+        const usersWithRoles = data.map((user) => ({
+          ...user,
+          roles: rolesMap.get(user.id) ?? (['user'] as UserRole[]),
+        }));
 
         return { users: usersWithRoles };
       } catch (error) {
@@ -218,6 +211,7 @@ export const adminRouter = router({
           }
 
           revalidateTag('team-count', 'max');
+          cache.delete('admin:team_count');
           return { success: true, message: 'Role granted successfully' };
         } catch (error) {
           if (error instanceof TRPCError) throw error;
@@ -241,6 +235,7 @@ export const adminRouter = router({
             });
           }
           revalidateTag('team-count', 'max');
+          cache.delete('admin:team_count');
           return { success: true, message: 'Role revoked successfully' };
         }),
     }),
@@ -253,23 +248,29 @@ export const adminRouter = router({
     }
 
     try {
-      const roleData = await db
-        .select({ userId: userRoles.userId, role: userRoles.role })
-        .from(userRoles)
-        .where(
-          and(
-            inArray(userRoles.role, ['support', 'admin']),
-            eq(userRoles.isActive, true),
-            isNull(userRoles.revokedAt),
-          ),
-        );
+      return await cached(
+        'admin:team_count',
+        async () => {
+          const roleData = await db!
+            .select({ userId: userRoles.userId, role: userRoles.role })
+            .from(userRoles)
+            .where(
+              and(
+                inArray(userRoles.role, ['support', 'admin']),
+                eq(userRoles.isActive, true),
+                isNull(userRoles.revokedAt),
+              ),
+            );
 
-      const uniqueUserIds = new Set<string>();
-      const supportCount = roleData.filter((r) => r.role === 'support').length || 0;
-      const adminCount = roleData.filter((r) => r.role === 'admin').length || 0;
-      roleData.forEach((role) => uniqueUserIds.add(role.userId));
+          const uniqueUserIds = new Set<string>();
+          const supportCount = roleData.filter((r) => r.role === 'support').length || 0;
+          const adminCount = roleData.filter((r) => r.role === 'admin').length || 0;
+          roleData.forEach((role) => uniqueUserIds.add(role.userId));
 
-      return { count: uniqueUserIds.size, support: supportCount, admin: adminCount };
+          return { count: uniqueUserIds.size, support: supportCount, admin: adminCount };
+        },
+        300,
+      );
     } catch (error) {
       logger.error('Error fetching team roles', {
         error: error instanceof Error ? error.message : 'Unknown error',

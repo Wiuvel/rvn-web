@@ -334,12 +334,7 @@ export default function PublicOfferPage() {
                   </p>
 
                   <div className="last-updated">
-                    Дата публикации и вступления в силу:{' '}
-                    {new Date().toLocaleDateString('ru-RU', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric',
-                    })}
+                    Дата публикации и вступления в силу: 3 апреля 2026 г.
                   </div>
                 </div>
               )}

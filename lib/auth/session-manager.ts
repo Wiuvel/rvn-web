@@ -98,14 +98,17 @@ export class SessionManager {
       }
 
       try {
-        const [inserted] = await db.insert(userDevices).values({
-          userId,
-          tokenHash,
-          deviceName,
-          ipAddress,
-          lastActive: now,
-          deviceFpHash,
-        }).returning({ id: userDevices.id });
+        const [inserted] = await db
+          .insert(userDevices)
+          .values({
+            userId,
+            tokenHash,
+            deviceName,
+            ipAddress,
+            lastActive: now,
+            deviceFpHash,
+          })
+          .returning({ id: userDevices.id });
         if (inserted) resolveAndStoreLocation(inserted.id, ipAddress);
       } catch (error) {
         logger.error('Failed to register device', {
@@ -116,14 +119,39 @@ export class SessionManager {
       return token;
     }
 
+    // No FPID — try to find existing device by deviceName + IP prefix (same browser+OS on same network)
     try {
-      const [inserted] = await db.insert(userDevices).values({
-        userId,
-        tokenHash,
-        deviceName,
-        ipAddress,
-        lastActive: now,
-      }).returning({ id: userDevices.id });
+      const rows = await db
+        .select({ id: userDevices.id })
+        .from(userDevices)
+        .where(
+          and(
+            eq(userDevices.userId, userId),
+            eq(userDevices.deviceName, deviceName),
+            eq(userDevices.ipAddress, ipAddress),
+          ),
+        );
+      const existing = rows[0] ?? null;
+
+      if (existing) {
+        await db
+          .update(userDevices)
+          .set({ tokenHash, lastActive: now })
+          .where(eq(userDevices.id, existing.id));
+        resolveAndStoreLocation(existing.id, ipAddress);
+        return token;
+      }
+
+      const [inserted] = await db
+        .insert(userDevices)
+        .values({
+          userId,
+          tokenHash,
+          deviceName,
+          ipAddress,
+          lastActive: now,
+        })
+        .returning({ id: userDevices.id });
       if (inserted) resolveAndStoreLocation(inserted.id, ipAddress);
     } catch (error) {
       logger.error('Failed to register device', {

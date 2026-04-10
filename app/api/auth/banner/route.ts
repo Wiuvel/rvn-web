@@ -1,6 +1,6 @@
 /**
- * API endpoint для загрузки и обновления баннера пользователя
- * Удаляет старый баннер из S3 при загрузке нового
+ * API endpoint for uploading and updating user banner
+ * Deletes old banner from S3 when uploading a new one
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -33,11 +33,11 @@ export async function OPTIONS() {
 }
 
 /**
- * POST - Загрузить/обновить баннер пользователя
+ * POST - Upload/update user banner
  */
 export async function POST(request: NextRequest) {
   try {
-    // Rate limiting
+    /* Rate limiting */
     const rateLimitResult = await generalRateLimit.check(request);
     if (!rateLimitResult.allowed) {
       return setCorsHeaders(NextResponse.json({ error: ERROR_TOO_MANY_REQUESTS }, { status: 429 }));
@@ -49,13 +49,13 @@ export async function POST(request: NextRequest) {
     }
     const user = authResult.user;
 
-    // Валидация userId (защита от уязвимостей)
+    /* Validate userId (protection against vulnerabilities) */
     if (!isValidUUID(user.id)) {
       logger.error('Invalid user ID format', { userId: user.id });
       return setCorsHeaders(NextResponse.json({ error: 'Invalid user ID' }, { status: 400 }));
     }
 
-    // Получаем файл из FormData
+    /* Get file from FormData */
     const formData = await request.formData();
     const file = formData.get('banner') as File;
 
@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
       return setCorsHeaders(NextResponse.json({ error: 'No file provided' }, { status: 400 }));
     }
 
-    // Валидация файла
+    /* Validate file */
     const validation = validateFile({
       size: file.size,
       type: file.type,
@@ -76,32 +76,32 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Дополнительная валидация: только изображения для баннеров (без GIF)
+    /* Additional validation: only images for banners (no GIF) */
     if (!file.type.startsWith('image/')) {
       return setCorsHeaders(
         NextResponse.json({ error: 'Only image files are allowed for banners' }, { status: 400 }),
       );
     }
 
-    // Запрещаем GIF для баннеров
+    /* Disallow GIF for banners */
     if (file.type === 'image/gif' || file.name.toLowerCase().endsWith('.gif')) {
       return setCorsHeaders(
         NextResponse.json({ error: 'GIF files are not allowed for banners' }, { status: 400 }),
       );
     }
 
-    // Ограничиваем размер файла (лимит из конфига)
+    /* Limit file size (limit from config) */
     if (file.size > BANNER_MAX_BYTES) {
       return setCorsHeaders(
         NextResponse.json({ error: 'File size must not exceed 2MB' }, { status: 400 }),
       );
     }
 
-    // Читаем файл в Buffer и валидируем содержимое до обращения к БД
+    /* Read file into Buffer and validate content before DB access */
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    // Валидация содержимого по magic bytes
+    /* Validate content by magic bytes */
     const contentCheck = validateFileWithContent(
       { size: file.size, type: file.type, name: file.name },
       buffer,
@@ -115,14 +115,14 @@ export async function POST(request: NextRequest) {
 
     const verifiedType = contentCheck.detectedType || file.type;
 
-    // Проверяем что реальный тип — изображение (не GIF)
+    /* Ensure real type is an image (not GIF) */
     if (verifiedType === 'image/gif') {
       return setCorsHeaders(
         NextResponse.json({ error: 'GIF files are not allowed for banners' }, { status: 400 }),
       );
     }
 
-    // Получаем текущий баннер пользователя для удаления
+    /* Get current user banner for deletion */
     if (!db) {
       logger.error('Database client not available');
       return setCorsHeaders(
@@ -146,17 +146,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Определяем расширение из реального типа файла
+    /* Determine extension from real file type */
     const extension = getExtensionFromMime(verifiedType);
 
-    // Генерируем путь для хранения нового баннера
+    /* Generate storage path for new banner */
     const timestamp = Date.now();
     const storagePath = `banners/${user.id}/${timestamp}.${extension}`;
 
-    // Загружаем новый баннер в S3 с публичным доступом (verified type)
+    /* Upload new banner to S3 with public access (verified type) */
     try {
       await uploadAvatarToS3(buffer, storagePath, verifiedType);
-      // Прогрев кэша: первый запрос изображения будет HIT
+      /* Cache warm-up: first image request will be HIT */
       await setMediaCache(storagePath, buffer, verifiedType, { isAvatarOrBanner: true });
     } catch (error) {
       logger.error('Error uploading banner to S3', {
@@ -168,7 +168,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Обновляем баннер в базе данных
+    /* Update banner in database */
     const newBannerPath = `s3:${storagePath}`;
     try {
       await db.update(users).set({ banner: newBannerPath }).where(eq(users.id, user.id));
@@ -177,7 +177,7 @@ export async function POST(request: NextRequest) {
         error: updateError,
         userId: user.id,
       });
-      // Пытаемся удалить загруженный файл из S3 при ошибке обновления БД
+      /* Attempt to delete uploaded file from S3 on DB update failure */
       try {
         await deleteFileFromS3(storagePath);
       } catch (deleteError) {
@@ -190,17 +190,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Удаляем старый баннер из S3, если он существует и отличается от нового
+    /* Delete old banner from S3 if it exists and differs from the new one */
     if (currentUser.banner && currentUser.banner.startsWith('s3:banners/')) {
-      const oldStoragePath = currentUser.banner.substring(3); // Убираем префикс 's3:'
+      const oldStoragePath = currentUser.banner.substring(3); /* Remove 's3:' prefix */
 
-      // Дополнительная проверка безопасности: убеждаемся, что путь действительно относится к текущему пользователю
-      // Это защищает от уязвимостей типа path traversal
+      /* Additional security check: ensure path belongs to current user */
+      /* This protects against path traversal vulnerabilities */
       if (oldStoragePath.startsWith(`banners/${user.id}/`)) {
         try {
           await deleteFileFromS3(oldStoragePath);
         } catch (deleteError) {
-          // Логируем ошибку, но не блокируем ответ (старый файл можно удалить позже)
+          /* Log error but don't block response (old file can be deleted later) */
           logger.warn('Error deleting old banner from S3', {
             error: deleteError,
             oldPath: oldStoragePath,
@@ -208,7 +208,7 @@ export async function POST(request: NextRequest) {
           });
         }
       } else {
-        // Логируем попытку удаления файла другого пользователя (защита от уязвимостей)
+        /* Log attempt to delete another user's file (vulnerability protection) */
         logger.warn('Attempted to delete banner of different user', {
           oldPath: oldStoragePath,
           userId: user.id,
@@ -216,11 +216,11 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Обновляем user_data cookie с новым баннером
+    /* Update user_data cookie with new banner */
     const hostname = request.nextUrl?.hostname ?? request.headers.get('host') ?? '';
     const isLocalhost = hostname.includes('localhost') || hostname.includes('127.0.0.1');
 
-    // Получаем текущий pex из cookie или базы
+    /* Get current pex from cookie or database */
     const {
       parseUserDataCookie,
       createUserDataCookie,

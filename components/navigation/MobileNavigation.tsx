@@ -13,6 +13,7 @@ import { clearQueryCache } from '@/components/providers/TRPCProvider';
 import {
   Home,
   Info,
+  Bell,
   LifeBuoy,
   Menu,
   X,
@@ -25,6 +26,7 @@ import {
   ShieldCheck,
   CreditCard,
 } from 'lucide-react';
+import { useNotifications } from '@/hooks/useNotifications';
 
 export default function MobileNavigation() {
   const [isOpen, setIsOpen] = useState(false);
@@ -36,6 +38,7 @@ export default function MobileNavigation() {
   const router = useRouter();
 
   const { userData, loading } = useAuth({ silent: true, lightweight: true });
+  const { unreadCount } = useNotifications({ enabled: true });
 
   // Не показываем MobileMenu для страницы /protection/
   const shouldRender = !(pathname === '/protection' || pathname?.startsWith('/protection/'));
@@ -367,6 +370,15 @@ export default function MobileNavigation() {
                   icon={Settings}
                   label="Настройки"
                 />
+                <OverlayMenuItem
+                  href="/notifications"
+                  onClick={closeOverlay}
+                  icon={Bell}
+                  label="Уведомления"
+                  badge={
+                    unreadCount > 0 ? (unreadCount > 99 ? '99+' : String(unreadCount)) : undefined
+                  }
+                />
                 <div className="mx-2 my-2 h-px bg-white/5" />
               </>
             )}
@@ -422,13 +434,24 @@ export default function MobileNavigation() {
       >
         <div className="mx-auto flex h-[60px] max-w-lg items-center justify-around px-1">
           <NavItem href="/" icon={Home} label="Главная" active={isActive('/')} />
-          <NavItem
-            href="/about"
-            icon={Info}
-            label="О проекте"
-            active={isActive('/about')}
-            prefetch={false}
-          />
+          {userData ? (
+            <NavItem
+              href="/notifications"
+              icon={Bell}
+              label="Уведомл."
+              active={isActive('/notifications')}
+              prefetch={false}
+              badge={unreadCount > 0 ? (unreadCount > 99 ? '99+' : String(unreadCount)) : undefined}
+            />
+          ) : (
+            <NavItem
+              href="/about"
+              icon={Info}
+              label="О проекте"
+              active={isActive('/about')}
+              prefetch={false}
+            />
+          )}
 
           {/* Center Logo Button */}
           <div className="-mt-4 flex h-[52px] w-[52px] items-center justify-center rounded-2xl bg-primary-500 shadow-[0_0_20px_rgba(22,163,255,0.35)]">
@@ -498,16 +521,24 @@ interface NavItemProps {
   label: string;
   active?: boolean;
   prefetch?: boolean;
+  badge?: string;
 }
 
-function NavItem({ href, icon: Icon, label, active, prefetch }: NavItemProps) {
+function NavItem({ href, icon: Icon, label, active, prefetch, badge }: NavItemProps) {
   return (
     <Link
       href={href}
       prefetch={prefetch}
       className={`flex min-w-[52px] flex-col items-center justify-center gap-0.5 py-1 transition-colors ${active ? 'text-white' : 'text-neutral-500 active:text-neutral-300'}`}
     >
-      <Icon className="h-5 w-5" strokeWidth={active ? 2.2 : 1.8} />
+      <div className="relative">
+        <Icon className="h-5 w-5" strokeWidth={active ? 2.2 : 1.8} />
+        {badge && (
+          <span className="absolute -right-2.5 -top-1.5 flex h-[14px] min-w-[14px] items-center justify-center rounded-full bg-primary-500 px-0.5 text-[8px] font-bold leading-none text-white">
+            {badge}
+          </span>
+        )}
+      </div>
       <span className="text-[10px] font-medium leading-tight">{label}</span>
     </Link>
   );
@@ -521,6 +552,7 @@ interface OverlayMenuItemProps {
   highlight?: boolean;
   active?: boolean;
   prefetch?: boolean;
+  badge?: string;
 }
 
 function OverlayMenuItem({
@@ -531,6 +563,7 @@ function OverlayMenuItem({
   highlight,
   active,
   prefetch = false,
+  badge,
 }: OverlayMenuItemProps) {
   return (
     <Link
@@ -547,6 +580,11 @@ function OverlayMenuItem({
       <span className={`text-[15px] font-medium ${highlight ? 'text-purple-100' : ''}`}>
         {label}
       </span>
+      {badge && (
+        <span className="rounded-full bg-primary-500/20 px-2 py-0.5 text-[11px] font-semibold text-primary-400">
+          {badge}
+        </span>
+      )}
       <ChevronRight className="ml-auto h-4 w-4 text-neutral-700 opacity-0 transition-all group-hover:opacity-100" />
     </Link>
   );

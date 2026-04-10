@@ -81,6 +81,23 @@ export function broadcastMessageRead(
   broadcast('/broadcast/support/message-read', { ticketId, messageIds, readBy });
 }
 
+/** Sends a notification to a specific user via WebSocket user room */
+export function broadcastNotification(
+  userId: string,
+  notification: {
+    id: string;
+    type: string;
+    title: string;
+    message: string;
+    is_read: boolean;
+    count: number;
+    related_ticket_id?: string | null;
+    created_at: string;
+  },
+): void {
+  broadcast('/broadcast/notification', { userId, notification });
+}
+
 export function broadcastNewComment(
   profileId: string,
   comment: {

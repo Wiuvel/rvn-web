@@ -17,6 +17,7 @@ import {
   ShieldAlert,
   LogOut,
   Radio,
+  MapPin,
 } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -439,17 +440,17 @@ export default function SettingsClient() {
 
                                 <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-neutral-500">
                                   <div className="flex items-center gap-1.5">
-                                    <Globe className="h-3.5 w-3.5 opacity-70" />
+                                    <Globe className="h-3.5 w-3.5 shrink-0 opacity-70" />
                                     <span>{device.ipAddress}</span>
-                                    {device.location && (
-                                      <>
-                                        <span className="h-1 w-1 rounded-full bg-neutral-700"></span>
-                                        <span>{device.location}</span>
-                                      </>
-                                    )}
                                   </div>
+                                  {device.location && (
+                                    <div className="flex items-center gap-1.5">
+                                      <MapPin className="h-3.5 w-3.5 shrink-0 opacity-70" />
+                                      <span>{device.location}</span>
+                                    </div>
+                                  )}
                                   <div className="flex items-center gap-1.5">
-                                    <Clock className="h-3.5 w-3.5 opacity-70" />
+                                    <Clock className="h-3.5 w-3.5 shrink-0 opacity-70" />
                                     <span>{formatRelativeTime(device.lastActive)}</span>
                                   </div>
                                 </div>

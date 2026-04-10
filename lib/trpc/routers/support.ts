@@ -22,6 +22,7 @@ import {
 import { isValidUUID } from '@/lib/utils/uuid-validation';
 import { cached } from '@/lib/database/cache';
 import { logger } from '@/lib/utils/secure-logger';
+import { createNotification } from '@/lib/notifications/create';
 import {
   MAX_TICKETS_PER_USER,
   ERROR_MAXIMUM_TICKET_LIMIT_REACHED,
@@ -620,6 +621,26 @@ export const supportRouter = router({
                 : ticket.closed_at || null,
           });
 
+          /* Notify ticket owner on status change (support-initiated only) */
+          if (status && oldStatus !== status && ticket.user_id !== user.id) {
+            const subjectPreview =
+              ticket.subject.length > 80 ? ticket.subject.slice(0, 80) + '…' : ticket.subject;
+            const statusMessages: Record<string, string> = {
+              pending: `Ваше обращение приняли в обработку: ${subjectPreview}`,
+              closed: `Ваше обращение было закрыто: ${subjectPreview}`,
+            };
+            const notifMessage = statusMessages[status];
+            if (notifMessage) {
+              createNotification({
+                userId: ticket.user_id,
+                type: 'ticket_status',
+                title: status === 'closed' ? 'Обращение закрыто' : 'Обращение в обработке',
+                message: notifMessage,
+                relatedTicketId: ticketId,
+              });
+            }
+          }
+
           if (assignedTo !== undefined && assignedTo !== oldAssignedTo) {
             broadcastTicketAssignment(ticketId, assignedTo || null, ticket.assigned_user || null);
           }
@@ -743,6 +764,7 @@ export const supportRouter = router({
             id: supportTickets.id,
             userId: supportTickets.userId,
             status: supportTickets.status,
+            subject: supportTickets.subject,
           })
           .from(supportTickets)
           .where(eq(supportTickets.id, ticketId));
@@ -948,6 +970,19 @@ export const supportRouter = router({
             logger.error('Error broadcasting new message', {
               error: err instanceof Error ? err.message : 'Unknown error',
               ticketId,
+            });
+          }
+
+          /* Notify ticket owner on support reply */
+          if (isSupport && ticket.userId !== user.id) {
+            const subjectPreview =
+              ticket.subject.length > 80 ? ticket.subject.slice(0, 80) + '…' : ticket.subject;
+            createNotification({
+              userId: ticket.userId,
+              type: 'support_reply',
+              title: 'Новый ответ в тикете',
+              message: `Поддержка ответила на обращение: ${subjectPreview}`,
+              relatedTicketId: ticketId,
             });
           }
 

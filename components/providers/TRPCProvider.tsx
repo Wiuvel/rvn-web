@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
-import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persister';
+import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
 import { httpBatchLink } from '@trpc/client';
 import { TRPCClientError } from '@trpc/client';
 import { observable } from '@trpc/server/observable';
@@ -15,17 +15,22 @@ import { rateLimitLink } from '@/lib/trpc/rate-limit-link';
 const PERSIST_MAX_AGE = 24 * 60 * 60 * 1000; // 24h
 const PERSIST_CACHE_KEY = 'REACT_QUERY_OFFLINE_CACHE';
 
+/** Singleton ref for clearing in-memory cache from outside React tree */
+let queryClientRef: QueryClient | null = null;
+
 /**
- * Очищает tRPC/React Query кеш и localStorage при смене аккаунта/логауте.
- * Вызывать перед редиректом на /auth.
+ * Clears the tRPC/React Query cache and localStorage when changing accounts/logging out.
+ * Call before redirecting to /auth.
  */
 export function clearQueryCache() {
   if (typeof window === 'undefined') return;
-  // Очищаем persisted React Query cache
+  /** Clear the in-memory React Query cache */
+  queryClientRef?.clear();
+  /** Clear the persisted React Query cache */
   try {
     window.localStorage.removeItem(PERSIST_CACHE_KEY);
   } catch {}
-  // Очищаем support-related кеш
+  /** Clear the support-related cache */
   try {
     const keysToRemove: string[] = [];
     for (let i = 0; i < window.localStorage.length; i++) {
@@ -42,8 +47,6 @@ function handleTRPCError(err: unknown) {
   if (err instanceof TRPCClientError && err.data?.code === 'UNAUTHORIZED') {
     if (typeof window !== 'undefined') {
       const path = window.location.pathname || '';
-      // Не перенаправляем со страниц /auth и /ui/panel/admin,
-      // чтобы не ломать формы входа пользователя и админа
       if (path !== '/auth' && !path.startsWith('/ui/panel/admin')) {
         const return_to = path && path !== '/' ? `&return_to=${encodeURIComponent(path)}` : '';
         window.location.href = `/auth?reason=session_expired${return_to}`;
@@ -90,15 +93,21 @@ function makeQueryClient() {
 }
 
 export function TRPCProvider({ children }: { children: React.ReactNode }) {
-  const [queryClient] = useState(makeQueryClient);
-  // Defer persister creation to useEffect to avoid hydration mismatch:
-  // server always renders null, client initializes after mount.
-  const [persister, setPersister] = useState<ReturnType<typeof createSyncStoragePersister> | null>(
+  const [queryClient] = useState(() => {
+    const client = makeQueryClient();
+    queryClientRef = client;
+    return client;
+  });
+  /**
+   * Defer persister creation to useEffect to avoid hydration mismatch:
+   ^ Server always renders null, client initializes after mount.
+   */
+  const [persister, setPersister] = useState<ReturnType<typeof createAsyncStoragePersister> | null>(
     null,
   );
 
   useEffect(() => {
-    setPersister(createSyncStoragePersister({ storage: window.localStorage }));
+    setPersister(createAsyncStoragePersister({ storage: window.localStorage }));
   }, []);
 
   const [trpcClient] = useState(() =>
@@ -122,7 +131,7 @@ export function TRPCProvider({ children }: { children: React.ReactNode }) {
     </trpc.Provider>
   );
 
-  // Wrap with PersistQueryClientProvider only after client-side mount
+  /** Wrap with PersistQueryClientProvider only after client-side mount */
   if (persister) {
     return (
       <PersistQueryClientProvider

@@ -8,6 +8,7 @@ import { eq, asc } from 'drizzle-orm';
 import { hasUserRole } from '@/lib/auth/user-roles';
 import { broadcastNewComment } from '@/lib/websocket/client';
 import { logger } from '@/lib/utils/secure-logger';
+import { cache, cached } from '@/lib/database/cache';
 import { createCommentBodySchema, userIdParamSchema } from '@/lib/validation/api-schemas';
 
 type CommentResponse = {
@@ -33,39 +34,45 @@ export const userRouter = router({
     }
 
     try {
-      const rows = await db
-        .select({
-          id: users.id,
-          userId: users.userId,
-          username: users.username,
-          createdAt: users.createdAt,
-          avatar: users.avatar,
-          banner: users.banner,
-        })
-        .from(users)
-        .where(eq(users.userId, input.user_id))
-        .limit(1);
-      const user = rows[0];
+      return await cached(
+        `profile:${input.user_id}`,
+        async () => {
+          const rows = await db!
+            .select({
+              id: users.id,
+              userId: users.userId,
+              username: users.username,
+              createdAt: users.createdAt,
+              avatar: users.avatar,
+              banner: users.banner,
+            })
+            .from(users)
+            .where(eq(users.userId, input.user_id))
+            .limit(1);
+          const user = rows[0];
 
-      if (!user) {
-        throw new TRPCError({ code: 'NOT_FOUND', message: 'User not found' });
-      }
+          if (!user) {
+            throw new TRPCError({ code: 'NOT_FOUND', message: 'User not found' });
+          }
 
-      const [isSupport, isAdmin] = await Promise.all([
-        hasUserRole(user.id, 'support'),
-        hasUserRole(user.id, 'admin'),
-      ]);
+          const [isSupport, isAdmin] = await Promise.all([
+            hasUserRole(user.id, 'support'),
+            hasUserRole(user.id, 'admin'),
+          ]);
 
-      return {
-        id: user.id,
-        user_id: user.userId,
-        username: user.username,
-        created_at: user.createdAt,
-        avatar: user.avatar,
-        banner: user.banner,
-        isSupport,
-        isAdmin,
-      };
+          return {
+            id: user.id,
+            user_id: user.userId,
+            username: user.username,
+            created_at: user.createdAt,
+            avatar: user.avatar,
+            banner: user.banner,
+            isSupport,
+            isAdmin,
+          };
+        },
+        60,
+      );
     } catch (error) {
       if (error instanceof TRPCError) throw error;
       throw new TRPCError({ code: 'NOT_FOUND', message: 'User not found' });
@@ -79,53 +86,60 @@ export const userRouter = router({
       }
 
       try {
-        const profileOwnerRows = await db
-          .select({ id: users.id })
-          .from(users)
-          .where(eq(users.userId, input.user_id))
-          .limit(1);
-        const profileOwner = profileOwnerRows[0];
+        return await cached(
+          `comments:${input.user_id}`,
+          async () => {
+            const profileOwnerRows = await db!
+              .select({ id: users.id })
+              .from(users)
+              .where(eq(users.userId, input.user_id))
+              .limit(1);
+            const profileOwner = profileOwnerRows[0];
 
-        if (!profileOwner) {
-          throw new TRPCError({ code: 'NOT_FOUND', message: 'Profile not found' });
-        }
+            if (!profileOwner) {
+              throw new TRPCError({ code: 'NOT_FOUND', message: 'Profile not found' });
+            }
 
-        const commentRows = await db
-          .select({
-            id: profileComments.id,
-            profileId: profileComments.profileId,
-            authorId: profileComments.authorId,
-            parentId: profileComments.parentId,
-            content: profileComments.content,
-            isPinned: profileComments.isPinned,
-            createdAt: profileComments.createdAt,
-            authorUuid: users.id,
-            authorUserId: users.userId,
-            authorUsername: users.username,
-            authorAvatar: users.avatar,
-          })
-          .from(profileComments)
-          .leftJoin(users, eq(profileComments.authorId, users.id))
-          .where(eq(profileComments.profileId, profileOwner.id))
-          .orderBy(asc(profileComments.createdAt));
+            const commentRows = await db!
+              .select({
+                id: profileComments.id,
+                profileId: profileComments.profileId,
+                authorId: profileComments.authorId,
+                parentId: profileComments.parentId,
+                content: profileComments.content,
+                isPinned: profileComments.isPinned,
+                createdAt: profileComments.createdAt,
+                authorUuid: users.id,
+                authorUserId: users.userId,
+                authorUsername: users.username,
+                authorAvatar: users.avatar,
+              })
+              .from(profileComments)
+              .leftJoin(users, eq(profileComments.authorId, users.id))
+              .where(eq(profileComments.profileId, profileOwner.id))
+              .orderBy(asc(profileComments.createdAt));
 
-        const formattedComments: CommentResponse[] = commentRows.map((c) => ({
-          id: c.id,
-          profile_id: c.profileId,
-          author_id: c.authorId,
-          parent_id: c.parentId ?? null,
-          content: c.content,
-          is_pinned: c.isPinned ?? false,
-          created_at: c.createdAt instanceof Date ? c.createdAt.toISOString() : String(c.createdAt),
-          author: {
-            id: c.authorUuid ?? '',
-            username: c.authorUsername ?? '',
-            user_id: c.authorUserId ?? '',
-            avatar: c.authorAvatar ?? null,
+            const formattedComments: CommentResponse[] = commentRows.map((c) => ({
+              id: c.id,
+              profile_id: c.profileId,
+              author_id: c.authorId,
+              parent_id: c.parentId ?? null,
+              content: c.content,
+              is_pinned: c.isPinned ?? false,
+              created_at:
+                c.createdAt instanceof Date ? c.createdAt.toISOString() : String(c.createdAt),
+              author: {
+                id: c.authorUuid ?? '',
+                username: c.authorUsername ?? '',
+                user_id: c.authorUserId ?? '',
+                avatar: c.authorAvatar ?? null,
+              },
+            }));
+
+            return formattedComments;
           },
-        }));
-
-        return formattedComments;
+          30,
+        );
       } catch (error) {
         if (error instanceof TRPCError) throw error;
         logger.error('Error fetching comments', {
@@ -190,6 +204,7 @@ export const userRouter = router({
           };
 
           revalidateTag(`user-profile:${input.user_id}`, 'max');
+          cache.delete(`comments:${input.user_id}`);
 
           try {
             broadcastNewComment(profileOwner.id, fullComment);

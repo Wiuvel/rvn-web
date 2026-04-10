@@ -9,6 +9,7 @@ import {
   authenticateAdmin,
   createAdmin,
   checkAdminExists,
+  invalidateUserTokenCache,
 } from '@/lib/auth/index';
 import { hasUserRole } from '@/lib/auth/user-roles';
 import { generateCSRFToken, verifyCSRFToken, revokeCSRFToken } from '@/lib/security/csrf';
@@ -418,7 +419,10 @@ export const authRouter = router({
 
       if (scope === 'user') {
         const token = cookieStore.get('token')?.value;
-        if (token) await SessionManager.revokeDevice(token);
+        if (token) {
+          await SessionManager.revokeDevice(token);
+          await invalidateUserTokenCache(token);
+        }
         cookieStore.delete('user_data');
         cookieStore.delete('oauth_state');
       } else {

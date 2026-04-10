@@ -298,7 +298,28 @@ END;
 $$;
 
 -- ============================================
--- 7. ТАБЛИЦА КОММЕНТАРИЕВ (profile_comments)
+-- 7. ТАБЛИЦА УВЕДОМЛЕНИЙ (notifications)
+-- ============================================
+CREATE TABLE IF NOT EXISTS notifications (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    type TEXT NOT NULL,                    -- 'support_reply' | 'ticket_status' | ...
+    title TEXT NOT NULL,
+    message TEXT NOT NULL,
+    is_read BOOLEAN NOT NULL DEFAULT false,
+    count INTEGER NOT NULL DEFAULT 1,      -- количество сгруппированных сообщений (UPSERT по тикету)
+    related_ticket_id UUID REFERENCES support_tickets(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Индексы для notifications
+CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_user_unread ON notifications(user_id, is_read)
+    WHERE is_read = false;
+CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON notifications(created_at);
+
+-- ============================================
+-- 8. ТАБЛИЦА КОММЕНТАРИЕВ (profile_comments)
 -- ============================================
 CREATE TABLE IF NOT EXISTS profile_comments (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

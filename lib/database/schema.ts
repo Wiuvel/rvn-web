@@ -220,6 +220,35 @@ export const supportMessageAttachments = pgTable(
 );
 
 // ============================================
+// 8. notifications — UPSERT grouping by ticket
+// ============================================
+export const notifications = pgTable(
+  'notifications',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    type: text('type').notNull(),
+    title: text('title').notNull(),
+    message: text('message').notNull(),
+    isRead: boolean('is_read').notNull().default(false),
+    count: integer('count').notNull().default(1),
+    relatedTicketId: uuid('related_ticket_id').references(() => supportTickets.id, {
+      onDelete: 'cascade',
+    }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('idx_notifications_user_id').on(table.userId),
+    index('idx_notifications_user_unread')
+      .on(table.userId, table.isRead)
+      .where(sql`is_read = false`),
+    index('idx_notifications_created_at').on(table.createdAt),
+  ],
+);
+
+// ============================================
 // 9. profile_comments
 // ============================================
 export const profileComments = pgTable(
@@ -267,6 +296,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   tickets: many(supportTickets, { relationName: 'ticketUser' }),
   assignedTickets: many(supportTickets, { relationName: 'assignedUser' }),
   sentMessages: many(supportMessages),
+  notifications: many(notifications),
   profileComments: many(profileComments, { relationName: 'profileOwner' }),
   authoredComments: many(profileComments, { relationName: 'commentAuthor' }),
 }));
@@ -325,6 +355,17 @@ export const supportMessageAttachmentsRelations = relations(
   }),
 );
 
+export const notificationsRelations = relations(notifications, ({ one }) => ({
+  user: one(users, {
+    fields: [notifications.userId],
+    references: [users.id],
+  }),
+  ticket: one(supportTickets, {
+    fields: [notifications.relatedTicketId],
+    references: [supportTickets.id],
+  }),
+}));
+
 export const profileCommentsRelations = relations(profileComments, ({ one, many }) => ({
   profile: one(users, {
     fields: [profileComments.profileId],
@@ -370,6 +411,9 @@ export type SupportMessageInsert = InferInsertModel<typeof supportMessages>;
 
 export type SupportMessageAttachment = InferSelectModel<typeof supportMessageAttachments>;
 export type SupportMessageAttachmentInsert = InferInsertModel<typeof supportMessageAttachments>;
+
+export type Notification = InferSelectModel<typeof notifications>;
+export type NotificationInsert = InferInsertModel<typeof notifications>;
 
 export type ProfileComment = InferSelectModel<typeof profileComments>;
 export type ProfileCommentInsert = InferInsertModel<typeof profileComments>;

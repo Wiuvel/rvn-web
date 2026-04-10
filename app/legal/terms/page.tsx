@@ -251,14 +251,7 @@ export default function TermsOfServicePage() {
                     .
                   </p>
 
-                  <div className="last-updated">
-                    Последнее обновление:{' '}
-                    {new Date().toLocaleDateString('ru-RU', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric',
-                    })}
-                  </div>
+                  <div className="last-updated">Последнее обновление: 3 апреля 2026 г.</div>
                 </div>
               )}
             </div>

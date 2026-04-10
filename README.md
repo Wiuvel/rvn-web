@@ -1,5 +1,8 @@
 <div align="center">
   <h1 align="center">@rvn-website</h1>
+
+  <img src="docs/images/readme-card.png" alt="RVN Website" width="75%" />
+  
   <p align="center">
     <img src="https://img.shields.io/badge/Next.js-16-000000?style=flat-square&logo=next.js&logoColor=white" alt="Next.js">
     <img src="https://img.shields.io/badge/React-19-61dafb?style=flat-square&logo=react&logoColor=black" alt="React">
@@ -27,11 +30,19 @@
 
 ## Documentation
 
-### Аутентификация
+### Authentication
 
 | Document | Description |
 |----------|-------------|
 | [Authentication architecture](docs/auth/architecture.en.md) | Sessions, device tokens, OAuth, password hashing, cookies |
+| [Device fingerprinting](docs/auth/device-fingerprint.en.md) | Two-layer FPID system, IndexedDB, server-side hashing, deduplication |
+| [Device IP geolocation](docs/auth/geolocation.en.md) | MaxMind GeoLite2, ip-api.com fallback, caching, storage format |
+
+### Notifications
+
+| Document | Description |
+|----------|-------------|
+| [Notification system](docs/notifications/notifications.en.md) | Real-time notifications, UPSERT grouping, WebSocket delivery, caching |
 
 ### WebSocket
 

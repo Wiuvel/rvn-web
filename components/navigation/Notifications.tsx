@@ -1,48 +1,63 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { useMenuAnimation } from '@/hooks/useMenuAnimation';
-import { Bell as BellIcon } from 'lucide-react';
-
-interface Notification {
-  id: string;
-  title: string;
-  message: string;
-  created_at: string;
-}
+import { useNotifications } from '@/hooks/useNotifications';
+import { Bell as BellIcon, Check, CheckCheck, LifeBuoy, ExternalLink } from 'lucide-react';
 
 interface NotificationsWidgetProps {
   isMobile?: boolean;
+  /** Active ticket ID — matching notifications are auto-marked as read */
+  activeTicketId?: string;
 }
 
-/**
- * Унифицированный виджет уведомлений.
- * Содержит в себе кнопку (колокольчик) и выпадающее меню.
- * Инкапсулирует логику загрузки, хранения и отметки уведомлений.
- */
-export function NotificationsWidget({ isMobile = false }: NotificationsWidgetProps) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [readNotifications, setReadNotifications] = useState<Set<string>>(new Set());
-  const [isMounted, setIsMounted] = useState(false);
+/** Formats a date string as Russian relative time ("2 мин назад", "вчера") */
+function formatRelativeTime(dateStr: string): string {
+  const now = Date.now();
+  const date = new Date(dateStr).getTime();
+  const diff = now - date;
 
+  const seconds = Math.floor(diff / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+
+  if (seconds < 60) return 'только что';
+  if (minutes < 60) return `${minutes} мин назад`;
+  if (hours < 24) return `${hours} ч назад`;
+  if (days === 1) return 'вчера';
+  if (days < 7) return `${days} дн назад`;
+
+  return new Date(dateStr).toLocaleDateString('ru-RU', {
+    day: 'numeric',
+    month: 'short',
+  });
+}
+
+/** Resolves icon component by notification type */
+function NotificationIcon({ type }: { type: string }) {
+  if (type === 'support_reply' || type === 'ticket_status') {
+    return <LifeBuoy className="h-4 w-4 text-primary-400" />;
+  }
+  return <BellIcon className="h-4 w-4 text-neutral-400" />;
+}
+
+/** Bell icon widget with dropdown — uses tRPC + WebSocket via useNotifications */
+export function NotificationsWidget({
+  isMobile = false,
+  activeTicketId,
+}: NotificationsWidgetProps) {
+  const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const { shouldRender, menuRef: animatedMenuRef } = useMenuAnimation(isOpen);
+  const router = useRouter();
 
-  // Инициализация и загрузка данных
-  useEffect(() => {
-    setIsMounted(true);
-    // Загружаем прочитанные уведомления из localStorage
-    const storedRead = localStorage.getItem('readNotifications');
-    const readSet = storedRead ? new Set<string>(JSON.parse(storedRead)) : new Set<string>();
-    setReadNotifications(readSet);
+  const { unreadCount, notifications, isLoading, markRead, markAllRead } = useNotifications({
+    activeTicketId,
+  });
 
-    // TODO: Здесь должен быть запрос к API за уведомлениями
-    // Пока мокаем пустой массив или тестовые данные
-    setNotifications([]);
-  }, []);
-
-  // Закрытие при клике снаружи
+  /* Close on outside click */
   useEffect(() => {
     if (!isOpen) return;
 
@@ -56,22 +71,21 @@ export function NotificationsWidget({ isMobile = false }: NotificationsWidgetPro
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isOpen]);
 
-  const markAsRead = (id: string) => {
-    const newReadSet = new Set(readNotifications);
-    newReadSet.add(id);
-    setReadNotifications(newReadSet);
-    localStorage.setItem('readNotifications', JSON.stringify(Array.from(newReadSet)));
+  const handleNotificationClick = (notification: {
+    id: string;
+    isRead: boolean;
+    relatedTicketId?: string | null;
+  }) => {
+    if (!notification.isRead) {
+      markRead(notification.id);
+    }
+    setIsOpen(false);
+    if (notification.relatedTicketId) {
+      router.push(`/support?ticket=${notification.relatedTicketId}`);
+    }
   };
 
-  const hasUnread = notifications.some((n) => !readNotifications.has(n.id));
-  const unreadCount = notifications.filter((n) => !readNotifications.has(n.id)).length;
-
-  if (!isMounted) return null;
-
-  // Мобильная версия (рендерится только кнопка в хедере или встроенное меню)
-  // В данном случае, если isMobile=true, мы предполагаем, что это часть мобильного меню
-  // Но обычно кнопка колокольчика в мобилке тоже есть в навбаре.
-  // Для унификации, этот компонент всегда рендерит кнопку + дропдаун (или развернутое меню для мобилки)
+  const badgeText = unreadCount > 99 ? '99+' : String(unreadCount);
 
   return (
     <div className="relative" ref={containerRef}>
@@ -87,94 +101,147 @@ export function NotificationsWidget({ isMobile = false }: NotificationsWidgetPro
       >
         <div className="relative">
           <BellIcon className="h-6 w-6" />
-          {hasUnread && (
-            <span className="absolute right-0 top-0 block h-2 w-2 rounded-full bg-red-500 ring-2 ring-neutral-800" />
+          {unreadCount > 0 && (
+            <span className="absolute -right-2 -top-2 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-primary-500 px-1 text-[10px] font-bold leading-none text-white ring-2 ring-neutral-800">
+              {badgeText}
+            </span>
           )}
         </div>
       </button>
 
-      {/* Выпадающее меню */}
+      {/* Dropdown menu */}
       {shouldRender && (
         <div
           ref={animatedMenuRef}
           className={`absolute z-50 overflow-hidden rounded-2xl border border-white/10 bg-neutral-900/95 shadow-xl backdrop-blur-xl ${
-            isMobile
-              ? 'fixed left-4 right-4 top-[70px] mt-0 w-auto' // Мобильные стили (на весь экран по ширине)
-              : '-right-3 top-full mt-5 w-80' // Десктопные стили
+            isMobile ? 'fixed left-4 right-4 top-[70px] mt-0 w-auto' : '-right-3 top-full mt-5 w-80'
           } `}
         >
+          {/* Dropdown header */}
           <div className="mx-2 flex items-center justify-between border-b border-white/10 p-4">
             <h3 className="text-sm font-semibold text-white">Уведомления</h3>
-            {unreadCount > 0 && (
-              <span className="rounded-full bg-primary-500 px-2 py-0.5 text-xs font-semibold text-white">
-                {unreadCount}
-              </span>
-            )}
+            <div className="flex items-center gap-2">
+              {unreadCount > 0 && (
+                <>
+                  <span className="rounded-full bg-primary-500/20 px-2 py-0.5 text-xs font-semibold text-primary-400">
+                    {unreadCount}
+                  </span>
+                  <button
+                    onClick={() => markAllRead()}
+                    className="rounded-lg p-1.5 text-neutral-400 transition-colors hover:bg-white/5 hover:text-white"
+                    title="Прочитать все"
+                    aria-label="Прочитать все"
+                  >
+                    <CheckCheck className="h-4 w-4" />
+                  </button>
+                </>
+              )}
+            </div>
           </div>
 
+          {/* Notification list */}
           <div className="max-h-96 overflow-y-auto">
-            {notifications.length === 0 ? (
+            {isLoading ? (
+              <div className="p-8 text-center">
+                <div className="mx-auto h-6 w-6 animate-spin rounded-full border-2 border-neutral-600 border-t-primary-500" />
+              </div>
+            ) : notifications.length === 0 ? (
               <div className="p-8 text-center">
                 <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-neutral-800/50">
-                  <svg
-                    className="h-8 w-8 text-neutral-500"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
-                    />
-                  </svg>
+                  <BellIcon className="h-8 w-8 text-neutral-500" />
                 </div>
                 <p className="text-sm text-neutral-400">Нет уведомлений</p>
               </div>
             ) : (
-              <div className="space-y-1 py-2">
-                {notifications.map((notification) => {
-                  const isRead = readNotifications.has(notification.id);
-                  return (
+              <div className="space-y-0.5 py-2">
+                {notifications.map(
+                  (notification: {
+                    id: string;
+                    type: string;
+                    title: string;
+                    message: string;
+                    isRead: boolean;
+                    count: number;
+                    relatedTicketId: string | null;
+                    createdAt: Date | string;
+                  }) => (
                     <button
                       key={notification.id}
-                      onClick={() => markAsRead(notification.id)}
-                      className={`mx-2 w-full cursor-pointer rounded-xl px-4 py-3 text-left transition-colors duration-200 ${
-                        !isRead
-                          ? 'border-l-2 border-blue-500 bg-blue-500/10 hover:bg-blue-500/20'
+                      onClick={() =>
+                        handleNotificationClick({
+                          id: notification.id,
+                          isRead: notification.isRead,
+                          relatedTicketId: notification.relatedTicketId,
+                        })
+                      }
+                      className={`mx-2 w-[calc(100%-16px)] cursor-pointer rounded-xl px-3 py-3 text-left transition-colors duration-200 ${
+                        !notification.isRead
+                          ? 'bg-primary-500/5 hover:bg-primary-500/10'
                           : 'hover:bg-white/5'
                       }`}
                     >
                       <div className="flex items-start gap-3">
-                        {!isRead && (
-                          <div className="mt-2 h-2 w-2 flex-shrink-0 animate-pulse rounded-full bg-blue-500"></div>
-                        )}
+                        <div className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-white/5">
+                          <NotificationIcon type={notification.type} />
+                        </div>
                         <div className="min-w-0 flex-1">
-                          <div
-                            className={`mb-1 text-sm font-medium ${isRead ? 'text-white/90' : 'text-white'}`}
-                          >
-                            {notification.title}
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`text-sm font-medium ${!notification.isRead ? 'text-white' : 'text-white/80'}`}
+                            >
+                              {notification.title}
+                            </span>
+                            {!notification.isRead && (
+                              <span className="h-2 w-2 flex-shrink-0 rounded-full bg-primary-500" />
+                            )}
                           </div>
-                          <div className="mb-1 text-xs text-neutral-400">
-                            {notification.message}
-                          </div>
-                          <div className="text-xs text-neutral-500">
-                            {new Date(notification.created_at).toLocaleDateString('ru-RU', {
-                              day: 'numeric',
-                              month: 'short',
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })}
+                          <p className="mt-0.5 line-clamp-2 text-xs text-neutral-400">
+                            {notification.count > 1
+                              ? `(${notification.count}) ${notification.message}`
+                              : notification.message}
+                          </p>
+                          <div className="mt-1.5 flex items-center gap-2">
+                            <span className="text-[11px] text-neutral-500">
+                              {formatRelativeTime(notification.createdAt.toString())}
+                            </span>
+                            {!notification.isRead && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  markRead(notification.id);
+                                }}
+                                className="rounded p-0.5 text-neutral-500 transition-colors hover:text-primary-400"
+                                title="Прочитать"
+                                aria-label="Прочитать"
+                              >
+                                <Check className="h-3 w-3" />
+                              </button>
+                            )}
                           </div>
                         </div>
                       </div>
                     </button>
-                  );
-                })}
+                  ),
+                )}
               </div>
             )}
           </div>
+
+          {/* Footer */}
+          {notifications.length > 0 && (
+            <div className="border-t border-white/10 p-2">
+              <button
+                onClick={() => {
+                  setIsOpen(false);
+                  router.push('/notifications');
+                }}
+                className="flex w-full items-center justify-center gap-1.5 rounded-xl py-2.5 text-xs font-medium text-neutral-400 transition-colors hover:bg-white/5 hover:text-white"
+              >
+                Все уведомления
+                <ExternalLink className="h-3 w-3" />
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
