@@ -36,32 +36,34 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
     },
   );
 
+  /** Invalidate all notification-related queries */
+  const invalidateAll = useCallback(() => {
+    utils.notification.unreadCount.invalidate();
+    utils.notification.list.invalidate();
+    utils.notification.groupedList.invalidate();
+  }, [utils]);
+
   const markReadMutation = trpc.notification.markRead.useMutation({
-    onSuccess: () => {
-      utils.notification.unreadCount.invalidate();
-      utils.notification.list.invalidate();
-    },
-    onError: () => {
-      /* Refetch to restore consistent state */
-      utils.notification.unreadCount.invalidate();
-      utils.notification.list.invalidate();
-    },
+    onSuccess: invalidateAll,
+    onError: invalidateAll,
   });
 
   const markAllReadMutation = trpc.notification.markAllRead.useMutation({
-    onSuccess: () => {
-      utils.notification.unreadCount.invalidate();
-      utils.notification.list.invalidate();
-    },
-    onError: () => {
-      utils.notification.unreadCount.invalidate();
-      utils.notification.list.invalidate();
-    },
+    onSuccess: invalidateAll,
+    onError: invalidateAll,
+  });
+
+  const markGroupReadMutation = trpc.notification.markGroupRead.useMutation({
+    onSuccess: invalidateAll,
+    onError: invalidateAll,
   });
 
   const markRead = useCallback((id: string) => markReadMutation.mutate({ id }), [markReadMutation]);
-
   const markAllRead = useCallback(() => markAllReadMutation.mutate(), [markAllReadMutation]);
+  const markGroupRead = useCallback(
+    (relatedTicketId: string) => markGroupReadMutation.mutate({ relatedTicketId }),
+    [markGroupReadMutation],
+  );
 
   /* WebSocket subscription for instant updates */
   useEffect(() => {
@@ -71,18 +73,16 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
       /* Auto-mark-read if user is viewing this ticket */
       if (activeTicketId && data.notification.related_ticket_id === activeTicketId) {
         markRead(data.notification.id);
-        /* markRead onSuccess already invalidates queries */
         return;
       }
-      utils.notification.unreadCount.invalidate();
-      utils.notification.list.invalidate();
+      invalidateAll();
     };
 
     socket.on('notification:new', handler);
     return () => {
       socket.off('notification:new', handler);
     };
-  }, [socket, enabled, activeTicketId, markRead, utils]);
+  }, [socket, enabled, activeTicketId, markRead, invalidateAll]);
 
   return {
     unreadCount: unreadData?.count ?? 0,
@@ -90,5 +90,6 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
     isLoading,
     markRead,
     markAllRead,
+    markGroupRead,
   };
 }

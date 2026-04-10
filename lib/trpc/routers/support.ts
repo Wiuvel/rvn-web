@@ -624,18 +624,24 @@ export const supportRouter = router({
           /* Notify ticket owner on status change (support-initiated only) */
           if (status && oldStatus !== status && ticket.user_id !== user.id) {
             const subjectPreview =
-              ticket.subject.length > 80 ? ticket.subject.slice(0, 80) + '…' : ticket.subject;
-            const statusMessages: Record<string, string> = {
-              pending: `Ваше обращение приняли в обработку: ${subjectPreview}`,
-              closed: `Ваше обращение было закрыто: ${subjectPreview}`,
+              ticket.subject.length > 60 ? ticket.subject.slice(0, 60) + '…' : ticket.subject;
+            const statusConfig: Record<string, { title: string; message: string }> = {
+              pending: {
+                title: `Тикет в обработке «${subjectPreview}»`,
+                message: 'Ваше обращение приняли в обработку',
+              },
+              closed: {
+                title: `Тикет закрыт «${subjectPreview}»`,
+                message: 'Ваше обращение было закрыто',
+              },
             };
-            const notifMessage = statusMessages[status];
-            if (notifMessage) {
+            const config = statusConfig[status];
+            if (config) {
               createNotification({
                 userId: ticket.user_id,
                 type: 'ticket_status',
-                title: status === 'closed' ? 'Обращение закрыто' : 'Обращение в обработке',
-                message: notifMessage,
+                title: config.title,
+                message: config.message,
                 relatedTicketId: ticketId,
               });
             }
@@ -976,12 +982,12 @@ export const supportRouter = router({
           /* Notify ticket owner on support reply */
           if (isSupport && ticket.userId !== user.id) {
             const subjectPreview =
-              ticket.subject.length > 80 ? ticket.subject.slice(0, 80) + '…' : ticket.subject;
+              ticket.subject.length > 60 ? ticket.subject.slice(0, 60) + '…' : ticket.subject;
             createNotification({
               userId: ticket.userId,
               type: 'support_reply',
-              title: 'Новый ответ в тикете',
-              message: `Поддержка ответила на обращение: ${subjectPreview}`,
+              title: `Новый ответ в тикете «${subjectPreview}»`,
+              message: 'Поддержка ответила на ваше обращение',
               relatedTicketId: ticketId,
             });
           }

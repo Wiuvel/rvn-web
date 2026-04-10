@@ -196,9 +196,12 @@ export function NotificationsWidget({
                             )}
                           </div>
                           <p className="mt-0.5 line-clamp-2 text-xs text-neutral-400">
-                            {notification.count > 1
-                              ? `(${notification.count}) ${notification.message}`
-                              : notification.message}
+                            {notification.message}
+                            {notification.count > 1 && (
+                              <span className="ml-1.5 inline-flex items-center rounded-full bg-primary-500/20 px-1.5 text-[10px] font-semibold text-primary-400">
+                                {notification.count}
+                              </span>
+                            )}
                           </p>
                           <div className="mt-1.5 flex items-center gap-2">
                             <span className="text-[11px] text-neutral-500">

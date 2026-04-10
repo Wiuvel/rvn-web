@@ -1,7 +1,7 @@
 <div align="center">
   <h1 align="center">@rvn-website</h1>
 
-  <img src="docs/images/readme-card.png" alt="RVN Website" width="75%" />
+  <img src="docs/images/readme-card.png" alt="RVN Website" width="90%" />
   
   <p align="center">
     <img src="https://img.shields.io/badge/Next.js-16-000000?style=flat-square&logo=next.js&logoColor=white" alt="Next.js">
