@@ -3,7 +3,7 @@ import { cookies } from 'next/headers';
 import { revalidateTag } from 'next/cache';
 import { TRPCError } from '@trpc/server';
 import { router, publicProcedure, adminPanelProcedure } from '../init';
-import { checkAdminExists } from '@/lib/auth/index';
+import { checkAdminExists, invalidateUserAuthCacheByUserId } from '@/lib/auth/index';
 import { SessionManager } from '@/lib/auth/session-manager';
 import { db } from '@/lib/database/db';
 import { admins, users, userRoles, trustedGithubDevelopers } from '@/lib/database/schema';
@@ -212,6 +212,7 @@ export const adminRouter = router({
 
           revalidateTag('team-count', 'max');
           cache.delete('admin:team_count');
+          await invalidateUserAuthCacheByUserId(input.userId);
           return { success: true, message: 'Role granted successfully' };
         } catch (error) {
           if (error instanceof TRPCError) throw error;
@@ -236,6 +237,7 @@ export const adminRouter = router({
           }
           revalidateTag('team-count', 'max');
           cache.delete('admin:team_count');
+          await invalidateUserAuthCacheByUserId(input.userId);
           return { success: true, message: 'Role revoked successfully' };
         }),
     }),

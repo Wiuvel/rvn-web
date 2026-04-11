@@ -4,7 +4,7 @@ import { trpc } from '@/lib/trpc/client';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useRouter, usePathname } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { gsap } from 'gsap';
 import { useAuth } from '@/hooks/useAuth';
 import { getGradientClasses, getAvatarUrl } from '@/lib/utils/avatar-gradients';
@@ -35,7 +35,7 @@ export default function MobileNavigation() {
   const hasOpened = useRef(false); // Track if overlay was ever opened
   const prevPathnameRef = useRef<string | null>(null); // Only close when pathname actually changes
   const pathname = usePathname();
-  const router = useRouter();
+
 
   const { userData, loading } = useAuth({ silent: true, lightweight: true });
   const { unreadCount } = useNotifications({ enabled: true });
@@ -197,12 +197,11 @@ export default function MobileNavigation() {
     try {
       await logoutMutation.mutateAsync({ scope: 'user' });
       clearQueryCache();
-      setIsOpen(false);
-      router.push('/auth');
+      window.location.href = '/auth';
     } catch (error) {
       console.error('Logout error:', error);
     }
-  }, [router, logoutMutation]);
+  }, [logoutMutation]);
 
   const closeOverlay = useCallback(() => setIsOpen(false), []);
   const toggleOverlay = useCallback(() => {

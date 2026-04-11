@@ -15,11 +15,7 @@ export default function SessionExpiredModal() {
   const [isOpen, setIsOpen] = useState(false);
 
   useEffect(() => {
-    if (sessionExpired) {
-      setIsOpen(true);
-    } else {
-      setIsOpen(false);
-    }
+    setIsOpen(sessionExpired);
   }, [sessionExpired]);
 
   const handleLogin = () => {

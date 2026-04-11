@@ -24,7 +24,7 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
   const { data: unreadData } = trpc.notification.unreadCount.useQuery(undefined, {
     enabled,
     refetchInterval: 60_000,
-    staleTime: 10_000,
+    staleTime: 60_000,
   });
 
   /* Last 5 notifications for dropdown preview */

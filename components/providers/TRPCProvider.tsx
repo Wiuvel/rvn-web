@@ -41,6 +41,10 @@ export function clearQueryCache() {
     }
     keysToRemove.forEach((key) => window.localStorage.removeItem(key));
   } catch {}
+  /** Clear user_data cookie client-side to prevent stale header */
+  try {
+    document.cookie = 'user_data=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+  } catch {}
 }
 
 function handleTRPCError(err: unknown) {

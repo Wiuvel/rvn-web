@@ -10,6 +10,7 @@ interface CacheEntry<T> {
 }
 
 class SimpleCache {
+  private static readonly MAX_SIZE = 10_000;
   private cache: Map<string, CacheEntry<unknown>> = new Map();
   private cleanupInterval: NodeJS.Timeout | null = null;
 
@@ -63,6 +64,11 @@ class SimpleCache {
    * @param ttlSeconds - Время жизни в секундах (по умолчанию 5 минут)
    */
   set<T>(key: string, data: T, ttlSeconds: number = 300): void {
+    /* FIFO eviction when cache is full */
+    if (this.cache.size >= SimpleCache.MAX_SIZE && !this.cache.has(key)) {
+      const firstKey = this.cache.keys().next().value;
+      if (firstKey !== undefined) this.cache.delete(firstKey);
+    }
     const expiresAt = Date.now() + ttlSeconds * 1000;
     this.cache.set(key, { data, expiresAt });
   }
@@ -151,20 +157,36 @@ class SimpleCache {
 // Singleton instance
 export const cache = new SimpleCache();
 
+/** In-flight request map for deduplicating concurrent calls to cached() with the same key */
+const inFlight = new Map<string, Promise<unknown>>();
+
 /**
- * Вспомогательная функция для кэширования результатов асинхронных функций
+ * Вспомогательная функция для кэширования результатов асинхронных функций.
+ * Дедуплицирует конкурентные запросы с одним ключом.
  */
 export async function cached<T>(
   key: string,
   fn: () => Promise<T>,
   ttlSeconds: number = 300,
 ): Promise<T> {
-  const cached = cache.get<T>(key);
-  if (cached !== null) {
-    return cached;
-  }
+  const existing = cache.get<T>(key);
+  if (existing !== null) return existing;
 
-  const result = await fn();
-  cache.set(key, result, ttlSeconds);
-  return result;
+  /* Deduplicate concurrent in-flight requests */
+  const pending = inFlight.get(key);
+  if (pending) return pending as Promise<T>;
+
+  const promise = fn()
+    .then((result) => {
+      cache.set(key, result, ttlSeconds);
+      inFlight.delete(key);
+      return result;
+    })
+    .catch((err) => {
+      inFlight.delete(key);
+      throw err;
+    });
+
+  inFlight.set(key, promise);
+  return promise;
 }

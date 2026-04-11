@@ -4,7 +4,6 @@ import { trpc } from '@/lib/trpc/client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
 import { UserData } from '@/types';
 import { useMenuAnimation } from '@/hooks/useMenuAnimation';
 import { getGradientClasses, getAvatarUrl } from '@/lib/utils/avatar-gradients';
@@ -39,7 +38,6 @@ export function UserMenu({
   menuRef: externalMenuRef,
   persist = true,
 }: UserMenuProps) {
-  const router = useRouter();
   const logoutMutation = trpc.auth.logout.useMutation();
   const { shouldRender, menuRef: animatedMenuRef } = useMenuAnimation(isOpen, {
     onClose,
@@ -74,8 +72,7 @@ export function UserMenu({
     try {
       await logoutMutation.mutateAsync({ scope: 'user' });
       clearQueryCache();
-      onClose();
-      router.push('/auth');
+      window.location.href = '/auth';
     } catch (error) {
       console.error('Logout error:', error);
     }

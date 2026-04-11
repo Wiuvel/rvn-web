@@ -354,6 +354,25 @@ export async function invalidateUserTokenCache(authToken: string): Promise<void>
   }
 }
 
+/** Invalidates Redis auth cache for all active devices of a user (e.g. after role change) */
+export async function invalidateUserAuthCacheByUserId(userId: string): Promise<void> {
+  const redis = getRedisClient();
+  if (!redis || !db) return;
+  try {
+    const devices = await db
+      .select({ tokenHash: userDevices.tokenHash })
+      .from(userDevices)
+      .where(eq(userDevices.userId, userId));
+
+    if (devices.length > 0) {
+      const keys = devices.map((d) => `auth:user:${d.tokenHash}`);
+      await redis.del(...keys);
+    }
+  } catch {
+    /* Ignore errors */
+  }
+}
+
 export async function getUserById(visibleUserId: string): Promise<User | null> {
   try {
     if (!db) return null;

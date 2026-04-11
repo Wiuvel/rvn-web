@@ -1,11 +1,10 @@
 'use client';
 
-import { useEffect, useCallback, useRef } from 'react';
+import { useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { trpc } from '@/lib/trpc/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useNotifications } from '@/hooks/useNotifications';
-import { useGlobalSocket } from '@/components/providers/WebSocketProvider';
 import {
   Accordion,
   AccordionItem,
@@ -55,22 +54,6 @@ export default function NotificationsPageClient() {
   const { markRead, markAllRead, markGroupRead, unreadCount } = useNotifications({
     enabled: !!userData,
   });
-  const { socket } = useGlobalSocket();
-  const utils = trpc.useUtils();
-
-  /* Sync grouped query with real-time WebSocket events */
-  useEffect(() => {
-    if (!socket || !userData) return;
-
-    const handler = () => {
-      utils.notification.groupedList.invalidate();
-    };
-
-    socket.on('notification:new', handler);
-    return () => {
-      socket.off('notification:new', handler);
-    };
-  }, [socket, userData, utils]);
 
   /* Infinite scroll via grouped tRPC cursor pagination */
   const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } =
