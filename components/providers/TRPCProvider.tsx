@@ -47,11 +47,20 @@ export function clearQueryCache() {
   } catch {}
 }
 
+/** Prevents multiple concurrent 401 handlers from firing duplicate redirects */
+let isRedirecting = false;
+
 function handleTRPCError(err: unknown) {
   if (err instanceof TRPCClientError && err.data?.code === 'UNAUTHORIZED') {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && !isRedirecting) {
+      /** Only redirect if user had an active session (user_data cookie present).
+       *  No cookie = never logged in, not "session expired". */
+      const hadSession = document.cookie.includes('user_data=');
+      if (!hadSession) return;
+
       const path = window.location.pathname || '';
       if (path !== '/auth' && !path.startsWith('/ui/panel/admin')) {
+        isRedirecting = true;
         const return_to = path && path !== '/' ? `&return_to=${encodeURIComponent(path)}` : '';
         window.location.href = `/auth?reason=session_expired${return_to}`;
       }

@@ -64,7 +64,7 @@ class SimpleCache {
    * @param ttlSeconds - Время жизни в секундах (по умолчанию 5 минут)
    */
   set<T>(key: string, data: T, ttlSeconds: number = 300): void {
-    /* FIFO eviction when cache is full */
+    /** FIFO eviction when cache exceeds MAX_SIZE */
     if (this.cache.size >= SimpleCache.MAX_SIZE && !this.cache.has(key)) {
       const firstKey = this.cache.keys().next().value;
       if (firstKey !== undefined) this.cache.delete(firstKey);
@@ -157,12 +157,12 @@ class SimpleCache {
 // Singleton instance
 export const cache = new SimpleCache();
 
-/** In-flight request map for deduplicating concurrent calls to cached() with the same key */
+/** In-flight request map for deduplicating concurrent calls to {@link cached} */
 const inFlight = new Map<string, Promise<unknown>>();
 
 /**
- * Вспомогательная функция для кэширования результатов асинхронных функций.
- * Дедуплицирует конкурентные запросы с одним ключом.
+ * Caches the result of an async function with TTL.
+ * Deduplicates concurrent in-flight requests sharing the same key.
  */
 export async function cached<T>(
   key: string,
@@ -172,7 +172,7 @@ export async function cached<T>(
   const existing = cache.get<T>(key);
   if (existing !== null) return existing;
 
-  /* Deduplicate concurrent in-flight requests */
+  /** Deduplicate concurrent in-flight requests */
   const pending = inFlight.get(key);
   if (pending) return pending as Promise<T>;
 

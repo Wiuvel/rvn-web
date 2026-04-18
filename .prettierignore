@@ -3,18 +3,29 @@ node_modules
 .next
 out
 build
+coverage
+.vercel
+
+# Static / generated
+public
+data
+database
+docs
 temp
-lib/wasm/pkg
 wasm/target
+lib/wasm/pkg
+
+# Lock files
+pnpm-lock.yaml
+bun.lock
+
+# Env
 .env
 .env.*
 !.env.example
-package-lock.json
-pnpm-lock.yaml
-yarn.lock
-*.min.js
-*.min.css
-coverage
-.vercel
+
+# Generated / minified
 *.tsbuildinfo
 next-env.d.ts
+*.min.js
+*.min.css

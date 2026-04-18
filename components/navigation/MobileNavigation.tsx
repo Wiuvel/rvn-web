@@ -36,9 +36,8 @@ export default function MobileNavigation() {
   const prevPathnameRef = useRef<string | null>(null); // Only close when pathname actually changes
   const pathname = usePathname();
 
-
   const { userData, loading } = useAuth({ silent: true, lightweight: true });
-  const { unreadCount } = useNotifications({ enabled: true });
+  const { unreadCount } = useNotifications({ enabled: !!userData });
 
   // Не показываем MobileMenu для страницы /protection/
   const shouldRender = !(pathname === '/protection' || pathname?.startsWith('/protection/'));

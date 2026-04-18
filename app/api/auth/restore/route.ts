@@ -5,7 +5,8 @@ import { setUserDataCookie } from '@/lib/auth/helper';
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const rawRedirect = searchParams.get('redirect') || '/dashboard';
-  const redirectUrl = rawRedirect.startsWith('/') && !rawRedirect.startsWith('//') ? rawRedirect : '/dashboard';
+  const redirectUrl =
+    rawRedirect.startsWith('/') && !rawRedirect.startsWith('//') ? rawRedirect : '/dashboard';
 
   // Construct base URL from headers to avoid 0.0.0.0 or internal IP usage
   const host = request.headers.get('host') || request.nextUrl.host;

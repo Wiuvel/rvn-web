@@ -15,8 +15,13 @@ export default function SessionExpiredModal() {
   const [isOpen, setIsOpen] = useState(false);
 
   useEffect(() => {
-    setIsOpen(sessionExpired);
-  }, [sessionExpired]);
+    /** Don't show expired-session modal on the login page itself */
+    if (pathname === '/auth') {
+      setIsOpen(false);
+    } else {
+      setIsOpen(sessionExpired);
+    }
+  }, [sessionExpired, pathname]);
 
   const handleLogin = () => {
     setIsOpen(false);

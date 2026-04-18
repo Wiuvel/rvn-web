@@ -153,11 +153,13 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
       return;
     }
 
-    // Only mark session as expired if:
-    // 1. User had a valid cookie (was authenticated)
-    // 2. API explicitly returned 401/unauthenticated
-    // 3. Not currently loading
-    // 4. We actually attempted to fetch (shouldFetch = true)
+    /**
+     * Only mark session as expired when all conditions are met:
+     * 1. User had a valid cookie (was previously authenticated)
+     * 2. API explicitly returned 401 / unauthenticated
+     * 3. Not currently loading
+     * 4. Fetch was actually attempted (shouldFetch = true)
+     */
     const hadCookie = !!fallbackFromCookie;
     if (hadCookie && apiSaysUnauthenticated && !isLoading && shouldFetch) {
       setSessionExpired(true);

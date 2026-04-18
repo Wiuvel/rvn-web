@@ -112,13 +112,14 @@ export const notificationRouter = router({
   groupedList: protectedProcedure
     .input(
       z.object({
-        cursor: z.string().optional(),
+        cursor: z.string().datetime().optional(),
         limit: z.number().min(1).max(50).default(20),
       }),
     )
     .query(async ({ ctx, input }) => {
       const { cursor, limit } = input;
       const userId = ctx.user.id;
+      const ITEMS_PER_GROUP = 50;
 
       /* Phase 1: group summaries via raw SQL */
       const cursorCondition = cursor
@@ -159,7 +160,7 @@ export const notificationRouter = router({
         return { groups: [], nextCursor: null };
       }
 
-      /* Phase 2: fetch all items for returned groups */
+      /* Phase 2: fetch recent items for returned groups (capped per group) */
       const ticketIds = rows
         .map((r: { related_ticket_id: string | null }) => r.related_ticket_id)
         .filter((id: string | null): id is string => id !== null);
@@ -175,7 +176,8 @@ export const notificationRouter = router({
               inArray(notifications.relatedTicketId, ticketIds),
             ),
           )
-          .orderBy(desc(notifications.createdAt));
+          .orderBy(desc(notifications.createdAt))
+          .limit(ticketIds.length * ITEMS_PER_GROUP);
       }
 
       /* Also fetch items with NULL relatedTicketId if any group has it */
@@ -189,7 +191,8 @@ export const notificationRouter = router({
           .where(
             and(eq(notifications.userId, userId), sql`${notifications.relatedTicketId} IS NULL`),
           )
-          .orderBy(desc(notifications.createdAt));
+          .orderBy(desc(notifications.createdAt))
+          .limit(ITEMS_PER_GROUP);
         items = [...items, ...nullItems];
       }
 
