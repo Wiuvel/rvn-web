@@ -54,7 +54,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-RUN mkdir -p data && \
+RUN mkdir -p database && \
     wget -q -O database/GeoLite2-City.mmdb \
       "https://github.com/P3TERX/GeoLite.mmdb/raw/download/GeoLite2-City.mmdb"
 
@@ -75,7 +75,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 COPY --from=wasm --chown=nextjs:nodejs /app/lib/wasm/pkg ./lib/wasm/pkg
-COPY --from=builder --chown=nextjs:nodejs /app/data ./data
+COPY --from=builder --chown=nextjs:nodejs /app/database ./database
 
 USER nextjs
 EXPOSE 3001
