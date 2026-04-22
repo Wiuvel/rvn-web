@@ -36,6 +36,19 @@ const TrustedDevelopersSettings = dynamic(
   },
 );
 
+const RemnawaveSettings = dynamic(() => import('@/components/admin/RemnawaveSettings'), {
+  loading: () => <LoadingSpinner />,
+  ssr: false,
+});
+
+const SubscriptionPlansSettings = dynamic(
+  () => import('@/components/admin/SubscriptionPlansSettings'),
+  {
+    loading: () => <LoadingSpinner />,
+    ssr: false,
+  },
+);
+
 interface AuthState {
   isAuthenticated: boolean;
   username: string | null;
@@ -239,6 +252,8 @@ export default function AdminPanelContent({ teamCount }: AdminPanelContentProps)
     { id: 'users', name: 'Пользователи', icon: '👥' },
     { id: 'servers', name: 'Серверы', icon: '🖥️' },
     { id: 'analytics', name: 'Аналитика', icon: '📈' },
+    { id: 'remnawave', name: 'Remnawave', icon: '🌐' },
+    { id: 'subscriptions', name: 'Подписки', icon: '📋' },
     { id: 'settings', name: 'Настройки', icon: '⚙️' },
   ];
 
@@ -618,6 +633,18 @@ export default function AdminPanelContent({ teamCount }: AdminPanelContentProps)
           {activeTab === 'analytics' && (
             <div className="space-y-6">
               <SupportAnalytics />
+            </div>
+          )}
+
+          {activeTab === 'remnawave' && (
+            <div className="space-y-6">
+              <RemnawaveSettings />
+            </div>
+          )}
+
+          {activeTab === 'subscriptions' && (
+            <div className="space-y-6">
+              <SubscriptionPlansSettings />
             </div>
           )}
 

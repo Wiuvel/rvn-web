@@ -1,7 +1,7 @@
 {
   "name": "rvn-web",
   "version": "0.1.0",
-  "description": "Secure, high-performance VPN & Proxy (VLESS) platform for a clean internet without limits",
+  "description": "RVN — VPN & Proxy platform",
   "keywords": [
     "rvn",
     "vpn",

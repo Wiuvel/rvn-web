@@ -55,7 +55,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 RUN mkdir -p data && \
-    wget -q -O data/GeoLite2-City.mmdb \
+    wget -q -O database/GeoLite2-City.mmdb \
       "https://github.com/P3TERX/GeoLite.mmdb/raw/download/GeoLite2-City.mmdb"
 
 RUN pnpm build

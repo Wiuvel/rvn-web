@@ -13,12 +13,12 @@ async function getMaxMindReader(): Promise<Reader<CityResponse> | null> {
   if (mmdbLoadAttempted) return mmdbReader;
   mmdbLoadAttempted = true;
 
-  const dbPath = process.env.MAXMIND_DB_PATH || './data/GeoLite2-City.mmdb';
+  const dbPath = process.env.MAXMIND_DB_PATH || './database/GeoLite2-City.mmdb';
 
   try {
     const maxmind = await import('maxmind');
     mmdbReader = await maxmind.open<CityResponse>(dbPath);
-    logger.info('MaxMind GeoLite2 database loaded', { path: dbPath });
+    /** Already logged in instrumentation.ts: [startup] GeoIP: MaxMind ready */
   } catch {
     // .mmdb not found — expected in dev, will use IP-API fallback
     mmdbReader = null;

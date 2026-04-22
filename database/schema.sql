@@ -44,6 +44,7 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash TEXT, -- NULL для OAuth пользователей
     avatar TEXT, -- Путь к аватару в S3 (формат: s3:avatars/userId/timestamp.ext) или короткий идентификатор (0-9)
     banner TEXT, -- Путь к баннеру профиля в S3 (формат: s3:banners/userId/timestamp.ext)
+    balance INTEGER NOT NULL DEFAULT 0, -- Баланс в копейках
     is_active BOOLEAN NOT NULL DEFAULT true,
     last_login TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -348,8 +349,13 @@ SET search_path = public
 AS $$
 DECLARE comment_count INTEGER;
 BEGIN
+    -- Запрет top-level комментариев на своём профиле (ответы разрешены)
+    IF NEW.parent_id IS NULL AND NEW.profile_id = NEW.author_id THEN
+        RAISE EXCEPTION 'Нельзя оставлять комментарии на своей странице';
+    END IF;
+    -- Скрытый лимит: максимум 5 комментариев на профиль от одного автора
     SELECT COUNT(*) INTO comment_count FROM profile_comments WHERE profile_id = NEW.profile_id AND author_id = NEW.author_id;
-    IF comment_count >= 3 THEN RAISE EXCEPTION 'Достигнут лимит комментариев (максимум 3 на профиль)'; END IF;
+    IF comment_count >= 5 THEN RAISE EXCEPTION 'Достигнут лимит комментариев на этом профиле'; END IF;
     RETURN NEW;
 END;
 $$;
@@ -358,3 +364,94 @@ CREATE TRIGGER trigger_check_comment_limit
     BEFORE INSERT ON profile_comments
     FOR EACH ROW
     EXECUTE FUNCTION check_comment_limit();
+
+-- ============================================
+-- 9. НАСТРОЙКИ ПАНЕЛИ (panel_settings)
+-- ============================================
+-- Key-value хранилище для подключения к Remnawave Panel
+CREATE TABLE IF NOT EXISTS panel_settings (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    key TEXT NOT NULL UNIQUE,
+    value TEXT NOT NULL,
+    updated_by UUID REFERENCES admins(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TRIGGER update_panel_settings_updated_at BEFORE UPDATE ON panel_settings
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- ============================================
+-- 10. ПОДПИСКИ (subscriptions)
+-- ============================================
+-- VPN-подписки пользователей, привязанные к Remnawave Panel
+CREATE TABLE IF NOT EXISTS subscriptions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    remnawave_uuid TEXT,                -- UUID пользователя в Remnawave Panel
+    short_uuid TEXT,                    -- Короткий UUID для subscription URL
+    subscription_url TEXT,              -- Полный URL подписки для VPN-клиента
+    status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'active', 'expired', 'disabled', 'limited', 'cancelled')),
+    plan TEXT NOT NULL DEFAULT 'base-monthly',
+    expire_at TIMESTAMPTZ,
+    traffic_limit_bytes BIGINT DEFAULT 0,
+    traffic_limit_strategy TEXT DEFAULT 'MONTH' CHECK (traffic_limit_strategy IN ('NO_RESET', 'DAY', 'WEEK', 'MONTH', 'MONTH_ROLLING')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Индексы для subscriptions
+CREATE INDEX IF NOT EXISTS idx_subscriptions_user_id ON subscriptions(user_id);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_status ON subscriptions(status);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_expire_at ON subscriptions(expire_at);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_remnawave_uuid ON subscriptions(remnawave_uuid);
+
+CREATE TRIGGER update_subscriptions_updated_at BEFORE UPDATE ON subscriptions
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- ============================================
+-- 11. ПЛАТЕЖИ (payments)
+-- ============================================
+-- Записи о платежах, суммы в копейках (INTEGER)
+CREATE TABLE IF NOT EXISTS payments (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    subscription_id UUID REFERENCES subscriptions(id) ON DELETE SET NULL,
+    amount INTEGER NOT NULL,            -- Сумма в копейках (30000 = 300 ₽)
+    currency TEXT NOT NULL DEFAULT 'RUB',
+    status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'completed', 'failed', 'refunded')),
+    provider TEXT NOT NULL DEFAULT 'test',
+    provider_payment_id TEXT,           -- ID платежа во внешней системе
+    promo_code TEXT,
+    metadata TEXT,                      -- JSON с доп. данными
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Индексы для payments
+CREATE INDEX IF NOT EXISTS idx_payments_user_id ON payments(user_id);
+CREATE INDEX IF NOT EXISTS idx_payments_status ON payments(status);
+CREATE INDEX IF NOT EXISTS idx_payments_subscription_id ON payments(subscription_id);
+CREATE INDEX IF NOT EXISTS idx_payments_created_at ON payments(created_at);
+
+CREATE TRIGGER update_payments_updated_at BEFORE UPDATE ON payments
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- ============================================
+-- 12. ТРАНЗАКЦИИ БАЛАНСА (balance_transactions)
+-- ============================================
+-- Лог операций с балансом: положительные = пополнение, отрицательные = списание
+CREATE TABLE IF NOT EXISTS balance_transactions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    amount INTEGER NOT NULL,            -- Сумма в копейках
+    type TEXT NOT NULL,                 -- 'topup', 'purchase', 'refund', 'bonus'
+    description TEXT,
+    related_payment_id UUID REFERENCES payments(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Индексы для balance_transactions
+CREATE INDEX IF NOT EXISTS idx_balance_transactions_user_id ON balance_transactions(user_id);
+CREATE INDEX IF NOT EXISTS idx_balance_transactions_type ON balance_transactions(type);
+CREATE INDEX IF NOT EXISTS idx_balance_transactions_created_at ON balance_transactions(created_at);

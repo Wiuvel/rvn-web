@@ -68,6 +68,7 @@ export const users = pgTable(
     passwordHash: text('password_hash'),
     avatar: text('avatar'),
     banner: text('banner'),
+    balance: integer('balance').notNull().default(0),
     isActive: boolean('is_active').notNull().default(true),
     lastLogin: timestamp('last_login', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -275,6 +276,95 @@ export const profileComments = pgTable(
   ],
 );
 
+/** Panel settings — key-value store for Remnawave panel connection config. */
+export const panelSettings = pgTable('panel_settings', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  key: text('key').notNull().unique(),
+  value: text('value').notNull(),
+  updatedBy: uuid('updated_by').references(() => admins.id, { onDelete: 'set null' }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** User VPN subscriptions linked to Remnawave panel users. */
+export const subscriptions = pgTable(
+  'subscriptions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    remnawaveUuid: text('remnawave_uuid'),
+    shortUuid: text('short_uuid'),
+    subscriptionUrl: text('subscription_url'),
+    status: text('status').notNull().default('pending'),
+    plan: text('plan').notNull().default('base-monthly'),
+    expireAt: timestamp('expire_at', { withTimezone: true }),
+    trafficLimitBytes: bigint('traffic_limit_bytes', { mode: 'number' }).default(0),
+    trafficLimitStrategy: text('traffic_limit_strategy').default('MONTH'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('idx_subscriptions_user_id').on(table.userId),
+    index('idx_subscriptions_status').on(table.status),
+    index('idx_subscriptions_expire_at').on(table.expireAt),
+    index('idx_subscriptions_remnawave_uuid').on(table.remnawaveUuid),
+  ],
+);
+
+/** Payment records — amounts stored in kopecks (integer). */
+export const payments = pgTable(
+  'payments',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    subscriptionId: uuid('subscription_id').references(() => subscriptions.id, {
+      onDelete: 'set null',
+    }),
+    amount: integer('amount').notNull(),
+    currency: text('currency').notNull().default('RUB'),
+    status: text('status').notNull().default('pending'),
+    provider: text('provider').notNull().default('test'),
+    providerPaymentId: text('provider_payment_id'),
+    promoCode: text('promo_code'),
+    metadata: text('metadata'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('idx_payments_user_id').on(table.userId),
+    index('idx_payments_status').on(table.status),
+    index('idx_payments_subscription_id').on(table.subscriptionId),
+    index('idx_payments_created_at').on(table.createdAt),
+  ],
+);
+
+/** Balance transaction log — amounts in kopecks, positive = top-up, negative = spend. */
+export const balanceTransactions = pgTable(
+  'balance_transactions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    amount: integer('amount').notNull(),
+    type: text('type').notNull(),
+    description: text('description'),
+    relatedPaymentId: uuid('related_payment_id').references(() => payments.id, {
+      onDelete: 'set null',
+    }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('idx_balance_transactions_user_id').on(table.userId),
+    index('idx_balance_transactions_type').on(table.type),
+    index('idx_balance_transactions_created_at').on(table.createdAt),
+  ],
+);
+
 // ============================================
 // Relations
 // ============================================
@@ -299,6 +389,9 @@ export const usersRelations = relations(users, ({ many }) => ({
   notifications: many(notifications),
   profileComments: many(profileComments, { relationName: 'profileOwner' }),
   authoredComments: many(profileComments, { relationName: 'commentAuthor' }),
+  subscriptions: many(subscriptions),
+  payments: many(payments),
+  balanceTransactions: many(balanceTransactions),
 }));
 
 export const userDevicesRelations = relations(userDevices, ({ one }) => ({
@@ -385,6 +478,43 @@ export const profileCommentsRelations = relations(profileComments, ({ one, many 
   replies: many(profileComments, { relationName: 'commentReplies' }),
 }));
 
+export const panelSettingsRelations = relations(panelSettings, ({ one }) => ({
+  updatedByAdmin: one(admins, {
+    fields: [panelSettings.updatedBy],
+    references: [admins.id],
+  }),
+}));
+
+export const subscriptionsRelations = relations(subscriptions, ({ one, many }) => ({
+  user: one(users, {
+    fields: [subscriptions.userId],
+    references: [users.id],
+  }),
+  payments: many(payments),
+}));
+
+export const paymentsRelations = relations(payments, ({ one }) => ({
+  user: one(users, {
+    fields: [payments.userId],
+    references: [users.id],
+  }),
+  subscription: one(subscriptions, {
+    fields: [payments.subscriptionId],
+    references: [subscriptions.id],
+  }),
+}));
+
+export const balanceTransactionsRelations = relations(balanceTransactions, ({ one }) => ({
+  user: one(users, {
+    fields: [balanceTransactions.userId],
+    references: [users.id],
+  }),
+  payment: one(payments, {
+    fields: [balanceTransactions.relatedPaymentId],
+    references: [payments.id],
+  }),
+}));
+
 // ============================================
 // Inferred Types
 // ============================================
@@ -417,3 +547,15 @@ export type NotificationInsert = InferInsertModel<typeof notifications>;
 
 export type ProfileComment = InferSelectModel<typeof profileComments>;
 export type ProfileCommentInsert = InferInsertModel<typeof profileComments>;
+
+export type PanelSetting = InferSelectModel<typeof panelSettings>;
+export type PanelSettingInsert = InferInsertModel<typeof panelSettings>;
+
+export type Subscription = InferSelectModel<typeof subscriptions>;
+export type SubscriptionInsert = InferInsertModel<typeof subscriptions>;
+
+export type Payment = InferSelectModel<typeof payments>;
+export type PaymentInsert = InferInsertModel<typeof payments>;
+
+export type BalanceTransaction = InferSelectModel<typeof balanceTransactions>;
+export type BalanceTransactionInsert = InferInsertModel<typeof balanceTransactions>;

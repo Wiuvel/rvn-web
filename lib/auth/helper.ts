@@ -30,6 +30,7 @@ export async function setUserDataCookie(user: User, isLocalhost: boolean): Promi
     avatar: user.avatar ?? null,
     banner: user.banner ?? null,
     pex: (isAdmin ? 'a' : isSupport ? 's' : 'u') as 'u' | 's' | 'a',
+    balance: user.balance ?? 0,
   };
   const value = createUserDataCookie(payload);
   const opts = getUserDataCookieOptions(isLocalhost);

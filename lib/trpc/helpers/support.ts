@@ -64,7 +64,10 @@ export async function resolveLastMessagesForTickets(
         SELECT sm.ticket_id, sm.id, sm.message_text, sm.sender_id, sm.sender_type, sm.created_at, sm.is_read,
                ROW_NUMBER() OVER (PARTITION BY sm.ticket_id ORDER BY sm.created_at DESC) as rn
         FROM support_messages sm
-        WHERE sm.ticket_id = ANY(${ticketIds})
+        WHERE sm.ticket_id IN (${sql.join(
+          ticketIds.map((id) => sql`${id}`),
+          sql`, `,
+        )})
       )
       SELECT ticket_id, id, message_text, sender_id, sender_type, created_at, is_read
       FROM ranked_messages

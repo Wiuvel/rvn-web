@@ -4,12 +4,17 @@ import { TRPCError } from '@trpc/server';
 import { router, publicProcedure, protectedProcedure } from '../init';
 import { db } from '@/lib/database/db';
 import { users, profileComments } from '@/lib/database/schema';
-import { eq, asc } from 'drizzle-orm';
+import { eq, asc, and, sql } from 'drizzle-orm';
 import { hasUserRole } from '@/lib/auth/user-roles';
 import { broadcastNewComment } from '@/lib/websocket/client';
 import { logger } from '@/lib/utils/secure-logger';
 import { cache, cached } from '@/lib/database/cache';
 import { createCommentBodySchema, userIdParamSchema } from '@/lib/validation/api-schemas';
+
+/** In-memory rate limit: userId -> last comment timestamp */
+const commentRateLimit = new Map<string, number>();
+const COMMENT_COOLDOWN_MS = 30_000;
+const MAX_COMMENTS_PER_PROFILE = 5;
 
 type CommentResponse = {
   id: string;
@@ -174,6 +179,40 @@ export const userRouter = router({
 
           const author = ctx.user;
 
+          /** Deny top-level comments on own profile (replies are allowed) */
+          if (profileOwner.id === author.id && !input.parent_id) {
+            throw new TRPCError({
+              code: 'FORBIDDEN',
+              message: 'Нельзя оставлять комментарии на своей странице',
+            });
+          }
+
+          /** Rate limit: 30-second cooldown between comments */
+          const lastCommentTime = commentRateLimit.get(author.id);
+          if (lastCommentTime && Date.now() - lastCommentTime < COMMENT_COOLDOWN_MS) {
+            throw new TRPCError({
+              code: 'TOO_MANY_REQUESTS',
+              message: 'Подождите перед отправкой следующего комментария',
+            });
+          }
+
+          /** Hidden limit: max 5 comments per profile per author */
+          const [countResult] = await db
+            .select({ count: sql<number>`count(*)::int` })
+            .from(profileComments)
+            .where(
+              and(
+                eq(profileComments.profileId, profileOwner.id),
+                eq(profileComments.authorId, author.id),
+              ),
+            );
+          if (countResult && countResult.count >= MAX_COMMENTS_PER_PROFILE) {
+            throw new TRPCError({
+              code: 'FORBIDDEN',
+              message: 'Достигнут лимит комментариев на этом профиле',
+            });
+          }
+
           const [insertedComment] = await db
             .insert(profileComments)
             .values({
@@ -203,6 +242,9 @@ export const userRouter = router({
             },
           };
 
+          /** Update rate limit timestamp */
+          commentRateLimit.set(author.id, Date.now());
+
           revalidateTag(`user-profile:${input.user_id}`, 'max');
           cache.delete(`comments:${input.user_id}`);
 
@@ -216,12 +258,6 @@ export const userRouter = router({
         } catch (error) {
           if (error instanceof TRPCError) throw error;
           const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-          if (errorMessage.includes('Достигнут лимит комментариев')) {
-            throw new TRPCError({
-              code: 'FORBIDDEN',
-              message: 'Достигнут лимит комментариев (максимум 3 на профиль)',
-            });
-          }
           logger.error('Error inserting comment', { error: errorMessage });
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',

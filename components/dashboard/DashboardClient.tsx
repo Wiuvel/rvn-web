@@ -11,6 +11,8 @@ import { getGradientClasses, getAvatarUrl, getBannerUrl } from '@/lib/utils/avat
 import { APP_VERSION } from '@/lib/utils/constants';
 import AvatarUploadModal from '@/components/auth/AvatarUploadModal';
 import BannerUploadModal from '@/components/auth/BannerUploadModal';
+import SubscriptionPurchaseModal from '@/components/modals/SubscriptionPurchaseModal';
+import BalanceTopUpModal from '@/components/modals/BalanceTopUpModal';
 import {
   Pencil,
   Monitor as Server,
@@ -25,6 +27,7 @@ import {
   Calendar,
   Smartphone,
   ShoppingBag,
+  Globe,
 } from 'lucide-react';
 import Header from '@/components/layout/Header';
 
@@ -164,11 +167,40 @@ export default function DashboardClient({ userId }: DashboardClientProps) {
       pex: authData.pex as 'u' | 's' | 'a',
     };
   }, [authData, avatarOverride, bannerOverride]);
+  const { data: subsData } = trpc.subscription.list.useQuery(undefined, {
+    enabled: !!userData,
+  });
+  const { data: serversData } = trpc.subscription.servers.useQuery(undefined, {
+    enabled: !!userData,
+    staleTime: 5 * 60_000,
+  });
+  const { data: plansData } = trpc.subscription.plans.useQuery(undefined, {
+    enabled: !!userData,
+    staleTime: 5 * 60_000,
+  });
+  const activeSub = useMemo(() => subsData?.find((s) => s.status === 'active') ?? null, [subsData]);
+  const daysLeft = useMemo(() => {
+    if (!activeSub?.expireAt) return null;
+    const diff = new Date(activeSub.expireAt).getTime() - Date.now();
+    return Math.max(0, Math.ceil(diff / 86_400_000));
+  }, [activeSub]);
+  /** Resolve plan ID to human-readable name */
+  const planNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    if (plansData) {
+      for (const p of plansData) map.set(p.id, p.name);
+    }
+    return map;
+  }, [plansData]);
+  const getPlanName = (planId: string) => planNameMap.get(planId) ?? 'Подписка';
+
   const [userMenuOpen, setUserMenuOpen] = useState(false);
 
   const [currentYear] = useState(() => new Date().getFullYear());
   const [showAvatarModal, setShowAvatarModal] = useState(false);
   const [showBannerModal, setShowBannerModal] = useState(false);
+  const [showPurchaseModal, setShowPurchaseModal] = useState(false);
+  const [showTopUpModal, setShowTopUpModal] = useState(false);
   const [avatarLoading, setAvatarLoading] = useState(true);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const userMenuButtonRef = useRef<HTMLButtonElement>(null);
@@ -363,15 +395,17 @@ export default function DashboardClient({ userId }: DashboardClientProps) {
                         {userData ? formatDate(userData.created_at) : '—'}
                       </span>
                     </div>
-                    <div
-                      className="group/info relative flex items-center gap-1.5 sm:gap-2"
-                      title="Ваш баланс"
+                    <button
+                      type="button"
+                      onClick={() => setShowTopUpModal(true)}
+                      className="group/info relative flex items-center gap-1.5 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-emerald-400 transition-colors hover:bg-emerald-500/20 sm:gap-2"
+                      title="Пополнить баланс"
                     >
-                      <Wallet className="h-4 w-4 text-neutral-500 sm:h-5 sm:w-5" />
-                      <span className="cursor-help">
-                        {userData?.balance !== undefined ? `${userData.balance} ₽` : '0 ₽'}
+                      <Wallet className="h-4 w-4 sm:h-5 sm:w-5" />
+                      <span className="text-sm font-medium">
+                        {userData?.balance ? `${(userData.balance / 100).toFixed(0)} ₽` : '0 ₽'}
                       </span>
-                    </div>
+                    </button>
                   </div>
                 </div>
               </div>
@@ -382,8 +416,8 @@ export default function DashboardClient({ userId }: DashboardClientProps) {
             <StatCard
               icon={CreditCard}
               label="Подписка"
-              value="Нет"
-              subtext="Не активна"
+              value={activeSub ? 'Активна' : 'Нет'}
+              subtext={activeSub ? getPlanName(activeSub.plan) : 'Не активна'}
               delay={0}
             />
             <StatCard
@@ -398,8 +432,8 @@ export default function DashboardClient({ userId }: DashboardClientProps) {
             <StatCard
               icon={Clock}
               label="Осталось"
-              value="—"
-              subtext="Дней подписки"
+              value={daysLeft !== null ? String(daysLeft) : '—'}
+              subtext={daysLeft !== null ? 'Дней подписки' : 'Нет подписки'}
               gradient="from-emerald-500/20 to-emerald-600/5"
               iconColor="text-emerald-400"
               delay={160}
@@ -407,8 +441,16 @@ export default function DashboardClient({ userId }: DashboardClientProps) {
             <StatCard
               icon={TrendingUp}
               label="Трафик"
-              value="∞"
-              subtext="Безлимитный"
+              value={
+                activeSub?.trafficLimitBytes
+                  ? `${(activeSub.trafficLimitBytes / 1073741824).toFixed(0)} GB`
+                  : '∞'
+              }
+              subtext={
+                activeSub?.trafficLimitBytes
+                  ? (activeSub.trafficLimitStrategy ?? 'Лимит')
+                  : 'Безлимитный'
+              }
               gradient="from-amber-500/20 to-amber-600/5"
               iconColor="text-amber-400"
               delay={240}
@@ -425,7 +467,7 @@ export default function DashboardClient({ userId }: DashboardClientProps) {
                   <QuickAction
                     icon={CreditCard}
                     label="Приобрести подписку"
-                    href="/#pricing"
+                    onClick={() => setShowPurchaseModal(true)}
                     variant="primary"
                   />
                   <QuickAction icon={Smartphone} label="Мои устройства" href="/user/devices" />
@@ -441,14 +483,59 @@ export default function DashboardClient({ userId }: DashboardClientProps) {
               <div className="rounded-2xl border border-neutral-800 bg-neutral-900/50 p-4 backdrop-blur-sm sm:p-6">
                 <div className="mb-4 flex items-center justify-between">
                   <h2 className="text-lg font-semibold text-white">Мои покупки</h2>
-                  <span className="text-xs text-neutral-500">0 из 3</span>
+                  <span className="text-xs text-neutral-500">{subsData?.length ?? 0} подписок</span>
                 </div>
-                <div className="rounded-xl border border-dashed border-neutral-700/50 bg-neutral-950/30 p-8 text-center">
-                  <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-neutral-800/50">
-                    <ShoppingBag className="h-6 w-6 text-neutral-500" />
+                {subsData && subsData.length > 0 ? (
+                  <div className="space-y-3">
+                    {subsData.map((sub) => (
+                      <div
+                        key={sub.id}
+                        className="flex items-center justify-between rounded-xl border border-neutral-800 bg-neutral-800/30 p-4"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div
+                            className={`flex h-10 w-10 items-center justify-center rounded-lg ${
+                              sub.status === 'active'
+                                ? 'bg-green-500/10 text-green-400'
+                                : 'bg-neutral-700/30 text-neutral-500'
+                            }`}
+                          >
+                            <CreditCard className="h-5 w-5" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-white">
+                              {getPlanName(sub.plan)}
+                            </p>
+                            <p className="text-xs text-neutral-500">
+                              {sub.status === 'active'
+                                ? `до ${new Date(sub.expireAt!).toLocaleDateString('ru-RU')}`
+                                : sub.status === 'expired'
+                                  ? 'Истекла'
+                                  : sub.status}
+                            </p>
+                          </div>
+                        </div>
+                        {sub.subscriptionUrl && sub.status === 'active' && (
+                          <Link
+                            href={sub.subscriptionUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="rounded-lg border border-primary-500/30 bg-primary-500/10 px-3 py-1.5 text-xs font-medium text-primary-400 transition-colors hover:bg-primary-500/20"
+                          >
+                            Подключить
+                          </Link>
+                        )}
+                      </div>
+                    ))}
                   </div>
-                  <p className="text-sm text-neutral-400">У вас пока нет покупок</p>
-                </div>
+                ) : (
+                  <div className="rounded-xl border border-dashed border-neutral-700/50 bg-neutral-950/30 p-8 text-center">
+                    <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-neutral-800/50">
+                      <ShoppingBag className="h-6 w-6 text-neutral-500" />
+                    </div>
+                    <p className="text-sm text-neutral-400">У вас пока нет покупок</p>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -459,11 +546,41 @@ export default function DashboardClient({ userId }: DashboardClientProps) {
                     <Server className="h-5 w-5 text-neutral-400" />
                     <h2 className="text-lg font-semibold text-white">Серверы</h2>
                   </div>
-                  <span className="text-xs text-neutral-500">Скоро</span>
+                  {serversData && (
+                    <span className="text-xs text-neutral-500">
+                      {serversData.filter((s) => s.isOnline).length}/{serversData.length} онлайн
+                    </span>
+                  )}
                 </div>
-                <div className="rounded-xl border border-dashed border-neutral-700/50 bg-neutral-950/30 p-6 text-center">
-                  <p className="text-sm text-neutral-500">Информация о серверах недоступна</p>
-                </div>
+                {serversData && serversData.length > 0 ? (
+                  <div className="space-y-2">
+                    {serversData.map((node) => (
+                      <div
+                        key={node.id}
+                        className="flex items-center justify-between rounded-xl bg-neutral-800/30 px-4 py-3"
+                      >
+                        <div className="flex items-center gap-3">
+                          <Globe className="h-4 w-4 text-neutral-500" />
+                          <span className="text-sm font-medium text-white">{node.label}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div
+                            className={`h-2 w-2 rounded-full ${node.isOnline ? 'bg-emerald-400' : 'bg-red-400'}`}
+                          />
+                          <span
+                            className={`text-xs ${node.isOnline ? 'text-emerald-400' : 'text-red-400'}`}
+                          >
+                            {node.isOnline ? 'Онлайн' : 'Оффлайн'}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-dashed border-neutral-700/50 bg-neutral-950/30 p-6 text-center">
+                    <p className="text-sm text-neutral-500">Серверы недоступны</p>
+                  </div>
+                )}
               </div>
 
               <div className="rounded-2xl border border-neutral-800 bg-neutral-900/50 p-4 backdrop-blur-sm sm:p-6">
@@ -515,6 +632,26 @@ export default function DashboardClient({ userId }: DashboardClientProps) {
           void utils.auth.me.invalidate();
         }}
         currentBannerUrl={userData ? getBannerUrl(userData.banner) : null}
+      />
+
+      <SubscriptionPurchaseModal
+        isOpen={showPurchaseModal}
+        onClose={() => setShowPurchaseModal(false)}
+        balance={userData?.balance ?? 0}
+        onSuccess={() => {
+          void utils.auth.me.invalidate();
+          void utils.subscription.list.invalidate();
+          void utils.subscription.balance.invalidate();
+        }}
+      />
+
+      <BalanceTopUpModal
+        isOpen={showTopUpModal}
+        onClose={() => setShowTopUpModal(false)}
+        onSuccess={() => {
+          void utils.auth.me.invalidate();
+          void utils.subscription.balance.invalidate();
+        }}
       />
     </div>
   );

@@ -224,7 +224,7 @@ const MessageItem = memo(function MessageItem({
                 const avatarUrl = getAvatarUrl(message.sender.avatar);
                 const gradientClasses = getGradientClasses(message.sender.avatar);
 
-                return (
+                const avatarEl = (
                   <div
                     className={`h-10 w-10 overflow-hidden rounded-full ${avatarUrl ? '' : gradientClasses} mb-1 flex flex-shrink-0 items-center justify-center text-sm font-semibold text-white`}
                   >
@@ -241,6 +241,17 @@ const MessageItem = memo(function MessageItem({
                       getInitial(message.sender.username)
                     )}
                   </div>
+                );
+                return message.sender.user_id ? (
+                  <Link
+                    href={`/user/${message.sender.user_id}`}
+                    prefetch={false}
+                    className="transition-opacity hover:opacity-80"
+                  >
+                    {avatarEl}
+                  </Link>
+                ) : (
+                  avatarEl
                 );
               })()}
 

@@ -19,6 +19,7 @@ type AuthMeResponse = {
   banner?: string | null;
   isSupport?: boolean;
   isAdmin?: boolean;
+  balance?: number;
 };
 
 function toUserData(data: AuthMeResponse | null): UserData | null {
@@ -35,6 +36,7 @@ function toUserData(data: AuthMeResponse | null): UserData | null {
     token: data.token,
     isSupport: data.isSupport,
     isAdmin: data.isAdmin,
+    balance: data.balance ?? 0,
     pex,
   };
 }
@@ -53,6 +55,7 @@ function cookieToFallbackData(): AuthMeResponse | null {
     banner: payload.banner ?? null,
     isSupport: pex === 's' || pex === 'a',
     isAdmin: pex === 'a',
+    balance: payload.balance ?? 0,
   };
 }
 

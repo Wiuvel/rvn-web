@@ -3,6 +3,7 @@
 import { trpc } from '@/lib/trpc/client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { UserData } from '@/types';
 import { useMenuAnimation } from '@/hooks/useMenuAnimation';
@@ -38,6 +39,7 @@ export function UserMenu({
   menuRef: externalMenuRef,
   persist = true,
 }: UserMenuProps) {
+  const router = useRouter();
   const logoutMutation = trpc.auth.logout.useMutation();
   const { shouldRender, menuRef: animatedMenuRef } = useMenuAnimation(isOpen, {
     onClose,
@@ -165,10 +167,20 @@ export function UserMenu({
 
               {!hideBalance && (
                 <div className="mt-2 flex items-center gap-1.5 text-sm">
-                  <div className="flex items-center gap-1.5 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-emerald-400">
+                  <button
+                    type="button"
+                    className="flex items-center gap-1.5 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-emerald-400 transition-colors hover:bg-emerald-500/20"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      router.push('/dashboard/transactions');
+                    }}
+                  >
                     <Wallet className="h-3.5 w-3.5" />
-                    <span className="font-medium">{userData.balance || 0} ₽</span>
-                  </div>
+                    <span className="font-medium">
+                      {userData.balance ? (userData.balance / 100).toFixed(0) : 0} ₽
+                    </span>
+                  </button>
                 </div>
               )}
             </div>
@@ -192,7 +204,7 @@ export function UserMenu({
           <div className="mx-2 my-2 h-px bg-white/5" />
 
           <MenuItem
-            href={`/dashboard/${userData.user_id}`}
+            href="/dashboard/transactions"
             onClick={onClose}
             icon={Receipt}
             label="Транзакции"

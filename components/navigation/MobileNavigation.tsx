@@ -333,12 +333,16 @@ export default function MobileNavigation() {
         {/* Balance */}
         {userData && (
           <div className="px-4 pb-3">
-            <div className="flex items-center gap-2 rounded-xl border border-emerald-500/15 bg-emerald-500/[0.06] px-3 py-2.5">
+            <Link
+              href="/dashboard/transactions"
+              prefetch={false}
+              className="flex items-center gap-2 rounded-xl border border-emerald-500/15 bg-emerald-500/[0.06] px-3 py-2.5 transition-colors hover:bg-emerald-500/10"
+            >
               <Wallet className="h-4 w-4 text-emerald-400" />
               <span className="text-sm font-medium text-emerald-400">
-                {userData.balance || 0} ₽
+                {userData.balance ? (userData.balance / 100).toFixed(0) : 0} ₽
               </span>
-            </div>
+            </Link>
           </div>
         )}
 
@@ -357,7 +361,7 @@ export default function MobileNavigation() {
                   highlight
                 />
                 <OverlayMenuItem
-                  href={`/dashboard/${userData.user_id}`}
+                  href="/dashboard/transactions"
                   onClick={closeOverlay}
                   icon={Receipt}
                   label="Транзакции"

@@ -6,7 +6,13 @@ import { router, publicProcedure, adminPanelProcedure } from '../init';
 import { checkAdminExists, invalidateUserAuthCacheByUserId } from '@/lib/auth/index';
 import { SessionManager } from '@/lib/auth/session-manager';
 import { db } from '@/lib/database/db';
-import { admins, users, userRoles, trustedGithubDevelopers } from '@/lib/database/schema';
+import {
+  admins,
+  users,
+  userRoles,
+  trustedGithubDevelopers,
+  panelSettings,
+} from '@/lib/database/schema';
 import { eq, and, or, ilike, inArray, isNull, desc } from 'drizzle-orm';
 import {
   getUserRoles,
@@ -439,7 +445,264 @@ export const adminRouter = router({
       }),
   }),
 
-  // --- Maintenance ---
+  /** Remnawave panel connection settings */
+  remnawave: router({
+    get: adminPanelProcedure.query(async () => {
+      if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB not configured' });
+
+      const rows = await db.select().from(panelSettings);
+      const settings: Record<string, string> = {};
+      for (const row of rows) {
+        settings[row.key] = row.value;
+      }
+      return {
+        endpoint: settings['remnawave_endpoint'] ?? '',
+        apiKey: settings['remnawave_api_key'] ?? '',
+        testPromoEnabled: settings['test_promo_enabled'] === 'true',
+        testPromoCode: settings['test_promo_code'] ?? '',
+      };
+    }),
+
+    update: adminPanelProcedure
+      .input(
+        z.object({
+          endpoint: z.string().url().min(1),
+          apiKey: z.string().min(1),
+          testPromoEnabled: z.boolean().optional(),
+          testPromoCode: z.string().optional(),
+        }),
+      )
+      .mutation(async ({ input, ctx }) => {
+        if (!db)
+          throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB not configured' });
+
+        const adminRow = ctx.adminUsername
+          ? await db
+              .select({ id: admins.id })
+              .from(admins)
+              .where(eq(admins.username, ctx.adminUsername))
+              .limit(1)
+          : [];
+        const adminId = adminRow[0]?.id ?? null;
+        const now = new Date();
+
+        /** Build key-value pairs to upsert */
+        const entries: [string, string][] = [
+          ['remnawave_endpoint', input.endpoint.replace(/\/$/, '')],
+          ['remnawave_api_key', input.apiKey],
+        ];
+        if (input.testPromoEnabled !== undefined) {
+          entries.push(['test_promo_enabled', String(input.testPromoEnabled)]);
+        }
+        if (input.testPromoCode !== undefined) {
+          entries.push(['test_promo_code', input.testPromoCode]);
+        }
+
+        for (const [key, value] of entries) {
+          await db
+            .insert(panelSettings)
+            .values({ key, value, updatedBy: adminId, createdAt: now, updatedAt: now })
+            .onConflictDoUpdate({
+              target: panelSettings.key,
+              set: { value, updatedBy: adminId, updatedAt: now },
+            });
+        }
+
+        const { invalidateSettingsCache } = await import('@/lib/api/remnawave');
+        invalidateSettingsCache();
+
+        logger.info('Remnawave settings updated', { adminId });
+        return { success: true };
+      }),
+
+    healthCheck: adminPanelProcedure.query(async () => {
+      const { healthCheck } = await import('@/lib/api/remnawave');
+      const result = await healthCheck();
+      if (!result.ok) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: result.error });
+      }
+      return { connected: true, metrics: result.data.runtimeMetrics };
+    }),
+
+    /** Fetch internal squads from Remnawave panel. */
+    squads: adminPanelProcedure.query(async () => {
+      const { getInternalSquads } = await import('@/lib/api/remnawave');
+      const result = await getInternalSquads();
+      if (!result.ok) {
+        logger.warn('Failed to fetch squads', { error: result.error });
+        return [];
+      }
+      return Array.isArray(result.data) ? result.data : [];
+    }),
+  }),
+
+  /** Subscription plans stored as JSON in panel_settings. */
+  subscriptionPlans: router({
+    /** Fetch current plans configuration. */
+    list: adminPanelProcedure.query(async () => {
+      if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB not configured' });
+
+      const [row] = await db
+        .select()
+        .from(panelSettings)
+        .where(eq(panelSettings.key, 'subscription_plans'))
+        .limit(1);
+
+      if (!row) {
+        /** Return default plan if nothing configured yet */
+        return [
+          {
+            id: 'base-monthly',
+            name: 'Базовая',
+            priceKopecks: 20000,
+            durationDays: 30,
+            squadUuid: null as string | null,
+            active: true,
+            isStub: false,
+          },
+        ];
+      }
+
+      try {
+        return JSON.parse(row.value) as {
+          id: string;
+          name: string;
+          priceKopecks: number;
+          durationDays: number;
+          squadUuid: string | null;
+          active: boolean;
+          isStub: boolean;
+        }[];
+      } catch {
+        return [];
+      }
+    }),
+
+    /** Save plans configuration. Handles mass squad update when squad changes. */
+    save: adminPanelProcedure
+      .input(
+        z.object({
+          plans: z.array(
+            z.object({
+              id: z.string().min(1),
+              name: z.string().min(1),
+              priceKopecks: z.number().int().min(0),
+              durationDays: z.number().int().min(0),
+              squadUuid: z.string().nullable(),
+              active: z.boolean(),
+              isStub: z.boolean(),
+            }),
+          ),
+        }),
+      )
+      .mutation(async ({ input, ctx }) => {
+        if (!db)
+          throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB not configured' });
+
+        const realPlans = input.plans.filter((p) => !p.isStub);
+        if (realPlans.length > 3) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Максимум 3 тарифных плана (не считая заглушки)',
+          });
+        }
+        if (input.plans.length === 0 || input.plans[0]?.isStub) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Первый план должен быть базовым (не заглушкой)',
+          });
+        }
+
+        /** Detect squad changes for mass update */
+        const [existingRow] = await db
+          .select()
+          .from(panelSettings)
+          .where(eq(panelSettings.key, 'subscription_plans'))
+          .limit(1);
+
+        let oldPlansMap: Record<string, string | null> = {};
+        if (existingRow) {
+          try {
+            const oldPlans = JSON.parse(existingRow.value) as {
+              id: string;
+              squadUuid: string | null;
+            }[];
+            for (const p of oldPlans) oldPlansMap[p.id] = p.squadUuid;
+          } catch {
+            /* ignore parse errors */
+          }
+        }
+
+        const adminRow = ctx.adminUsername
+          ? await db
+              .select({ id: admins.id })
+              .from(admins)
+              .where(eq(admins.username, ctx.adminUsername))
+              .limit(1)
+          : [];
+        const adminId = adminRow[0]?.id ?? null;
+        const now = new Date();
+
+        await db
+          .insert(panelSettings)
+          .values({
+            key: 'subscription_plans',
+            value: JSON.stringify(input.plans),
+            updatedBy: adminId,
+            createdAt: now,
+            updatedAt: now,
+          })
+          .onConflictDoUpdate({
+            target: panelSettings.key,
+            set: { value: JSON.stringify(input.plans), updatedBy: adminId, updatedAt: now },
+          });
+
+        /** Mass squad update for plans where squadUuid changed */
+        const { addUsersToSquad } = await import('@/lib/api/remnawave');
+        const { subscriptions } = await import('@/lib/database/schema');
+
+        for (const plan of input.plans) {
+          if (plan.isStub || !plan.squadUuid) continue;
+          const oldSquad = oldPlansMap[plan.id];
+          if (oldSquad === plan.squadUuid) continue;
+
+          /** Squad changed — find all active subscriptions with this planId */
+          const activeSubs = await db
+            .select({ remnawaveUuid: subscriptions.remnawaveUuid })
+            .from(subscriptions)
+            .where(and(eq(subscriptions.plan, plan.id), eq(subscriptions.status, 'active')));
+
+          const uuids = activeSubs
+            .map((s) => s.remnawaveUuid)
+            .filter((u): u is string => u !== null);
+
+          if (uuids.length > 0) {
+            const result = await addUsersToSquad(plan.squadUuid, uuids);
+            if (!result.ok) {
+              logger.warn('Failed to mass-update squad for plan', {
+                planId: plan.id,
+                squadUuid: plan.squadUuid,
+                error: result.error,
+                userCount: uuids.length,
+              });
+            } else {
+              logger.info('Mass squad update completed', {
+                planId: plan.id,
+                squadUuid: plan.squadUuid,
+                userCount: uuids.length,
+              });
+            }
+          }
+        }
+
+        /** Invalidate plans cache used by getPlansConfig() and subscription.plans */
+        cache.delete('subscription_plans_config');
+
+        logger.info('Subscription plans updated', { adminId, planCount: input.plans.length });
+        return { success: true };
+      }),
+  }),
+
   maintenance: router({
     get: adminPanelProcedure.query(async () => {
       const config = await getMaintenanceConfig();

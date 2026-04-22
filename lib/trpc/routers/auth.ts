@@ -105,6 +105,7 @@ export const authRouter = router({
       banner: user.banner || null,
       isSupport,
       isAdmin,
+      balance: user.balance ?? 0,
     };
   }),
 
@@ -228,6 +229,7 @@ export const authRouter = router({
             avatar: user.avatar ?? null,
             banner: user.banner ?? null,
             pex: isAdmin ? 'a' : isSupport ? 's' : 'u',
+            balance: user.balance ?? 0,
           }),
           getUserDataCookieOptions(isLocalhost),
         );
@@ -394,6 +396,7 @@ export const authRouter = router({
           avatar: user.avatar ?? null,
           banner: user.banner ?? null,
           pex: 'u',
+          balance: user.balance ?? 0,
         }),
         getUserDataCookieOptions(isLocalhost),
       );

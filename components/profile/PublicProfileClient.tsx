@@ -7,7 +7,7 @@ import { getGradientClasses, getAvatarUrl, getBannerUrl } from '@/lib/utils/avat
 import { APP_VERSION } from '@/lib/utils/constants';
 import Header from '@/components/layout/Header';
 import CommentsSection, { Comment } from '@/components/profile/CommentsSection';
-import { Lock } from 'lucide-react';
+import { Lock, ShieldCheck } from 'lucide-react';
 import ErrorState from '@/components/ui/ErrorState';
 
 export interface PublicUserData {
@@ -131,6 +131,7 @@ export default function PublicProfileClient({
                           src={avatarUrl}
                           alt={userData.username}
                           fill
+                          loading="eager"
                           sizes="(max-width: 640px) 96px, 128px"
                           className={`rounded-xl object-cover transition-opacity duration-300 ${avatarLoading ? 'opacity-0' : 'opacity-100'}`}
                           unoptimized
@@ -156,6 +157,22 @@ export default function PublicProfileClient({
                   >
                     {userData.username}
                   </h1>
+                  {(userData.isAdmin || userData.isSupport) && (
+                    <div className="mt-1.5 flex flex-wrap gap-2">
+                      {userData.isAdmin && (
+                        <span className="inline-flex items-center gap-1 rounded-full border border-orange-500/20 bg-orange-500/10 px-2.5 py-0.5 text-xs font-medium text-orange-400">
+                          <ShieldCheck className="h-3 w-3" />
+                          Администратор
+                        </span>
+                      )}
+                      {userData.isSupport && (
+                        <span className="inline-flex items-center gap-1 rounded-full border border-green-500/20 bg-green-500/10 px-2.5 py-0.5 text-xs font-medium text-green-400">
+                          <ShieldCheck className="h-3 w-3" />
+                          Поддержка
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

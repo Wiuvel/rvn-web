@@ -85,16 +85,11 @@ export default function CommentsSection({
   const [submitting, setSubmitting] = useState(false);
 
   // Group comments: Top-level vs Replies
-  const { topLevelComments, repliesMap, userCommentCount } = useMemo(() => {
+  const { topLevelComments, repliesMap } = useMemo(() => {
     const top: Comment[] = [];
     const map: Record<string, Comment[]> = {};
-    let count = 0;
 
     comments.forEach((c) => {
-      if (currentUser && c.author_id === currentUser.id) {
-        count++;
-      }
-
       if (c.parent_id) {
         if (!map[c.parent_id]) map[c.parent_id] = [];
         map[c.parent_id].push(c);
@@ -111,8 +106,8 @@ export default function CommentsSection({
     // Sort top level: Newest first
     top.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-    return { topLevelComments: top, repliesMap: map, userCommentCount: count };
-  }, [comments, currentUser]);
+    return { topLevelComments: top, repliesMap: map };
+  }, [comments]);
 
   // WebSocket Subscription
   useEffect(() => {
@@ -143,11 +138,6 @@ export default function CommentsSection({
 
   const handleSubmit = async (parentId?: string) => {
     if (!newCommentText.trim() || !authToken || !currentUser) return;
-
-    if (userCommentCount >= 3) {
-      alert('Вы достигли лимита комментариев (3 сообщения).');
-      return;
-    }
 
     const tempId = `temp-${Date.now()}`;
     const content = newCommentText;
@@ -203,7 +193,7 @@ export default function CommentsSection({
     }
   };
 
-  const isLimitReached = userCommentCount >= 3;
+  const isOwnProfile = currentUser?.id === profileId;
 
   if (loading || swrLoading) {
     return <SkeletonComments />;
@@ -216,17 +206,10 @@ export default function CommentsSection({
           <MessageSquare className="h-6 w-6 text-primary-500" />
           Комментарии ({comments.length})
         </h3>
-        {currentUser && (
-          <span
-            className={`text-sm font-medium ${isLimitReached ? 'text-red-400' : 'text-neutral-400'}`}
-          >
-            Ваши сообщения: {userCommentCount}/3
-          </span>
-        )}
       </div>
 
-      {/* Main Input */}
-      {currentUser ? (
+      {/* Comment input — hidden on own profile */}
+      {currentUser && !isOwnProfile ? (
         <div className="mb-8">
           <div className="relative">
             <textarea
@@ -234,11 +217,11 @@ export default function CommentsSection({
               onChange={(e) => {
                 if (!replyingTo) setNewCommentText(e.target.value);
               }}
-              disabled={!!replyingTo || isLimitReached || submitting}
-              placeholder={isLimitReached ? 'Лимит сообщений исчерпан' : 'Напишите комментарий...'}
-              className={`h-28 w-full resize-none rounded-xl border border-white/10 bg-neutral-900 p-4 text-base text-white placeholder-neutral-500 transition-colors focus:border-primary-500 focus:outline-none ${isLimitReached ? 'cursor-not-allowed opacity-50' : ''}`}
+              disabled={!!replyingTo || submitting}
+              placeholder="Напишите комментарий..."
+              className="h-28 w-full resize-none rounded-xl border border-white/10 bg-neutral-900 p-4 text-base text-white placeholder-neutral-500 transition-colors focus:border-primary-500 focus:outline-none"
             />
-            {!replyingTo && !isLimitReached && (
+            {!replyingTo && (
               <div className="absolute bottom-3 right-3">
                 <button
                   onClick={() => handleSubmit()}
@@ -251,7 +234,7 @@ export default function CommentsSection({
             )}
           </div>
         </div>
-      ) : (
+      ) : !currentUser ? (
         <div className="mb-8 rounded-xl border border-white/5 bg-neutral-900/40 p-6 text-center">
           <p className="text-base text-neutral-400">
             <Link href="/auth" prefetch={false} className="font-medium text-white hover:underline">
@@ -260,7 +243,7 @@ export default function CommentsSection({
             , чтобы присоединиться к обсуждению
           </p>
         </div>
-      )}
+      ) : null}
 
       {/* Comments List */}
       <div className="space-y-6">
@@ -276,7 +259,6 @@ export default function CommentsSection({
             setNewCommentText={setNewCommentText}
             onSubmitReply={handleSubmit}
             submitting={submitting}
-            isLimitReached={isLimitReached}
           />
         ))}
 
@@ -358,7 +340,6 @@ function CommentItem({
   setNewCommentText,
   onSubmitReply,
   submitting,
-  isLimitReached,
 }: {
   comment: Comment;
   replies: Comment[];
@@ -369,7 +350,6 @@ function CommentItem({
   setNewCommentText: (text: string) => void;
   onSubmitReply: (parentId: string) => void;
   submitting: boolean;
-  isLimitReached: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const isReplying = replyingTo === comment.id;
@@ -411,7 +391,7 @@ function CommentItem({
           </p>
 
           <div className="mt-2 flex items-center gap-4">
-            {!isLimitReached && currentUser && (
+            {currentUser && (
               <button
                 onClick={() => setReplyingTo(isReplying ? null : comment.id)}
                 className="flex items-center gap-1.5 py-1 text-xs text-neutral-500 transition-colors hover:text-white"
@@ -459,7 +439,6 @@ function CommentItem({
               setNewCommentText={setNewCommentText}
               onSubmitReply={onSubmitReply}
               submitting={submitting}
-              isLimitReached={isLimitReached}
             />
           ))}
 

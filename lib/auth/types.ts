@@ -4,6 +4,7 @@ export interface UserDataPayload {
   avatar?: string | null;
   banner?: string | null;
   pex?: 'u' | 's' | 'a';
+  balance?: number;
 }
 
 export interface SessionData {

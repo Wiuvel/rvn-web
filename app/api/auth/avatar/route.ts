@@ -23,6 +23,8 @@ import {
   validateFile,
   validateFileWithContent,
 } from '@/lib/storage/s3-client';
+import { invalidateUserAuthCacheByUserId } from '@/lib/auth/index';
+import { cache } from '@/lib/database/cache';
 import { getExtensionFromMime } from '@/lib/validation/magic-bytes';
 import { setMediaCache } from '@/lib/storage/media-cache';
 import { isValidUUID } from '@/lib/utils/uuid-validation';
@@ -189,6 +191,10 @@ export async function POST(request: NextRequest) {
         NextResponse.json({ error: ERROR_INTERNAL_SERVER_ERROR }, { status: 500 }),
       );
     }
+
+    /* Invalidate Redis auth cache so auth.me returns fresh avatar */
+    await invalidateUserAuthCacheByUserId(user.id);
+    cache.delete(`profile:${user.userId}`);
 
     /* Delete old avatar from S3 if it exists and differs from the new one */
     if (currentUser.avatar && currentUser.avatar.startsWith('s3:avatars/')) {

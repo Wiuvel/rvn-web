@@ -2,6 +2,7 @@
 
 import { useRef, useEffect, memo } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 import { gsap } from 'gsap';
 import { FileText } from 'lucide-react';
 import { getGradientClasses, getAvatarUrl } from '@/lib/utils/avatar-gradients';
@@ -141,28 +142,42 @@ function MessageItem({
           className={`flex items-end gap-2 ${message.sender === 'user' ? 'flex-row-reverse' : 'flex-row'} w-full`}
         >
           {/* Аватар поддержки */}
-          {message.sender === 'support' && (
-            <div className="mb-1 flex h-8 w-8 flex-shrink-0 items-center justify-center overflow-hidden rounded-full sm:h-12 sm:w-12">
-              {message.senderData?.avatar && getAvatarUrl(message.senderData.avatar) ? (
-                <Image
-                  src={getAvatarUrl(message.senderData.avatar)!}
-                  alt={message.senderData.username || 'Support'}
-                  width={48}
-                  height={48}
-                  className="h-full w-full object-cover"
-                  unoptimized
-                />
-              ) : (
-                <div
-                  className={`h-full w-full ${getGradientClasses(message.senderData?.avatar)} flex items-center justify-center text-xs font-semibold text-white sm:text-sm`}
-                >
-                  {message.senderData?.username
-                    ? message.senderData.username.charAt(0).toUpperCase()
-                    : 'S'}
+          {message.sender === 'support' &&
+            (() => {
+              const avatarContent = (
+                <div className="mb-1 flex h-8 w-8 flex-shrink-0 items-center justify-center overflow-hidden rounded-full sm:h-12 sm:w-12">
+                  {message.senderData?.avatar && getAvatarUrl(message.senderData.avatar) ? (
+                    <Image
+                      src={getAvatarUrl(message.senderData.avatar)!}
+                      alt={message.senderData.username || 'Support'}
+                      width={48}
+                      height={48}
+                      className="h-full w-full object-cover"
+                      unoptimized
+                    />
+                  ) : (
+                    <div
+                      className={`h-full w-full ${getGradientClasses(message.senderData?.avatar)} flex items-center justify-center text-xs font-semibold text-white sm:text-sm`}
+                    >
+                      {message.senderData?.username
+                        ? message.senderData.username.charAt(0).toUpperCase()
+                        : 'S'}
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-          )}
+              );
+              return message.senderData?.user_id ? (
+                <Link
+                  href={`/user/${message.senderData.user_id}`}
+                  prefetch={false}
+                  className="transition-opacity hover:opacity-80"
+                >
+                  {avatarContent}
+                </Link>
+              ) : (
+                avatarContent
+              );
+            })()}
 
           {/* Пузырь сообщения */}
           <div
