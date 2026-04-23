@@ -7,24 +7,26 @@ const WS_SERVER_URL = process.env.WEBSOCKET_SERVER_URL || 'http://localhost:3002
 const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY || '';
 
 async function broadcast(path: string, data: unknown): Promise<void> {
-  try {
-    const res = await fetch(`${WS_SERVER_URL}${path}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-internal-api-key': INTERNAL_API_KEY,
-      },
-      body: JSON.stringify(data),
-      signal: AbortSignal.timeout(5000),
-    });
-    if (!res.ok) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const res = await fetch(`${WS_SERVER_URL}${path}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-internal-api-key': INTERNAL_API_KEY,
+        },
+        body: JSON.stringify(data),
+        signal: AbortSignal.timeout(5000),
+      });
+      if (res.ok) return;
       console.error(`[ws-client] Broadcast ${path} failed: ${res.status}`);
+    } catch (error) {
+      console.error(
+        `[ws-client] Broadcast ${path} error (attempt ${attempt + 1}):`,
+        error instanceof Error ? error.message : error,
+      );
     }
-  } catch (error) {
-    console.error(
-      `[ws-client] Broadcast ${path} error:`,
-      error instanceof Error ? error.message : error,
-    );
+    if (attempt === 0) await new Promise((r) => setTimeout(r, 2000));
   }
 }
 

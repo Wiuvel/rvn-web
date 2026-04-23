@@ -49,7 +49,7 @@
 | Document | Description |
 |----------|-------------|
 | [WebSocket architecture](docs/websocket/architecture.en.md) | Connection, rooms, broadcast, authentication |
-| [Event Directory](docs/websocket/events.en.md.md) | Client/server events, error codes, REST endpoints |
+| [Event Directory](docs/websocket/events.en.md) | Client/server events, error codes, REST endpoints |
 
 ---
 

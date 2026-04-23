@@ -601,11 +601,88 @@ export default function SupportClient() {
     }
   }, [activeTicket]);
 
-  // WebSocket: обработка новых сообщений
+  // WebSocket: always-on handler for ticket list updates (subscribed even when no activeTicket)
+  useEffect(() => {
+    if (!socket) return;
+
+    type WsMessageData = {
+      ticketId: string;
+      message: {
+        id: string;
+        message_text: string;
+        sender_type: 'user' | 'support';
+        created_at: string;
+        is_read: boolean;
+        sender?: {
+          id: string;
+          username: string;
+          user_id: string;
+        };
+        attachments?: Array<{
+          id: string;
+          file_name: string;
+          file_type: string;
+          file_size: number;
+          storage_path: string;
+          storage_url?: string;
+        }>;
+      };
+    };
+
+    const handleNewMessageGlobal = (data: WsMessageData) => {
+      const attachments = data.message.attachments || [];
+      let lastMessageText = data.message.message_text || '';
+      if (!lastMessageText && attachments.length > 0) {
+        lastMessageText = getLastMessageLabelForAttachments(attachments);
+      } else if (lastMessageText) {
+        lastMessageText = normalizeLastMessageDisplayText(lastMessageText);
+      }
+
+      const lastMessageData = {
+        id: data.message.id,
+        message_text: lastMessageText,
+        sender_type: data.message.sender_type,
+        created_at: data.message.created_at,
+        is_read: data.message.is_read,
+        attachments: attachments.length > 0 ? attachments : undefined,
+      };
+
+      setTickets((prev) =>
+        prev.map((t) =>
+          t.id === data.ticketId
+            ? { ...t, last_message: lastMessageData }
+            : t,
+        ),
+      );
+    };
+
+    const handleTicketUpdateGlobal = (data: {
+      ticketId: string;
+      ticket: { status: 'open' | 'closed' | 'pending'; updated_at?: string };
+    }) => {
+      setTickets((prev) =>
+        prev.map((t) =>
+          t.id === data.ticketId
+            ? { ...t, status: data.ticket.status, updated_at: data.ticket.updated_at || t.updated_at }
+            : t,
+        ),
+      );
+    };
+
+    socket.on('support:message:new', handleNewMessageGlobal);
+    socket.on('support:ticket:updated', handleTicketUpdateGlobal);
+
+    return () => {
+      socket.off('support:message:new', handleNewMessageGlobal);
+      socket.off('support:ticket:updated', handleTicketUpdateGlobal);
+    };
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
+  }, [socket]);
+
+  // WebSocket: active ticket message handlers (only when a ticket is open)
   useEffect(() => {
     if (!socket || !activeTicket) return;
 
-    // Обработчик новых сообщений через WebSocket (оптимизировано)
     const handleNewMessage = (data: {
       ticketId: string;
       message: {
@@ -631,10 +708,8 @@ export default function SupportClient() {
     }) => {
       if (data.ticketId !== activeTicketRef.current?.id) return;
 
-      // Проверяем, что сообщение уже существует (optimistic UI)
       const existingMessage = activeTicketMessagesRef.current.find((m) => m.id === data.message.id);
 
-      // Если сообщение уже существует (optimistic), обновляем его (убираем isPending)
       if (existingMessage) {
         startTransition(() => {
           setActiveTicket((prev) => {
@@ -660,7 +735,6 @@ export default function SupportClient() {
         return;
       }
 
-      // Сообщение пришло по WS до ответа mutateAsync: привязываем к оптимистичному (isPending, тот же отправитель)
       const optimisticMatch = activeTicketMessagesRef.current.find(
         (m) =>
           m.isPending &&
@@ -695,7 +769,6 @@ export default function SupportClient() {
         return;
       }
 
-      // Оптимизация: объединяем обновления состояния в один переход
       const newMessage: Message = {
         id: data.message.id,
         text: data.message.message_text,
@@ -706,60 +779,21 @@ export default function SupportClient() {
         attachments: mapWsAttachments(data.message.attachments),
       };
 
-      const attachments = data.message.attachments || [];
-      let lastMessageText = data.message.message_text || '';
-      if (!lastMessageText && attachments.length > 0) {
-        lastMessageText = getLastMessageLabelForAttachments(attachments);
-      } else if (lastMessageText) {
-        lastMessageText = normalizeLastMessageDisplayText(lastMessageText);
-      }
-
-      const lastMessageData = {
-        id: data.message.id,
-        message_text: lastMessageText,
-        sender_type: data.message.sender_type,
-        created_at: data.message.created_at,
-        is_read: data.message.is_read,
-        attachments: attachments.length > 0 ? attachments : undefined,
-      };
-
-      // Используем startTransition для неблокирующих обновлений
       startTransition(() => {
-        // Добавляем новое сообщение
         setActiveTicket((prev) => {
           if (!prev || prev.id !== data.ticketId) return prev;
-          // Dedup: skip if message already exists (e.g. mutation response arrived first)
           if (prev.messages.some((m) => m.id === data.message.id)) return prev;
 
           const updatedMessages = [...(prev.messages || []), newMessage];
-          activeTicketMessagesRef.current = updatedMessages; // Обновляем ref сразу
-
-          // Кэшируем обновленные сообщения
+          activeTicketMessagesRef.current = updatedMessages;
           saveMessagesToCache(data.ticketId, updatedMessages);
 
-          return {
-            ...prev,
-            messages: updatedMessages,
-          };
+          return { ...prev, messages: updatedMessages };
         });
-
-        // Обновляем last_message в списке тикетов
-        setTickets((prev) =>
-          prev.map((t) =>
-            t.id === data.ticketId
-              ? {
-                  ...t,
-                  last_message: lastMessageData,
-                }
-              : t,
-          ),
-        );
       });
 
-      // Инвалидируем tRPC кэш, чтобы при следующем fetch данные были актуальны
-      void utils.support.tickets.get.invalidate();
+      void utils.support.tickets.get.invalidate({ ticketId: data.ticketId });
 
-      // Отмечаем сообщение как прочитанное
       markMessagesAsRead(data.ticketId);
     };
 
@@ -770,39 +804,12 @@ export default function SupportClient() {
         updated_at?: string;
       };
     }) => {
-      if (data.ticketId !== activeTicketRef.current?.id) {
-        // Обновляем тикет в списке даже если он не активный
-        setTickets((prev) =>
-          prev.map((t) =>
-            t.id === data.ticketId
-              ? {
-                  ...t,
-                  status: data.ticket.status,
-                  updated_at: data.ticket.updated_at || t.updated_at,
-                }
-              : t,
-          ),
-        );
-        return;
-      }
+      if (data.ticketId !== activeTicketRef.current?.id) return;
 
-      // Обновляем активный тикет
       setActiveTicket((prev) => {
         if (!prev || prev.id !== data.ticketId) return prev;
-        return {
-          ...prev,
-          status: data.ticket.status,
-        };
+        return { ...prev, status: data.ticket.status };
       });
-
-      // Обновляем тикет в списке
-      setTickets((prev) =>
-        prev.map((t) =>
-          t.id === data.ticketId
-            ? { ...t, status: data.ticket.status, updated_at: data.ticket.updated_at }
-            : t,
-        ),
-      );
     };
 
     const handleMessageRead = (data: {
@@ -812,7 +819,6 @@ export default function SupportClient() {
     }) => {
       if (data.ticketId !== activeTicketRef.current?.id) return;
 
-      // Обновляем статус прочитанности сообщений
       setActiveTicket((prev) => {
         if (!prev || prev.id !== data.ticketId) return prev;
         const messageIds = data.messageIds || [];
@@ -895,14 +901,7 @@ export default function SupportClient() {
     };
 
     const checkForNewMessages = async () => {
-      // Проверяем только если страница видима
       if (document.hidden) return;
-
-      // ОПТИМИЗАЦИЯ: Если WebSocket подключен, не делаем polling
-      // WebSocket обеспечивает мгновенное обновление с нулевой латентностью
-      if (isWebSocketConnected && socket?.connected) {
-        return;
-      }
 
       try {
         const data = await utils.support.tickets.get.fetch({
@@ -1010,12 +1009,9 @@ export default function SupportClient() {
       );
     }
 
-    // ОПТИМИЗАЦИЯ: Polling только как fallback когда WebSocket недоступен
-    // Используем увеличенный интервал (30 секунд) для снижения нагрузки
-    // WebSocket обеспечивает мгновенные обновления, polling нужен только для резерва
-    if (!isWebSocketConnected || !socket?.connected) {
-      interval = setInterval(checkForNewMessages, 30000); // 30 секунд вместо 5
-    }
+    // Polling как safety net: 60s при активном WS, 15s без WS
+    const pollInterval = isWebSocketConnected && socket?.connected ? 60000 : 15000;
+    interval = setInterval(checkForNewMessages, pollInterval);
 
     // Отмечаем сообщения как прочитанные при открытии тикета
     markMessagesAsRead(activeTicket.id);
@@ -1685,9 +1681,8 @@ export default function SupportClient() {
 
         markMessagesAsRead(activeTicket.id);
 
-        // Ревалидация кэша: список тикетов и сообщения тикета (чтобы после обновления страницы данные были актуальны)
         void utils.support.tickets.list.invalidate();
-        void utils.support.tickets.get.invalidate();
+        void utils.support.tickets.get.invalidate({ ticketId: activeTicket.id });
       }
     } catch (error) {
       // Откат оптимистичного сообщения при ошибке

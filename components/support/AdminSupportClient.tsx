@@ -1206,18 +1206,18 @@ export default function AdminSupportClient() {
     return msgs.map((m) => `${m.id}-${m.created_at}`).join('|');
   }, []);
 
-  // Умное обновление сообщений: polling как fallback когда WebSocket недоступен
+  // Safety-net polling: 60s when WS connected, 15s without WS
+  const wsActive = isConnected && socket?.connected;
   const shouldPoll =
     activeTicket &&
     authState.hasSupportAccess &&
-    (!isConnected || !socket?.connected) &&
     !document.hidden;
 
   const pollingQuery = trpc.support.tickets.get.useQuery(
     { ticketId: activeTicket?.id ?? '', limit: 100, offset: 0 },
     {
       enabled: !!shouldPoll && !!activeTicket?.id,
-      refetchInterval: 30000,
+      refetchInterval: wsActive ? 60000 : 15000,
     },
   );
   const polledData = pollingQuery.data;
