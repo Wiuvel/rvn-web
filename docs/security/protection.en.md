@@ -13,9 +13,9 @@ The protection layer is a multi-stage filter that runs **before** every non-stat
                      │  2. handleProtection ◄──────────┐    │
                      │  3. handleAuth                  │    │
                      │  4. applySecurityHeaders        │    │
-                     └─────────────────┬────────────────┘    │
-                                       │                     │
-                                       ▼                     │
+                     └─────────────────┬───────────────┘   │
+                                       │                    │
+                                       ▼                    │
                   ┌──────────────────────────────────────┐  │
                   │  handleProtection                    │  │
                   │  ──────────────────────────────────  │  │
@@ -23,9 +23,9 @@ The protection layer is a multi-stage filter that runs **before** every non-stat
                   │     (HMAC-SHA256, ≤ 12h)             │
                   │                                      │
                   │  ② IP rate limit (Redis sliding,     │
-                  │     30 req/min) ─── exceeded? ──────►│ /protection
+                  │     30 req/min) ─── exceeded? ──────►│ protection
                   │                                      │
-                  │  ③ suspicion score ≥ 30  ───────────►│ /protection
+                  │  ③ suspicion score ≥ 30  ───────────►│ protection
                   │     (UA, headers, IP, bot pattern)   │
                   │                                      │
                   │  ④ none of the above ───────────────►│ allow

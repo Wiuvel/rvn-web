@@ -55,7 +55,7 @@
 
 | Document | Description |
 |----------|-------------|
-| [Bot & DDoS protection](docs/security/protection.en.md) | Proxy middleware, suspicion detector, Turnstile access cookie, rate limiting, CSRF, security headers |
+| [Bot Protection](docs/security/protection.en.md) | Proxy middleware, suspicion detector, Turnstile access cookie, rate limiting, CSRF, security headers |
 
 ### Storage & Media
 
