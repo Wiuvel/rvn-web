@@ -138,14 +138,18 @@ export const useStaggeredFadeIn = (delay: number = 0, stagger: number = 0.05) =>
         },
       });
 
-      (containerRef.current as any).__gsapAnimation = animation;
+      (
+        containerRef.current as HTMLDivElement & { __gsapAnimation?: gsap.core.Tween }
+      ).__gsapAnimation = animation;
     }, 150);
 
     const container = containerRef.current;
 
     return () => {
       clearTimeout(timeout);
-      const animation = (container as any)?.__gsapAnimation;
+      const animation = (
+        container as (HTMLDivElement & { __gsapAnimation?: gsap.core.Tween }) | null
+      )?.__gsapAnimation;
       if (animation) {
         animation.kill();
       }

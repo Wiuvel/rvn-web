@@ -147,7 +147,16 @@ export const notificationRouter = router({
         LIMIT ${limit + 1}
       `);
 
-      const rows = Array.isArray(groupRows) ? groupRows : ((groupRows as any).rows ?? []);
+      type GroupRow = {
+        related_ticket_id: string | null;
+        ticket_subject: string | null;
+        unread_count: number;
+        total_count: number;
+        latest_at: string;
+      };
+      const rows: GroupRow[] = Array.isArray(groupRows)
+        ? (groupRows as GroupRow[])
+        : ((groupRows as { rows?: GroupRow[] }).rows ?? []);
 
       let nextCursor: string | null = null;
       if (rows.length > limit) {

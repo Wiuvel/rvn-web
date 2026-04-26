@@ -77,10 +77,10 @@ describe('User Cookie Security', () => {
   });
 
   it('should return null if required fields are missing', () => {
-    const invalidPayload = { ...validPayload };
-    delete (invalidPayload as any).user_id;
+    const invalidPayload: Partial<typeof validPayload> = { ...validPayload };
+    delete invalidPayload.user_id;
 
-    const cookie = createUserDataCookie(invalidPayload);
+    const cookie = createUserDataCookie(invalidPayload as typeof validPayload);
     const parsed = parseUserDataCookie(cookie);
     expect(parsed).toBeNull();
   });

@@ -72,11 +72,11 @@ export function useAdminUsers(isAuthenticated: boolean) {
 
   const setUsers = useCallback(
     (updater: PanelUser[] | ((prev: PanelUser[]) => PanelUser[])) => {
-      utils.admin.users.list.setData(queryInput, (prev: any) => {
+      utils.admin.users.list.setData(queryInput, (prev) => {
         if (!prev) return prev;
-        const current = (prev.users ?? []) as PanelUser[];
+        const current = (prev.users ?? []) as unknown as PanelUser[];
         const next = typeof updater === 'function' ? updater(current) : updater;
-        return { users: next };
+        return { users: next as unknown as typeof prev.users };
       });
     },
     [utils, queryInput],

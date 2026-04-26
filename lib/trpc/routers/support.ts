@@ -10,7 +10,7 @@ import {
   supportMessageAttachments,
   users,
 } from '@/lib/database/schema';
-import { eq, and, ne, desc, asc, inArray, count } from 'drizzle-orm';
+import { eq, and, ne, desc, asc, inArray, count, type SQL } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { messageRateLimit } from '@/lib/security/rate-limit';
 import { verifyCSRFToken } from '@/lib/security/csrf';
@@ -44,7 +44,11 @@ import {
   invalidateTicketCaches,
 } from '../helpers/support';
 
-function remapTicketRow(row: any) {
+// `row` is the Drizzle leftJoin result row; left untyped because the joined
+// shape changes per call-site and tightening it cascades into the 3000-line
+// support god-components. Tracked separately as a refactor.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function remapTicketRow(row: any): any {
   return {
     id: row.id,
     user_id: row.userId,
@@ -127,7 +131,7 @@ export const supportRouter = router({
           const ticketUser = alias(users, 'ticketUser');
           const assignedUser = alias(users, 'assignedUser');
 
-          const conditions: any[] = [];
+          const conditions: SQL[] = [];
 
           if (forUser || !isSupport) {
             conditions.push(eq(supportTickets.userId, user.id));
@@ -181,13 +185,13 @@ export const supportRouter = router({
         return { tickets: [] };
       }
 
-      const ticketIds = tickets.map((t: any) => t.id);
+      const ticketIds = tickets.map((t) => t.id);
       const lastMessagesMap = await resolveLastMessagesForTickets(
         ticketIds,
-        tickets.map((t: any) => ({ id: t.id, userId: t.user_id })),
+        tickets.map((t) => ({ id: t.id, userId: t.user_id })),
       );
 
-      const ticketsWithLastMessage = tickets.map((ticket: any) => ({
+      const ticketsWithLastMessage = tickets.map((ticket) => ({
         ...ticket,
         last_message: lastMessagesMap[ticket.id] || null,
       }));

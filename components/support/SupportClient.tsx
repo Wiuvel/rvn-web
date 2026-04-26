@@ -165,8 +165,12 @@ export default function SupportClient() {
   );
 
   const setNotification = useCallback(
-    (val: any) => {
-      if (val.show) dispatch({ type: 'SHOW_NOTIFICATION', payload: val });
+    (val: { message: string; show: boolean; type?: 'error' | 'info' }) => {
+      if (val.show)
+        dispatch({
+          type: 'SHOW_NOTIFICATION',
+          payload: { message: val.message, type: val.type },
+        });
       else dispatch({ type: 'HIDE_NOTIFICATION' });
     },
     [dispatch],
@@ -378,6 +382,7 @@ export default function SupportClient() {
         return null;
       }
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const messages = (cacheData.messages || []).map((msg: any) => ({
         ...msg,
         timestamp: msg.timestamp instanceof Date ? msg.timestamp : new Date(msg.timestamp),
@@ -656,11 +661,7 @@ export default function SupportClient() {
       };
 
       setTickets((prev) =>
-        prev.map((t) =>
-          t.id === data.ticketId
-            ? { ...t, last_message: lastMessageData }
-            : t,
-        ),
+        prev.map((t) => (t.id === data.ticketId ? { ...t, last_message: lastMessageData } : t)),
       );
     };
 
@@ -671,7 +672,11 @@ export default function SupportClient() {
       setTickets((prev) =>
         prev.map((t) =>
           t.id === data.ticketId
-            ? { ...t, status: data.ticket.status, updated_at: data.ticket.updated_at || t.updated_at }
+            ? {
+                ...t,
+                status: data.ticket.status,
+                updated_at: data.ticket.updated_at || t.updated_at,
+              }
             : t,
         ),
       );
@@ -1427,7 +1432,7 @@ export default function SupportClient() {
         showNotification('Обращение создано', 'info');
       }
     } catch (error) {
-      const errorMessage = (error as any)?.message || 'Ошибка создания обращения';
+      const errorMessage = error instanceof Error ? error.message : 'Ошибка создания обращения';
       showNotification(translateError(errorMessage));
       if (
         errorMessage.toLowerCase().includes('limit') ||
@@ -1724,7 +1729,7 @@ export default function SupportClient() {
         );
         loadedMessagesRef.current.delete(tempId);
       }
-      const errorMessage = (error as any)?.message || 'Ошибка отправки сообщения';
+      const errorMessage = error instanceof Error ? error.message : 'Ошибка отправки сообщения';
       showNotification(translateError(errorMessage));
     } finally {
       setIsSendingMessage(false);

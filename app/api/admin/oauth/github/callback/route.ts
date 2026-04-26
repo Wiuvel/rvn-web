@@ -7,6 +7,9 @@ import { logger } from '@/lib/utils/secure-logger';
 import { authRateLimit } from '@/lib/security/rate-limit';
 import { getErrorRedirectUrl, GOOGLE_ERROR_MAP } from '@/lib/utils/oauth-errors';
 import { domains } from '@/lib/utils';
+import type { db as dbClient } from '@/lib/database/db';
+
+type Db = NonNullable<typeof dbClient>;
 
 const ADMIN_SESSION_COOKIE = 'admin_sid';
 
@@ -25,7 +28,7 @@ export async function OPTIONS() {
 async function isTrustedDeveloper(
   email: string | null | undefined,
   username: string,
-  db: any,
+  db: Db | null,
 ): Promise<boolean> {
   if (!db) {
     return false;

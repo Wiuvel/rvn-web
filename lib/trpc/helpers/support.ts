@@ -74,10 +74,23 @@ export async function resolveLastMessagesForTickets(
       WHERE rn = 1
     `);
 
-    const lastMessages: RpcLastMessage[] = (rawLastMessages as any[]).map((row: any) => ({
+    interface RawLastMessageRow {
+      ticket_id: string;
+      id: string;
+      message_text: string | null;
+      sender_id: string;
+      sender_type: string | null;
+      created_at: string;
+      is_read: boolean;
+    }
+    const rawArray: RawLastMessageRow[] = Array.isArray(rawLastMessages)
+      ? (rawLastMessages as unknown as RawLastMessageRow[])
+      : (((rawLastMessages as unknown as { rows?: RawLastMessageRow[] }).rows ??
+          []) as RawLastMessageRow[]);
+    const lastMessages: RpcLastMessage[] = rawArray.map((row) => ({
       ticket_id: row.ticket_id,
       id: row.id,
-      message_text: row.message_text,
+      message_text: row.message_text ?? '',
       sender_id: row.sender_id,
       sender_type: row.sender_type,
       created_at: row.created_at,
