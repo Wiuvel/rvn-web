@@ -35,10 +35,18 @@ export default function MaintenanceModal({
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   const [mounted, setMounted] = useState(false);
 
-  const { isLoading: loading } = trpc.admin.maintenance.get.useQuery(undefined, {
-    enabled: !initialConfig,
-    onSuccess: (data: MaintenanceConfig) => setConfig(data),
-  } as any);
+  const { data: fetchedConfig, isLoading: loading } = trpc.admin.maintenance.get.useQuery(
+    undefined,
+    {
+      enabled: !initialConfig,
+    },
+  );
+
+  useEffect(() => {
+    if (fetchedConfig) {
+      setConfig(fetchedConfig as MaintenanceConfig);
+    }
+  }, [fetchedConfig]);
 
   const updateMutation = trpc.admin.maintenance.update.useMutation({
     onSuccess: () => {

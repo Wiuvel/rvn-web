@@ -57,6 +57,18 @@
 |----------|-------------|
 | [Bot & DDoS protection](docs/security/protection.en.md) | Proxy middleware, suspicion detector, Turnstile access cookie, rate limiting, CSRF, security headers |
 
+### Storage & Media
+
+| Document | Description |
+|----------|-------------|
+| [Storage & Media](docs/storage/storage.en.md) | S3-compatible upload, Redis media cache (gzip + TTL), Rust → WASM image processor, ThumbHash blur previews |
+
+### Subscriptions & Payments
+
+| Document | Description |
+|----------|-------------|
+| [Subscriptions & Payments](docs/subscriptions/subscriptions.en.md) | Plan catalogue, Remnawave provisioning, balance/promo/external purchase flows, payment webhook |
+
 ---
 
 ## Setup

@@ -168,7 +168,7 @@ export default function ImageWithBlur({
       tabIndex={0}
       onKeyDown={(e) => {
         if (onClick && (e.key === 'Enter' || e.key === ' ')) {
-          onClick(e as any);
+          onClick(e as unknown as React.MouseEvent<HTMLDivElement>);
         }
       }}
     >

@@ -67,8 +67,8 @@ export default function CommentsSection({
   const mutateComments = useCallback(
     (updater: (prev: Comment[] | undefined) => Comment[] | undefined, revalidate = true) => {
       utils.user.comments.list.setData(queryInput, (prev) => {
-        const result = updater(prev as Comment[] | undefined);
-        return result as any;
+        const result = updater(prev as unknown as Comment[] | undefined);
+        return result as unknown as typeof prev;
       });
       if (revalidate) {
         utils.user.comments.list.invalidate(queryInput);

@@ -450,7 +450,7 @@ export default function AdminSupportClient() {
   useEffect(() => {
     if (ticketsRaw && !ticketsInitialized.current) {
       ticketsInitialized.current = true;
-      const raw = (ticketsRaw as any).tickets ?? ticketsRaw;
+      const raw = (ticketsRaw as { tickets?: unknown }).tickets ?? (ticketsRaw as unknown);
       setTickets((Array.isArray(raw) ? raw : []).map(mapRawTicketToUi));
     }
   }, [ticketsRaw]);
@@ -647,6 +647,7 @@ export default function AdminSupportClient() {
         return null;
       }
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const messages = (cacheData.messages || []).map((msg: any) => ({
         ...msg,
       }));
@@ -864,6 +865,7 @@ export default function AdminSupportClient() {
   useEffect(() => {
     if (statusFilter !== 'archive' || !archiveQuery.data?.tickets) return;
     setTicketsLoading(archiveQuery.isLoading);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let list = (archiveQuery.data.tickets || []).map((t: any) => ({
       id: t.id,
       subject: t.subject,
@@ -1007,7 +1009,11 @@ export default function AdminSupportClient() {
   useEffect(() => {
     if (!socket || !activeTicket || !authState.hasSupportAccess) return;
 
-    const handleNewMessage = (data: { ticketId: string; message: any }) => {
+    const handleNewMessage = (data: {
+      ticketId: string;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      message: any;
+    }) => {
       // ALWAYS update ticket list (even if this ticket isn't currently active)
       let lastMessageText = data.message.message_text || '';
       if (!lastMessageText && data.message.attachments && data.message.attachments.length > 0) {
@@ -1206,10 +1212,7 @@ export default function AdminSupportClient() {
 
   // Safety-net polling: 60s when WS connected, 15s without WS
   const wsActive = isConnected && socket?.connected;
-  const shouldPoll =
-    activeTicket &&
-    authState.hasSupportAccess &&
-    !document.hidden;
+  const shouldPoll = activeTicket && authState.hasSupportAccess && !document.hidden;
 
   const pollingQuery = trpc.support.tickets.get.useQuery(
     { ticketId: activeTicket?.id ?? '', limit: 100, offset: 0 },
@@ -1246,6 +1249,7 @@ export default function AdminSupportClient() {
       statusChanged ||
       currentMessagesHash !== lastMessagesHash
     ) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const mappedMessages: Message[] = (polledData.messages || []).map((m: any) => ({
         id: m.id,
         ticket_id: activeTicket.id,
@@ -1427,7 +1431,7 @@ export default function AdminSupportClient() {
             updated_at: t.updated_at,
             last_message_at: t.last_message_at,
             closed_at: t.closed_at,
-            user_id: (t as any).user_id, // Сохраняем user_id для проверки прав
+            user_id: (t as { user_id?: string }).user_id, // Сохраняем user_id для проверки прав
             user: t.user,
             assigned_to: t.assigned_to,
             assigned_user: t.assigned_user,
@@ -1853,10 +1857,7 @@ export default function AdminSupportClient() {
         return filtered;
       });
 
-      const msg =
-        error instanceof Error && 'data' in error
-          ? (error as any).message
-          : 'Ошибка отправки сообщения';
+      const msg = error instanceof Error ? error.message : 'Ошибка отправки сообщения';
       showNotification(translateError(msg), 'error');
     }
   };
@@ -1941,10 +1942,7 @@ export default function AdminSupportClient() {
         }
       }
     } catch (error) {
-      const msg =
-        error instanceof Error && 'data' in error
-          ? (error as any).message
-          : 'Ошибка при взятии тикета';
+      const msg = error instanceof Error ? error.message : 'Ошибка при взятии тикета';
       showNotification(translateError(msg), 'error');
     }
   };

@@ -22,6 +22,15 @@ type ChartContextProps = {
   config: ChartConfig;
 };
 
+type ChartPayloadItem = {
+  dataKey?: string | number;
+  name?: string;
+  value?: string | number;
+  color?: string;
+  payload?: { fill?: string; [k: string]: unknown };
+  [k: string]: unknown;
+};
+
 const ChartContext = React.createContext<ChartContextProps | null>(null);
 
 function useChart() {
@@ -90,15 +99,18 @@ const ChartTooltipContent = React.forwardRef<
       nameKey?: string;
       labelKey?: string;
       labelClassName?: string;
-      payload?: any[];
-      label?: any;
-      labelFormatter?: (label: any, payload: any[]) => React.ReactNode;
+      payload?: ReadonlyArray<ChartPayloadItem>;
+      label?: React.ReactNode;
+      labelFormatter?: (
+        label: React.ReactNode,
+        payload: ReadonlyArray<ChartPayloadItem>,
+      ) => React.ReactNode;
       formatter?: (
-        value: any,
-        name: any,
-        item: any,
+        value: ChartPayloadItem['value'],
+        name: ChartPayloadItem['name'],
+        item: ChartPayloadItem,
         index: number,
-        payload: any,
+        payload: ChartPayloadItem['payload'],
       ) => React.ReactNode;
       color?: string;
     }
@@ -168,7 +180,7 @@ const ChartTooltipContent = React.forwardRef<
           {payload.map((item, index) => {
             const key = `${nameKey || item.name || item.dataKey || 'value'}`;
             const itemConfig = config[key as keyof typeof config];
-            const indicatorColor = color || item.payload.fill || item.color;
+            const indicatorColor = color || item.payload?.fill || item.color;
 
             return (
               <div
@@ -240,7 +252,7 @@ const ChartLegendContent = React.forwardRef<
     Pick<RechartsPrimitive.LegendProps, 'verticalAlign'> & {
       hideIcon?: boolean;
       nameKey?: string;
-      payload?: any[];
+      payload?: ReadonlyArray<ChartPayloadItem>;
     }
 >(({ className, hideIcon = false, payload, verticalAlign = 'bottom', nameKey, ...props }, ref) => {
   const { config } = useChart();
@@ -280,9 +292,12 @@ const ChartLegendContent = React.forwardRef<
             )}
             {itemConfig?.icon && (
               <div className="h-3 w-3">
-                {React.createElement(itemConfig.icon as React.ComponentType<any>, {
-                  className: 'h-3 w-3',
-                })}
+                {React.createElement(
+                  itemConfig.icon as React.ComponentType<{ className?: string }>,
+                  {
+                    className: 'h-3 w-3',
+                  },
+                )}
               </div>
             )}
             <span className="text-neutral-400">{itemConfig?.label}</span>

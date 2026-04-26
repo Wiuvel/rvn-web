@@ -307,7 +307,11 @@ export async function grantUserRole(
         });
       } catch (insertError) {
         // Если ошибка уникальности - значит роль уже есть (race condition)
-        if ((insertError as any).code === '23505') {
+        const errCode =
+          insertError && typeof insertError === 'object' && 'code' in insertError
+            ? (insertError as { code?: string }).code
+            : undefined;
+        if (errCode === '23505') {
           cache.delete(`user_role:${userId}:${role}`);
           return { success: false, error: 'User already has this role' };
         }

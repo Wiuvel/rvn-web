@@ -6,6 +6,19 @@ import { trpc } from '@/lib/trpc/client';
 import { UserData } from '@/types';
 import { parseUserDataCookieClient } from '@/lib/auth/user-cookie.client';
 
+function httpStatusOf(err: unknown): number | undefined {
+  if (!err || typeof err !== 'object') return undefined;
+  const data = (err as { data?: unknown }).data;
+  if (!data || typeof data !== 'object') return undefined;
+  const status = (data as { httpStatus?: unknown }).httpStatus;
+  return typeof status === 'number' ? status : undefined;
+}
+
+function errorDataOf(err: unknown): unknown {
+  if (!err || typeof err !== 'object') return undefined;
+  return (err as { data?: unknown }).data;
+}
+
 /**
  * Represents the expected response structure from the `auth.me` tRPC endpoint.
  */
@@ -122,10 +135,10 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
   } = trpc.auth.me.useQuery(undefined, {
     enabled: shouldFetch,
     staleTime: STALE_TIME,
-    placeholderData: (fallbackFromCookie ?? undefined) as any,
+    placeholderData: (fallbackFromCookie ?? undefined) as never,
     refetchOnWindowFocus: !lightweight,
     retry: (failureCount, error) => {
-      if ((error as any)?.data?.httpStatus === 401) return false;
+      if (httpStatusOf(error) === 401) return false;
       return failureCount < 2;
     },
   });
@@ -139,15 +152,15 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
 
   useEffect(() => {
     if (trpcError) {
-      const err = new Error(trpcError.message);
-      (err as any).status = (trpcError as any)?.data?.httpStatus;
+      const err = new Error(trpcError.message) as Error & { status?: number };
+      err.status = httpStatusOf(trpcError);
       if (onError) onError(err);
       else if (!silent) console.error('Auth fetch error:', trpcError);
     }
   }, [trpcError, onError, silent]);
 
   const error: Error | null = trpcError
-    ? Object.assign(new Error(trpcError.message), { data: (trpcError as any).data })
+    ? Object.assign(new Error(trpcError.message), { data: errorDataOf(trpcError) })
     : null;
 
   const userData = useMemo(
@@ -161,8 +174,7 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
     const apiData = data as AuthMeResponse | undefined;
     const isAuthenticated = apiData?.authenticated === true && !!apiData?.user_id;
     const apiSaysUnauthenticated =
-      apiData?.authenticated === false ||
-      (trpcError && (trpcError as any)?.data?.httpStatus === 401);
+      apiData?.authenticated === false || (trpcError && httpStatusOf(trpcError) === 401);
 
     if (isAuthenticated) {
       setSessionExpired(false);
@@ -192,7 +204,7 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
     if (!requireAuth || !redirectOnFail) return;
     const unauth =
       (data as AuthMeResponse | undefined)?.authenticated === false ||
-      (trpcError && (trpcError as any)?.data?.httpStatus === 401);
+      (trpcError && httpStatusOf(trpcError) === 401);
     if (unauth && !isLoading) {
       document.cookie = 'user_data=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
       router.push(redirectOnFail);

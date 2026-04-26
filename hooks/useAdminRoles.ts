@@ -24,7 +24,7 @@ export function useAdminRoles(
     setRolesLoading(true);
     try {
       const data = await utils.admin.users.roles.get.fetch({ userId: user.id });
-      setUserRoles((data as any).roles || []);
+      setUserRoles('roles' in data ? data.roles : []);
     } catch {
       setUserRoles([]);
     } finally {
@@ -36,7 +36,7 @@ export function useAdminRoles(
     if (!user || !user.id) return;
     try {
       const data = await utils.admin.users.roles.get.fetch({ userId: user.id });
-      const updatedRoles = (data as any).roles || [];
+      const updatedRoles = 'roles' in data ? data.roles : [];
       setUserRoles(updatedRoles);
       setUsers((prev) => {
         const updated = prev.map((u) => (u.id === user.id ? { ...u, roles: updatedRoles } : u));
