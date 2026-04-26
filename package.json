@@ -33,15 +33,15 @@
     "type:check": "tsc --noEmit"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.1030.0",
-    "@aws-sdk/s3-request-presigner": "^3.1030.0",
+    "@aws-sdk/client-s3": "^3.1037.0",
+    "@aws-sdk/s3-request-presigner": "^3.1037.0",
     "@hookform/resolvers": "^5.2.2",
     "@node-rs/argon2": "^2.0.2",
     "@radix-ui/react-accordion": "^1.2.12",
     "@radix-ui/react-slot": "^1.2.4",
-    "@tanstack/query-async-storage-persister": "^5.99.0",
-    "@tanstack/react-query": "^5.99.0",
-    "@tanstack/react-query-persist-client": "^5.99.0",
+    "@tanstack/query-async-storage-persister": "^5.100.5",
+    "@tanstack/react-query": "^5.100.5",
+    "@tanstack/react-query-persist-client": "^5.100.5",
     "@trpc/client": "^11.16.0",
     "@trpc/react-query": "^11.16.0",
     "@trpc/server": "^11.16.0",
@@ -50,14 +50,14 @@
     "drizzle-orm": "^0.45.2",
     "gsap": "^3.15.0",
     "ioredis": "^5.10.1",
-    "lucide-react": "^1.8.0",
+    "lucide-react": "^1.11.0",
     "maxmind": "^5.0.6",
-    "next": "16.2.3",
+    "next": "^16.2.3",
     "ogl": "^1.0.11",
     "postgres": "^3.4.9",
     "react": "^19.2.4",
     "react-dom": "^19.2.5",
-    "react-hook-form": "^7.72.1",
+    "react-hook-form": "^7.73.1",
     "recharts": "^3.8.1",
     "socket.io-client": "^4.8.3",
     "tailwind-merge": "^3.5.0",
@@ -72,16 +72,16 @@
     "autoprefixer": "^10.5.0",
     "drizzle-kit": "^0.31.10",
     "jsdom": "^29.0.2",
-    "oxlint": "^1.60.0",
+    "oxlint": "^1.61.0",
     "postcss": "^8.5.9",
     "prettier": "^3.8.2",
-    "prettier-plugin-tailwindcss": "^0.7.2",
+    "prettier-plugin-tailwindcss": "^0.7.3",
     "tailwindcss": "^3.4.17",
-    "typescript": "^6.0.2",
-    "vitest": "^4.1.4"
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.5"
   },
   "overrides": {
-    "fast-xml-parser": "5.5.12"
+    "fast-xml-parser": "5.7.1"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

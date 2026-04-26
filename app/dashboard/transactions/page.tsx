@@ -7,6 +7,12 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import Header from '@/components/layout/Header';
 import { Wallet, ArrowLeft, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
 
+/**
+ * Displays the user's transaction history and current balance.
+ * Requires active authentication.
+ *
+ * @returns React component.
+ */
 export default function TransactionsPage() {
   const router = useRouter();
   const { userData, loading: authLoading } = useAuth({
@@ -24,20 +30,23 @@ export default function TransactionsPage() {
   const transactions = balanceData?.transactions ?? [];
 
   return (
-    <div className="min-h-screen bg-neutral-950">
+    <div className="min-h-screen bg-neutral-950 text-white selection:bg-primary-500/30">
       <Header />
-      <main className="mx-auto max-w-3xl px-4 pb-20 pt-24">
-        <div className="mb-6">
-          <button
-            onClick={() => router.back()}
-            className="rounded-xl p-2 text-neutral-400 transition-colors hover:bg-white/5 hover:text-white"
-            aria-label="Назад"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </button>
+      <main className="mx-auto max-w-2xl px-4 pb-24 pt-8 lg:pt-32 lg:pb-8">
+        <div className="mb-6 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => router.back()}
+              className="rounded-xl p-2 text-neutral-400 transition-colors hover:bg-white/5 hover:text-white"
+              aria-label="Назад"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </button>
+            <h1 className="text-xl font-semibold text-white">Транзакции</h1>
+          </div>
         </div>
 
-        <div className="mb-8 rounded-2xl border border-neutral-800 bg-neutral-900/50 p-6">
+        <div className="mb-8 overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-neutral-400">Текущий баланс</p>
@@ -51,14 +60,14 @@ export default function TransactionsPage() {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-neutral-800 bg-neutral-900/50 p-6">
+        <div className="overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6">
           <h3 className="mb-4 text-base font-semibold text-white">История операций</h3>
           {transactions.length > 0 ? (
             <div className="space-y-3">
               {transactions.map((tx) => (
                 <div
                   key={tx.id}
-                  className="flex items-center justify-between rounded-xl bg-neutral-800/30 px-4 py-3"
+                  className="flex items-center justify-between rounded-xl bg-white/[0.03] px-4 py-3 transition-colors hover:bg-white/[0.05]"
                 >
                   <div className="flex items-center gap-3">
                     <div

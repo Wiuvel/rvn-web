@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { trpc } from '@/lib/trpc/client';
 import {
   X,
@@ -20,6 +21,7 @@ interface SubscriptionPurchaseModalProps {
   onClose: () => void;
   balance: number;
   onSuccess: () => void;
+  initialPlanId?: string;
 }
 
 export default function SubscriptionPurchaseModal({
@@ -27,11 +29,13 @@ export default function SubscriptionPurchaseModal({
   onClose,
   balance,
   onSuccess,
+  initialPlanId,
 }: SubscriptionPurchaseModalProps) {
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [promoCode, setPromoCode] = useState('');
   const [debouncedPromo, setDebouncedPromo] = useState('');
   const [error, setError] = useState('');
+  const router = useRouter();
   const [successData, setSuccessData] = useState<{
     subscriptionUrl: string;
     expireAt: string;
@@ -55,16 +59,28 @@ export default function SubscriptionPurchaseModal({
       { enabled: debouncedPromo.length > 0 },
     );
 
-  /** Auto-select first real plan when plans load */
+  /** Auto-select plan: prefer initialPlanId, fallback to first real plan */
   useEffect(() => {
     if (plansData) {
+      if (initialPlanId) {
+        const target = plansData.find((p) => p.id === initialPlanId && !p.isStub);
+        if (target) {
+          setSelectedPlanId(target.id);
+          return;
+        }
+      }
       const firstReal = plansData.find((p) => !p.isStub);
       if (firstReal) setSelectedPlanId((prev) => prev ?? firstReal.id);
     }
-  }, [plansData]);
+  }, [plansData, initialPlanId]);
 
   const purchaseMutation = trpc.subscription.purchase.useMutation({
     onSuccess: (data) => {
+      if (data.status === 'pending' && data.redirectUrl) {
+        router.push(data.redirectUrl);
+        onClose();
+        return;
+      }
       if (data.status === 'completed' && data.subscription) {
         setSuccessData({
           subscriptionUrl: data.subscription.subscriptionUrl,

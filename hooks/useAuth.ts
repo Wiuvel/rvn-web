@@ -6,7 +6,9 @@ import { trpc } from '@/lib/trpc/client';
 import { UserData } from '@/types';
 import { parseUserDataCookieClient } from '@/lib/auth/user-cookie.client';
 
-/** Response shape from auth.me tRPC query */
+/**
+ * Represents the expected response structure from the `auth.me` tRPC endpoint.
+ */
 type AuthMeResponse = {
   authenticated: boolean;
   id?: string;
@@ -65,7 +67,11 @@ export interface UseAuthOptions {
   redirectOnTimeout?: string;
   silent?: boolean;
   validateUserId?: string;
-  lightweight?: boolean; // При true — только user_data из cookie, без fetch (для Header и т.д.)
+  /**
+   * Bypasses the network request and relies strictly on the client-side cookie.
+   * Useful for lightweight components like headers that only need basic user metadata.
+   */
+  lightweight?: boolean;
   onSuccess?: (data: UserData) => void;
   onError?: (error: Error) => void;
 }
@@ -77,8 +83,16 @@ export interface UseAuthReturn {
   sessionExpired: boolean;
 }
 
-const STALE_TIME = 60 * 1000; // 60 seconds — roles can change at any time
+const STALE_TIME = 60 * 1000;
 
+/**
+ * Hook for managing authentication state and fetching the current user.
+ * Combines client-side cookie parsing for immediate feedback with a tRPC call
+ * for verified data. Can optionally redirect unauthenticated users.
+ *
+ * @param options Configuration options for authentication behavior.
+ * @returns The current authentication state, including user data, loading status, and errors.
+ */
 export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
   const {
     requireAuth = false,
@@ -116,7 +130,6 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
     },
   });
 
-  // Callbacks
   useEffect(() => {
     if (data && (data as AuthMeResponse).authenticated !== false) {
       const user = toUserData(data as AuthMeResponse);
@@ -157,11 +170,10 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
     }
 
     /**
-     * Only mark session as expired when all conditions are met:
-     * 1. User had a valid cookie (was previously authenticated)
-     * 2. API explicitly returned 401 / unauthenticated
-     * 3. Not currently loading
-     * 4. Fetch was actually attempted (shouldFetch = true)
+     * Mark the session as expired strictly when:
+     * 1. A valid cookie previously existed.
+     * 2. The API explicitly returns an unauthenticated status.
+     * 3. A fetch was actively requested and completed.
      */
     const hadCookie = !!fallbackFromCookie;
     if (hadCookie && apiSaysUnauthenticated && !isLoading && shouldFetch) {

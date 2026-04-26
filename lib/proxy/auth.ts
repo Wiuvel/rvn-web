@@ -125,11 +125,19 @@ export function handleAuth(
       return response;
     }
 
-    const urlUserId = pathname.split('/dashboard/')[1]?.split('/')[0];
-    if (urlUserId && userId && urlUserId !== userId) {
-      const response = NextResponse.redirect(new URL(`/dashboard/${userId}`, request.url));
-      applySecurityHeaders(response, false);
-      return response;
+    const dashboardSubPath = pathname.slice('/dashboard/'.length);
+    const isSharedRoute =
+      dashboardSubPath.startsWith('payment/') ||
+      dashboardSubPath.startsWith('payment') ||
+      dashboardSubPath === 'transactions';
+
+    if (!isSharedRoute) {
+      const urlUserId = dashboardSubPath.split('/')[0];
+      if (urlUserId && userId && urlUserId !== userId) {
+        const response = NextResponse.redirect(new URL(`/dashboard/${userId}`, request.url));
+        applySecurityHeaders(response, false);
+        return response;
+      }
     }
 
     const response = NextResponse.next({ request: { headers: requestHeaders } });

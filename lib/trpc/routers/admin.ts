@@ -554,6 +554,8 @@ export const adminRouter = router({
           {
             id: 'base-monthly',
             name: 'Базовая',
+            description: '',
+            features: [] as string[],
             priceKopecks: 20000,
             durationDays: 30,
             squadUuid: null as string | null,
@@ -564,15 +566,20 @@ export const adminRouter = router({
       }
 
       try {
-        return JSON.parse(row.value) as {
-          id: string;
-          name: string;
-          priceKopecks: number;
-          durationDays: number;
-          squadUuid: string | null;
-          active: boolean;
-          isStub: boolean;
-        }[];
+        const raw = JSON.parse(row.value) as Record<string, unknown>[];
+        return raw.map((p) => ({
+          ...(p as {
+            id: string;
+            name: string;
+            priceKopecks: number;
+            durationDays: number;
+            squadUuid: string | null;
+            active: boolean;
+            isStub: boolean;
+          }),
+          description: typeof p.description === 'string' ? p.description : '',
+          features: Array.isArray(p.features) ? (p.features as string[]) : [],
+        }));
       } catch {
         return [];
       }
@@ -586,6 +593,8 @@ export const adminRouter = router({
             z.object({
               id: z.string().min(1),
               name: z.string().min(1),
+              description: z.string().default(''),
+              features: z.array(z.string()).default([]),
               priceKopecks: z.number().int().min(0),
               durationDays: z.number().int().min(0),
               squadUuid: z.string().nullable(),

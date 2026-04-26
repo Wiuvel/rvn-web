@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { trpc } from '@/lib/trpc/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useNotifications } from '@/hooks/useNotifications';
+import Header from '@/components/layout/Header';
 import {
   Accordion,
   AccordionItem,
@@ -12,31 +13,14 @@ import {
   AccordionContent,
 } from '@/components/ui/accordion';
 import { Bell, CheckCheck, Check, LifeBuoy, ArrowLeft } from 'lucide-react';
+import { formatRelativeTime } from '@/lib/utils/format';
 
-/** Formats a date string as Russian relative time */
-function formatRelativeTime(dateStr: string): string {
-  const now = Date.now();
-  const date = new Date(dateStr).getTime();
-  const diff = now - date;
-
-  const seconds = Math.floor(diff / 1000);
-  const minutes = Math.floor(seconds / 60);
-  const hours = Math.floor(minutes / 60);
-  const days = Math.floor(hours / 24);
-
-  if (seconds < 60) return 'только что';
-  if (minutes < 60) return `${minutes} мин назад`;
-  if (hours < 24) return `${hours} ч назад`;
-  if (days === 1) return 'вчера';
-  if (days < 7) return `${days} дн назад`;
-
-  return new Date(dateStr).toLocaleDateString('ru-RU', {
-    day: 'numeric',
-    month: 'short',
-  });
-}
-
-/** Resolves icon component by notification type */
+/**
+ * Resolves the appropriate icon component based on the notification type.
+ *
+ * @param props Component properties containing the notification type.
+ * @returns React node representing the icon.
+ */
 function GroupIcon({ type }: { type: string }) {
   if (type === 'support_reply' || type === 'ticket_status') {
     return <LifeBuoy className="h-5 w-5 text-primary-400" />;
@@ -44,7 +28,12 @@ function GroupIcon({ type }: { type: string }) {
   return <Bell className="h-5 w-5 text-neutral-400" />;
 }
 
-/** Full notifications page with grouped accordion layout */
+/**
+ * Main component for the notifications page.
+ * Displays a paginated, grouped list of user notifications using an accordion layout.
+ *
+ * @returns React component.
+ */
 export default function NotificationsPageClient() {
   const router = useRouter();
   const { userData, loading: authLoading } = useAuth({
@@ -55,7 +44,6 @@ export default function NotificationsPageClient() {
     enabled: !!userData,
   });
 
-  /* Infinite scroll via grouped tRPC cursor pagination */
   const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } =
     trpc.notification.groupedList.useInfiniteQuery(
       { limit: 20 },
@@ -98,9 +86,10 @@ export default function NotificationsPageClient() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-8 pb-24 lg:pb-8">
-      {/* Header */}
-      <div className="mb-6 flex items-center justify-between">
+    <div className="min-h-screen bg-neutral-950 text-white selection:bg-primary-500/30">
+      <Header />
+      <main className="mx-auto max-w-2xl px-4 pb-24 pt-8 lg:pt-32 lg:pb-8">
+        <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <button
             onClick={() => router.back()}
@@ -127,14 +116,13 @@ export default function NotificationsPageClient() {
         )}
       </div>
 
-      {/* Groups */}
       {isLoading ? (
         <div className="flex items-center justify-center py-20">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-neutral-600 border-t-primary-500" />
         </div>
       ) : allGroups.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20">
-          <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-neutral-800/50">
+          <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full border border-white/[0.06] bg-white/[0.03]">
             <Bell className="h-10 w-10 text-neutral-500" />
           </div>
           <p className="text-sm text-neutral-400">Нет уведомлений</p>
@@ -239,7 +227,6 @@ export default function NotificationsPageClient() {
                       )}
                     </div>
 
-                    {/* Group mark-all-read */}
                     {group.unreadCount > 0 && group.relatedTicketId && (
                       <button
                         onClick={() => markGroupRead(group.relatedTicketId!)}
@@ -255,7 +242,6 @@ export default function NotificationsPageClient() {
             })}
           </Accordion>
 
-          {/* Infinite scroll sentinel */}
           {hasNextPage && (
             <div ref={sentinelRef} className="flex justify-center py-4">
               {isFetchingNextPage && (
@@ -265,6 +251,7 @@ export default function NotificationsPageClient() {
           )}
         </div>
       )}
+      </main>
     </div>
   );
 }

@@ -119,13 +119,9 @@ export const notificationRouter = router({
     .query(async ({ ctx, input }) => {
       const { cursor, limit } = input;
       const userId = ctx.user.id;
-      const ITEMS_PER_GROUP = 50;
+      const ITEMS_PER_GROUP = 5;
 
-      /* Phase 1: group summaries via raw SQL */
-      const cursorCondition = cursor
-        ? sql`HAVING MAX(n.created_at) < ${cursor}::timestamptz`
-        : sql``;
-
+      /* Phase 1: group summaries via subquery + WHERE for cursor pagination */
       const groupRows = await db!.execute<{
         related_ticket_id: string | null;
         ticket_subject: string | null;
@@ -133,18 +129,21 @@ export const notificationRouter = router({
         total_count: number;
         latest_at: string;
       }>(sql`
-        SELECT
-          n.related_ticket_id,
-          st.subject AS ticket_subject,
-          COUNT(*) FILTER (WHERE n.is_read = false)::int AS unread_count,
-          COUNT(*)::int AS total_count,
-          MAX(n.created_at) AS latest_at
-        FROM notifications n
-        LEFT JOIN support_tickets st ON st.id = n.related_ticket_id
-        WHERE n.user_id = ${userId}
-        GROUP BY n.related_ticket_id, st.subject
-        ${cursorCondition}
-        ORDER BY latest_at DESC
+        SELECT g.related_ticket_id, g.ticket_subject, g.unread_count, g.total_count, g.latest_at
+        FROM (
+          SELECT
+            n.related_ticket_id,
+            st.subject AS ticket_subject,
+            COUNT(*) FILTER (WHERE n.is_read = false)::int AS unread_count,
+            COUNT(*)::int AS total_count,
+            MAX(n.created_at) AS latest_at
+          FROM notifications n
+          LEFT JOIN support_tickets st ON st.id = n.related_ticket_id
+          WHERE n.user_id = ${userId}
+          GROUP BY n.related_ticket_id, st.subject
+        ) g
+        ${cursor ? sql`WHERE g.latest_at < ${cursor}::timestamptz` : sql``}
+        ORDER BY g.latest_at DESC
         LIMIT ${limit + 1}
       `);
 

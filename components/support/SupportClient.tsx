@@ -378,11 +378,9 @@ export default function SupportClient() {
         return null;
       }
 
-      // Преобразуем timestamp строки обратно в Date объекты и проверяем вложения
       const messages = (cacheData.messages || []).map((msg: any) => ({
         ...msg,
         timestamp: msg.timestamp instanceof Date ? msg.timestamp : new Date(msg.timestamp),
-        attachments: mapWsAttachments(msg.attachments),
       }));
 
       return messages;
@@ -435,6 +433,16 @@ export default function SupportClient() {
   });
   const sendMessageMutation = trpc.support.tickets.sendMessage.useMutation();
   const markAsReadMutation = trpc.support.tickets.markAsRead.useMutation();
+  const markNotifGroupReadMutation = trpc.notification.markGroupRead.useMutation({
+    onSuccess: () => utils.notification.unreadCount.invalidate(),
+  });
+
+  useEffect(() => {
+    if (activeTicket?.id) {
+      markNotifGroupReadMutation.mutate({ relatedTicketId: activeTicket.id });
+    }
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTicket?.id]);
 
   const hasRestoredLastTicketRef = useRef(false);
 
@@ -848,30 +856,29 @@ export default function SupportClient() {
     if (typeof window === 'undefined' || !newTicketFormRef.current) return;
 
     if (showNewTicketForm) {
-      // Анимация появления
       gsap.fromTo(
         newTicketFormRef.current,
-        { opacity: 0, y: -10, height: 0, marginBottom: 0 },
+        { opacity: 0, y: -10, height: 0, marginBottom: 0, overflow: 'hidden' },
         {
           opacity: 1,
           y: 0,
           height: 'auto',
           marginBottom: '1rem',
+          overflow: 'visible',
           duration: 0.3,
           ease: 'power2.out',
         },
       );
     } else {
-      // Анимация исчезновения
       gsap.to(newTicketFormRef.current, {
         opacity: 0,
         y: -10,
         height: 0,
         marginBottom: 0,
+        overflow: 'hidden',
         duration: 0.2,
         ease: 'power2.in',
         onComplete: () => {
-          // Очищаем поля после анимации
           setNewTicketSubject('');
           setNewTicketMessage('');
         },

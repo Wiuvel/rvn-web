@@ -1,8 +1,32 @@
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, lt, sql } from 'drizzle-orm';
 import { db } from '@/lib/database/db';
 import { notifications } from '@/lib/database/schema';
 import { cache } from '@/lib/database/cache';
 import { broadcastNotification } from '@/lib/websocket/client';
+
+const CLEANUP_THROTTLE_MS = 60 * 60 * 1000; // 1 hour
+const CLEANUP_MAX_AGE_DAYS = 30;
+
+async function cleanupOldNotifications(userId: string): Promise<void> {
+  const cacheKey = `notif_cleanup:${userId}`;
+  if (cache.has(cacheKey)) return;
+  cache.set(cacheKey, true, CLEANUP_THROTTLE_MS / 1000);
+
+  try {
+    const cutoff = new Date(Date.now() - CLEANUP_MAX_AGE_DAYS * 24 * 60 * 60 * 1000);
+    await db!
+      .delete(notifications)
+      .where(
+        and(
+          eq(notifications.userId, userId),
+          eq(notifications.isRead, true),
+          lt(notifications.createdAt, cutoff),
+        ),
+      );
+  } catch {
+    // Fire-and-forget
+  }
+}
 
 interface CreateNotificationParams {
   userId: string;
@@ -88,6 +112,9 @@ export async function createNotification(params: CreateNotificationParams): Prom
       related_ticket_id: relatedTicketId ?? null,
       created_at: new Date().toISOString(),
     });
+
+    /* Periodic cleanup of old read notifications */
+    cleanupOldNotifications(userId);
   } catch (error) {
     console.error(
       '[notifications] createNotification error:',

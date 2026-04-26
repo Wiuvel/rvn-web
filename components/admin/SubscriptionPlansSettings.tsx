@@ -11,12 +11,15 @@ import {
   Loader2,
   AlertTriangle,
   Clock,
+  X,
 } from 'lucide-react';
 
 /** Plan shape matching the backend schema */
 interface PlanConfig {
   id: string;
   name: string;
+  description: string;
+  features: string[];
   priceKopecks: number;
   durationDays: number;
   squadUuid: string | null;
@@ -88,6 +91,8 @@ export default function SubscriptionPlansSettings() {
       {
         id: generatePlanId(),
         name: '',
+        description: '',
+        features: [],
         priceKopecks: 20000,
         durationDays: 30,
         squadUuid: null,
@@ -104,6 +109,8 @@ export default function SubscriptionPlansSettings() {
       {
         id: generatePlanId(),
         name: '',
+        description: '',
+        features: [],
         priceKopecks: 0,
         durationDays: 0,
         squadUuid: null,
@@ -304,6 +311,76 @@ export default function SubscriptionPlansSettings() {
                       </label>
                     </>
                   )}
+                </div>
+
+                {/* Описание */}
+                <label className="mt-3 block">
+                  <span className="mb-1 block text-xs text-neutral-500">Описание</span>
+                  <textarea
+                    value={plan.description}
+                    onChange={(e) => updatePlan(index, { description: e.target.value })}
+                    placeholder="Краткое описание тарифа"
+                    rows={2}
+                    className="w-full resize-none rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-white placeholder-neutral-500 focus:border-primary-500 focus:outline-none"
+                  />
+                </label>
+
+                {/* Что входит (features) */}
+                <div className="mt-3">
+                  <span className="mb-1 block text-xs text-neutral-500">Что входит</span>
+                  {plan.features.length > 0 && (
+                    <div className="mb-2 flex flex-wrap gap-1.5">
+                      {plan.features.map((feature, fi) => (
+                        <span
+                          key={fi}
+                          className="inline-flex items-center gap-1 rounded-md border border-neutral-700 bg-neutral-800 px-2 py-1 text-xs text-neutral-300"
+                        >
+                          {feature}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const next = plan.features.filter((_, i) => i !== fi);
+                              updatePlan(index, { features: next });
+                            }}
+                            className="ml-0.5 text-neutral-500 transition-colors hover:text-red-400"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Новая фича"
+                      className="flex-1 rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-1.5 text-xs text-white placeholder-neutral-500 focus:border-primary-500 focus:outline-none"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          const val = (e.target as HTMLInputElement).value.trim();
+                          if (val) {
+                            updatePlan(index, { features: [...plan.features, val] });
+                            (e.target as HTMLInputElement).value = '';
+                          }
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        const input = (e.currentTarget.previousElementSibling as HTMLInputElement);
+                        const val = input.value.trim();
+                        if (val) {
+                          updatePlan(index, { features: [...plan.features, val] });
+                          input.value = '';
+                        }
+                      }}
+                      className="rounded-lg border border-neutral-700 px-2.5 py-1.5 text-xs text-neutral-400 transition-colors hover:border-neutral-500 hover:text-white"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                 </div>
               </div>
             );

@@ -19,17 +19,7 @@ export function useAdminBan(setUserActionMessage: (msg: string) => void) {
 
     setBanLoading(true);
     try {
-      // TODO: Реализовать API для бана пользователя
-      // const response = await fetch('/api/admin/users/ban', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   credentials: 'include',
-      //   body: JSON.stringify({
-      //     userId: banUser.id,
-      //     duration: banDuration,
-      //     reason: banReason
-      //   })
-      // });
+      /* TODO: Implement an API for banning a user */
 
       const durationText =
         banDuration === 'forever'

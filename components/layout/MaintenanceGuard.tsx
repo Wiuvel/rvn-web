@@ -7,7 +7,6 @@ export default async function MaintenanceGuard({ children }: { children: React.R
   const pathname = headersList.get('x-pathname') || '';
 
   try {
-    // Исключаем админ-панель, API и статику
     const isExempt =
       pathname.startsWith('/ui/panel') ||
       pathname.startsWith('/api/admin') ||

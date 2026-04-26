@@ -17,7 +17,7 @@ export default function ConditionalLayout({ children }: ConditionalLayoutProps) 
   const pagesWithHeaderFooter = ['/'];
 
   // Страницы только с header (без footer)
-  const pagesWithHeaderOnly = ['/about'];
+  const pagesWithHeaderOnly = ['/about', '/subscription'];
 
   // Legal страницы
   const legalPages = [

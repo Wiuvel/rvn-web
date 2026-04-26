@@ -12,14 +12,14 @@ export interface SupportState {
   ticketsLoading: boolean;
   isSupport: boolean;
 
-  // UI / Modals
+  /* UI / Modals */
   userMenuOpen: boolean;
   showNewTicketForm: boolean;
   showCreateTicketModal: boolean;
   isCreatingTicket: boolean;
   isSendingMessage: boolean;
 
-  // Additional UI State
+  /* Additional UI State */
   showRateLimitCaptcha: boolean;
   ticketsListVisible: boolean;
   sidebarCollapsed: boolean;
@@ -27,30 +27,30 @@ export interface SupportState {
   isUploading: boolean;
   viewingImage: { url: string; alt: string } | null;
 
-  // File Uploads
+  /* File Uploads */
   uploadedFiles: UploadedFile[];
   filePreviews: Map<string, string>;
   fileErrors: Set<string>;
 
-  // Inputs
+  /* Inputs */
   messageText: string;
   newTicketSubject: string;
   newTicketMessage: string;
 
-  // Rate Limiting
+  /* Rate Limiting */
   lastMessageTime: number | null;
   timeoutSeconds: number;
   messagesSentCount: number;
 
-  // Notifications
+  /* Notifications */
   notification: { message: string; show: boolean; type?: 'error' | 'info' };
 
-  // Pagination
+  /* Pagination */
   hasMoreMessages: boolean;
   isLoadingOlderMessages: boolean;
   loadedMessageCount: number;
 
-  // Skeletons
+  /* Skeletons */
   skeletonCount: number | null;
 }
 
@@ -84,7 +84,7 @@ export type SupportAction =
       >;
     }
   | { type: 'SET_SKELETON_COUNT'; payload: number | null }
-  // Additional Actions
+  /* Additional Actions */
   | { type: 'SET_SHOW_RATE_LIMIT_CAPTCHA'; payload: boolean }
   | { type: 'SET_TICKETS_LIST_VISIBLE'; payload: boolean }
   | { type: 'SET_SIDEBAR_COLLAPSED'; payload: boolean }
@@ -194,7 +194,7 @@ export function supportReducer(state: SupportState, action: SupportAction): Supp
     case 'SET_SKELETON_COUNT':
       if (state.skeletonCount === action.payload) return state;
       return { ...state, skeletonCount: action.payload };
-    // Additional Reducers
+    /* Additional Reducers */
     case 'SET_SHOW_RATE_LIMIT_CAPTCHA':
       if (state.showRateLimitCaptcha === action.payload) return state;
       return { ...state, showRateLimitCaptcha: action.payload };
@@ -254,12 +254,12 @@ export function useSupportState(
         tickets: mappedTickets,
         activeTicket,
         isSupport: init.userData?.isSupport === true,
-        skeletonCount: 3, // Default for SSR
+        skeletonCount: 3,
       };
     },
   );
 
-  // Sync skeleton count on mount
+  /* Sync skeleton count on mount */
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const cached = localStorage.getItem('support_tickets_count');

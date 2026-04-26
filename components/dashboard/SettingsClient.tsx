@@ -26,6 +26,7 @@ import { useAuth } from '@/hooks/useAuth';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { useStaggeredFadeIn } from '@/hooks/useGSAP';
 import clsx from 'clsx';
+import { formatRelativeTime } from '@/lib/utils/format';
 
 interface Device {
   id: string;
@@ -37,21 +38,13 @@ interface Device {
   isCurrent: boolean;
 }
 
-// Helper to format relative time
-function formatRelativeTime(dateString: string): string {
-  const date = new Date(dateString);
-  const now = new Date();
-  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-
-  if (diffInSeconds < 60) return 'Только что';
-  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} мин. назад`;
-  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} ч. назад`;
-  if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)} дн. назад`;
-
-  return date.toLocaleDateString('ru-RU');
-}
-
-// Helper to format device name "Browser on OS" -> "Browser (OS)"
+/**
+ * Formats a device name string by wrapping the OS segment in parentheses.
+ * Improves readability of raw User-Agent parses in the UI.
+ *
+ * @param deviceName Raw device name (e.g., "Chrome on Windows")
+ * @returns Formatted device name (e.g., "Chrome (Windows)")
+ */
 function formatDeviceName(deviceName: string): string {
   if (deviceName.includes(' on ')) {
     return deviceName.replace(' on ', ' (').trim() + ')';
@@ -150,9 +143,8 @@ export default function SettingsClient() {
     <div className="min-h-screen bg-neutral-950 text-white selection:bg-primary-500/30">
       <Header />
 
-      <main className="relative pb-24 pt-24 lg:pt-32">
+      <main className="relative pb-24 pt-8 lg:pt-32">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          {/* Header section */}
           <div className="mb-12 flex flex-col items-center text-center lg:items-start lg:text-left">
             <h1 className="bg-gradient-to-br from-white via-neutral-200 to-neutral-500 bg-clip-text text-4xl font-bold tracking-tight text-transparent sm:text-5xl">
               Настройки аккаунта
@@ -163,9 +155,7 @@ export default function SettingsClient() {
           </div>
 
           <div ref={containerRef} className="grid grid-cols-1 gap-6 lg:grid-cols-12 lg:gap-8">
-            {/* LEFT COLUMN: Profile & Password */}
             <div className="flex flex-col gap-6 lg:col-span-4">
-              {/* Profile Card */}
               <section className="group relative overflow-hidden rounded-3xl border border-neutral-800/60 bg-neutral-900/40 p-[1px] shadow-2xl transition-all duration-500 hover:shadow-primary-500/10">
                 <div className="absolute inset-0 bg-gradient-to-br from-primary-500/20 via-transparent to-purple-500/20 opacity-30 transition-opacity duration-500 group-hover:opacity-60"></div>
                 <div className="relative h-full w-full rounded-[23px] bg-neutral-950/80 p-6 backdrop-blur-xl">
@@ -205,7 +195,6 @@ export default function SettingsClient() {
                 </div>
               </section>
 
-              {/* Password Change Card */}
               <section className="group relative overflow-hidden rounded-3xl border border-neutral-800/60 bg-neutral-900/40 p-[1px] shadow-2xl transition-all duration-500 hover:shadow-primary-500/10">
                 <div className="absolute inset-0 bg-gradient-to-br from-neutral-800 to-neutral-900 opacity-50"></div>
                 <div className="relative h-full w-full rounded-[23px] bg-neutral-950/80 p-6 backdrop-blur-xl">
@@ -351,7 +340,6 @@ export default function SettingsClient() {
               </section>
             </div>
 
-            {/* RIGHT COLUMN: Active Sessions */}
             <div className="flex flex-col lg:col-span-8">
               <section className="relative flex h-full flex-col overflow-hidden rounded-3xl border border-neutral-800/60 bg-neutral-900/40 p-[1px] shadow-2xl">
                 <div className="absolute inset-0 bg-gradient-to-b from-neutral-800/50 to-neutral-950/50 opacity-50"></div>
@@ -396,7 +384,6 @@ export default function SettingsClient() {
                                 : 'border-neutral-800/60 bg-neutral-900/30 hover:border-neutral-700 hover:bg-neutral-800/50',
                             )}
                           >
-                            {/* Hover Gradient */}
                             {!device.isCurrent && (
                               <div className="absolute inset-0 bg-gradient-to-r from-white/[0.02] to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100"></div>
                             )}

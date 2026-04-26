@@ -199,7 +199,7 @@ export default function PricingSection() {
                         : '!border-0 !bg-white !text-neutral-900 hover:!bg-neutral-200 hover:!text-neutral-900'
                     }`}
                   >
-                    <Link href="#">Купить</Link>
+                    <Link href="subscription/">Купить</Link>
                   </Button>
                 ) : (
                   <Button

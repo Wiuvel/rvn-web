@@ -20,11 +20,11 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
   const { socket } = useGlobalSocket();
   const utils = trpc.useUtils();
 
-  /* Unread count with 60s polling baseline */
+  /* Unread count with 60s polling baseline, 10s staleTime (matches server cache TTL) */
   const { data: unreadData } = trpc.notification.unreadCount.useQuery(undefined, {
     enabled,
     refetchInterval: 60_000,
-    staleTime: 60_000,
+    staleTime: 10_000,
   });
 
   /* Last 5 notifications for dropdown preview */

@@ -32,21 +32,23 @@ export default function MobileNavigation() {
   const [isOpen, setIsOpen] = useState(false);
   const overlayRef = useRef<HTMLDivElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
-  const hasOpened = useRef(false); // Track if overlay was ever opened
-  const prevPathnameRef = useRef<string | null>(null); // Only close when pathname actually changes
+  const hasOpened = useRef(false);
+  const prevPathnameRef = useRef<string | null>(null);
   const pathname = usePathname();
 
   const { userData, loading } = useAuth({ silent: true, lightweight: true });
   const { unreadCount } = useNotifications({ enabled: !!userData });
 
-  // Не показываем MobileMenu для страницы /protection/
-  const shouldRender = !(pathname === '/protection' || pathname?.startsWith('/protection/'));
+  const shouldRender = !(
+    pathname === '/protection' ||
+    pathname?.startsWith('/protection/') ||
+    pathname?.startsWith('/ui/panel/admin') ||
+    pathname?.startsWith('/ui/panel/support')
+  );
 
-  // ── GSAP: initialize hidden state on mount ──
   useEffect(() => {
     if (!shouldRender) return;
 
-    // Force reset GSAP state on mount to ensure clean state
     if (overlayRef.current) {
       gsap.killTweensOf(overlayRef.current);
       gsap.set(overlayRef.current, { xPercent: 100, display: 'none' });
@@ -55,20 +57,16 @@ export default function MobileNavigation() {
       gsap.killTweensOf(backdropRef.current);
       gsap.set(backdropRef.current, { opacity: 0, display: 'none', pointerEvents: 'none' });
     }
-    // Also ensure body overflow is reset
     document.body.style.overflow = '';
   }, [shouldRender]);
 
-  // ── GSAP: animate open / close ──
   useEffect(() => {
     if (typeof window === 'undefined' || !shouldRender) return;
 
-    // Kill running tweens before starting new ones
     if (overlayRef.current) gsap.killTweensOf(overlayRef.current);
     if (backdropRef.current) gsap.killTweensOf(backdropRef.current);
 
     if (isOpen) {
-      // Always start from a clean closed state so open works after any previous stuck state
       if (overlayRef.current) {
         gsap.set(overlayRef.current, { xPercent: 100, display: 'none' });
       }
@@ -77,21 +75,18 @@ export default function MobileNavigation() {
       }
       hasOpened.current = true;
 
-      // Backdrop: show + fade in
       if (backdropRef.current) {
-        gsap.set(backdropRef.current, { display: 'block', pointerEvents: 'auto' });
-        gsap.to(backdropRef.current, { opacity: 1, duration: 0.25, ease: 'power2.out' });
+        gsap.set(backdropRef.current, { display: 'block', pointerEvents: 'auto', force3D: true });
+        gsap.to(backdropRef.current, { opacity: 1, duration: 0.25, ease: 'power2.out', force3D: true });
       }
 
-      // Overlay: show at right edge, slide to 0
       if (overlayRef.current) {
-        gsap.set(overlayRef.current, { display: 'flex', xPercent: 100 });
-        gsap.to(overlayRef.current, { xPercent: 0, duration: 0.32, ease: 'power3.out' });
+        gsap.set(overlayRef.current, { display: 'flex', xPercent: 100, force3D: true });
+        gsap.to(overlayRef.current, { xPercent: 0, duration: 0.32, ease: 'power3.out', force3D: true });
       }
 
       document.body.style.overflow = 'hidden';
     } else {
-      // Skip close animation if never opened (e.g. initial render)
       if (!hasOpened.current) {
         if (overlayRef.current) gsap.set(overlayRef.current, { display: 'none', xPercent: 100 });
         if (backdropRef.current)
@@ -99,24 +94,24 @@ export default function MobileNavigation() {
         return;
       }
 
-      // Overlay: slide out to right
       if (overlayRef.current) {
         gsap.to(overlayRef.current, {
           xPercent: 100,
           duration: 0.28,
           ease: 'power3.in',
+          force3D: true,
           onComplete() {
             if (overlayRef.current) gsap.set(overlayRef.current, { display: 'none' });
           },
         });
       }
 
-      // Backdrop: fade out
       if (backdropRef.current) {
         gsap.to(backdropRef.current, {
           opacity: 0,
           duration: 0.22,
           ease: 'power2.in',
+          force3D: true,
           onComplete() {
             if (backdropRef.current)
               gsap.set(backdropRef.current, { display: 'none', pointerEvents: 'none' });
@@ -126,14 +121,8 @@ export default function MobileNavigation() {
 
       document.body.style.overflow = '';
     }
-
-    return () => {
-      // Clean up overflow only on unmount, NOT on every effect run
-      // document.body.style.overflow = '';
-    };
   }, [isOpen, shouldRender]);
 
-  // ── Close overlay only when route actually changes (not on mount/hydration) ──
   useEffect(() => {
     if (!shouldRender) return;
 
@@ -141,7 +130,6 @@ export default function MobileNavigation() {
     if (prev !== null && prev !== pathname) {
       if (isOpen) setIsOpen(false);
       prevPathnameRef.current = pathname;
-      // Reset GSAP and hasOpened so state is clean on next page (avoids "stuck" menu)
       hasOpened.current = false;
       if (overlayRef.current) {
         gsap.killTweensOf(overlayRef.current);
@@ -157,7 +145,6 @@ export default function MobileNavigation() {
     }
   }, [pathname, isOpen, shouldRender]);
 
-  // ── Close overlay when viewport becomes desktop (DevTools resize) ──
   useEffect(() => {
     if (typeof window === 'undefined' || !shouldRender) return;
     const mq = window.matchMedia('(min-width: 1024px)');
@@ -175,7 +162,6 @@ export default function MobileNavigation() {
     return () => mq.removeEventListener('change', handler);
   }, [isOpen, shouldRender]);
 
-  // ── Cleanup on unmount ──
   useEffect(() => {
     if (!shouldRender) return;
 
@@ -189,7 +175,6 @@ export default function MobileNavigation() {
     };
   }, [shouldRender]);
 
-  // ── Handlers ──
   const logoutMutation = trpc.auth.logout.useMutation();
 
   const handleLogout = useCallback(async () => {
@@ -206,7 +191,6 @@ export default function MobileNavigation() {
   const toggleOverlay = useCallback(() => {
     setIsOpen((prev) => {
       if (!prev) {
-        // Opening: force-clear any stuck overflow from other components
         document.body.style.overflow = '';
       }
       return !prev;
@@ -220,27 +204,22 @@ export default function MobileNavigation() {
 
   return (
     <>
-      {/* ===== Backdrop =====
-           z-[1000] — above page content, below overlay & bottom nav */}
       <div
         ref={backdropRef}
-        className="fixed inset-0 z-[1000] bg-black/60 backdrop-blur-sm lg:hidden"
-        style={{ display: 'none', opacity: 0, pointerEvents: 'none' }}
+        className="fixed inset-0 z-[1000] bg-black/80 lg:hidden"
+        style={{ display: 'none', opacity: 0, pointerEvents: 'none', willChange: 'opacity' }}
         onClick={closeOverlay}
         aria-hidden="true"
       />
 
-      {/* ===== Slide-in Overlay Panel =====
-           z-[1001] — above backdrop, below bottom nav */}
       <div
         ref={overlayRef}
-        className="fixed bottom-0 right-0 top-0 z-[1001] w-[78%] max-w-[340px] flex-col overflow-y-auto overscroll-contain border-l border-white/[0.08] bg-[#0A0A0A]/[0.98] backdrop-blur-2xl lg:hidden"
-        style={{ display: 'none' }}
+        className="fixed bottom-0 right-0 top-0 z-[1001] w-[78%] max-w-[340px] flex-col overflow-y-auto overscroll-contain border-l border-white/[0.08] bg-[#0A0A0A] lg:hidden"
+        style={{ display: 'none', willChange: 'transform' }}
         role="dialog"
         aria-modal="true"
         aria-label="Меню навигации"
       >
-        {/* Header */}
         <div className="flex items-center justify-between p-5 pb-3">
           <span className="text-lg font-semibold text-white">Меню</span>
           <button
@@ -252,7 +231,6 @@ export default function MobileNavigation() {
           </button>
         </div>
 
-        {/* User profile card */}
         <div className="px-4 pb-2">
           {loading && !userData ? (
             <div className="flex items-center gap-4 rounded-2xl border border-white/5 bg-white/[0.03] p-4">
@@ -330,7 +308,6 @@ export default function MobileNavigation() {
           )}
         </div>
 
-        {/* Balance */}
         {userData && (
           <div className="px-4 pb-3">
             <Link
@@ -348,7 +325,6 @@ export default function MobileNavigation() {
 
         <div className="mx-6 my-1 h-px bg-white/5" />
 
-        {/* Menu items */}
         <div className="flex-1 px-3 py-2">
           <div className="flex flex-col gap-0.5">
             {userData && (
@@ -393,6 +369,13 @@ export default function MobileNavigation() {
               active={isActive('/')}
             />
             <OverlayMenuItem
+              href="/subscription"
+              onClick={closeOverlay}
+              icon={CreditCard}
+              label="Тарифы"
+              active={isActive('/subscription')}
+            />
+            <OverlayMenuItem
               href="/about"
               onClick={closeOverlay}
               icon={Info}
@@ -424,13 +407,11 @@ export default function MobileNavigation() {
           </div>
         </div>
 
-        <div className="h-8 shrink-0" />
+        <div className="h-28 shrink-0" />
       </div>
 
-      {/* ===== Bottom Navigation Bar =====
-           z-[1002] — HIGHEST layer, always clickable even when overlay is open */}
       <nav
-        className="fixed bottom-0 left-0 right-0 z-[1002] border-t border-white/[0.08] bg-neutral-950/95 backdrop-blur-xl lg:hidden"
+        className="fixed bottom-0 left-0 right-0 z-[1002] border-t border-white/[0.08] bg-neutral-950/95 lg:hidden"
         style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
         aria-label="Навигация"
       >
@@ -455,7 +436,6 @@ export default function MobileNavigation() {
             />
           )}
 
-          {/* Center Logo Button */}
           <div className="-mt-4 flex h-[52px] w-[52px] items-center justify-center rounded-2xl bg-primary-500 shadow-[0_0_20px_rgba(22,163,255,0.35)]">
             <Image
               src={getStaticUrl('/static/logo.svg')}
@@ -474,7 +454,6 @@ export default function MobileNavigation() {
             prefetch={false}
           />
 
-          {/* Menu toggle — always clickable because nav is z-[70] */}
           <button
             onClick={toggleOverlay}
             className={`flex min-w-[52px] flex-col items-center justify-center gap-0.5 py-1 transition-colors ${isOpen ? 'text-white' : 'text-neutral-500 active:text-neutral-300'}`}
@@ -514,8 +493,6 @@ export default function MobileNavigation() {
     </>
   );
 }
-
-/* ─── Sub-components ──────────────────────────────────── */
 
 interface NavItemProps {
   href: string;

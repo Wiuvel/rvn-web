@@ -15,14 +15,16 @@ export function useRateLimitedFetch() {
       const response = await fetch(url, options);
 
       if (response.status === 429) {
-        // Add callback to queue instead of overwriting - fixes race condition
+        /* Add callback to queue instead of overwriting - fixes race condition */
         if (retryCallback) {
           pendingRequestsQueueRef.current.push(retryCallback);
         }
 
-        // Open modal only if:
-        // 1. Not already open
-        // 2. Not processing captcha (prevents reopen loops)
+        /*
+         * Open modal only if:
+         * 1. Not already open.
+         * 2. Not processing captcha (prevents reopen loops).
+         */ 
         if (!isCaptchaOpenRef.current && !isProcessingCaptchaRef.current) {
           isCaptchaOpenRef.current = true;
           setShowRateLimitCaptcha(true);
@@ -36,17 +38,17 @@ export function useRateLimitedFetch() {
   );
 
   const handleRateLimitSuccess = useCallback(async () => {
-    // Set processing flag - prevents reopen loops
+    /* Set processing flag - prevents reopen loops */
     isProcessingCaptchaRef.current = true;
 
-    // Close modal
+    /* Close modal */
     isCaptchaOpenRef.current = false;
     setShowRateLimitCaptcha(false);
 
-    // Increase delay to ensure immunity is applied on server
+    /* Increase delay to ensure immunity is applied on server */
     await new Promise((resolve) => setTimeout(resolve, 1000));
 
-    // Process ALL requests in queue sequentially
+    /* Process ALL requests in queue sequentially */
     const queue = [...pendingRequestsQueueRef.current];
     pendingRequestsQueueRef.current = []; // Clear queue immediately
 
@@ -54,17 +56,19 @@ export function useRateLimitedFetch() {
       try {
         await requestCallback();
       } catch (error) {
-        // If request hits rate limit again after immunity - critical error
-        // DO NOT add back to queue and DO NOT show captcha again
+        /*
+         * If request hits rate limit again after immunity - critical error
+         * DO NOT add back to queue and DO NOT show captcha again
+         */
         if (error instanceof Error && error.message === 'RATE_LIMIT_EXCEEDED') {
-          // Rate limit still active - silent fail
+          /* Rate limit still active - silent fail */
         } else {
-          // Error on retry - silent fail
+          /* Error on retry - silent fail */
         }
       }
     }
 
-    // Reset processing flag only after queue is processed
+    /* Reset processing flag only after queue is processed */
     isProcessingCaptchaRef.current = false;
   }, []);
 

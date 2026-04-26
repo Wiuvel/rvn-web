@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
-import { router, protectedProcedure } from '../init';
+import { router, publicProcedure, protectedProcedure } from '../init';
 import { db } from '@/lib/database/db';
 import {
   users,
@@ -28,6 +28,8 @@ const DEFAULT_PRICE_KOPECKS = 20000;
 interface PlanConfig {
   id: string;
   name: string;
+  description: string;
+  features: string[];
   priceKopecks: number;
   durationDays: number;
   squadUuid: string | null;
@@ -55,7 +57,12 @@ async function getPlansConfig(): Promise<PlanConfig[]> {
   let plans: PlanConfig[] = [];
   if (row) {
     try {
-      plans = JSON.parse(row.value);
+      const raw = JSON.parse(row.value) as Partial<PlanConfig>[];
+      plans = raw.map((p) => ({
+        ...p,
+        description: p.description ?? '',
+        features: Array.isArray(p.features) ? p.features : [],
+      })) as PlanConfig[];
     } catch {
       plans = [];
     }
@@ -66,6 +73,8 @@ async function getPlansConfig(): Promise<PlanConfig[]> {
       {
         id: 'base-monthly',
         name: 'Базовая',
+        description: '',
+        features: [],
         priceKopecks: DEFAULT_PRICE_KOPECKS,
         durationDays: 30,
         squadUuid: null,
@@ -112,6 +121,29 @@ async function getTestPromoSettings(): Promise<{ enabled: boolean; code: string 
 }
 
 export const subscriptionRouter = router({
+  /** Public: available plans (no auth required, for /subscription page). */
+  publicPlans: publicProcedure.query(async () => {
+    const allPlans = await getPlansConfig();
+    return allPlans
+      .filter((p) => p.active)
+      .map(({ id, name, description, features, priceKopecks, durationDays, isStub }) => ({
+        id,
+        name,
+        description,
+        features,
+        priceKopecks,
+        durationDays,
+        isStub,
+      }));
+  }),
+
+  /** Public: VPN server nodes (no auth required, for /subscription page). */
+  publicServers: publicProcedure.query(async () => {
+    const result = await getServerNodes();
+    if (!result.ok) return [];
+    return result.data;
+  }),
+
   /** List current user's subscriptions. */
   list: protectedProcedure.query(async ({ ctx }) => {
     if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB not configured' });
@@ -214,9 +246,11 @@ export const subscriptionRouter = router({
     const allPlans = await getPlansConfig();
     return allPlans
       .filter((p) => p.active)
-      .map(({ id, name, priceKopecks, durationDays, isStub }) => ({
+      .map(({ id, name, description, features, priceKopecks, durationDays, isStub }) => ({
         id,
         name,
+        description,
+        features,
         priceKopecks,
         durationDays,
         isStub,
@@ -358,12 +392,12 @@ export const subscriptionRouter = router({
         })
         .returning();
 
-      /** External payment: return pending status */
+      /** External payment: return pending status with redirect */
       if (input.payFrom === 'external' && !isTest) {
         return {
           paymentId: payment.id,
           status: 'pending' as const,
-          redirectUrl: null,
+          redirectUrl: `/dashboard/payment/redirect?paymentId=${payment.id}`,
         };
       }
 

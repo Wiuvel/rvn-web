@@ -91,7 +91,7 @@ const CreateTicketForm = forwardRef<CreateTicketFormRef, CreateTicketFormProps>(
 
     return (
       <div
-        className={`${isInline ? 'mb-4 flex-shrink-0 rounded-xl bg-neutral-800/50 p-3' : ''} space-y-3 ${isInline && !isVisible ? 'hidden' : ''}`}
+        className={`${isInline ? 'mb-4 flex-shrink-0 rounded-xl bg-neutral-800/50 p-3' : ''} space-y-3`}
         style={containerStyle}
       >
         {/* Subject field */}

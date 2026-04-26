@@ -647,10 +647,8 @@ export default function AdminSupportClient() {
         return null;
       }
 
-      // Обрабатываем вложения при загрузке из кэша
       const messages = (cacheData.messages || []).map((msg: any) => ({
         ...msg,
-        attachments: mapWsAttachments(msg.attachments),
       }));
 
       return messages;
