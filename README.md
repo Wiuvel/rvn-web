@@ -51,6 +51,12 @@
 | [WebSocket architecture](docs/websocket/architecture.en.md) | Connection, rooms, broadcast, authentication |
 | [Event Directory](docs/websocket/events.en.md) | Client/server events, error codes, REST endpoints |
 
+### Security
+
+| Document | Description |
+|----------|-------------|
+| [Bot & DDoS protection](docs/security/protection.en.md) | Proxy middleware, suspicion detector, Turnstile access cookie, rate limiting, CSRF, security headers |
+
 ---
 
 ## Setup
