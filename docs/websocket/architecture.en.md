@@ -82,6 +82,7 @@ Ticket access is verified similarly via `POST /api/internal/verify-ticket-access
 
 - `hooks/useWebSocket.ts` — Socket.IO client hook
 - `lib/websocket/client.ts` — HTTP broadcast client (server-side)
+- `lib/websocket/types.ts` — TypeScript contract (mirrors `rvn-socketio-server/src/types.ts`)
 - `app/api/internal/verify-token/route.ts` — Token verification endpoint
 - `app/api/internal/verify-ticket-access/route.ts` — Ticket access verification
 
@@ -93,4 +94,17 @@ Ticket access is verified similarly via `POST /api/internal/verify-ticket-access
 - `src/handlers/support.ts` — Support ticket event handlers
 - `src/handlers/profile.ts` — Profile comment event handlers
 - `src/rate-limit.ts` — Connection & typing rate limiting
-- `src/types.ts` — Shared TypeScript types
+- `src/types.ts` — Shared TypeScript types (source of truth)
+
+## Type Contract
+
+The WebSocket message contract is defined twice: once on the server in [`Wiuvel/rvn-socketio-server`](https://github.com/Wiuvel/rvn-socketio-server) (`src/types.ts`) and mirrored in `lib/websocket/types.ts` on the rvn-web side. The server file is the **source of truth** — all changes start there.
+
+When modifying the contract:
+
+1. Update `src/types.ts` in `rvn-socketio-server`.
+2. Mirror the change in `lib/websocket/types.ts` here.
+3. Update broadcast helpers in `lib/websocket/client.ts` and consumers in `hooks/useWebSocket.ts`.
+4. Update the event tables in [`events.en.md`](events.en.md) / [`events.md`](events.md).
+
+There is currently no automated drift check; future work could publish a shared `@rvn/ws-types` npm package or add a CI step that diffs both files.

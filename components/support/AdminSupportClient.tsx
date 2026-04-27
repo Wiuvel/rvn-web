@@ -21,6 +21,8 @@ import TicketSkeleton from '@/components/ui/TicketSkeleton';
 import { FileText } from 'lucide-react';
 import ImageViewer from '@/components/support/ImageViewer';
 import ImageWithBlur from '@/components/support/ImageWithBlur';
+import { AdminAccessDeniedState } from '@/components/support/AdminAccessDeniedState';
+import { CloseReasonModal } from '@/components/support/CloseReasonModal';
 import { debugPerformanceAsync, debugStart, debugEnd, debugError } from '@/lib/utils/debug';
 import type { RawTicketApi } from '@/lib/types/support-api';
 import { mapWsAttachments } from '@/lib/utils/support-mappers';
@@ -2165,57 +2167,7 @@ export default function AdminSupportClient() {
   }
 
   if (!authState.hasSupportAccess) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-neutral-950 p-4">
-        <div className="w-full max-w-md text-center">
-          <div className="mb-6">
-            <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-red-500/20">
-              <svg
-                className="h-10 w-10 text-red-400"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                />
-              </svg>
-            </div>
-            <h1 className="mb-2 text-2xl font-bold text-white">Доступ ограничен</h1>
-            <p className="mb-6 text-neutral-400">
-              У вас нет доступа к данной странице. Возможно произошла ошибка или вы не авторизованы
-              в системе.
-            </p>
-            <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
-              <button
-                onClick={() => void utils.support.check.invalidate()}
-                className="inline-flex items-center rounded-lg bg-neutral-700 px-4 py-2 text-white transition-colors hover:bg-neutral-600"
-              >
-                Повторить
-              </button>
-              <Link
-                href="/ui/panel"
-                prefetch={false}
-                className="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700"
-              >
-                <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M10 19l-7-7m0 0l7-7m-7 7h18"
-                  />
-                </svg>
-                Вернуться к выбору панели
-              </Link>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+    return <AdminAccessDeniedState onRetry={() => void utils.support.check.invalidate()} />;
   }
 
   return (
@@ -3121,43 +3073,17 @@ export default function AdminSupportClient() {
         />
       )}
 
-      {/* Модальное окно для указания причины закрытия тикета */}
       {showCloseReasonModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-lg border border-neutral-800 bg-neutral-900 p-6">
-            <h3 className="mb-4 text-lg font-semibold text-white">Закрыть тикет</h3>
-            <label htmlFor="close-reason" className="mb-4 block text-sm text-neutral-400">
-              Укажите причину закрытия тикета:
-            </label>
-            <textarea
-              id="close-reason"
-              value={closeReason}
-              onChange={(e) => setCloseReason(e.target.value)}
-              placeholder="Введите причину закрытия..."
-              rows={4}
-              className="w-full resize-none rounded-lg border border-neutral-700 bg-neutral-800 px-4 py-3 text-sm text-white placeholder-neutral-500 focus:border-blue-500 focus:outline-none"
-            />
-            <div className="mt-4 flex gap-3">
-              <button
-                onClick={handleConfirmCloseTicket}
-                disabled={!closeReason.trim()}
-                className="flex-1 rounded-lg bg-red-600 px-4 py-2 font-medium text-white transition-colors hover:bg-red-700 disabled:bg-neutral-700 disabled:text-neutral-500"
-              >
-                Закрыть
-              </button>
-              <button
-                onClick={() => {
-                  setShowCloseReasonModal(false);
-                  setCloseReason('');
-                  setTicketToClose(null);
-                }}
-                className="flex-1 rounded-lg bg-neutral-700 px-4 py-2 font-medium text-white transition-colors hover:bg-neutral-600"
-              >
-                Отмена
-              </button>
-            </div>
-          </div>
-        </div>
+        <CloseReasonModal
+          reason={closeReason}
+          onReasonChange={setCloseReason}
+          onConfirm={handleConfirmCloseTicket}
+          onCancel={() => {
+            setShowCloseReasonModal(false);
+            setCloseReason('');
+            setTicketToClose(null);
+          }}
+        />
       )}
 
       {/* ImageViewer для просмотра изображений */}

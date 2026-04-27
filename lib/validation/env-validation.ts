@@ -15,6 +15,19 @@ const envSchema = z
         message: 'CSRF_SECRET must be changed from default value',
       }),
 
+    /**
+     * Secret для HMAC-подписи `user_data` cookie (см. `lib/auth/user-cookie.server.ts`).
+     * Обязателен в production; в development опционален и фолбекит на hardcoded dev-secret.
+     * Отдельный от `CSRF_SECRET`, чтобы ротация одного не ломала другое.
+     */
+    USER_DATA_SECRET: z
+      .string()
+      .min(32, 'USER_DATA_SECRET must be at least 32 characters')
+      .refine((val) => val !== 'default-user-data-secret-change-in-production-dev', {
+        message: 'USER_DATA_SECRET must be changed from default value',
+      })
+      .optional(),
+
     // Optional
     TURNSTILE_SECRET_KEY: z.string().optional(),
     ALLOWED_ORIGINS: z.string().optional(),
@@ -59,6 +72,13 @@ const envSchema = z
     NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   })
   .superRefine((val, ctx) => {
+    if (val.NODE_ENV === 'production' && !val.USER_DATA_SECRET) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'USER_DATA_SECRET is required in production',
+        path: ['USER_DATA_SECRET'],
+      });
+    }
     const pairs: Array<[keyof typeof val, keyof typeof val, string]> = [
       ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'Google'],
       ['YANDEX_CLIENT_ID', 'YANDEX_CLIENT_SECRET', 'Yandex'],
@@ -125,6 +145,7 @@ export function validateEnv(): Env {
     validatedEnv = envSchema.parse({
       DATABASE_URL: process.env.DATABASE_URL,
       CSRF_SECRET: process.env.CSRF_SECRET,
+      USER_DATA_SECRET: process.env.USER_DATA_SECRET,
       TURNSTILE_SECRET_KEY: process.env.TURNSTILE_SECRET_KEY,
       ALLOWED_ORIGINS: process.env.ALLOWED_ORIGINS,
       GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,

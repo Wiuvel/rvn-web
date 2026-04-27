@@ -7,8 +7,13 @@ import type { UserDataPayload } from './types';
 export const USER_DATA_COOKIE_NAME = 'user_data';
 
 function getUserDataSecret(): string {
+  /* Прямое чтение env позволяет не падать в тестах, где не установлены остальные обязательные переменные. */
+  if (process.env.USER_DATA_SECRET) {
+    return process.env.USER_DATA_SECRET;
+  }
   try {
-    return process.env.USER_DATA_SECRET || getEnv().CSRF_SECRET;
+    /* Fallback на CSRF_SECRET через validated env (production: USER_DATA_SECRET обязателен по zod-схеме). */
+    return getEnv().CSRF_SECRET;
   } catch {
     if (process.env.NODE_ENV === 'development') {
       return 'default-user-data-secret-change-in-production-dev';
