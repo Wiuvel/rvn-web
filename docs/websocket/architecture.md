@@ -82,6 +82,7 @@ WS-сервер **не имеет** прямого доступа к базе д
 
 - `hooks/useWebSocket.ts` — Socket.IO клиентский хук
 - `lib/websocket/client.ts` — HTTP broadcast клиент (серверная сторона)
+- `lib/websocket/types.ts` — TypeScript-контракт (зеркало `rvn-socketio-server/src/types.ts`)
 - `app/api/internal/verify-token/route.ts` — Эндпоинт верификации токена
 - `app/api/internal/verify-ticket-access/route.ts` — Верификация доступа к тикету
 
@@ -93,4 +94,17 @@ WS-сервер **не имеет** прямого доступа к базе д
 - `src/handlers/support.ts` — Обработчики событий тикетов
 - `src/handlers/profile.ts` — Обработчики событий комментариев
 - `src/rate-limit.ts` — Rate limiting подключений и typing
-- `src/types.ts` — Общие TypeScript типы
+- `src/types.ts` — Общие TypeScript типы (источник правды)
+
+## Контракт типов
+
+Контракт сообщений WebSocket описан дважды: на стороне сервера в [`Wiuvel/rvn-socketio-server`](https://github.com/Wiuvel/rvn-socketio-server) (`src/types.ts`) и в зеркальном файле `lib/websocket/types.ts` на стороне rvn-web. Серверный файл — **источник правды**, все изменения начинаются с него.
+
+При изменении контракта:
+
+1. Обновите `src/types.ts` в `rvn-socketio-server`.
+2. Отзеркальте изменение в `lib/websocket/types.ts` здесь.
+3. Обновите broadcast-хелперы в `lib/websocket/client.ts` и потребителей в `hooks/useWebSocket.ts`.
+4. Обновите таблицы событий в [`events.en.md`](events.en.md) / [`events.md`](events.md).
+
+Автоматической проверки на дрейф нет; в перспективе можно вынести типы в общий npm-пакет `@rvn/ws-types` либо добавить CI-шаг, который сверяет оба файла.
