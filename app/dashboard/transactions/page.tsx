@@ -32,7 +32,7 @@ export default function TransactionsPage() {
   return (
     <div className="min-h-screen bg-neutral-950 text-white selection:bg-primary-500/30">
       <Header />
-      <main className="mx-auto max-w-2xl px-4 pb-24 pt-8 lg:pt-32 lg:pb-8">
+      <main className="mx-auto max-w-2xl px-4 pb-24 pt-8 lg:pb-8 lg:pt-32">
         <div className="mb-6 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button

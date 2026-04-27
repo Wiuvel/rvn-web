@@ -296,11 +296,6 @@ export interface ServerNode {
 let nodesCache: { nodes: ServerNode[]; cachedAt: number } | null = null;
 const NODES_CACHE_TTL = 5 * 60_000; // 5 min
 
-/** Invalidate the nodes cache (e.g. after admin action). */
-export function invalidateNodesCache() {
-  nodesCache = null;
-}
-
 /**
  * Fetch all nodes from Remnawave panel, parse into country-labeled list.
  * Caches result for 5 minutes to avoid spamming the panel.
@@ -323,22 +318,14 @@ export async function getServerNodes(): Promise<
     .filter((n) => !n.isDisabled)
     .sort((a, b) => a.viewPosition - b.viewPosition);
 
-  /** Count per country to build labels like NL-1, NL-2. */
   const countryCount = new Map<string, number>();
-  const countryTotals = new Map<string, number>();
-
-  for (const node of sorted) {
-    const cc = (node.countryCode || 'XX').toUpperCase();
-    countryTotals.set(cc, (countryTotals.get(cc) ?? 0) + 1);
-  }
 
   const nodes: ServerNode[] = sorted.map((node) => {
     const cc = (node.countryCode || 'XX').toUpperCase();
     const idx = (countryCount.get(cc) ?? 0) + 1;
     countryCount.set(cc, idx);
 
-    const total = countryTotals.get(cc) ?? 1;
-    const label = total > 1 ? `${cc}-${idx}` : cc;
+    const label = `${cc}-${idx}`;
 
     return {
       id: node.uuid,

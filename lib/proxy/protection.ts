@@ -40,8 +40,7 @@ async function getHmacKey(secretKey: string): Promise<CryptoKey> {
 async function checkRateLimit(ip: string): Promise<boolean> {
   const redis = getRedisClient();
   if (!redis) {
-    // Если Redis недоступен, не блокируем (fallback)
-    return false;
+    return true; // Fail closed: блокируем при недоступности Redis
   }
 
   try {
@@ -70,7 +69,7 @@ async function checkRateLimit(ip: string): Promise<boolean> {
 
     return false;
   } catch {
-    return false;
+    return true; // Fail closed: блокируем при ошибке Redis
   }
 }
 

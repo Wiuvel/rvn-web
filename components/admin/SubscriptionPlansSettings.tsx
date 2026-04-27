@@ -369,7 +369,7 @@ export default function SubscriptionPlansSettings() {
                     <button
                       type="button"
                       onClick={(e) => {
-                        const input = (e.currentTarget.previousElementSibling as HTMLInputElement);
+                        const input = e.currentTarget.previousElementSibling as HTMLInputElement;
                         const val = input.value.trim();
                         if (val) {
                           updatePlan(index, { features: [...plan.features, val] });

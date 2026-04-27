@@ -5,15 +5,7 @@ import { trpc } from '@/lib/trpc/client';
 import { useAuth } from '@/hooks/useAuth';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
-import {
-  Check,
-  Globe,
-  Loader2,
-  Clock,
-  Shield,
-  Zap,
-  LogIn,
-} from 'lucide-react';
+import { Check, Globe, Loader2, Clock, Shield, Zap, LogIn } from 'lucide-react';
 
 const SubscriptionPurchaseModal = dynamic(
   () => import('@/components/modals/SubscriptionPurchaseModal'),
@@ -53,14 +45,6 @@ const COUNTRY_NAMES: Record<string, string> = {
   BR: 'Бразилия',
 };
 
-function countryFlag(cc: string): string {
-  return cc
-    .toUpperCase()
-    .split('')
-    .map((c) => String.fromCodePoint(0x1f1e6 + c.charCodeAt(0) - 65))
-    .join('');
-}
-
 export default function SubscriptionPage() {
   const { userData } = useAuth({ silent: true, lightweight: true });
   const [modalOpen, setModalOpen] = useState(false);
@@ -72,13 +56,7 @@ export default function SubscriptionPage() {
   const realPlans = plans?.filter((p) => !p.isStub) ?? [];
   const stubPlans = plans?.filter((p) => p.isStub) ?? [];
 
-  const uniqueCountries = servers
-    ? Array.from(
-        new Map(
-          servers.map((s) => [s.countryCode, { countryCode: s.countryCode, isOnline: s.isOnline }]),
-        ).values(),
-      )
-    : [];
+  const serverList = servers ?? [];
 
   const handlePurchase = (planId: string) => {
     setSelectedPlanId(planId);
@@ -248,22 +226,28 @@ export default function SubscriptionPage() {
             <div className="flex items-center justify-center py-12">
               <Loader2 className="h-6 w-6 animate-spin text-neutral-400" />
             </div>
-          ) : uniqueCountries.length > 0 ? (
+          ) : serverList.length > 0 ? (
             <div className="flex flex-wrap justify-center gap-3">
-              {uniqueCountries.map((country) => (
+              {serverList.map((server) => (
                 <div
-                  key={country.countryCode}
+                  key={server.id}
                   className="flex w-[calc(50%-0.375rem)] items-center gap-3 rounded-xl border border-neutral-800 bg-neutral-900/50 px-4 py-3 transition-colors hover:border-neutral-700 sm:w-[calc(33.333%-0.5rem)] md:w-[calc(25%-0.5625rem)]"
                 >
-                  <span className="text-xl">{countryFlag(country.countryCode)}</span>
+                  <span
+                    className={`fi fi-${server.countryCode.toLowerCase()} fis`}
+                    style={{ width: '1.5rem', height: '1.5rem', borderRadius: '3px' }}
+                  />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-white">
-                      {COUNTRY_NAMES[country.countryCode] || country.countryCode}
+                      {COUNTRY_NAMES[server.countryCode] || server.countryCode}
                     </p>
+                    <p className="text-xs text-neutral-500">{server.label}</p>
                   </div>
                   <div
                     className={`h-2 w-2 shrink-0 rounded-full ${
-                      country.isOnline ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.5)]' : 'bg-neutral-600'
+                      server.isOnline
+                        ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.5)]'
+                        : 'bg-neutral-600'
                     }`}
                   />
                 </div>

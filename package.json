@@ -19,7 +19,11 @@
   "private": true,
   "packageManager": "pnpm@10.33.0",
   "browserslist": [
-    "defaults"
+    "Chrome >= 90",
+    "Firefox >= 88",
+    "Safari >= 14",
+    "Edge >= 90",
+    "not dead"
   ],
   "scripts": {
     "dev": "next dev",
@@ -48,6 +52,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "drizzle-orm": "^0.45.2",
+    "flag-icons": "^7.5.0",
     "gsap": "^3.15.0",
     "ioredis": "^5.10.1",
     "lucide-react": "^1.11.0",

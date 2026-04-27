@@ -13,7 +13,7 @@ The protection layer is a multi-stage filter that runs **before** every non-stat
                      │  2. handleProtection ◄──────────┐    │
                      │  3. handleAuth                  │    │
                      │  4. applySecurityHeaders        │    │
-                     └─────────────────┬───────────────┘   │
+                     └─────────────────┬───────────────┘    │
                                        │                    │
                                        ▼                    │
                   ┌──────────────────────────────────────┐  │

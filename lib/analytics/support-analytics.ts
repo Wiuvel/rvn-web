@@ -63,16 +63,6 @@ export async function trackTicketCreated(
   if (!client) return;
 
   try {
-    // Проверяем состояние соединения и переподключаемся при необходимости
-    if (client.status !== 'ready') {
-      try {
-        await client.connect();
-      } catch {
-        // Redis необязателен - не логируем ошибки переподключения
-        return;
-      }
-    }
-
     const now = new Date();
 
     // Увеличиваем счетчики
@@ -122,16 +112,6 @@ export async function trackTicketClosed(
   if (!client) return;
 
   try {
-    // Проверяем состояние соединения и переподключаемся при необходимости
-    if (client.status !== 'ready') {
-      try {
-        await client.connect();
-      } catch {
-        // Redis необязателен - не логируем ошибки переподключения
-        return;
-      }
-    }
-
     const now = new Date();
 
     // Увеличиваем счетчики
@@ -191,16 +171,6 @@ export async function trackMessageSent(
   if (!client) return;
 
   try {
-    // Проверяем состояние соединения и переподключаемся при необходимости
-    if (client.status !== 'ready') {
-      try {
-        await client.connect();
-      } catch {
-        // Redis необязателен - не логируем ошибки переподключения
-        return;
-      }
-    }
-
     const now = new Date();
 
     // Увеличиваем счетчики
@@ -339,35 +309,6 @@ export async function getSupportAnalytics(
       websocketMessages: 0,
       period,
     };
-  }
-
-  // Проверяем состояние соединения
-  if (client.status !== 'ready') {
-    // Автоматическое переподключение не логируется
-    try {
-      await client.connect();
-    } catch (error) {
-      logger.error('Failed to reconnect to Redis', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-      });
-      // Возвращаем пустую аналитику при ошибке переподключения
-      return {
-        totalTicketsCreated: 0,
-        totalTicketsClosed: 0,
-        totalMessagesSent: 0,
-        ticketsByStatus: {},
-        avgResponseTime: 0,
-        avgResolutionTime: 0,
-        ticketsCreatedDaily: [],
-        ticketsClosedDaily: [],
-        messagesSentDaily: [],
-        ticketsCreatedHourly: [],
-        messagesSentHourly: [],
-        websocketConnections: 0,
-        websocketMessages: 0,
-        period,
-      };
-    }
   }
 
   try {

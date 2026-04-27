@@ -88,169 +88,169 @@ export default function NotificationsPageClient() {
   return (
     <div className="min-h-screen bg-neutral-950 text-white selection:bg-primary-500/30">
       <Header />
-      <main className="mx-auto max-w-2xl px-4 pb-24 pt-8 lg:pt-32 lg:pb-8">
+      <main className="mx-auto max-w-2xl px-4 pb-24 pt-8 lg:pb-8 lg:pt-32">
         <div className="mb-6 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => router.back()}
-            className="rounded-xl p-2 text-neutral-400 transition-colors hover:bg-white/5 hover:text-white"
-            aria-label="Назад"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </button>
-          <h1 className="text-xl font-semibold text-white">Уведомления</h1>
-          {unreadCount > 0 && (
-            <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-primary-500 px-1.5 text-xs font-bold text-white">
-              {unreadCount > 99 ? '99+' : unreadCount}
-            </span>
-          )}
-        </div>
-        {unreadCount > 0 && (
-          <button
-            onClick={() => markAllRead()}
-            className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-medium text-neutral-400 transition-colors hover:bg-white/5 hover:text-white"
-          >
-            <CheckCheck className="h-4 w-4" />
-            Прочитать все
-          </button>
-        )}
-      </div>
-
-      {isLoading ? (
-        <div className="flex items-center justify-center py-20">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-neutral-600 border-t-primary-500" />
-        </div>
-      ) : allGroups.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20">
-          <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full border border-white/[0.06] bg-white/[0.03]">
-            <Bell className="h-10 w-10 text-neutral-500" />
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => router.back()}
+              className="rounded-xl p-2 text-neutral-400 transition-colors hover:bg-white/5 hover:text-white"
+              aria-label="Назад"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </button>
+            <h1 className="text-xl font-semibold text-white">Уведомления</h1>
+            {unreadCount > 0 && (
+              <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-primary-500 px-1.5 text-xs font-bold text-white">
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
+            )}
           </div>
-          <p className="text-sm text-neutral-400">Нет уведомлений</p>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          <Accordion type="multiple">
-            {allGroups.map((group, idx) => {
-              const groupKey = group.relatedTicketId ?? `group-${idx}`;
-              const mainType = group.items[0]?.type ?? 'other';
-              const groupTitle = group.ticketSubject ? group.ticketSubject : 'Уведомление';
-
-              return (
-                <AccordionItem
-                  key={groupKey}
-                  value={groupKey}
-                  className="mb-2 overflow-hidden rounded-2xl border !border-b border-white/[0.06] bg-white/[0.02]"
-                >
-                  <AccordionTrigger className="gap-3 px-4 py-3 hover:bg-white/[0.03] hover:no-underline">
-                    <div className="flex min-w-0 flex-1 items-center gap-3">
-                      <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-white/5">
-                        <GroupIcon type={mainType} />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="truncate text-sm font-medium text-white">
-                            {groupTitle}
-                          </span>
-                          {group.unreadCount > 0 && (
-                            <span className="flex h-5 min-w-[20px] flex-shrink-0 items-center justify-center rounded-full bg-primary-500 px-1.5 text-[11px] font-bold text-white">
-                              {group.unreadCount}
-                            </span>
-                          )}
-                        </div>
-                        <span className="text-xs text-neutral-500">
-                          {formatRelativeTime(group.latestAt)}
-                          {group.totalCount > 1 && (
-                            <span className="text-neutral-600">
-                              {' · '}
-                              {group.totalCount} сообщ.
-                            </span>
-                          )}
-                        </span>
-                      </div>
-                    </div>
-                  </AccordionTrigger>
-
-                  <AccordionContent className="px-4 pb-3">
-                    <div className="space-y-0.5">
-                      {group.items.map(
-                        (item: {
-                          id: string;
-                          type: string;
-                          title: string;
-                          message: string;
-                          isRead: boolean;
-                          count: number;
-                          createdAt: string;
-                        }) => (
-                          <button
-                            key={item.id}
-                            onClick={() =>
-                              handleItemClick(
-                                { id: item.id, isRead: item.isRead },
-                                group.relatedTicketId,
-                              )
-                            }
-                            className={`group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors ${
-                              !item.isRead
-                                ? 'bg-primary-500/[0.04] hover:bg-primary-500/[0.08]'
-                                : 'hover:bg-white/[0.03]'
-                            }`}
-                          >
-                            <span
-                              className={`h-1.5 w-1.5 flex-shrink-0 rounded-full ${
-                                !item.isRead ? 'bg-primary-500' : 'bg-neutral-700'
-                              }`}
-                            />
-                            <span
-                              className={`flex-1 text-sm ${!item.isRead ? 'text-neutral-200' : 'text-neutral-500'}`}
-                            >
-                              {item.message}
-                            </span>
-                            <span className="flex-shrink-0 text-xs text-neutral-600">
-                              {formatRelativeTime(item.createdAt)}
-                            </span>
-                            {!item.isRead && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  markRead(item.id);
-                                }}
-                                className="flex-shrink-0 rounded-lg p-1 text-neutral-600 opacity-0 transition-all hover:text-primary-400 group-hover:opacity-100"
-                                title="Прочитать"
-                                aria-label="Прочитать"
-                              >
-                                <Check className="h-3.5 w-3.5" />
-                              </button>
-                            )}
-                          </button>
-                        ),
-                      )}
-                    </div>
-
-                    {group.unreadCount > 0 && group.relatedTicketId && (
-                      <button
-                        onClick={() => markGroupRead(group.relatedTicketId!)}
-                        className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-medium text-neutral-500 transition-colors hover:bg-white/[0.03] hover:text-neutral-300"
-                      >
-                        <CheckCheck className="h-3.5 w-3.5" />
-                        Прочитать все в группе
-                      </button>
-                    )}
-                  </AccordionContent>
-                </AccordionItem>
-              );
-            })}
-          </Accordion>
-
-          {hasNextPage && (
-            <div ref={sentinelRef} className="flex justify-center py-4">
-              {isFetchingNextPage && (
-                <div className="h-6 w-6 animate-spin rounded-full border-2 border-neutral-600 border-t-primary-500" />
-              )}
-            </div>
+          {unreadCount > 0 && (
+            <button
+              onClick={() => markAllRead()}
+              className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-medium text-neutral-400 transition-colors hover:bg-white/5 hover:text-white"
+            >
+              <CheckCheck className="h-4 w-4" />
+              Прочитать все
+            </button>
           )}
         </div>
-      )}
+
+        {isLoading ? (
+          <div className="flex items-center justify-center py-20">
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-neutral-600 border-t-primary-500" />
+          </div>
+        ) : allGroups.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20">
+            <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full border border-white/[0.06] bg-white/[0.03]">
+              <Bell className="h-10 w-10 text-neutral-500" />
+            </div>
+            <p className="text-sm text-neutral-400">Нет уведомлений</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <Accordion type="multiple">
+              {allGroups.map((group, idx) => {
+                const groupKey = group.relatedTicketId ?? `group-${idx}`;
+                const mainType = group.items[0]?.type ?? 'other';
+                const groupTitle = group.ticketSubject ? group.ticketSubject : 'Уведомление';
+
+                return (
+                  <AccordionItem
+                    key={groupKey}
+                    value={groupKey}
+                    className="mb-2 overflow-hidden rounded-2xl border !border-b border-white/[0.06] bg-white/[0.02]"
+                  >
+                    <AccordionTrigger className="gap-3 px-4 py-3 hover:bg-white/[0.03] hover:no-underline">
+                      <div className="flex min-w-0 flex-1 items-center gap-3">
+                        <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-white/5">
+                          <GroupIcon type={mainType} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="truncate text-sm font-medium text-white">
+                              {groupTitle}
+                            </span>
+                            {group.unreadCount > 0 && (
+                              <span className="flex h-5 min-w-[20px] flex-shrink-0 items-center justify-center rounded-full bg-primary-500 px-1.5 text-[11px] font-bold text-white">
+                                {group.unreadCount}
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-xs text-neutral-500">
+                            {formatRelativeTime(group.latestAt)}
+                            {group.totalCount > 1 && (
+                              <span className="text-neutral-600">
+                                {' · '}
+                                {group.totalCount} сообщ.
+                              </span>
+                            )}
+                          </span>
+                        </div>
+                      </div>
+                    </AccordionTrigger>
+
+                    <AccordionContent className="px-4 pb-3">
+                      <div className="space-y-0.5">
+                        {group.items.map(
+                          (item: {
+                            id: string;
+                            type: string;
+                            title: string;
+                            message: string;
+                            isRead: boolean;
+                            count: number;
+                            createdAt: string;
+                          }) => (
+                            <button
+                              key={item.id}
+                              onClick={() =>
+                                handleItemClick(
+                                  { id: item.id, isRead: item.isRead },
+                                  group.relatedTicketId,
+                                )
+                              }
+                              className={`group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors ${
+                                !item.isRead
+                                  ? 'bg-primary-500/[0.04] hover:bg-primary-500/[0.08]'
+                                  : 'hover:bg-white/[0.03]'
+                              }`}
+                            >
+                              <span
+                                className={`h-1.5 w-1.5 flex-shrink-0 rounded-full ${
+                                  !item.isRead ? 'bg-primary-500' : 'bg-neutral-700'
+                                }`}
+                              />
+                              <span
+                                className={`flex-1 text-sm ${!item.isRead ? 'text-neutral-200' : 'text-neutral-500'}`}
+                              >
+                                {item.message}
+                              </span>
+                              <span className="flex-shrink-0 text-xs text-neutral-600">
+                                {formatRelativeTime(item.createdAt)}
+                              </span>
+                              {!item.isRead && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    markRead(item.id);
+                                  }}
+                                  className="flex-shrink-0 rounded-lg p-1 text-neutral-600 opacity-0 transition-all hover:text-primary-400 group-hover:opacity-100"
+                                  title="Прочитать"
+                                  aria-label="Прочитать"
+                                >
+                                  <Check className="h-3.5 w-3.5" />
+                                </button>
+                              )}
+                            </button>
+                          ),
+                        )}
+                      </div>
+
+                      {group.unreadCount > 0 && group.relatedTicketId && (
+                        <button
+                          onClick={() => markGroupRead(group.relatedTicketId!)}
+                          className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-medium text-neutral-500 transition-colors hover:bg-white/[0.03] hover:text-neutral-300"
+                        >
+                          <CheckCheck className="h-3.5 w-3.5" />
+                          Прочитать все в группе
+                        </button>
+                      )}
+                    </AccordionContent>
+                  </AccordionItem>
+                );
+              })}
+            </Accordion>
+
+            {hasNextPage && (
+              <div ref={sentinelRef} className="flex justify-center py-4">
+                {isFetchingNextPage && (
+                  <div className="h-6 w-6 animate-spin rounded-full border-2 border-neutral-600 border-t-primary-500" />
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </main>
     </div>
   );

@@ -19,11 +19,11 @@
                   ┌──────────────────────────────────────┐  │
                   │  handleProtection                    │  │
                   │  ──────────────────────────────────  │  │
-                  │  ① access_token cookie валидна? ───► │──┘ allow
+                  │  ① access_token cookie валидна? ────►│──┘ allow
                   │     (HMAC-SHA256, ≤ 12ч)             │
                   │                                      │
                   │  ② IP rate limit (Redis sliding,     │
-                  │     30 req/min) ── превышен? ──────► │ protection
+                  │     30 req/min) ── превышен? ───────►│ protection
                   │                                      │
                   │  ③ suspicion score ≥ 30 ────────────►│ protection
                   │     (UA, headers, IP, bot pattern)   │

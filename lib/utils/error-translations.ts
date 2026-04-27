@@ -155,13 +155,3 @@ export function translateError(errorMessage: string | undefined | null): string 
   // Если перевод не найден, возвращаем оригинальное сообщение
   return normalizedError;
 }
-
-/**
- * Переводит ошибки валидации на русский язык
- * @param error - Сообщение об ошибке валидации
- * @returns Переведенное сообщение или оригинальное, если перевод не найден
- * @deprecated Используйте translateError() вместо этой функции
- */
-export function translateValidationError(error: string): string {
-  return translateError(error);
-}

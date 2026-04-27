@@ -1,5 +1,10 @@
 /**
- * Redis клиент для хранения аналитики и кэширования
+ * Redis клиент — стабильный singleton с автоматическим reconnect через ioredis.
+ *
+ * Принцип: создаём инстанс один раз, никогда не обнуляем.
+ * ioredis сам управляет reconnect через retryStrategy + enableOfflineQueue.
+ * Команды во время reconnect буферизируются (offline queue) и выполняются после восстановления.
+ * Отдельные команды фейлятся после maxRetriesPerRequest (3) попыток — это не убивает клиент.
  */
 
 import Redis, { RedisOptions } from 'ioredis';
@@ -8,55 +13,32 @@ import { logger } from '@/lib/utils/secure-logger';
 let redis: Redis | null = null;
 
 /**
- * Получить экземпляр Redis клиента
+ * Получить экземпляр Redis клиента.
+ * Возвращает один и тот же инстанс независимо от текущего статуса соединения.
+ * Возвращает null только если REDIS_URL не задан.
  */
 export function getRedisClient(): Redis | null {
   const redisUrl = process.env.REDIS_URL;
+  if (!redisUrl) return null;
 
-  if (!redisUrl) {
-    // Не логируем отсутствие Redis - это опциональная функция
-    return null;
-  }
-
-  // Если соединение существует и активно, возвращаем его
-  if (redis && redis.status === 'ready') {
-    return redis;
-  }
-
-  // Если соединение закрыто или не готово, пересоздаем
-  if (redis) {
-    try {
-      redis.disconnect();
-    } catch {
-      // Игнорируем ошибки при отключении
-    }
-    redis = null;
-  }
+  if (redis) return redis;
 
   try {
     const isTls = redisUrl.startsWith('rediss://');
     const options: RedisOptions = {
       maxRetriesPerRequest: 3,
       retryStrategy: (times) => {
-        if (times > 3) {
-          logger.error('Redis connection failed after 3 retries');
-          return null; // Stop retrying
-        }
-        return Math.min(times * 200, 2000); // Exponential backoff
+        return Math.min(times * 500, 5000);
       },
       reconnectOnError: (err) => {
-        const targetError = 'READONLY';
-        if (err.message.includes(targetError)) {
-          return true; // Reconnect on READONLY error
-        }
-        // Переподключаемся при ошибке "Connection is closed"
-        if (err.message.includes('Connection is closed')) {
-          return true;
-        }
+        if (err.message.includes('READONLY')) return true;
+        if (err.message.includes('Connection is closed')) return true;
         return false;
       },
       enableReadyCheck: true,
+      enableOfflineQueue: true,
       lazyConnect: false,
+      keepAlive: 30000,
     };
 
     if (isTls) {
@@ -83,23 +65,14 @@ export function getRedisClient(): Redis | null {
 
     redis = new Redis(redisUrl, options);
 
-    // Автоматические события подключения не логируются
-
     redis.on('error', (err) => {
-      // Логируем только критические ошибки
-      if (!err.message.includes('ECONNREFUSED') && !err.message.includes('Connection is closed')) {
+      if (
+        !err.message.includes('ECONNREFUSED') &&
+        !err.message.includes('Connection is closed') &&
+        !err.message.includes('ENOTFOUND')
+      ) {
         logger.error('Redis error', { error: err.message });
       }
-    });
-
-    redis.on('close', () => {
-      // Автоматическое закрытие не логируется
-      redis = null;
-    });
-
-    redis.on('end', () => {
-      // Автоматическое завершение не логируется
-      redis = null;
     });
 
     return redis;
@@ -107,13 +80,12 @@ export function getRedisClient(): Redis | null {
     logger.error('Failed to initialize Redis', {
       error: error instanceof Error ? error.message : 'Unknown error',
     });
-    redis = null;
     return null;
   }
 }
 
 /**
- * Закрыть соединение с Redis
+ * Закрыть соединение с Redis (для graceful shutdown)
  */
 export async function closeRedis(): Promise<void> {
   if (redis) {

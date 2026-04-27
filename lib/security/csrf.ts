@@ -141,12 +141,6 @@ export async function verifyCSRFToken(
   }
 }
 
-/**
- * Реэкспорт для обратной совместимости
- * @deprecated Используйте generateSessionId из lib/utils напрямую
- */
-export { generateSessionId } from '../utils/index';
-
 export async function revokeCSRFToken(sessionId: string): Promise<void> {
   const store = getCsrfStore();
   await store.delete(sessionId);

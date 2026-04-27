@@ -1,6 +1,8 @@
 /**
- * CSRF token store abstraction with Redis backend and in-memory fallback.
- * Enables horizontal scaling and CSRF persistence across restarts.
+ * CSRF token store с Redis backend и автоматическим in-memory fallback.
+ *
+ * ResilientCsrfStore пробует Redis на каждый вызов.
+ * При ошибке Redis — fallback на MemoryCsrfStore.
  */
 
 import { getRedisClient } from '@/lib/database/redis';
@@ -20,9 +22,6 @@ export interface ICsrfStore {
   delete(sessionId: string): Promise<boolean>;
 }
 
-/**
- * Redis-backed CSRF store.
- */
 class RedisCsrfStore implements ICsrfStore {
   private getKey(sessionId: string): string {
     return `${CSRF_KEY_PREFIX}${sessionId}`;
@@ -30,59 +29,33 @@ class RedisCsrfStore implements ICsrfStore {
 
   async get(sessionId: string): Promise<CsrfStoreEntry | null> {
     const redis = getRedisClient();
-    if (!redis) return null;
+    if (!redis) throw new Error('Redis unavailable');
 
-    try {
-      const key = this.getKey(sessionId);
-      const raw = await redis.get(key);
-      if (!raw) return null;
-      return JSON.parse(raw) as CsrfStoreEntry;
-    } catch (error) {
-      logger.error('Redis CSRF get error', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-        sessionId: sessionId.substring(0, 8) + '...',
-      });
-      return null;
-    }
+    const key = this.getKey(sessionId);
+    const raw = await redis.get(key);
+    if (!raw) return null;
+    return JSON.parse(raw) as CsrfStoreEntry;
   }
 
   async set(sessionId: string, data: CsrfStoreEntry, ttlMs: number): Promise<void> {
     const redis = getRedisClient();
-    if (!redis) return;
+    if (!redis) throw new Error('Redis unavailable');
 
-    try {
-      const key = this.getKey(sessionId);
-      const ttlSec = Math.ceil(ttlMs / 1000);
-      await redis.setex(key, ttlSec, JSON.stringify(data));
-    } catch (error) {
-      logger.error('Redis CSRF set error', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-        sessionId: sessionId.substring(0, 8) + '...',
-      });
-    }
+    const key = this.getKey(sessionId);
+    const ttlSec = Math.ceil(ttlMs / 1000);
+    await redis.setex(key, ttlSec, JSON.stringify(data));
   }
 
   async delete(sessionId: string): Promise<boolean> {
     const redis = getRedisClient();
-    if (!redis) return false;
+    if (!redis) throw new Error('Redis unavailable');
 
-    try {
-      const key = this.getKey(sessionId);
-      const deleted = await redis.del(key);
-      return deleted > 0;
-    } catch (error) {
-      logger.error('Redis CSRF delete error', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-        sessionId: sessionId.substring(0, 8) + '...',
-      });
-      return false;
-    }
+    const key = this.getKey(sessionId);
+    const deleted = await redis.del(key);
+    return deleted > 0;
   }
 }
 
-/**
- * In-memory CSRF store. Fallback when Redis is unavailable.
- */
 class MemoryCsrfStore implements ICsrfStore {
   private store = new Map<string, CsrfStoreEntry>();
   private expiration = new Map<string, number>();
@@ -113,14 +86,52 @@ class MemoryCsrfStore implements ICsrfStore {
   }
 }
 
+/**
+ * Resilient store: пробует Redis на каждый вызов, при ошибке — memory fallback.
+ */
+class ResilientCsrfStore implements ICsrfStore {
+  private redis = new RedisCsrfStore();
+  private memory = new MemoryCsrfStore();
+
+  async get(sessionId: string): Promise<CsrfStoreEntry | null> {
+    try {
+      const result = await this.redis.get(sessionId);
+      if (result) return result;
+    } catch {
+      // Redis недоступен — пробуем memory
+    }
+    return this.memory.get(sessionId);
+  }
+
+  async set(sessionId: string, data: CsrfStoreEntry, ttlMs: number): Promise<void> {
+    try {
+      await this.redis.set(sessionId, data, ttlMs);
+      return;
+    } catch {
+      logger.warn('Redis CSRF write failed, using memory fallback', {
+        sessionId: sessionId.substring(0, 8) + '...',
+      });
+    }
+    await this.memory.set(sessionId, data, ttlMs);
+  }
+
+  async delete(sessionId: string): Promise<boolean> {
+    let deleted = false;
+    try {
+      deleted = await this.redis.delete(sessionId);
+    } catch {
+      // Redis недоступен
+    }
+    const memDeleted = await this.memory.delete(sessionId);
+    return deleted || memDeleted;
+  }
+}
+
 let csrfStoreInstance: ICsrfStore | null = null;
 
-/**
- * Returns the CSRF store. Uses Redis when available, otherwise in-memory.
- */
 export function getCsrfStore(): ICsrfStore {
   if (!csrfStoreInstance) {
-    csrfStoreInstance = getRedisClient() ? new RedisCsrfStore() : new MemoryCsrfStore();
+    csrfStoreInstance = new ResilientCsrfStore();
   }
   return csrfStoreInstance;
 }

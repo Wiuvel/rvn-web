@@ -1,6 +1,9 @@
 /**
- * Session store abstraction with Redis backend and in-memory fallback.
- * Enables horizontal scaling and session persistence across restarts.
+ * Session store с Redis backend и автоматическим in-memory fallback.
+ *
+ * ResilientSessionStore пробует Redis на каждый вызов.
+ * При ошибке Redis — fallback на MemorySessionStore (сессии, созданные во время outage,
+ * доступны из памяти). Когда Redis восстановится, новые сессии снова идут туда.
  */
 
 import { getRedisClient } from '@/lib/database/redis';
@@ -14,7 +17,7 @@ export interface SessionData {
   id: string;
   userId: string;
   username: string;
-  tokenFingerprint: string; // HMAC(token) — привязка session к token; пусто для admin
+  tokenFingerprint: string;
   createdAt: number;
   lastActivity: number;
   ipAddress: string;
@@ -28,9 +31,6 @@ export interface ISessionStore {
   deleteByUserId(userId: string): Promise<number>;
 }
 
-/**
- * Redis-backed session store. Uses Redis for persistence and multi-instance support.
- */
 class RedisSessionStore implements ISessionStore {
   private getKey(sessionId: string): string {
     return `${SESSION_KEY_PREFIX}${sessionId}`;
@@ -42,109 +42,73 @@ class RedisSessionStore implements ISessionStore {
 
   async get(sessionId: string): Promise<SessionData | null> {
     const redis = getRedisClient();
-    if (!redis) return null;
+    if (!redis) throw new Error('Redis unavailable');
 
-    try {
-      const key = this.getKey(sessionId);
-      const raw = await redis.get(key);
-      if (!raw) return null;
+    const key = this.getKey(sessionId);
+    const raw = await redis.get(key);
+    if (!raw) return null;
 
-      const data = JSON.parse(raw) as SessionData;
-      const now = Date.now();
+    const data = JSON.parse(raw) as SessionData;
+    const now = Date.now();
 
-      if (data.lastActivity + SESSION_TIMEOUT < now) {
-        await this.delete(sessionId);
-        return null;
-      }
-
-      // Sliding expiration: update lastActivity and extend TTL
-      data.lastActivity = now;
-      await redis.setex(key, Math.ceil(SESSION_TIMEOUT / 1000), JSON.stringify(data));
-
-      return data;
-    } catch (error) {
-      logger.error('Redis session get error', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-        sessionId: sessionId.substring(0, 8) + '...',
-      });
+    if (data.lastActivity + SESSION_TIMEOUT < now) {
+      await this.delete(sessionId);
       return null;
     }
+
+    data.lastActivity = now;
+    await redis.setex(key, Math.ceil(SESSION_TIMEOUT / 1000), JSON.stringify(data));
+
+    return data;
   }
 
   async set(sessionId: string, data: SessionData, ttlMs: number): Promise<void> {
     const redis = getRedisClient();
-    if (!redis) return;
+    if (!redis) throw new Error('Redis unavailable');
 
-    try {
-      const key = this.getKey(sessionId);
-      const ttlSec = Math.ceil(ttlMs / 1000);
-      await redis.setex(key, ttlSec, JSON.stringify(data));
+    const key = this.getKey(sessionId);
+    const ttlSec = Math.ceil(ttlMs / 1000);
+    await redis.setex(key, ttlSec, JSON.stringify(data));
 
-      // Track session IDs per user for deleteByUserId
-      const userKey = this.getUserSessionsKey(data.userId);
-      await redis.sadd(userKey, sessionId);
-      await redis.expire(userKey, ttlSec);
-    } catch (error) {
-      logger.error('Redis session set error', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-        sessionId: sessionId.substring(0, 8) + '...',
-      });
-    }
+    const userKey = this.getUserSessionsKey(data.userId);
+    await redis.sadd(userKey, sessionId);
+    await redis.expire(userKey, ttlSec);
   }
 
   async delete(sessionId: string): Promise<boolean> {
     const redis = getRedisClient();
-    if (!redis) return false;
+    if (!redis) throw new Error('Redis unavailable');
 
-    try {
-      const key = this.getKey(sessionId);
-      const raw = await redis.get(key);
-      if (raw) {
-        const data = JSON.parse(raw) as SessionData;
-        const userKey = this.getUserSessionsKey(data.userId);
-        await redis.srem(userKey, sessionId);
-      }
-      const deleted = await redis.del(key);
-      return deleted > 0;
-    } catch (error) {
-      logger.error('Redis session delete error', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-        sessionId: sessionId.substring(0, 8) + '...',
-      });
-      return false;
+    const key = this.getKey(sessionId);
+    const raw = await redis.get(key);
+    if (raw) {
+      const data = JSON.parse(raw) as SessionData;
+      const userKey = this.getUserSessionsKey(data.userId);
+      await redis.srem(userKey, sessionId);
     }
+    const deleted = await redis.del(key);
+    return deleted > 0;
   }
 
   async deleteByUserId(userId: string): Promise<number> {
     const redis = getRedisClient();
-    if (!redis) return 0;
+    if (!redis) throw new Error('Redis unavailable');
 
-    try {
-      const userKey = this.getUserSessionsKey(userId);
-      const sessionIds = await redis.smembers(userKey);
-      if (sessionIds.length === 0) return 0;
+    const userKey = this.getUserSessionsKey(userId);
+    const sessionIds = await redis.smembers(userKey);
+    if (sessionIds.length === 0) return 0;
 
-      let destroyed = 0;
-      for (const sid of sessionIds) {
-        const key = this.getKey(sid);
-        const result = await redis.del(key);
-        if (result > 0) destroyed++;
-      }
-      await redis.del(userKey);
-      return destroyed;
-    } catch (error) {
-      logger.error('Redis session deleteByUserId error', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-        userId,
-      });
-      return 0;
+    let destroyed = 0;
+    for (const sid of sessionIds) {
+      const key = this.getKey(sid);
+      const result = await redis.del(key);
+      if (result > 0) destroyed++;
     }
+    await redis.del(userKey);
+    return destroyed;
   }
 }
 
-/**
- * In-memory session store. Fallback when Redis is unavailable.
- */
 class MemorySessionStore implements ISessionStore {
   private sessions = new Map<string, SessionData>();
   private sessionExpiration = new Map<string, number>();
@@ -161,7 +125,6 @@ class MemorySessionStore implements ISessionStore {
       return null;
     }
 
-    // Sliding expiration
     session.lastActivity = now;
     this.sessionExpiration.set(sessionId, now + SESSION_TIMEOUT);
     return session;
@@ -211,14 +174,63 @@ class MemorySessionStore implements ISessionStore {
   }
 }
 
+/**
+ * Resilient store: пробует Redis на каждый вызов, при ошибке — memory fallback.
+ */
+class ResilientSessionStore implements ISessionStore {
+  private redis = new RedisSessionStore();
+  private memory = new MemorySessionStore();
+
+  async get(sessionId: string): Promise<SessionData | null> {
+    try {
+      const result = await this.redis.get(sessionId);
+      if (result) return result;
+    } catch {
+      // Redis недоступен — пробуем memory
+    }
+    return this.memory.get(sessionId);
+  }
+
+  async set(sessionId: string, data: SessionData, ttlMs: number): Promise<void> {
+    try {
+      await this.redis.set(sessionId, data, ttlMs);
+      return;
+    } catch {
+      logger.warn('Redis session write failed, using memory fallback', {
+        sessionId: sessionId.substring(0, 8) + '...',
+      });
+    }
+    await this.memory.set(sessionId, data, ttlMs);
+  }
+
+  async delete(sessionId: string): Promise<boolean> {
+    let deleted = false;
+    try {
+      deleted = await this.redis.delete(sessionId);
+    } catch {
+      // Redis недоступен
+    }
+    const memDeleted = await this.memory.delete(sessionId);
+    return deleted || memDeleted;
+  }
+
+  async deleteByUserId(userId: string): Promise<number> {
+    let count = 0;
+    try {
+      count = await this.redis.deleteByUserId(userId);
+    } catch {
+      // Redis недоступен
+    }
+    const memCount = await this.memory.deleteByUserId(userId);
+    return count + memCount;
+  }
+}
+
 let storeInstance: ISessionStore | null = null;
 
-/**
- * Returns the session store. Uses Redis when available, otherwise in-memory.
- */
 export function getSessionStore(): ISessionStore {
   if (!storeInstance) {
-    storeInstance = getRedisClient() ? new RedisSessionStore() : new MemorySessionStore();
+    storeInstance = new ResilientSessionStore();
   }
   return storeInstance;
 }

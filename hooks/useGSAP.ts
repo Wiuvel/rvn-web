@@ -20,9 +20,11 @@ export const useGSAP = () => {
         nullTargetWarn: false,
       });
 
+      const isMobileDevice = window.innerWidth < 768;
+
       ScrollTrigger.config({
         ignoreMobileResize: true,
-        syncInterval: 60,
+        syncInterval: isMobileDevice ? 120 : 60,
       });
 
       if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
@@ -109,7 +111,9 @@ export const useStaggeredFadeIn = (delay: number = 0, stagger: number = 0.05) =>
       return;
     }
 
-    const timeout = setTimeout(() => {
+    let animation: gsap.core.Tween | null = null;
+
+    const raf = requestAnimationFrame(() => {
       if (!containerRef.current) return;
 
       const rect = containerRef.current.getBoundingClientRect();
@@ -122,7 +126,7 @@ export const useStaggeredFadeIn = (delay: number = 0, stagger: number = 0.05) =>
 
       gsap.set(elements, { opacity: 0, y: 10, scale: 0.98 });
 
-      const animation = gsap.to(elements, {
+      animation = gsap.to(elements, {
         opacity: 1,
         y: 0,
         scale: 1,
@@ -137,22 +141,11 @@ export const useStaggeredFadeIn = (delay: number = 0, stagger: number = 0.05) =>
           toggleActions: 'play none none none',
         },
       });
-
-      (
-        containerRef.current as HTMLDivElement & { __gsapAnimation?: gsap.core.Tween }
-      ).__gsapAnimation = animation;
-    }, 150);
-
-    const container = containerRef.current;
+    });
 
     return () => {
-      clearTimeout(timeout);
-      const animation = (
-        container as (HTMLDivElement & { __gsapAnimation?: gsap.core.Tween }) | null
-      )?.__gsapAnimation;
-      if (animation) {
-        animation.kill();
-      }
+      cancelAnimationFrame(raf);
+      animation?.kill();
     };
   }, [delay, stagger]);
 

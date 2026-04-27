@@ -29,9 +29,7 @@ export default function PaymentRedirectPage() {
         <div className="text-center">
           <XCircle className="mx-auto mb-4 h-12 w-12 text-red-400" />
           <h1 className="mb-2 text-xl font-semibold text-white">Платёж не найден</h1>
-          <p className="mb-4 text-sm text-neutral-400">
-            Не удалось найти информацию о платеже.
-          </p>
+          <p className="mb-4 text-sm text-neutral-400">Не удалось найти информацию о платеже.</p>
           <Link
             href={`/dashboard/${userData?.user_id}`}
             className="text-sm text-primary-400 hover:underline"

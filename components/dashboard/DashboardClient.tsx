@@ -27,7 +27,6 @@ import {
   Calendar,
   Smartphone,
   ShoppingBag,
-  Globe,
 } from 'lucide-react';
 import Header from '@/components/layout/Header';
 
@@ -560,7 +559,10 @@ export default function DashboardClient({ userId }: DashboardClientProps) {
                         className="flex items-center justify-between rounded-xl bg-neutral-800/30 px-4 py-3"
                       >
                         <div className="flex items-center gap-3">
-                          <Globe className="h-4 w-4 text-neutral-500" />
+                          <span
+                            className={`fi fi-${node.countryCode.toLowerCase()} fis`}
+                            style={{ width: '1.25rem', height: '1.25rem', borderRadius: '2px' }}
+                          />
                           <span className="text-sm font-medium text-white">{node.label}</span>
                         </div>
                         <div className="flex items-center gap-2">

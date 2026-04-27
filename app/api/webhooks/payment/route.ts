@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
      * 2. Assign Squad (addUsersToSquad);
      * 3. Update subscription (status → 'active');
      * 4. Invalidate the authorization cache.
-    */
+     */
     return NextResponse.json({ received: true });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';

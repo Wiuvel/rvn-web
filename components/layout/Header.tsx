@@ -158,8 +158,8 @@ export default function Header({ variant = 'main' }: HeaderProps = {}) {
 
   return (
     <header ref={headerRef} className="relative z-50 pt-4 lg:fixed lg:left-0 lg:right-0 lg:top-0">
-      <div className="mx-auto max-w-7xl px-3">
-        <div className="header-container flex items-center justify-between px-3 py-3 lg:rounded-full lg:border lg:border-white/10 lg:bg-neutral-900/40 lg:px-6 lg:py-4 lg:shadow-lg lg:backdrop-blur-md">
+      <div className="mx-auto max-w-7xl px-8">
+        <div className="header-container flex items-center justify-between py-3 lg:rounded-full lg:border lg:border-white/10 lg:bg-neutral-900/40 lg:px-6 lg:py-4 lg:shadow-lg lg:backdrop-blur-md">
           {/* Logo — always visible */}
           <Link
             href="/"

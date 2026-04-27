@@ -1,3 +1,5 @@
+@import 'flag-icons/css/flag-icons.min.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -1098,4 +1100,14 @@ a {
 
 .pulse-ring {
   animation: pulse-ring 2s ease-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pulse-ring,
+  .animate-blob,
+  .icon-float,
+  .wing-animation,
+  .logo-pulse {
+    animation: none !important;
+  }
 }

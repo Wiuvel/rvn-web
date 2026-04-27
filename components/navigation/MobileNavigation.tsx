@@ -77,12 +77,22 @@ export default function MobileNavigation() {
 
       if (backdropRef.current) {
         gsap.set(backdropRef.current, { display: 'block', pointerEvents: 'auto', force3D: true });
-        gsap.to(backdropRef.current, { opacity: 1, duration: 0.25, ease: 'power2.out', force3D: true });
+        gsap.to(backdropRef.current, {
+          opacity: 1,
+          duration: 0.25,
+          ease: 'power2.out',
+          force3D: true,
+        });
       }
 
       if (overlayRef.current) {
         gsap.set(overlayRef.current, { display: 'flex', xPercent: 100, force3D: true });
-        gsap.to(overlayRef.current, { xPercent: 0, duration: 0.32, ease: 'power3.out', force3D: true });
+        gsap.to(overlayRef.current, {
+          xPercent: 0,
+          duration: 0.32,
+          ease: 'power2.out',
+          force3D: true,
+        });
       }
 
       document.body.style.overflow = 'hidden';
@@ -207,7 +217,12 @@ export default function MobileNavigation() {
       <div
         ref={backdropRef}
         className="fixed inset-0 z-[1000] bg-black/80 lg:hidden"
-        style={{ display: 'none', opacity: 0, pointerEvents: 'none', willChange: 'opacity' }}
+        style={{
+          display: 'none',
+          opacity: 0,
+          pointerEvents: 'none',
+          willChange: 'opacity, transform',
+        }}
         onClick={closeOverlay}
         aria-hidden="true"
       />

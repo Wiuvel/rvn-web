@@ -50,7 +50,7 @@ export default function HeroSection() {
       });
     };
 
-    const interval = setInterval(updatePing, 1200);
+    const interval = setInterval(updatePing, 3000);
     return () => clearInterval(interval);
   }, [connected]);
 
@@ -70,12 +70,9 @@ export default function HeroSection() {
 
       {/* Top radial glow - reduced intensity */}
       <div
-        className="pointer-events-none absolute left-1/2 top-0 h-[500px] w-[min(1000px,100vw)] -translate-x-1/2 rounded-full bg-primary-500/[0.04] blur-[100px]"
+        className="pointer-events-none absolute left-1/2 top-0 h-[500px] w-[min(1000px,100vw)] -translate-x-1/2 rounded-full bg-primary-500/[0.04] blur-[60px] sm:blur-[100px]"
         aria-hidden="true"
       />
-
-      {/* Floating particles — desktop only */}
-      <div className="hidden md:block">{/* FloatingParticles removed */}</div>
 
       <div className="relative z-10 mx-auto max-w-7xl px-4 pb-24 pt-8 sm:px-6 lg:px-8 lg:pb-36 lg:pt-32">
         <div className="flex flex-col items-center gap-8 md:gap-12 lg:grid lg:grid-cols-2">

@@ -153,18 +153,3 @@ export function isValidAvatar(avatarId: string | null | undefined): avatarId is 
   const id = parseInt(avatarId);
   return !isNaN(id) && id >= 0 && id < AVATAR_GRADIENTS.length;
 }
-
-// Обратная совместимость (для миграции)
-/**
- * @deprecated Используйте generateRandomAvatar() вместо этого
- */
-export function generateRandomGradient(): string {
-  return generateRandomAvatar();
-}
-
-/**
- * @deprecated Используйте generateAvatarFromString() вместо этого
- */
-export function generateGradientFromString(str: string): string {
-  return generateAvatarFromString(str);
-}
