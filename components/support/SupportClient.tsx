@@ -21,6 +21,11 @@ import {
 } from '@/lib/utils/support-messages';
 import { translateError } from '@/lib/utils/error-translations';
 import { useWebSocket } from '@/hooks/useWebSocket';
+import type {
+  BroadcastMessagePayload,
+  BroadcastMessageReadPayload,
+  BroadcastTicketUpdatePayload,
+} from '@/lib/websocket/types';
 import { debugPerformanceAsync, debugStart, debugEnd, debugError } from '@/lib/utils/debug';
 import TicketSkeleton from '@/components/ui/TicketSkeleton';
 import FileUploadModal from '@/components/support/FileUploadModal';
@@ -374,7 +379,10 @@ export default function SupportClient() {
       const cached = localStorage.getItem(getCacheKey(ticketId));
       if (!cached) return null;
 
-      const cacheData = JSON.parse(cached);
+      const cacheData = JSON.parse(cached) as {
+        timestamp: number;
+        messages?: Array<Message & { timestamp?: Date | string }>;
+      };
       const age = Date.now() - cacheData.timestamp;
 
       // Проверяем TTL
@@ -383,10 +391,9 @@ export default function SupportClient() {
         return null;
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const messages = (cacheData.messages || []).map((msg: any) => ({
+      const messages: Message[] = (cacheData.messages || []).map((msg) => ({
         ...msg,
-        timestamp: msg.timestamp instanceof Date ? msg.timestamp : new Date(msg.timestamp),
+        timestamp: msg.timestamp instanceof Date ? msg.timestamp : new Date(msg.timestamp ?? 0),
       }));
 
       return messages;
@@ -619,31 +626,7 @@ export default function SupportClient() {
   useEffect(() => {
     if (!socket) return;
 
-    type WsMessageData = {
-      ticketId: string;
-      message: {
-        id: string;
-        message_text: string;
-        sender_type: 'user' | 'support';
-        created_at: string;
-        is_read: boolean;
-        sender?: {
-          id: string;
-          username: string;
-          user_id: string;
-        };
-        attachments?: Array<{
-          id: string;
-          file_name: string;
-          file_type: string;
-          file_size: number;
-          storage_path: string;
-          storage_url?: string;
-        }>;
-      };
-    };
-
-    const handleNewMessageGlobal = (data: WsMessageData) => {
+    const handleNewMessageGlobal = (data: BroadcastMessagePayload) => {
       const attachments = data.message.attachments || [];
       let lastMessageText = data.message.message_text || '';
       if (!lastMessageText && attachments.length > 0) {
@@ -666,10 +649,7 @@ export default function SupportClient() {
       );
     };
 
-    const handleTicketUpdateGlobal = (data: {
-      ticketId: string;
-      ticket: { status: 'open' | 'closed' | 'pending'; updated_at?: string };
-    }) => {
+    const handleTicketUpdateGlobal = (data: BroadcastTicketUpdatePayload) => {
       setTickets((prev) =>
         prev.map((t) =>
           t.id === data.ticketId
@@ -697,29 +677,7 @@ export default function SupportClient() {
   useEffect(() => {
     if (!socket || !activeTicket) return;
 
-    const handleNewMessage = (data: {
-      ticketId: string;
-      message: {
-        id: string;
-        message_text: string;
-        sender_type: 'user' | 'support';
-        created_at: string;
-        is_read: boolean;
-        sender?: {
-          id: string;
-          username: string;
-          user_id: string;
-        };
-        attachments?: Array<{
-          id: string;
-          file_name: string;
-          file_type: string;
-          file_size: number;
-          storage_path: string;
-          storage_url?: string;
-        }>;
-      };
-    }) => {
+    const handleNewMessage = (data: BroadcastMessagePayload) => {
       if (data.ticketId !== activeTicketRef.current?.id) return;
 
       const existingMessage = activeTicketMessagesRef.current.find((m) => m.id === data.message.id);
@@ -811,13 +769,7 @@ export default function SupportClient() {
       markMessagesAsRead(data.ticketId);
     };
 
-    const handleTicketUpdate = (data: {
-      ticketId: string;
-      ticket: {
-        status: 'open' | 'closed' | 'pending';
-        updated_at?: string;
-      };
-    }) => {
+    const handleTicketUpdate = (data: BroadcastTicketUpdatePayload) => {
       if (data.ticketId !== activeTicketRef.current?.id) return;
 
       setActiveTicket((prev) => {
@@ -826,11 +778,7 @@ export default function SupportClient() {
       });
     };
 
-    const handleMessageRead = (data: {
-      ticketId: string;
-      messageIds: string[];
-      readBy: 'user' | 'support';
-    }) => {
+    const handleMessageRead = (data: BroadcastMessageReadPayload) => {
       if (data.ticketId !== activeTicketRef.current?.id) return;
 
       setActiveTicket((prev) => {

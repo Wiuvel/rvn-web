@@ -1,7 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback, memo } from 'react';
-import Link from 'next/link';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import Image from 'next/image';
 import { trpc } from '@/lib/trpc/client';
 import { onRateLimited } from '@/lib/trpc/rate-limit-link';
@@ -11,18 +10,22 @@ import RateLimitCaptcha from '@/components/auth/RateLimitCaptcha';
 import { GSAP_DEFAULT_DURATION, GSAP_DEFAULT_EASE } from '@/lib/utils/constants';
 import {
   getLastMessageLabelForAttachments,
-  messageTextForBubble,
   normalizeLastMessageDisplayText,
 } from '@/lib/utils/support-messages';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { getGradientClasses, getAvatarUrl } from '@/lib/utils/avatar-gradients';
 import { useWebSocket } from '@/hooks/useWebSocket';
+import type {
+  BroadcastMessagePayload,
+  BroadcastTicketUpdatePayload,
+  BroadcastTicketAssignedPayload,
+  BroadcastMessageReadPayload,
+} from '@/lib/websocket/types';
 import TicketSkeleton from '@/components/ui/TicketSkeleton';
-import { FileText } from 'lucide-react';
 import ImageViewer from '@/components/support/ImageViewer';
-import ImageWithBlur from '@/components/support/ImageWithBlur';
 import { AdminAccessDeniedState } from '@/components/support/AdminAccessDeniedState';
 import { CloseReasonModal } from '@/components/support/CloseReasonModal';
+import { AdminMessageItem } from '@/components/support/AdminMessageItem';
 import { debugPerformanceAsync, debugStart, debugEnd, debugError } from '@/lib/utils/debug';
 import type { RawTicketApi } from '@/lib/types/support-api';
 import { mapWsAttachments } from '@/lib/utils/support-mappers';
@@ -105,281 +108,6 @@ interface Notification {
   type: 'error';
   show: boolean;
 }
-
-// Функция-помощник для обработки вложений с формированием storage_url
-
-// Компонент для анимированного сообщения
-const MessageItem = memo(function MessageItem({
-  message,
-  showDate,
-  isSystemMessage,
-  isSupport,
-  isUser,
-  formatDate,
-  formatTime,
-  getInitial,
-  isInitialLoad = false,
-  onImageClick,
-  formatFileSize,
-}: {
-  message: Message;
-  showDate: boolean;
-  isSystemMessage: boolean;
-  isSupport: boolean;
-  isUser: boolean;
-  formatDate: (date: string) => string;
-  formatTime: (date: string) => string;
-  getInitial: (username: string) => string;
-  isInitialLoad?: boolean;
-  onImageClick?: (url: string, alt: string) => void;
-  formatFileSize: (bytes: number) => string;
-}) {
-  const messageRef = useRef<HTMLDivElement>(null);
-  const hasAnimatedRef = useRef(false);
-
-  useEffect(() => {
-    // При первой загрузке не анимируем, чтобы избежать дергания
-    if (isInitialLoad) {
-      if (messageRef.current) {
-        gsap.set(messageRef.current, { opacity: 1, y: 0, scale: 1 });
-      }
-      return;
-    }
-
-    // Анимируем только новые сообщения (не при первой загрузке)
-    if (messageRef.current && typeof window !== 'undefined' && !hasAnimatedRef.current) {
-      hasAnimatedRef.current = true;
-      gsap.fromTo(
-        messageRef.current,
-        { opacity: 0, y: 10, scale: 0.95 },
-        { opacity: 1, y: 0, scale: 1, duration: 0.3, ease: 'power2.out' },
-      );
-    }
-  }, [message.id, isInitialLoad]);
-
-  return (
-    <div ref={messageRef}>
-      {showDate && (
-        <div className="my-4 text-center text-xs text-neutral-500">
-          {formatDate(message.created_at)}
-        </div>
-      )}
-      {/* Логика: саппорт справа (items-end), пользователь слева (items-start), системные сообщения слева */}
-      {isSystemMessage ? (
-        <div className="flex w-full flex-col items-start">
-          {/* Заголовок с именем "Система" */}
-          <div className="mb-1.5 flex items-baseline gap-1.5 px-1">
-            <span className="rounded bg-white/10 px-2 py-1 text-sm font-medium text-yellow-400">
-              Система
-            </span>
-          </div>
-
-          {/* Сообщение */}
-          <div
-            className="min-w-0 max-w-[70%] flex-shrink-0 rounded-2xl bg-neutral-700/50 px-4 py-3 text-neutral-300"
-            style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}
-          >
-            {(() => {
-              const bubbleText = messageTextForBubble(
-                message.message_text || '',
-                !!(message.attachments && message.attachments.length),
-              );
-              return bubbleText ? (
-                <p className="whitespace-pre-wrap break-words text-sm">{bubbleText}</p>
-              ) : null;
-            })()}
-            <div className="mt-1.5 flex items-center gap-2 text-xs text-neutral-400">
-              <span>{formatTime(message.created_at)}</span>
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div
-          className={`flex flex-col ${isSupport ? 'items-end' : 'items-start'} ${isSupport ? 'ml-auto max-w-[75%]' : ''}`}
-        >
-          {/* Заголовок с именем */}
-          {isUser && message.sender && (
-            <div className="mb-1.5 flex items-baseline gap-1.5 px-1">
-              <span className="rounded bg-white/10 px-2 py-1 text-sm font-medium text-white">
-                {message.sender.username}
-              </span>
-              <span className="text-xs text-neutral-400">#{message.sender.user_id}</span>
-            </div>
-          )}
-          {isSupport && message.sender && (
-            <div className="mb-1.5 flex items-baseline gap-1.5 px-1">
-              <span className="rounded bg-white/10 px-2 py-1 text-sm font-medium text-white">
-                {message.sender.username}
-              </span>
-              <span className="text-xs text-white">Поддержка</span>
-            </div>
-          )}
-
-          {/* Сообщение с аватаркой */}
-          <div
-            className={`flex items-end gap-3 ${isSupport ? 'flex-row-reverse' : 'flex-row'} ${isSupport ? 'w-full' : 'w-full'}`}
-          >
-            {/* Аватарка для пользователя (слева) */}
-            {isUser &&
-              message.sender &&
-              (() => {
-                const avatarUrl = getAvatarUrl(message.sender.avatar);
-                const gradientClasses = getGradientClasses(message.sender.avatar);
-
-                const avatarEl = (
-                  <div
-                    className={`h-10 w-10 overflow-hidden rounded-full ${avatarUrl ? '' : gradientClasses} mb-1 flex flex-shrink-0 items-center justify-center text-sm font-semibold text-white`}
-                  >
-                    {avatarUrl ? (
-                      <Image
-                        src={avatarUrl}
-                        alt={message.sender.username}
-                        width={40}
-                        height={40}
-                        className="h-full w-full object-cover"
-                        unoptimized
-                      />
-                    ) : (
-                      getInitial(message.sender.username)
-                    )}
-                  </div>
-                );
-                return message.sender.user_id ? (
-                  <Link
-                    href={`/user/${message.sender.user_id}`}
-                    prefetch={false}
-                    className="transition-opacity hover:opacity-80"
-                  >
-                    {avatarEl}
-                  </Link>
-                ) : (
-                  avatarEl
-                );
-              })()}
-
-            {/* Пузырь сообщения */}
-            <div
-              className={`${isSupport ? 'max-w-[60%]' : 'max-w-[70%]'} min-w-0 flex-shrink-0 rounded-2xl px-4 py-3 ${
-                isSupport
-                  ? message.is_read
-                    ? 'rounded-br-sm bg-blue-600 text-white'
-                    : 'rounded-br-sm bg-neutral-800 text-neutral-100'
-                  : 'rounded-bl-sm bg-neutral-800 text-neutral-100'
-              }`}
-              style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}
-            >
-              {(() => {
-                const bubbleText = messageTextForBubble(
-                  message.message_text || '',
-                  !!(message.attachments && message.attachments.length),
-                );
-                return bubbleText ? (
-                  <p className="whitespace-pre-wrap break-words text-sm">{bubbleText}</p>
-                ) : null;
-              })()}
-
-              {/* Вложения */}
-              {message.attachments &&
-                message.attachments.length > 0 &&
-                (() => {
-                  const images = message.attachments!.filter((a) =>
-                    a.file_type.startsWith('image/'),
-                  );
-                  const documents = message.attachments!.filter(
-                    (a) => !a.file_type.startsWith('image/'),
-                  );
-                  const bubbleText = messageTextForBubble(message.message_text || '', true);
-
-                  return (
-                    <div className={`space-y-2 ${bubbleText ? 'mt-2' : ''}`}>
-                      {/* Группировка изображений */}
-                      {images.length > 0 && (
-                        <div
-                          className={`grid w-full gap-1.5 ${images.length === 1 ? 'max-w-[29rem]' : 'max-w-[37.5rem] grid-cols-2'}`}
-                        >
-                          {images.map((attachment) => (
-                            <button
-                              key={attachment.id}
-                              onClick={() =>
-                                onImageClick?.(attachment.storage_url, attachment.file_name)
-                              }
-                              className="block w-full min-w-0 cursor-pointer overflow-hidden rounded-lg transition-opacity hover:opacity-90"
-                            >
-                              <ImageWithBlur
-                                src={attachment.storage_url}
-                                alt={attachment.file_name}
-                                className="rounded-lg"
-                                isRead={message.is_read}
-                                blurHash={attachment.blur_hash ?? undefined}
-                                width={attachment.width ?? undefined}
-                                height={attachment.height ?? undefined}
-                              />
-                            </button>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* Документы */}
-                      {documents.length > 0 && (
-                        <div className="space-y-1.5">
-                          {documents.map((attachment) => (
-                            <a
-                              key={attachment.id}
-                              href={attachment.storage_url}
-                              download={attachment.file_name}
-                              className="flex cursor-pointer items-center gap-2 rounded-lg bg-neutral-700/50 p-2 transition-colors hover:bg-neutral-700/70"
-                            >
-                              <FileText className="h-4 w-4 flex-shrink-0 text-neutral-300" />
-                              <div className="min-w-0 flex-1">
-                                <p className="truncate text-xs font-medium">
-                                  {attachment.file_name}
-                                </p>
-                                <p className="text-[10px] text-neutral-400">
-                                  {formatFileSize(attachment.file_size)}
-                                </p>
-                              </div>
-                            </a>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()}
-
-              <div
-                className={`mt-1.5 flex items-center gap-2 text-xs ${
-                  isSupport
-                    ? message.is_read
-                      ? 'text-blue-100'
-                      : 'text-neutral-400'
-                    : 'text-neutral-400'
-                }`}
-              >
-                <span>{formatTime(message.created_at)}</span>
-                {/* Индикация прочитанных сообщений саппорта пользователем */}
-                {isSupport && message.is_read && (
-                  <svg
-                    className="h-3.5 w-3.5 text-blue-400"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M5 13l4 4L19 7"
-                    />
-                  </svg>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-});
 
 const CACHE_PREFIX = 'support_panel_messages_';
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 минут
@@ -640,7 +368,10 @@ export default function AdminSupportClient() {
       const cached = localStorage.getItem(getCacheKey(ticketId));
       if (!cached) return null;
 
-      const cacheData = JSON.parse(cached);
+      const cacheData = JSON.parse(cached) as {
+        timestamp: number;
+        messages?: Message[];
+      };
       const age = Date.now() - cacheData.timestamp;
 
       // Проверяем TTL
@@ -649,10 +380,7 @@ export default function AdminSupportClient() {
         return null;
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const messages = (cacheData.messages || []).map((msg: any) => ({
-        ...msg,
-      }));
+      const messages: Message[] = (cacheData.messages || []).map((msg) => ({ ...msg }));
 
       return messages;
     } catch {
@@ -867,8 +595,7 @@ export default function AdminSupportClient() {
   useEffect(() => {
     if (statusFilter !== 'archive' || !archiveQuery.data?.tickets) return;
     setTicketsLoading(archiveQuery.isLoading);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let list = (archiveQuery.data.tickets || []).map((t: any) => ({
+    let list: Ticket[] = (archiveQuery.data.tickets || []).map((t) => ({
       id: t.id,
       subject: t.subject,
       status: t.status,
@@ -1011,11 +738,7 @@ export default function AdminSupportClient() {
   useEffect(() => {
     if (!socket || !activeTicket || !authState.hasSupportAccess) return;
 
-    const handleNewMessage = (data: {
-      ticketId: string;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      message: any;
-    }) => {
+    const handleNewMessage = (data: BroadcastMessagePayload) => {
       // ALWAYS update ticket list (even if this ticket isn't currently active)
       let lastMessageText = data.message.message_text || '';
       if (!lastMessageText && data.message.attachments && data.message.attachments.length > 0) {
@@ -1120,14 +843,7 @@ export default function AdminSupportClient() {
       markMessagesAsRead(data.ticketId);
     };
 
-    const handleTicketUpdate = (data: {
-      ticketId: string;
-      ticket: {
-        status: 'open' | 'closed' | 'pending';
-        updated_at: string;
-        closed_at?: string | null;
-      };
-    }) => {
+    const handleTicketUpdate = (data: BroadcastTicketUpdatePayload) => {
       // ОПТИМИЗАЦИЯ: Обновляем тикет в списке всегда, даже если он не активный
       // Это обеспечивает мгновенное обновление UI без дополнительных запросов
       updateTicketInList(data.ticketId, {
@@ -1150,16 +866,7 @@ export default function AdminSupportClient() {
       }
     };
 
-    const handleTicketAssignment = (data: {
-      ticketId: string;
-      assignedTo: string | null;
-      assignedUser: {
-        id: string;
-        username: string;
-        user_id: string;
-        avatar?: string | null;
-      } | null;
-    }) => {
+    const handleTicketAssignment = (data: BroadcastTicketAssignedPayload) => {
       // ОПТИМИЗАЦИЯ: Обновляем тикет в списке всегда для мгновенного обновления UI
       updateTicketInList(data.ticketId, {
         assigned_to: data.assignedTo,
@@ -1179,11 +886,7 @@ export default function AdminSupportClient() {
       }
     };
 
-    const handleMessageRead = (data: {
-      ticketId: string;
-      messageIds: string[];
-      readBy: 'user' | 'support';
-    }) => {
+    const handleMessageRead = (data: BroadcastMessageReadPayload) => {
       if (data.ticketId !== activeTicketRef.current?.id) return;
 
       // Обновляем статус прочитанности сообщений
@@ -1251,8 +954,7 @@ export default function AdminSupportClient() {
       statusChanged ||
       currentMessagesHash !== lastMessagesHash
     ) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const mappedMessages: Message[] = (polledData.messages || []).map((m: any) => ({
+      const mappedMessages: Message[] = (polledData.messages || []).map((m) => ({
         id: m.id,
         ticket_id: activeTicket.id,
         sender_id: m.sender?.id || '',
@@ -1396,50 +1098,24 @@ export default function AdminSupportClient() {
           return;
         }
 
-        let tickets = [...(openData.tickets || []), ...(pendingData.tickets || [])].map(
-          (t: {
-            id: string;
-            subject: string;
-            status: 'open' | 'closed' | 'pending';
-            priority?: 'low' | 'normal' | 'high' | 'urgent';
-            created_at: string;
-            updated_at: string;
-            last_message_at: string;
-            closed_at?: string | null;
-            user?: {
-              id: string;
-              username: string;
-              user_id: string;
-            };
-            assigned_to?: string | null;
-            assigned_user?: {
-              id: string;
-              username: string;
-              user_id: string;
-            } | null;
-            last_message?: {
-              id: string;
-              message_text: string;
-              sender_type: 'user' | 'support' | 'system';
-              created_at: string;
-              is_read: boolean;
-            } | null;
-          }) => ({
-            id: t.id,
-            subject: t.subject,
-            status: t.status,
-            priority: t.priority || 'normal',
-            created_at: t.created_at,
-            updated_at: t.updated_at,
-            last_message_at: t.last_message_at,
-            closed_at: t.closed_at,
-            user_id: (t as { user_id?: string }).user_id, // Сохраняем user_id для проверки прав
-            user: t.user,
-            assigned_to: t.assigned_to,
-            assigned_user: t.assigned_user,
-            last_message: t.last_message || null,
-          }),
-        );
+        let tickets: Ticket[] = [
+          ...(openData.tickets || []),
+          ...(pendingData.tickets || []),
+        ].map((t) => ({
+          id: t.id,
+          subject: t.subject,
+          status: t.status,
+          priority: t.priority || 'normal',
+          created_at: t.created_at,
+          updated_at: t.updated_at,
+          last_message_at: t.last_message_at,
+          closed_at: t.closed_at,
+          user_id: t.user_id,
+          user: t.user,
+          assigned_to: t.assigned_to,
+          assigned_user: t.assigned_user,
+          last_message: t.last_message || null,
+        }));
 
         // Для активных сортируем по давности последнего ответа (убывание - старые сверху)
         tickets = tickets.sort((a: Ticket, b: Ticket) => {
@@ -2782,7 +2458,7 @@ export default function AdminSupportClient() {
                         const isUser = senderType === 'user';
 
                         return (
-                          <MessageItem
+                          <AdminMessageItem
                             key={message._renderKey ?? message.id}
                             message={message}
                             showDate={showDate}
