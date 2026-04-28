@@ -6,14 +6,14 @@ import dynamic from 'next/dynamic';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { translateError } from '@/lib/utils/error-translations';
-import { getOAuthErrorMessage } from '@/lib/utils/oauth-errors';
+import { getOAuthErrorMessage } from '@/lib/auth/oauth-errors';
 import {
   loginSchema,
   registerSchema,
   type LoginFormData,
   type RegisterFormData,
 } from '@/lib/validation/schemas';
-import { calculatePasswordStrength } from '@/lib/utils/password';
+import { calculatePasswordStrength } from '@/lib/auth/password-strength';
 import { trpc } from '@/lib/trpc/client';
 import { onRateLimited } from '@/lib/trpc/rate-limit-link';
 import { useAuthForm } from '@/hooks/useAuthForm';

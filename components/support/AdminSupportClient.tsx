@@ -11,7 +11,7 @@ import { GSAP_DEFAULT_DURATION, GSAP_DEFAULT_EASE } from '@/lib/utils/constants'
 import {
   getLastMessageLabelForAttachments,
   normalizeLastMessageDisplayText,
-} from '@/lib/utils/support-messages';
+} from '@/lib/support/messages';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { getGradientClasses, getAvatarUrl } from '@/lib/utils/avatar-gradients';
 import { useWebSocket } from '@/hooks/useWebSocket';
@@ -27,8 +27,8 @@ import { AdminAccessDeniedState } from '@/components/support/AdminAccessDeniedSt
 import { CloseReasonModal } from '@/components/support/CloseReasonModal';
 import { AdminMessageItem } from '@/components/support/AdminMessageItem';
 import { debugPerformanceAsync, debugStart, debugEnd, debugError } from '@/lib/utils/debug';
-import type { RawTicketApi } from '@/lib/types/support-api';
-import { mapWsAttachments } from '@/lib/utils/support-mappers';
+import type { RawTicketApi } from '@/lib/support/types';
+import { mapWsAttachments } from '@/lib/support/mappers';
 
 interface AuthState {
   isAuthenticated: boolean;

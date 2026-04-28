@@ -5,7 +5,7 @@ import { SessionManager } from '@/lib/auth/session-manager';
 import { setCorsHeaders, handleCorsPreflight } from '@/lib/security/cors';
 import { logger } from '@/lib/utils/secure-logger';
 import { authRateLimit } from '@/lib/security/rate-limit';
-import { getErrorRedirectUrl, GOOGLE_ERROR_MAP } from '@/lib/utils/oauth-errors';
+import { getErrorRedirectUrl, GOOGLE_ERROR_MAP } from '@/lib/auth/oauth-errors';
 import { domains, getCookieDomain } from '@/lib/utils';
 
 export async function OPTIONS() {

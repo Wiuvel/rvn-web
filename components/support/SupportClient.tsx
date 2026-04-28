@@ -18,7 +18,7 @@ import {
 import {
   getLastMessageLabelForAttachments,
   normalizeLastMessageDisplayText,
-} from '@/lib/utils/support-messages';
+} from '@/lib/support/messages';
 import { translateError } from '@/lib/utils/error-translations';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import type {
@@ -41,8 +41,8 @@ import { SupportUnauthorizedState } from '@/components/support/SupportUnauthoriz
 import Header from '@/components/layout/Header';
 import { useAuth } from '@/hooks/useAuth';
 import type { Message, Ticket, UploadedFile } from '@/components/support/types';
-import type { RawTicketApi } from '@/lib/types/support-api';
-import { mapRawTicketsToUi, mapWsAttachments } from '@/lib/utils/support-mappers';
+import type { RawTicketApi } from '@/lib/support/types';
+import { mapRawTicketsToUi, mapWsAttachments } from '@/lib/support/mappers';
 
 // Lazy load RateLimitCaptcha для оптимизации bundle size
 // Убираем loading state, чтобы избежать показа модального окна при загрузке страницы

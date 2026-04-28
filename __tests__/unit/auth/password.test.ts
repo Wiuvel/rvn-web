@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculatePasswordStrength } from '@/lib/utils/password';
+import { calculatePasswordStrength } from '@/lib/auth/password-strength';
 
 describe('calculatePasswordStrength', () => {
   it('should return score 0 for empty password', () => {

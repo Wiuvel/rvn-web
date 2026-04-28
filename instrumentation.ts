@@ -95,7 +95,7 @@ export async function register() {
 
     /* GeoIP */
     try {
-      const { checkGeoReady } = await import('./lib/utils/geolocation');
+      const { checkGeoReady } = await import('./lib/auth/geolocation');
       const geo = await checkGeoReady();
       if (geo?.source === 'maxmind') {
         console.log(`[startup] GeoIP: MaxMind ready (${geo.dbPath})`);

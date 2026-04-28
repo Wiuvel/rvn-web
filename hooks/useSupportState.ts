@@ -1,8 +1,8 @@
 import { useReducer, useEffect } from 'react';
 import { UserData } from '@/types';
 import { Ticket, Message, UploadedFile } from '@/components/support/types';
-import type { RawTicketApi, RawMessageApi } from '@/lib/types/support-api';
-import { mapRawTicketsToUi, mapRawTicketWithMessagesToUi } from '@/lib/utils/support-mappers';
+import type { RawTicketApi, RawMessageApi } from '@/lib/support/types';
+import { mapRawTicketsToUi, mapRawTicketWithMessagesToUi } from '@/lib/support/mappers';
 
 export interface SupportState {
   userData: UserData | null;

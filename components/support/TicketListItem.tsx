@@ -1,6 +1,6 @@
 'use client';
 
-import { normalizeLastMessageDisplayText } from '@/lib/utils/support-messages';
+import { normalizeLastMessageDisplayText } from '@/lib/support/messages';
 import type { Ticket } from './types';
 
 interface TicketListItemProps {

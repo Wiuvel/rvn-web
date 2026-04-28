@@ -2,7 +2,7 @@
 
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { getOAuthErrorMessage, isPopupSpecificError } from '@/lib/utils/oauth-errors';
+import { getOAuthErrorMessage, isPopupSpecificError } from '@/lib/auth/oauth-errors';
 
 // Helper function to check if we're in a popup
 function isPopupWindow(): boolean {

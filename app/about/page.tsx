@@ -8,7 +8,7 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner';
 const MOBILE_BREAKPOINT_PX = 768;
 
 /* Heavy WebGL effect — load client-side only; disabled on mobile */
-const LightRays = dynamic(() => import('@/components/LightRays'), {
+const LightRays = dynamic(() => import('@/components/effects/LightRays'), {
   ssr: false,
   loading: () => <div className="absolute inset-0" aria-hidden="true" />,
 });
