@@ -34,9 +34,7 @@
     "test": "vitest",
     "format:check": "prettier --check .",
     "format:fix": "prettier --write .",
-    "type:check": "tsc --noEmit",
-    "ws:contract:sync": "node scripts/sync-ws-contract.mjs",
-    "ws:contract:check": "node scripts/sync-ws-contract.mjs --check"
+    "type:check": "tsc --noEmit"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1037.0",

@@ -100,32 +100,11 @@ WS-сервер **не имеет** прямого доступа к базе д
 
 Контракт сообщений WebSocket описан дважды: на стороне сервера в [`Wiuvel/rvn-socketio-server`](https://github.com/Wiuvel/rvn-socketio-server) (`src/types.ts`) и в зеркальном файле `lib/websocket/types.ts` на стороне rvn-web. Серверный файл — **источник правды**, все изменения начинаются с него.
 
-### Структура файлов на стороне rvn-web
+При изменении контракта:
 
-| Файл | Назначение |
-|------|------------|
-| `lib/websocket/types.ts` | Локальные типы (с префиксом `Ws*`), которые используют `client.ts` и `hooks/useWebSocket.ts`. |
-| `lib/websocket/__upstream__/server-types.ts` | Снапшот upstream-типов из `rvn-socketio-server/src/types.ts` за зафиксированным коммитом. Тело файла **байт-в-байт** совпадает с upstream. Не редактировать вручную. |
-| `lib/websocket/__contract-check__.ts` | Type-level проверка структурного равенства между `types.ts` и снапшотом. Если они расходятся — `pnpm run type:check` падает. |
-| `scripts/sync-ws-contract.mjs` | Скрипт синхронизации/проверки снапшота через GitHub API. |
+1. Обновите `src/types.ts` в `rvn-socketio-server`.
+2. Отзеркальте изменение в `lib/websocket/types.ts` здесь.
+3. Обновите broadcast-хелперы в `lib/websocket/client.ts` и потребителей в `hooks/useWebSocket.ts`.
+4. Обновите таблицы событий в [`events.en.md`](events.en.md) / [`events.md`](events.md).
 
-### Автоматическая проверка на дрейф
-
-`pnpm run type:check` (а значит — `tsc --noEmit` в локальной разработке и в CI) автоматически валит сборку, если локальные типы в `lib/websocket/types.ts` структурно расходятся с зафиксированным upstream-снапшотом. Это покрывает случаи, когда контракт случайно изменили только на стороне rvn-web.
-
-Дополнительно для проверки upstream:
-
-```bash
-pnpm run ws:contract:check   # сравнить снапшот с upstream@pinnedSha (нужен интернет)
-pnpm run ws:contract:sync    # подтянуть upstream@main, показать diff, обновить снапшот и pinned SHA
-```
-
-CI-степ может вызывать `ws:contract:check`, чтобы сорвать сборку, если кто-то изменил снапшот без честного пересинка.
-
-### Когда меняется контракт
-
-1. Обновите `src/types.ts` в `rvn-socketio-server`, замержите.
-2. Здесь запустите `pnpm run ws:contract:sync` — скрипт скачает свежий upstream, покажет diff и перезапишет снапшот вместе с pinned SHA.
-3. Подгоните `lib/websocket/types.ts` под новый контракт — `pnpm run type:check` подскажет, какие именно поля разошлись (см. ошибки от `__contract-check__.ts`).
-4. Обновите broadcast-хелперы в `lib/websocket/client.ts` и потребителей в `hooks/useWebSocket.ts`.
-5. Обновите таблицы событий в [`events.en.md`](events.en.md) / [`events.md`](events.md).
+Автоматической проверки на дрейф нет; в перспективе можно вынести типы в общий npm-пакет `@rvn/ws-types` либо добавить CI-шаг, который сверяет оба файла.
