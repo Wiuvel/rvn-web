@@ -77,6 +77,12 @@
 | [Subscriptions & Payments](docs/subscriptions/subscriptions.en.md) | Plan catalogue, Remnawave provisioning, balance/promo/external purchase flows, payment webhook |
 | [Balance & Promo](docs/subscriptions/balance.en.md) | `users.balance`, `payments`, `balance_transactions` ledger, test promo, top-up & purchase flows |
 
+### Database
+
+| Document | Description |
+|----------|-------------|
+| [Migrations](docs/database/migrations.en.md) | Drizzle Kit workflow, custom migrations for triggers/CHECK constraints, `db:generate` / `db:migrate` scripts, bootstrap on existing DBs |
+
 ---
 
 ## Setup
@@ -98,6 +104,9 @@ pnpm start             # production server
 pnpm test              # vitest
 pnpm lint              # oxlint
 pnpm format            # prettier
+pnpm db:generate       # drizzle-kit: emit a new SQL migration from schema.ts
+pnpm db:migrate        # apply pending migrations to DATABASE_URL
+pnpm db:studio         # drizzle-kit studio (local DB inspector)
 ```
 
 ## Project Structure
