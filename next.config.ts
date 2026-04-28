@@ -18,26 +18,23 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
-        /* Apply security headers to all routes except static files */
-        source:
-          '/:path((?!_next/static|static|favicon\\.ico|.*\\.svg$|.*\\.png$|.*\\.jpg$|.*\\.jpeg$|.*\\.gif$|.*\\.webp$|.*\\.ico$|.*\\.woff$|.*\\.woff2$|.*\\.ttf$|.*\\.eot$|.*\\.css$|.*\\.js$|.*\\.map$).*)',
+        /*
+         * Baseline headers for `/api/*` — middleware doesn't run on API routes
+         * (matcher excludes `api`), so we set them here. All other paths receive
+         * the same headers via `applySecurityHeaders` in `lib/security/headers.ts`.
+         */
+        source: '/api/:path*',
         headers: [
-          {
-            key: 'X-Content-Type-Options',
-            value: 'nosniff',
-          },
-          {
-            key: 'X-Frame-Options',
-            value: 'DENY',
-          },
-          {
-            key: 'Referrer-Policy',
-            value: 'strict-origin-when-cross-origin',
-          },
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          { key: 'X-Frame-Options', value: 'DENY' },
+          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
         ],
       },
       {
-        /* CORS headers for static files: /static/*, /_next/static/*, /favicon.ico */
+        /*
+         * CORS headers for static files: /static/*, /_next/static/*, /favicon.ico.
+         * Static assets bypass middleware, so CORS is set here directly.
+         */
         source: '/:path((?:static(?:/.*)?|_next/static(?:/.*)?|favicon\\.ico))',
         headers: [
           { key: 'Access-Control-Allow-Origin', value: '*' },
