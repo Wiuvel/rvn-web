@@ -8,7 +8,6 @@ import AdvantagesSection from '@/components/sections/Advantages';
 import DashboardPreviewSection from '@/components/sections/DashboardPreview';
 import AppsSection from '@/components/sections/Apps';
 import FAQSection from '@/components/sections/FAQ';
-import BackgroundEffects from '@/components/decorative/BackgroundEffects';
 import { useGSAP } from '@/hooks/useGSAP';
 import LogoLoader from '@/components/ui/LogoLoader';
 
@@ -27,9 +26,7 @@ export default function Home() {
   return (
     <>
       {isLoading && <LogoLoader />}
-
-      <BackgroundEffects />
-
+      
       <div ref={containerRef} className="relative z-10">
         <div
           className={
