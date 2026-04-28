@@ -1098,24 +1098,23 @@ export default function AdminSupportClient() {
           return;
         }
 
-        let tickets: Ticket[] = [
-          ...(openData.tickets || []),
-          ...(pendingData.tickets || []),
-        ].map((t) => ({
-          id: t.id,
-          subject: t.subject,
-          status: t.status,
-          priority: t.priority || 'normal',
-          created_at: t.created_at,
-          updated_at: t.updated_at,
-          last_message_at: t.last_message_at,
-          closed_at: t.closed_at,
-          user_id: t.user_id,
-          user: t.user,
-          assigned_to: t.assigned_to,
-          assigned_user: t.assigned_user,
-          last_message: t.last_message || null,
-        }));
+        let tickets: Ticket[] = [...(openData.tickets || []), ...(pendingData.tickets || [])].map(
+          (t) => ({
+            id: t.id,
+            subject: t.subject,
+            status: t.status,
+            priority: t.priority || 'normal',
+            created_at: t.created_at,
+            updated_at: t.updated_at,
+            last_message_at: t.last_message_at,
+            closed_at: t.closed_at,
+            user_id: t.user_id,
+            user: t.user,
+            assigned_to: t.assigned_to,
+            assigned_user: t.assigned_user,
+            last_message: t.last_message || null,
+          }),
+        );
 
         // Для активных сортируем по давности последнего ответа (убывание - старые сверху)
         tickets = tickets.sort((a: Ticket, b: Ticket) => {

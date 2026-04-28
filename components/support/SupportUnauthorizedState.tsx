@@ -26,8 +26,8 @@ export function SupportUnauthorizedState() {
           </div>
           <h1 className="mb-2 text-2xl font-bold text-white">Требуется авторизация</h1>
           <p className="mb-6 text-neutral-400">
-            Для доступа к данной странице требуется авторизация. Войдите в аккаунт или обратитесь
-            в Telegram Bot&apos;а.
+            Для доступа к данной странице требуется авторизация. Войдите в аккаунт или обратитесь в
+            Telegram Bot&apos;а.
           </p>
           <Link
             href={`/auth?return_to=${encodeURIComponent('/support/')}`}

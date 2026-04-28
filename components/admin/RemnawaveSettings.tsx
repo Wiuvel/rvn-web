@@ -96,9 +96,9 @@ export default function RemnawaveSettings() {
       <div className="rounded-xl border border-neutral-800 bg-neutral-900/50 p-6">
         <div className="mb-6 flex items-center justify-between">
           <div>
-            <h3 className="text-lg font-semibold text-white">Remnawave Panel</h3>
+            <h3 className="text-lg font-semibold text-white">Subscription API</h3>
             <p className="mt-1 text-sm text-neutral-400">
-              Подключение к панели для управления VPN-подписками
+              Подключение к панели для управления подписками
             </p>
           </div>
           <div className="flex items-center gap-2">

@@ -26,7 +26,7 @@ export default function Home() {
   return (
     <>
       {isLoading && <LogoLoader />}
-      
+
       <div ref={containerRef} className="relative z-10">
         <div
           className={

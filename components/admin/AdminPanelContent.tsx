@@ -82,7 +82,7 @@ export default function AdminPanelContent({ teamCount }: AdminPanelContentProps)
   const [userActionMessage, setUserActionMessage] = useState('');
   const userActionMessageRef = useRef<HTMLDivElement>(null);
 
-  // Hooks
+  // @Hooks
   const {
     users,
     setUsers,
@@ -122,10 +122,9 @@ export default function AdminPanelContent({ teamCount }: AdminPanelContentProps)
     handleBanSubmit,
   } = useAdminBan(setUserActionMessage);
 
-  // Анимация для userActionMessage
+  // Animation for userActionMessage..
   useEffect(() => {
     if (userActionMessage && userActionMessageRef.current) {
-      // Сбрасываем display перед анимацией появления
       if (userActionMessageRef.current.style.display === 'none') {
         userActionMessageRef.current.style.display = '';
       }
@@ -212,7 +211,7 @@ export default function AdminPanelContent({ teamCount }: AdminPanelContentProps)
     }
   }, [activeTab, authState.isAuthenticated, debouncedSearch, fetchUsers, sortDirection]);
 
-  // Сохранение активной вкладки в localStorage
+  // Saving the active tab to localStorage..
   useEffect(() => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('admin_panel_active_tab', activeTab);
@@ -288,7 +287,7 @@ export default function AdminPanelContent({ teamCount }: AdminPanelContentProps)
           <div className="flex items-center space-x-3">
             <div>
               <h1 className="text-lg font-semibold text-white">Raven Team</h1>
-              <p className="text-xs text-neutral-400">NextJS 16.0.7 / React 19.1.0</p>
+              <p className="text-xs text-neutral-400">NextJS 16.2.3 / React 19.2.4</p>
             </div>
           </div>
         </div>
@@ -300,7 +299,6 @@ export default function AdminPanelContent({ teamCount }: AdminPanelContentProps)
               key={tab.id}
               onClick={() => {
                 setActiveTab(tab.id);
-                // Закрываем мобильное меню при выборе вкладки
                 if (window.innerWidth < 768) {
                   setMobileMenuOpen(false);
                 }
@@ -496,7 +494,6 @@ export default function AdminPanelContent({ teamCount }: AdminPanelContentProps)
 
                     {!usersLoading &&
                       users.map((user) => {
-                        // Определяем самую старшую роль (admin > support > user)
                         let highestRole: string | null = null;
                         if (user.roles && user.roles.length > 0) {
                           if (user.roles.includes('admin')) {
@@ -510,14 +507,13 @@ export default function AdminPanelContent({ teamCount }: AdminPanelContentProps)
                           }
                         }
 
-                        // Определяем цвет логина в зависимости от роли
                         const getUsernameColor = () => {
                           if (highestRole === 'admin') {
                             return '!text-purple-400';
                           } else if (highestRole === 'support') {
                             return '!text-green-400';
                           }
-                          return ''; // Обычный цвет для клиентов (из CSS)
+                          return '';
                         };
 
                         return (

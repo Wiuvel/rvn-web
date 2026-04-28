@@ -5,7 +5,7 @@
 
 export async function register() {
   if (process.env.NEXT_RUNTIME === 'nodejs') {
-    // WASM Image Processor check
+    /* WASM image processor */
     try {
       const { checkWasmReady } = await import('./lib/wasm/image-processor');
       const ok = await checkWasmReady();
@@ -18,7 +18,7 @@ export async function register() {
       console.log('[startup] WASM image processor: failed to load (fallback to passthrough)');
     }
 
-    /* S3 Object Storage check (HeadBucket — lightweight API call to verify connectivity) */
+    /* S3 storage */
     try {
       const endpoint = process.env.S3_ENDPOINT;
       const accessKey = process.env.S3_ACCESS_KEY;
@@ -60,7 +60,7 @@ export async function register() {
       );
     }
 
-    /* Redis check */
+    /* Redis */
     try {
       const redisUrl = process.env.REDIS_URL;
       if (redisUrl) {
@@ -93,7 +93,7 @@ export async function register() {
       );
     }
 
-    /* GeoIP check */
+    /* GeoIP */
     try {
       const { checkGeoReady } = await import('./lib/utils/geolocation');
       const geo = await checkGeoReady();
@@ -108,7 +108,7 @@ export async function register() {
       );
     }
 
-    /* Database check (Drizzle) */
+    /* Database */
     try {
       const { db } = await import('./lib/database/db');
       const { sql } = await import('drizzle-orm');

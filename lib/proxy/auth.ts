@@ -3,25 +3,13 @@ import { parseUserDataCookie } from '@/lib/auth/user-cookie.server';
 import { applySecurityHeaders } from '@/lib/security/headers';
 
 /**
- * Auth Proxy - handles authentication and authorization
+ * Handles authentication and authorization in the proxy layer.
  *
- * Logic flow:
- * 1. Auth routes (login/register):
- *    - Redirect authenticated users to dashboard
- *    - Handle OAuth callbacks
+ * 1. Auth routes — redirect authenticated users to dashboard, pass OAuth callbacks.
+ * 2. Dashboard routes — require token, enforce correct user ID in URL.
+ * 3. Support/admin panels — require authentication.
  *
- * 2. Dashboard routes:
- *    - Require authentication (token cookie)
- *    - Redirect unauthenticated users to login
- *    - Enforce correct user ID in URL
- *
- * 3. Support panel:
- *    - Require authentication
- *
- * @param request - The Next.js request object
- * @param pathname - The request pathname
- * @param requestHeaders - Headers to pass to the response
- * @returns NextResponse with redirect or null to allow/deny access
+ * @returns Redirect response, or null to allow access.
  */
 export function handleAuth(
   request: NextRequest,
@@ -32,15 +20,8 @@ export function handleAuth(
   const userData = parseUserDataCookie(request.cookies.get('user_data')?.value);
   const userId = userData?.user_id;
 
-  /**
-   * Session Restore & Validation
-   * If token exists but user_data is missing or invalid (e.g. tampered):
-   * 1. If token is valid: restore user_data and redirect back
-   * 2. If token is invalid: clear cookies and redirect to auth
-   * This prevents infinite redirect loops and restores broken sessions
-   */
+  /** Token present but user_data missing/invalid — redirect to restore endpoint. */
   if (hasToken && !userId) {
-    // Avoid redirect loop if we are already on the restore route (handled by shouldBypassProxy, but safety first)
     if (!pathname.startsWith('/api/')) {
       const targetPath = pathname + request.nextUrl.search;
       const restoreUrl = new URL('/api/auth/restore', request.url);
@@ -51,10 +32,7 @@ export function handleAuth(
     }
   }
 
-  /**
-   * Auth routes - redirect authenticated users to dashboard
-   * Prevent logged-in users from accessing login/register pages
-   */
+  /** Auth routes — redirect authenticated users to dashboard. */
   if (pathname === '/auth' || pathname.startsWith('/auth/')) {
     if (
       pathname === '/auth/oauth-handler' ||
@@ -85,9 +63,7 @@ export function handleAuth(
     return response;
   }
 
-  /**
-   * User settings - requires authentication
-   */
+  /** User settings — requires authentication. */
   if (pathname.startsWith('/user/settings')) {
     if (!hasToken) {
       const return_to = encodeURIComponent(pathname);
@@ -100,10 +76,7 @@ export function handleAuth(
     return response;
   }
 
-  /**
-   * Dashboard routes - require authentication
-   * Redirects unauthenticated users to login page with return URL
-   */
+  /** Dashboard — requires authentication, enforces correct user ID in URL. */
   if (pathname.startsWith('/dashboard')) {
     if (!hasToken) {
       const return_to = encodeURIComponent(pathname);
@@ -118,8 +91,7 @@ export function handleAuth(
         applySecurityHeaders(response, false);
         return response;
       }
-      // If no userId (e.g. corrupted user_data cookie), let the page load
-      // The client-side useAuth will handle the actual redirection or data fetching
+      // No userId — let client-side useAuth handle redirection
       const response = NextResponse.next({ request: { headers: requestHeaders } });
       applySecurityHeaders(response, false);
       return response;
@@ -145,10 +117,7 @@ export function handleAuth(
     return response;
   }
 
-  /**
-   * Support panel - requires authentication
-   * Redirects unauthenticated users to login page
-   */
+  /** Support panel — requires authentication. */
   if (pathname.startsWith('/ui/panel/support')) {
     if (!hasToken) {
       const return_to = encodeURIComponent(pathname);
@@ -161,21 +130,14 @@ export function handleAuth(
     return response;
   }
 
-  /**
-   * Admin panel - requires admin authentication
-   * Currently, we allow all requests to pass through to the panel
-   * Authentication is handled client-side or in server components
-   */
+  /** Admin panel — auth handled client-side. */
   if (pathname.startsWith('/ui/panel/admin')) {
     const response = NextResponse.next({ request: { headers: requestHeaders } });
     applySecurityHeaders(response, false);
     return response;
   }
 
-  /**
-   * Public support page - no auth required
-   * Applies security headers to the response
-   */
+  /** Public support page — no auth required. */
   if (pathname === '/support' || pathname.startsWith('/support/')) {
     const response = NextResponse.next({ request: { headers: requestHeaders } });
     applySecurityHeaders(response, false);

@@ -4,41 +4,32 @@ import { domains } from '@/lib/utils/config';
 const MAIN_DOMAIN = domains.main;
 
 /**
- * Проверяет, является ли hostname поддоменом основного домена
- * @param hostname - Hostname для проверки
- * @returns True если это поддомен основного домена
+ * Checks if hostname is a subdomain of the main domain.
  */
 export function isSubdomain(hostname: string): boolean {
   return hostname === MAIN_DOMAIN || hostname.endsWith(`.${MAIN_DOMAIN}`);
 }
 
 /**
- * Проверяет, является ли origin допустимым (основной домен или его поддомены)
- * @param origin - Origin header для проверки
- * @returns True если origin допустим
+ * Validates that origin belongs to the main domain or its subdomains.
  */
 export function isValidOrigin(origin: string): boolean {
   return origin.includes(MAIN_DOMAIN);
 }
 
 /**
- * Generates Content Security Policy header
- * Based on Next.js.org CSP structure, adapted for .market
- * @param isDev - Whether running in development mode
- * @returns CSP header string
+ * Generates Content Security Policy header.
+ * Based on Next.js CSP structure, adapted for the project domain.
  */
 export function generateCSPHeader(isDev: boolean): string {
   const turnstileDomain = 'challenges.cloudflare.com';
 
-  // Base domains for CSP
   const baseDomains = `'self' ${MAIN_DOMAIN} *.${MAIN_DOMAIN}`;
 
-  // Localhost for dev mode
   const localhost = isDev
     ? ' localhost:* http://localhost:* ws://localhost:* wss://localhost:*'
     : '';
 
-  // CSP directives
   const csp = [
     `default-src ${baseDomains}${localhost};`,
     `script-src 'self' 'unsafe-eval' 'unsafe-inline' ${baseDomains} https://${turnstileDomain}${localhost};`,
@@ -61,10 +52,8 @@ export function generateCSPHeader(isDev: boolean): string {
 }
 
 /**
- * Applies security headers to response
- * @param response - The NextResponse object
- * @param isStaticFile - Whether this is a static file request
- * @param request - The NextRequest object (for origin detection)
+ * Applies security headers to the response.
+ * Static files receive only CORS headers; non-static get full CSP + HSTS.
  */
 export function applySecurityHeaders(
   response: NextResponse,
@@ -74,21 +63,17 @@ export function applySecurityHeaders(
   const isDev = process.env.NODE_ENV === 'development';
   const cspHeader = generateCSPHeader(isDev);
 
-  // For static files, apply minimal headers to avoid HTTP/2 protocol errors
   if (isStaticFile) {
-    // CORS headers for static files
     if (request) {
       const origin = request.headers.get('origin');
       const hostname = request.nextUrl.hostname;
 
-      // Allow requests from same origin or subdomains
       if (origin && isValidOrigin(origin)) {
         response.headers.set('Access-Control-Allow-Origin', origin);
         response.headers.set('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
         response.headers.set('Access-Control-Allow-Headers', 'Content-Type');
         response.headers.set('Access-Control-Max-Age', '86400');
       } else if (isSubdomain(hostname)) {
-        // Allow all subdomains of main domain
         response.headers.set('Access-Control-Allow-Origin', '*');
         response.headers.set('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
         response.headers.set('Access-Control-Allow-Headers', 'Content-Type');
@@ -96,8 +81,7 @@ export function applySecurityHeaders(
       }
     }
 
-    // Set proper Content-Type for SVG files to avoid HTTP/2 errors
-    // Only set if not already set by Next.js
+    // SVG Content-Type fix for HTTP/2
     if (request) {
       const pathname = request.nextUrl.pathname.toLowerCase();
       if (pathname.endsWith('.svg') && !response.headers.has('Content-Type')) {
@@ -105,14 +89,11 @@ export function applySecurityHeaders(
       }
     }
 
-    // Don't apply security headers to static files to avoid HTTP/2 protocol errors
     return;
   }
 
-  // Security headers for non-static files
   response.headers.set('Content-Security-Policy', cspHeader);
 
-  // Strict Transport Security (HSTS) - only in production, not for static files
   if (!isDev) {
     response.headers.set(
       'Strict-Transport-Security',
@@ -120,6 +101,5 @@ export function applySecurityHeaders(
     );
   }
 
-  // X-XSS-Protection
   response.headers.set('X-XSS-Protection', '1; mode=block');
 }

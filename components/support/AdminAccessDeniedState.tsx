@@ -30,8 +30,8 @@ export function AdminAccessDeniedState({ onRetry }: AdminAccessDeniedStateProps)
           </div>
           <h1 className="mb-2 text-2xl font-bold text-white">Доступ ограничен</h1>
           <p className="mb-6 text-neutral-400">
-            У вас нет доступа к данной странице. Возможно произошла ошибка или вы не авторизованы
-            в системе.
+            У вас нет доступа к данной странице. Возможно произошла ошибка или вы не авторизованы в
+            системе.
           </p>
           <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
             <button

@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-// Apply pending Drizzle migrations from ./database/drizzle to DATABASE_URL.
-// Tracks applied migrations in the __drizzle_migrations table managed by Drizzle.
-// Usage: pnpm run db:migrate
-
+/*
+ * Apply pending Drizzle migrations from ./database/drizzle to DATABASE_URL.
+ * Tracks applied migrations in the __drizzle_migrations table managed by Drizzle.
+ */
 import { drizzle } from 'drizzle-orm/postgres-js';
 import { migrate } from 'drizzle-orm/postgres-js/migrator';
 import postgres from 'postgres';

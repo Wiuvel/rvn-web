@@ -17,7 +17,7 @@
     "wasm"
   ],
   "private": true,
-  "packageManager": "pnpm@10.33.0",
+  "packageManager": "pnpm@10.33.2",
   "browserslist": [
     "Chrome >= 90",
     "Firefox >= 88",
@@ -40,8 +40,8 @@
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.1037.0",
-    "@aws-sdk/s3-request-presigner": "^3.1037.0",
+    "@aws-sdk/client-s3": "^3.1038.0",
+    "@aws-sdk/s3-request-presigner": "^3.1038.0",
     "@hookform/resolvers": "^5.2.2",
     "@node-rs/argon2": "^2.0.2",
     "@radix-ui/react-accordion": "^1.2.12",
@@ -65,7 +65,7 @@
     "postgres": "^3.4.9",
     "react": "^19.2.4",
     "react-dom": "^19.2.5",
-    "react-hook-form": "^7.73.1",
+    "react-hook-form": "^7.74.0",
     "recharts": "^3.8.1",
     "socket.io-client": "^4.8.3",
     "tailwind-merge": "^3.5.0",
@@ -79,17 +79,14 @@
     "@vitejs/plugin-react": "^6.0.1",
     "autoprefixer": "^10.5.0",
     "drizzle-kit": "^0.31.10",
-    "jsdom": "^29.0.2",
-    "oxlint": "^1.61.0",
-    "postcss": "^8.5.9",
+    "jsdom": "^29.1.0",
+    "oxlint": "^1.62.0",
+    "postcss": "^8.5.12",
     "prettier": "^3.8.2",
-    "prettier-plugin-tailwindcss": "^0.7.3",
+    "prettier-plugin-tailwindcss": "^0.7.4",
     "tailwindcss": "^3.4.17",
     "typescript": "^6.0.3",
     "vitest": "^4.1.5"
-  },
-  "overrides": {
-    "fast-xml-parser": "5.7.1"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
