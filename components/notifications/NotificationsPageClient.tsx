@@ -88,22 +88,28 @@ export default function NotificationsPageClient() {
   return (
     <div className="min-h-screen bg-neutral-950 text-white selection:bg-primary-500/30">
       <Header />
-      <main className="mx-auto max-w-2xl px-4 pb-24 pt-8 lg:pb-8 lg:pt-32">
-        <div className="mb-6 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => router.back()}
-              className="rounded-xl p-2 text-neutral-400 transition-colors hover:bg-white/5 hover:text-white"
-              aria-label="Назад"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </button>
-            <h1 className="text-xl font-semibold text-white">Уведомления</h1>
-            {unreadCount > 0 && (
-              <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-primary-500 px-1.5 text-xs font-bold text-white">
-                {unreadCount > 99 ? '99+' : unreadCount}
-              </span>
-            )}
+      <main className="mx-auto max-w-2xl px-4 pb-24 pt-24 lg:pb-8 lg:pt-32">
+        <button
+          onClick={() => router.back()}
+          className="mb-8 inline-flex items-center gap-2 text-base text-neutral-400 transition-colors hover:text-white"
+        >
+          <ArrowLeft className="h-5 w-5" />
+          Назад
+        </button>
+
+        <div className="mb-8 flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-3">
+              <h1 className="bg-gradient-to-br from-white via-neutral-200 to-neutral-500 bg-clip-text text-3xl font-bold tracking-tight text-transparent sm:text-4xl">
+                Уведомления
+              </h1>
+              {unreadCount > 0 && (
+                <span className="flex h-6 min-w-[24px] items-center justify-center rounded-full bg-primary-500 px-2 text-xs font-bold text-white">
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
+              )}
+            </div>
+            <p className="mt-3 text-sm text-neutral-400">Ответы поддержки и системные события</p>
           </div>
           {unreadCount > 0 && (
             <button

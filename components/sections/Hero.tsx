@@ -2,11 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { getStaticUrl } from '@/lib/utils';
 import { Shield, ChevronRight } from 'lucide-react';
 
 const INITIAL_PING = () => Math.floor(Math.random() * 15) + 48;
@@ -17,15 +15,17 @@ export default function HeroSection() {
   const [serverInfo, setServerInfo] = useState<{
     country: string;
     code: string;
-    flag: string;
+    countryCode: string;
   } | null>(null);
 
   useEffect(() => {
     const servers = [
-      { country: 'Германия', code: 'DE-1', flag: getStaticUrl('/static/icons/flags/de.svg') },
-      { country: 'Германия', code: 'DE-2', flag: getStaticUrl('/static/icons/flags/de.svg') },
-      { country: 'Швеция', code: 'SWE-1', flag: getStaticUrl('/static/icons/flags/swe.svg') },
-      { country: 'Швеция', code: 'SWE-2', flag: getStaticUrl('/static/icons/flags/swe.svg') },
+      { country: 'Германия', code: 'DE-1', countryCode: 'de' },
+      { country: 'Германия', code: 'DE-2', countryCode: 'de' },
+      { country: 'Швеция', code: 'SE-1', countryCode: 'se' },
+      { country: 'Швеция', code: 'SE-2', countryCode: 'se' },
+      { country: 'Нидерланды', code: 'NL-1', countryCode: 'nl' },
+      { country: 'Нидерланды', code: 'NL-2', countryCode: 'nl' },
     ];
 
     const timer = setTimeout(() => {
@@ -174,12 +174,8 @@ export default function HeroSection() {
                           </div>
                         ) : serverInfo ? (
                           <div className="mt-1 flex items-center gap-2">
-                            <Image
-                              src={serverInfo.flag}
-                              alt={serverInfo.country}
-                              width={24}
-                              height={16}
-                              className="h-4 w-6 rounded-sm border border-neutral-700"
+                            <span
+                              className={`fi fi-${serverInfo.countryCode} fis h-4 w-6 rounded-sm border border-neutral-700`}
                             />
                             <span className="text-sm font-medium text-white md:text-base">
                               {serverInfo.country} · {serverInfo.code}

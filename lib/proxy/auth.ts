@@ -101,7 +101,9 @@ export function handleAuth(
     const isSharedRoute =
       dashboardSubPath.startsWith('payment/') ||
       dashboardSubPath.startsWith('payment') ||
-      dashboardSubPath === 'transactions';
+      dashboardSubPath === 'transactions' ||
+      dashboardSubPath === 'devices' ||
+      dashboardSubPath.startsWith('devices/');
 
     if (!isSharedRoute) {
       const urlUserId = dashboardSubPath.split('/')[0];

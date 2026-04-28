@@ -32,18 +32,20 @@ export default function TransactionsPage() {
   return (
     <div className="min-h-screen bg-neutral-950 text-white selection:bg-primary-500/30">
       <Header />
-      <main className="mx-auto max-w-2xl px-4 pb-24 pt-8 lg:pb-8 lg:pt-32">
-        <div className="mb-6 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => router.back()}
-              className="rounded-xl p-2 text-neutral-400 transition-colors hover:bg-white/5 hover:text-white"
-              aria-label="Назад"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </button>
-            <h1 className="text-xl font-semibold text-white">Транзакции</h1>
-          </div>
+      <main className="mx-auto max-w-2xl px-4 pb-24 pt-24 lg:pb-8 lg:pt-32">
+        <button
+          onClick={() => router.back()}
+          className="mb-8 inline-flex items-center gap-2 text-base text-neutral-400 transition-colors hover:text-white"
+        >
+          <ArrowLeft className="h-5 w-5" />
+          Назад
+        </button>
+
+        <div className="mb-8">
+          <h1 className="bg-gradient-to-br from-white via-neutral-200 to-neutral-500 bg-clip-text text-3xl font-bold tracking-tight text-transparent sm:text-4xl">
+            Транзакции
+          </h1>
+          <p className="mt-3 text-sm text-neutral-400">Баланс и история операций</p>
         </div>
 
         <div className="mb-8 overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6">

@@ -469,7 +469,7 @@ export default function DashboardClient({ userId }: DashboardClientProps) {
                     onClick={() => setShowPurchaseModal(true)}
                     variant="primary"
                   />
-                  <QuickAction icon={Smartphone} label="Мои устройства" href="/user/devices" />
+                  <QuickAction icon={Smartphone} label="Мои устройства" href="/dashboard/devices" />
                   <QuickAction
                     icon={HeadphonesIcon}
                     label="Связаться с поддержкой"

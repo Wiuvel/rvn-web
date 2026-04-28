@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { useStaggeredFadeIn } from '@/hooks/useGSAP';
@@ -92,6 +92,7 @@ function DeviceCard({ device }: { device: MockDevice }) {
 }
 
 export default function DevicesClient() {
+  const router = useRouter();
   const { loading } = useAuth({
     requireAuth: true,
     redirectOnFail: '/auth',
@@ -112,27 +113,25 @@ export default function DevicesClient() {
 
       <main className="relative pb-24 pt-24 lg:pt-32">
         <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
-          {/* Back button */}
-          <Link
-            href="/dashboard"
-            prefetch={false}
-            className="mb-8 inline-flex items-center gap-2 text-sm text-neutral-400 transition-colors hover:text-white"
+          <button
+            onClick={() => router.back()}
+            className="mb-8 inline-flex items-center gap-2 text-base text-neutral-400 transition-colors hover:text-white"
           >
-            <ArrowLeft className="h-4 w-4" />
-            Назад в панель
-          </Link>
+            <ArrowLeft className="h-5 w-5" />
+            Назад
+          </button>
 
           {/* Header */}
           <div className="mb-8">
             <div className="flex items-center justify-between">
               <h1 className="bg-gradient-to-br from-white via-neutral-200 to-neutral-500 bg-clip-text text-3xl font-bold tracking-tight text-transparent sm:text-4xl">
-                Мои устройства (скоро)
+                Мои устройства
               </h1>
               <span className="rounded-full border border-neutral-800 bg-neutral-900/80 px-4 py-1.5 text-sm font-medium text-neutral-300">
                 {deviceCount} из {DEVICE_LIMIT}
               </span>
             </div>
-            <p className="mt-3 text-sm text-neutral-400">Устройства, подключённые к VPN</p>
+            <p className="mt-3 text-sm text-neutral-400">Устройства, подключённые к сервису</p>
           </div>
 
           {/* Progress bar */}

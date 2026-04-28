@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { shouldShowProtection, detectSuspiciousVisitor } from '@/lib/security/suspicious-detector';
+import { detectSuspiciousVisitor } from '@/lib/security/suspicious-detector';
 import { getRedisClient } from '@/lib/database/redis';
 import { logger } from '@/lib/utils/secure-logger';
 import { applySecurityHeaders } from '@/lib/security/headers';
@@ -194,30 +194,32 @@ export async function handleProtection(
     return response;
   }
 
-  const showProtection = shouldShowProtection(requestInfo, false);
+  const factors = detectSuspiciousVisitor(requestInfo);
 
-  if (showProtection) {
-    const factors = detectSuspiciousVisitor(requestInfo);
-    logger.warn('Suspicious visitor detected', {
-      ip,
-      userAgent: userAgent.substring(0, 100),
-      pathname,
-      suspicionScore: factors.score,
-      factors: {
-        suspiciousUserAgent: factors.suspiciousUserAgent,
-        missingHeaders: factors.missingHeaders,
-        suspiciousIP: factors.suspiciousIP,
-        botPattern: factors.botPattern,
-        suspiciousBehavior: factors.suspiciousBehavior,
-      },
-    });
-  }
-
-  if (!showProtection) {
+  if (factors.score < 30) {
     return null;
   }
 
-  /** Redirect suspicious visitor to protection page. */
+  /** Score >= 80: definite bot — block with 403, no logging. */
+  if (factors.score >= 80) {
+    return new NextResponse('Forbidden', { status: 403 });
+  }
+
+  /** Score 30-79: suspicious — log with full IP and redirect to protection. */
+  logger.warn('Suspicious visitor detected', {
+    ip,
+    userAgent: userAgent.substring(0, 100),
+    pathname,
+    suspicionScore: factors.score,
+    factors: {
+      suspiciousUserAgent: factors.suspiciousUserAgent,
+      missingHeaders: factors.missingHeaders,
+      suspiciousIP: factors.suspiciousIP,
+      botPattern: factors.botPattern,
+      suspiciousBehavior: factors.suspiciousBehavior,
+    },
+  });
+
   const targetPath = pathname + request.nextUrl.search;
   const response = NextResponse.redirect(
     new URL(`/protection?redirect=${encodeURIComponent(targetPath)}`, request.url),
