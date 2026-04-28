@@ -44,33 +44,103 @@ import {
   invalidateTicketCaches,
 } from '../helpers/support';
 
-// `row` is the Drizzle leftJoin result row; left untyped because the joined
-// shape changes per call-site and tightening it cascades into the 3000-line
-// support god-components. Tracked separately as a refactor.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function remapTicketRow(row: any): any {
+/**
+ * Shape of a single row returned by every Drizzle ticket-list query in this
+ * router. All three call-sites (`tickets.list`, `tickets.byId`, the singleton
+ * fetch in `messages.list`) use the same `select({...})` projection, so this
+ * one interface covers all of them. Keep the field names in sync with the
+ * `select` blocks below.
+ *
+ * `status` and `priority` are `text` columns at the schema level so Drizzle
+ * returns plain `string` (and `string | null` for `priority` due to default).
+ */
+interface TicketJoinRow {
+  id: string;
+  userId: string;
+  assignedTo: string | null;
+  status: string;
+  priority: string | null;
+  subject: string;
+  lastMessageAt: Date;
+  closedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+  userName: string | null;
+  userUserId: string | null;
+  userAvatar: string | null;
+  assignedUserName: string | null;
+  assignedUserUserId: string | null;
+  assignedUserAvatar: string | null;
+}
+
+/**
+ * `status` and `priority` are runtime-constrained to these unions even though
+ * the schema columns are loose `text`. Narrowing here keeps the response type
+ * accurate for clients without rewriting every god-component's local type.
+ */
+type TicketStatus = 'open' | 'closed' | 'pending';
+type TicketPriority = 'low' | 'normal' | 'high' | 'urgent';
+
+/**
+ * tRPC serializes responses with plain `JSON.stringify` (no superjson
+ * transformer is configured), so `Date` instances are emitted as ISO strings
+ * on the wire and decoded as strings on the client. We do the conversion
+ * explicitly here so the response type matches what consumers actually see.
+ */
+interface RemappedTicket {
+  id: string;
+  user_id: string;
+  assigned_to: string | null;
+  status: TicketStatus;
+  priority: TicketPriority;
+  subject: string;
+  last_message_at: string;
+  closed_at: string | null;
+  created_at: string;
+  updated_at: string;
+  user: {
+    id: string;
+    username: string;
+    user_id: string;
+    avatar: string | null;
+  } | null;
+  assigned_user: {
+    id: string;
+    username: string;
+    user_id: string;
+    avatar: string | null;
+  } | null;
+}
+
+function remapTicketRow(row: TicketJoinRow): RemappedTicket {
   return {
     id: row.id,
     user_id: row.userId,
     assigned_to: row.assignedTo,
-    status: row.status,
-    priority: row.priority,
+    status: row.status as TicketStatus,
+    priority: (row.priority ?? 'normal') as TicketPriority,
     subject: row.subject,
-    last_message_at: row.lastMessageAt,
-    closed_at: row.closedAt,
-    created_at: row.createdAt,
-    updated_at: row.updatedAt,
+    last_message_at: row.lastMessageAt.toISOString(),
+    closed_at: row.closedAt ? row.closedAt.toISOString() : null,
+    created_at: row.createdAt.toISOString(),
+    updated_at: row.updatedAt.toISOString(),
     user: row.userName
-      ? { id: row.userId, username: row.userName, user_id: row.userUserId, avatar: row.userAvatar }
-      : null,
-    assigned_user: row.assignedUserName
       ? {
-          id: row.assignedTo,
-          username: row.assignedUserName,
-          user_id: row.assignedUserUserId,
-          avatar: row.assignedUserAvatar,
+          id: row.userId,
+          username: row.userName,
+          user_id: row.userUserId ?? '',
+          avatar: row.userAvatar,
         }
       : null,
+    assigned_user:
+      row.assignedTo && row.assignedUserName
+        ? {
+            id: row.assignedTo,
+            username: row.assignedUserName,
+            user_id: row.assignedUserUserId ?? '',
+            avatar: row.assignedUserAvatar,
+          }
+        : null,
   };
 }
 
@@ -614,15 +684,9 @@ export const supportRouter = router({
 
           broadcastTicketUpdate(ticketId, {
             id: ticketId,
-            status: ticket.status as 'open' | 'closed' | 'pending',
-            updated_at:
-              ticket.updated_at instanceof Date
-                ? ticket.updated_at.toISOString()
-                : ticket.updated_at,
-            closed_at:
-              ticket.closed_at instanceof Date
-                ? ticket.closed_at.toISOString()
-                : ticket.closed_at || null,
+            status: ticket.status,
+            updated_at: ticket.updated_at,
+            closed_at: ticket.closed_at,
           });
 
           /* Notify ticket owner on status change (support-initiated only) */

@@ -43,7 +43,7 @@ export interface RawTicketApi {
   assigned_to?: string | null;
   unread_count?: number;
   priority?: 'low' | 'normal' | 'high' | 'urgent';
-  user?: RawSupportUser;
+  user?: RawSupportUser | null;
   assigned_user?: RawSupportUser | null;
   last_message?: RawLastMessageApi | null;
 }

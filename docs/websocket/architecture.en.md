@@ -100,11 +100,32 @@ Ticket access is verified similarly via `POST /api/internal/verify-ticket-access
 
 The WebSocket message contract is defined twice: once on the server in [`Wiuvel/rvn-socketio-server`](https://github.com/Wiuvel/rvn-socketio-server) (`src/types.ts`) and mirrored in `lib/websocket/types.ts` on the rvn-web side. The server file is the **source of truth** — all changes start there.
 
-When modifying the contract:
+### File layout on the rvn-web side
 
-1. Update `src/types.ts` in `rvn-socketio-server`.
-2. Mirror the change in `lib/websocket/types.ts` here.
-3. Update broadcast helpers in `lib/websocket/client.ts` and consumers in `hooks/useWebSocket.ts`.
-4. Update the event tables in [`events.en.md`](events.en.md) / [`events.md`](events.md).
+| File | Purpose |
+|------|---------|
+| `lib/websocket/types.ts` | Local types (`Ws*` prefix) consumed by `client.ts` and `hooks/useWebSocket.ts`. |
+| `lib/websocket/__upstream__/server-types.ts` | Snapshot of upstream `rvn-socketio-server/src/types.ts` at a pinned commit. The body is **byte-identical** to upstream. Do not hand-edit. |
+| `lib/websocket/__contract-check__.ts` | Type-level structural equality check between `types.ts` and the snapshot. A divergence makes `pnpm run type:check` fail. |
+| `scripts/sync-ws-contract.mjs` | Sync / drift script that talks to the GitHub API. |
 
-There is currently no automated drift check; future work could publish a shared `@rvn/ws-types` npm package or add a CI step that diffs both files.
+### Automated drift detection
+
+`pnpm run type:check` (i.e. `tsc --noEmit` both locally and in CI) automatically fails the build whenever the local types in `lib/websocket/types.ts` diverge structurally from the pinned upstream snapshot. This catches the case where someone accidentally changes the contract only on the rvn-web side.
+
+For upstream verification:
+
+```bash
+pnpm run ws:contract:check   # diff snapshot against upstream@pinnedSha (network)
+pnpm run ws:contract:sync    # pull upstream@main, print diff, rewrite snapshot + pinned SHA
+```
+
+A CI step can call `ws:contract:check` to fail the build if someone edits the snapshot without an honest re-sync.
+
+### When the contract changes
+
+1. Update `src/types.ts` in `rvn-socketio-server` and merge.
+2. Run `pnpm run ws:contract:sync` here — the script fetches fresh upstream, prints the diff, and rewrites the snapshot with the new pinned SHA.
+3. Reconcile `lib/websocket/types.ts` with the new contract — `pnpm run type:check` will point at every diverging field via `__contract-check__.ts`.
+4. Update broadcast helpers in `lib/websocket/client.ts` and consumers in `hooks/useWebSocket.ts`.
+5. Update the event tables in [`events.en.md`](events.en.md) / [`events.md`](events.md).
