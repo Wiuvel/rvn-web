@@ -15,7 +15,7 @@ import { hasUserRole } from '@/lib/auth/user-roles';
 import { generateCSRFToken, verifyCSRFToken, revokeCSRFToken } from '@/lib/security/csrf';
 import { generateSessionId } from '@/lib/utils/index';
 import { db } from '@/lib/database/db';
-import { admins, users, userDevices } from '@/lib/database/schema';
+import { users, userDevices } from '@/lib/database/schema';
 import { eq, desc } from 'drizzle-orm';
 import { SessionManager } from '@/lib/auth/session-manager';
 import { sanitizeInput } from '@/lib/security/sanitize';
@@ -252,14 +252,12 @@ export const authRouter = router({
         throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database not configured' });
       }
 
-      try {
-        await db.update(admins).set({ token }).where(eq(admins.id, result.admin.id));
-      } catch (error) {
-        logger.error('Failed to update admin token', {
-          error: error instanceof Error ? error.message : 'Unknown error',
-        });
-        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Internal server error' });
-      }
+      /*
+       * Admin auth state lives in two places:
+       *   - the cookie pair (admin_sid, admin_token)
+       *   - the session entry in SessionManager (with tokenFingerprint = HMAC(token))
+       * The raw token is intentionally NOT persisted to the DB.
+       */
 
       const ipAddress = ctx.headers.get('x-forwarded-for') || 'unknown';
       const userAgent = ctx.headers.get('user-agent') || 'unknown';

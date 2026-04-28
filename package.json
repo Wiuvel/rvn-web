@@ -34,7 +34,10 @@
     "test": "vitest",
     "format:check": "prettier --check .",
     "format:fix": "prettier --write .",
-    "type:check": "tsc --noEmit"
+    "type:check": "tsc --noEmit",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "node scripts/db-migrate.mjs",
+    "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1037.0",

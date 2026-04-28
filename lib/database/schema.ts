@@ -9,7 +9,6 @@ import {
   timestamp,
   uniqueIndex,
   uuid,
-  varchar,
 } from 'drizzle-orm/pg-core';
 
 // ============================================
@@ -21,15 +20,11 @@ export const admins = pgTable(
     id: uuid('id').primaryKey().defaultRandom(),
     username: text('username').notNull().unique(),
     passwordHash: text('password_hash'),
-    token: varchar('token', { length: 64 }).unique(),
     isRoot: boolean('is_root').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => [
-    index('idx_admins_username').on(table.username),
-    index('idx_admins_token').on(table.token),
-  ],
+  (table) => [index('idx_admins_username').on(table.username)],
 );
 
 // ============================================
