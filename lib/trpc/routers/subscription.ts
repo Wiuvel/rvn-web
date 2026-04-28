@@ -17,7 +17,7 @@ import {
   disableUser as rwDisableUser,
   addUsersToSquad,
   getServerNodes,
-} from '@/lib/api/remnawave';
+} from '@/lib/integrations/remnawave';
 import { invalidateUserAuthCacheByUserId } from '@/lib/auth/index';
 import { cache } from '@/lib/database/cache';
 

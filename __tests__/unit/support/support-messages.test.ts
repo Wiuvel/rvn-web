@@ -3,7 +3,7 @@ import {
   getLastMessageLabelForAttachments,
   messageTextForBubble,
   normalizeLastMessageDisplayText,
-} from '@/lib/utils/support-messages';
+} from '@/lib/support/messages';
 import {
   LAST_MESSAGE_LABEL_PHOTO,
   LAST_MESSAGE_LABEL_FILE,

@@ -1,4 +1,4 @@
-import { getTeamCount } from '@/lib/data/team';
+import { getTeamCount } from '@/lib/utils/team';
 import AdminPanelContent from '@/components/admin/AdminPanelContent';
 
 export default async function AdminPanelPage() {

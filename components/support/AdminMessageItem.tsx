@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { gsap } from 'gsap';
 import { FileText } from 'lucide-react';
 import { getAvatarUrl, getGradientClasses } from '@/lib/utils/avatar-gradients';
-import { messageTextForBubble } from '@/lib/utils/support-messages';
+import { messageTextForBubble } from '@/lib/support/messages';
 import ImageWithBlur from '@/components/support/ImageWithBlur';
 
 export interface AdminMessageAttachment {

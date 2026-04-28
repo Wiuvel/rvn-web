@@ -5,7 +5,7 @@ import { sanitizeInput } from '@/lib/security/sanitize';
 import { setCorsHeaders, handleCorsPreflight } from '@/lib/security/cors';
 import { logger } from '@/lib/utils/secure-logger';
 import { authRateLimit } from '@/lib/security/rate-limit';
-import { getErrorRedirectUrl, GOOGLE_ERROR_MAP } from '@/lib/utils/oauth-errors';
+import { getErrorRedirectUrl, GOOGLE_ERROR_MAP } from '@/lib/auth/oauth-errors';
 import { domains } from '@/lib/utils';
 import type { db as dbClient } from '@/lib/database/db';
 

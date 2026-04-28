@@ -7,8 +7,8 @@ import {
   mapRawTicketToUi,
   mapRawTicketsToUi,
   mapRawTicketWithMessagesToUi,
-} from '@/lib/utils/support-mappers';
-import type { RawAttachmentApi, RawMessageApi, RawTicketApi } from '@/lib/types/support-api';
+} from '@/lib/support/mappers';
+import type { RawAttachmentApi, RawMessageApi, RawTicketApi } from '@/lib/support/types';
 
 const sampleAttachment: RawAttachmentApi = {
   id: 'att-1',

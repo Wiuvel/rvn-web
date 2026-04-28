@@ -14,7 +14,7 @@ import { db } from '../database/db';
 import { userDevices } from '../database/schema';
 import { eq, and, ne } from 'drizzle-orm';
 import { computeDeviceFpHash } from './device-fingerprint.server';
-import { resolveAndStoreLocation } from '../utils/geolocation';
+import { resolveAndStoreLocation } from './geolocation';
 
 export type { SessionData };
 

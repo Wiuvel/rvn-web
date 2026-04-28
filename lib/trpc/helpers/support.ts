@@ -2,7 +2,7 @@ import { db } from '@/lib/database/db';
 import { supportMessages, supportMessageAttachments } from '@/lib/database/schema';
 import { inArray, sql } from 'drizzle-orm';
 import { batchHasUserRole } from '@/lib/auth/user-roles';
-import { getLastMessageLabelForAttachments } from '@/lib/utils/support-messages';
+import { getLastMessageLabelForAttachments } from '@/lib/support/messages';
 import { cache } from '@/lib/database/cache';
 import { logger } from '@/lib/utils/secure-logger';
 

@@ -10,7 +10,7 @@ import { trpc } from '@/lib/trpc/client';
 const Skeleton = ({ className }: { className?: string }) => (
   <div className={`animate-pulse rounded bg-neutral-800 ${className || ''}`} />
 );
-import type { AnalyticsPeriod } from '@/lib/analytics/support-analytics';
+import type { AnalyticsPeriod } from '@/lib/support/analytics';
 
 const PERIODS: Array<{ value: AnalyticsPeriod; label: string }> = [
   { value: 'hour', label: '1 час' },

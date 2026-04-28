@@ -1,7 +1,7 @@
 import type { CityResponse, Reader } from 'maxmind';
-import { logger } from './secure-logger';
-import { db } from '../database/db';
-import { userDevices } from '../database/schema';
+import { logger } from '@/lib/utils/secure-logger';
+import { db } from '@/lib/database/db';
+import { userDevices } from '@/lib/database/schema';
 import { eq } from 'drizzle-orm';
 
 // --- MaxMind lazy loader ---

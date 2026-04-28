@@ -22,7 +22,7 @@ import {
   revokeUserRole,
 } from '@/lib/auth/user-roles';
 import type { UserRole } from '@/lib/auth/user-roles';
-import { getSupportAnalytics } from '@/lib/analytics/support-analytics';
+import { getSupportAnalytics } from '@/lib/support/analytics';
 import { getMaintenanceConfig, setMaintenanceConfig } from '@/lib/utils/maintenance';
 import { logger } from '@/lib/utils/secure-logger';
 import { cache, cached } from '@/lib/database/cache';
@@ -508,7 +508,7 @@ export const adminRouter = router({
             });
         }
 
-        const { invalidateSettingsCache } = await import('@/lib/api/remnawave');
+        const { invalidateSettingsCache } = await import('@/lib/integrations/remnawave');
         invalidateSettingsCache();
 
         logger.info('Remnawave settings updated', { adminId });
@@ -516,7 +516,7 @@ export const adminRouter = router({
       }),
 
     healthCheck: adminPanelProcedure.query(async () => {
-      const { healthCheck } = await import('@/lib/api/remnawave');
+      const { healthCheck } = await import('@/lib/integrations/remnawave');
       const result = await healthCheck();
       if (!result.ok) {
         throw new TRPCError({ code: 'BAD_REQUEST', message: result.error });
@@ -526,7 +526,7 @@ export const adminRouter = router({
 
     /** Fetch internal squads from Remnawave panel. */
     squads: adminPanelProcedure.query(async () => {
-      const { getInternalSquads } = await import('@/lib/api/remnawave');
+      const { getInternalSquads } = await import('@/lib/integrations/remnawave');
       const result = await getInternalSquads();
       if (!result.ok) {
         logger.warn('Failed to fetch squads', { error: result.error });
@@ -667,7 +667,7 @@ export const adminRouter = router({
           });
 
         /** Mass squad update for plans where squadUuid changed */
-        const { addUsersToSquad } = await import('@/lib/api/remnawave');
+        const { addUsersToSquad } = await import('@/lib/integrations/remnawave');
         const { subscriptions } = await import('@/lib/database/schema');
 
         for (const plan of input.plans) {

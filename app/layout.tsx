@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { Suspense } from 'react';
 import './globals.css';
-import SmoothScroll from '@/components/utils/SmoothScroll';
+import SmoothScroll from '@/components/effects/SmoothScroll';
 import ConditionalLayout from '@/components/layout/Conditional';
 import { pageMetadata } from '@/lib/utils/seo';
 import { exo2 } from './fonts';

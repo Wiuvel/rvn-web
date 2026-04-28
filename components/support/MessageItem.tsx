@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { gsap } from 'gsap';
 import { FileText } from 'lucide-react';
 import { getGradientClasses, getAvatarUrl } from '@/lib/utils/avatar-gradients';
-import { messageTextForBubble } from '@/lib/utils/support-messages';
+import { messageTextForBubble } from '@/lib/support/messages';
 import ImageWithBlur from './ImageWithBlur';
 import type { Message } from './types';
 import { UserData } from '@/types';

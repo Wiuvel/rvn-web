@@ -22,7 +22,7 @@ import {
 import { isValidUUID } from '@/lib/utils/uuid-validation';
 import { cached } from '@/lib/database/cache';
 import { logger } from '@/lib/utils/secure-logger';
-import { createNotification } from '@/lib/notifications/create';
+import { createNotification } from '@/lib/notifications';
 import {
   MAX_TICKETS_PER_USER,
   ERROR_MAXIMUM_TICKET_LIMIT_REACHED,
@@ -392,8 +392,7 @@ export const supportRouter = router({
       invalidateTicketCaches(user.id);
 
       try {
-        const { trackTicketCreated, trackMessageSent } =
-          await import('@/lib/analytics/support-analytics');
+        const { trackTicketCreated, trackMessageSent } = await import('@/lib/support/analytics');
         await Promise.all([
           trackTicketCreated(mappedTicket.id, user.id, mappedTicket.status),
           trackMessageSent(mappedTicket.id, user.id, 'user'),
@@ -726,7 +725,7 @@ export const supportRouter = router({
             messageText = 'Ваше обращение приняли в обработку. Ожидайте ответа.';
           } else if (status === 'closed') {
             try {
-              const { trackTicketClosed } = await import('@/lib/analytics/support-analytics');
+              const { trackTicketClosed } = await import('@/lib/support/analytics');
               await trackTicketClosed(ticketId, user.id, status);
             } catch {}
 
@@ -1034,7 +1033,7 @@ export const supportRouter = router({
           };
 
           try {
-            const { trackMessageSent } = await import('@/lib/analytics/support-analytics');
+            const { trackMessageSent } = await import('@/lib/support/analytics');
             await trackMessageSent(ticketId, newMessage.senderId, messageForBroadcast.sender_type);
           } catch {}
 

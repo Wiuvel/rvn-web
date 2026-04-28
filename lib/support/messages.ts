@@ -8,7 +8,7 @@ import {
   LAST_MESSAGE_LABEL_PHOTO,
   LAST_MESSAGE_LABEL_FILE,
   LAST_MESSAGE_LABEL_ATTACHMENTS,
-} from './constants';
+} from '@/lib/utils/constants';
 
 const PLACEHOLDER_PATTERN =
   /^\d+\s+(?:фотографи(?:й|я|и)|файл(?:ов|а)?|вложени(?:й|е|я)|изображени(?:й|е|я)|документ(?:ов|а)?)/i;

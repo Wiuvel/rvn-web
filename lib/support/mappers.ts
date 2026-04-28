@@ -7,7 +7,7 @@ import type {
   RawMessageApi,
   RawAttachmentApi,
   RawLastMessageApi,
-} from '@/lib/types/support-api';
+} from '@/lib/support/types';
 import type {
   Ticket,
   Message,

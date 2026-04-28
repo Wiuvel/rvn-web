@@ -47,7 +47,7 @@ export default function ProtectionClient({ initialIp = null }: ProtectionClientP
       }
     };
 
-    import('@/lib/scripts/protection')
+    import('@/components/protection/captcha-script')
       .then(() => {
         const initTurnstile = () => {
           if (typeof window === 'undefined') return;

@@ -21,7 +21,7 @@ import {
   _formatLocation,
   _cache,
   _cacheSet,
-} from '@/lib/utils/geolocation';
+} from '@/lib/auth/geolocation';
 
 describe('geolocation', () => {
   beforeEach(() => {

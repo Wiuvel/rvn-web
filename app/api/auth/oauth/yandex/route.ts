@@ -4,7 +4,7 @@ import { getEnv } from '@/lib/validation/env-validation';
 import { setCorsHeaders, handleCorsPreflight } from '@/lib/security/cors';
 import { logger } from '@/lib/utils/secure-logger';
 import { authRateLimit } from '@/lib/security/rate-limit';
-import { getErrorRedirectUrl } from '@/lib/utils/oauth-errors';
+import { getErrorRedirectUrl } from '@/lib/auth/oauth-errors';
 import { domains } from '@/lib/utils';
 
 // Handle CORS preflight
