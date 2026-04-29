@@ -13,6 +13,5 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     include: ['__tests__/**/*.test.ts'],
-    /* Launch by type: npx vitest run __tests__/unit | __tests__/integration */
   },
 });

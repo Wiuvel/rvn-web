@@ -10,10 +10,8 @@ import { domains, getStaticUrl } from '@/lib/utils';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { TRPCProvider } from '@/components/providers/TRPCProvider';
 import { WebSocketProvider } from '@/components/providers/WebSocketProvider';
-
 import SessionExpiredModal from '@/components/auth/SessionExpiredModal';
 
-// Generate favicon URLs
 const getFaviconUrl = (path: string) => getStaticUrl(path);
 
 export const metadata: Metadata = {

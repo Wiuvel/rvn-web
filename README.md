@@ -1,5 +1,8 @@
 <div align="center">
-  <h1 align="center">@rvn-website</h1>
+  <h1 align="center">
+    <img src="./public/favicon.svg" width="48" height="48" style="vertical-align: middle; margin-right: 2px;">
+    <span style="vertical-align: middle;">rvncom/website</span>
+  </h1>
 
   <img src="docs/images/readme-card.png" alt="RVN Website" width="90%" />
   
@@ -12,7 +15,7 @@
     <img src="https://img.shields.io/badge/Drizzle-PostgreSQL-c5f74f?style=flat-square&logo=drizzle&logoColor=black" alt="Drizzle ORM">
     <img src="https://img.shields.io/badge/Redis-DC382D?style=flat-square&logo=redis&logoColor=white" alt="Redis">
     <img src="https://img.shields.io/badge/Docker-2496ED?style=flat-square&logo=docker&logoColor=white" alt="Docker">
-    <img src="https://img.shields.io/badge/Rust→WASM-000000?style=flat-square&logo=rust&logoColor=white" alt="Rust WASM">
+    <img src="https://img.shields.io/badge/Rust-000000?style=flat-square&logo=rust&logoColor=white" alt="Rust">
   </p>
 </div>
 

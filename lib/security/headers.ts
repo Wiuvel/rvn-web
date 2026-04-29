@@ -95,8 +95,7 @@ export function generateCSPHeader(isDev: boolean): string {
   // - dev: + 'unsafe-eval' for Turbopack
   // baseDomains already includes 'self' — no need to prepend it again.
   const scriptSrcExtras = isDev ? " 'unsafe-eval'" : '';
-  const scriptSrc =
-    `script-src${scriptSrcExtras} 'unsafe-inline' ${baseDomains} ${turnstileDomain}${localhostHttp};`;
+  const scriptSrc = `script-src${scriptSrcExtras} 'unsafe-inline' ${baseDomains} ${turnstileDomain}${localhostHttp};`;
 
   // style-src: 'unsafe-inline' kept for CSS-in-JS / Tailwind runtime.
   const styleSrc = `style-src 'unsafe-inline' ${baseDomains}${localhostHttp};`;

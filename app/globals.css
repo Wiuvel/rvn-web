@@ -21,8 +21,8 @@ body {
   -ms-overflow-style: none;
 }
 
-/* Font loading теперь обрабатывается через next/font в app/fonts.ts */
-/* @font-face декларации удалены, так как next/font автоматически генерирует оптимизированные @font-face */
+/* Font loading is now handled via next/font in app/fonts.ts */
+/* Font-face declarations have been removed, as next/font automatically generates optimized @font-faces */
 
 html::-webkit-scrollbar,
 body::-webkit-scrollbar {
@@ -445,7 +445,7 @@ a {
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
 }
 
-/* Glass-карточки с glow: выносим карточку на отдельный слой, чтобы не было мерцания при отрисовке backdrop-blur */
+/* Glass cards with glow: we put the card on a separate layer to avoid flickering when rendering the backdrop-blur */
 .glass-card-no-flicker {
   transform: translateZ(0);
   backface-visibility: hidden;
@@ -660,7 +660,7 @@ a {
   }
 }
 
-/* Анимация логотипа для лоадера */
+/* ─── Logo animation for the loader ─── */
 .logo-pulse {
   animation: logoPulse 2s ease-in-out infinite;
   filter: brightness(1) drop-shadow(0 0 20px rgba(22, 162, 255, 0.3));
@@ -734,7 +734,7 @@ a {
   animation: formSwitch 0.3s ease-out;
 }
 
-/* Кастомный скролл для support страницы */
+/* ─── Custom scroll for the support page ─── */
 .support-tickets-list,
 .support-chat-messages,
 .custom-scrollbar {
@@ -850,7 +850,7 @@ a {
   color: #e5e5e5;
 }
 
-/* Aurora Background Animations */
+/* ─── Aurora Background Animations ─── */
 @keyframes blob {
   0% {
     transform: translate(0px, 0px) scale(1) rotate(0deg);
@@ -885,7 +885,7 @@ a {
   animation-delay: 9s;
 }
 
-/* Shimmer animation for skeleton loaders */
+/* ─── Shimmer animation for skeleton loaders ─── */
 @keyframes shimmer {
   0% {
     background-position: -200% 0;

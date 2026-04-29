@@ -13,16 +13,13 @@ function OAuthHandlerContent() {
   useEffect(() => {
     if (isPopup && window.opener) {
       if (success === 'true') {
-        // Send success message to parent window
         window.opener.postMessage({ type: 'oauth-success', username }, window.location.origin);
         window.close();
       } else if (error) {
-        // Send error message to parent window
         window.opener.postMessage({ type: 'oauth-error', error }, window.location.origin);
         window.close();
       }
     } else if (!isPopup) {
-      // Not a popup, redirect to admin panel
       window.location.href = '/ui/panel/admin';
     }
   }, [success, error, username, isPopup]);
