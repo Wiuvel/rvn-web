@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import Image from 'next/image';
 import { ArrowLeft } from 'lucide-react';
 import { getStaticUrl } from '@/lib/utils';
 
@@ -77,15 +76,13 @@ export default function ErrorState({
         {/* Right Column: Image (Optional) */}
         {showImage && imageSrc && (
           <div className="relative order-first hidden justify-center lg:order-last lg:col-span-5 lg:flex lg:justify-end">
-            <div className="relative mx-auto aspect-square w-full max-w-[280px] animate-fadeIn sm:max-w-[320px] md:max-w-[500px] lg:mr-0">
-              <Image
+            <div className="mx-auto w-full max-w-[280px] animate-fadeIn sm:max-w-[320px] md:max-w-[500px] lg:mr-0">
+              <img
                 src={getStaticUrl(imageSrc)}
                 alt={imageAlt}
-                fill
-                sizes="(max-width: 1024px) 0px, (max-width: 1280px) 320px, 500px"
-                className="object-contain drop-shadow-2xl"
-                priority
-                unoptimized
+                fetchPriority="high"
+                decoding="async"
+                className="h-auto w-full object-contain drop-shadow-2xl"
               />
             </div>
           </div>
