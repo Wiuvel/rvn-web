@@ -71,6 +71,7 @@ RUN groupadd --system --gid 1001 nodejs \
 
 COPY --from=builder --chown=nodejs:nodejs /app/dist/standalone ./
 COPY --from=wasm --chown=nodejs:nodejs /app/lib/wasm/pkg ./lib/wasm/pkg
+COPY --from=wasm --chown=nodejs:nodejs /app/lib/wasm/pkg ./dist/server/assets/pkg
 COPY --from=builder --chown=nodejs:nodejs /app/database ./database
 
 USER nodejs

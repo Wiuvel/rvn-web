@@ -4,13 +4,30 @@
  */
 
 import { readFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import initWasm, {
   resize_image,
   generate_thumbhash as wasm_generate_thumbhash,
 } from './pkg/image_processor_wasm.js';
 
-const wasmPath = fileURLToPath(new URL('./pkg/image_processor_wasm_bg.wasm', import.meta.url));
+const WASM_FILENAME = 'image_processor_wasm_bg.wasm';
+
+function resolveWasmPath(): string {
+  // 1. Абсолютный путь от cwd (Docker: /app/lib/wasm/pkg/)
+  const cwdPath = join(process.cwd(), 'lib', 'wasm', 'pkg', WASM_FILENAME);
+  if (existsSync(cwdPath)) return cwdPath;
+
+  // 2. Относительно текущего модуля (dev mode)
+  const metaPath = fileURLToPath(new URL('./pkg/' + WASM_FILENAME, import.meta.url));
+  if (existsSync(metaPath)) return metaPath;
+
+  // 3. Fallback — вернуть cwd-путь (ошибка будет при чтении)
+  return cwdPath;
+}
+
+const wasmPath = resolveWasmPath();
 
 export interface ProcessImageOptions {
   width?: number;
