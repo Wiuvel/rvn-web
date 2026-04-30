@@ -19,5 +19,5 @@
     "nextjs/no-before-interactive-script-outside-document": "off",
     "jsx-a11y/prefer-tag-over-role": "off"
   },
-  "ignorePatterns": ["node_modules", ".next", "out", "build", "next-env.d.ts", "lib/wasm/pkg"]
+  "ignorePatterns": ["node_modules", "dist", "out", "build", "vinext-env.d.ts", "lib/wasm/pkg"]
 }

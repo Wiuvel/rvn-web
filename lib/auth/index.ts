@@ -1,4 +1,4 @@
-import { randomBytes, createHash } from 'crypto';
+import { randomBytes, createHash } from 'node:crypto';
 import { hash as argon2Hash } from '@node-rs/argon2';
 import { db } from '../database/db';
 import { admins, users, userDevices } from '../database/schema';

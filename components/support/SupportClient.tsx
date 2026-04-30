@@ -31,6 +31,7 @@ import TicketSkeleton from '@/components/ui/TicketSkeleton';
 import FileUploadModal from '@/components/support/FileUploadModal';
 import MessageInput from '@/components/support/MessageInput';
 import ChatHeader from '@/components/support/ChatHeader';
+import ConnectionBanner from '@/components/support/ConnectionBanner';
 import MessageItem from '@/components/support/MessageItem';
 import TicketListItem from '@/components/support/TicketListItem';
 import CreateTicketForm from '@/components/support/CreateTicketForm';
@@ -1976,6 +1977,8 @@ export default function SupportClient() {
       <div className="hidden lg:block">
         <Header />
       </div>
+
+      <ConnectionBanner isConnected={isWebSocketConnected} />
 
       {/* Main Content */}
       <main

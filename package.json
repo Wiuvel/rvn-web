@@ -2,6 +2,7 @@
   "name": "rvn-web",
   "version": "0.1.0",
   "description": "RVN — VPN & Proxy platform",
+  "type": "module",
   "keywords": [
     "rvn",
     "vpn",
@@ -18,18 +19,11 @@
   ],
   "private": true,
   "packageManager": "pnpm@10.33.2",
-  "browserslist": [
-    "Chrome >= 90",
-    "Firefox >= 88",
-    "Safari >= 14",
-    "Edge >= 90",
-    "not dead"
-  ],
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "build:wasm": "cd wasm && wasm-pack build --target nodejs --out-dir ../lib/wasm/pkg",
-    "start": "next start",
+    "dev": "vinext dev -H 127.0.0.1",
+    "build": "vinext build",
+    "build:wasm": "cd wasm && wasm-pack build --target web --out-dir ../lib/wasm/pkg",
+    "start": "vinext start",
     "lint": "oxlint",
     "test": "vitest",
     "format:check": "prettier --check .",
@@ -40,8 +34,8 @@
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.1038.0",
-    "@aws-sdk/s3-request-presigner": "^3.1038.0",
+    "@aws-sdk/client-s3": "^3.1039.0",
+    "@aws-sdk/s3-request-presigner": "^3.1039.0",
     "@hookform/resolvers": "^5.2.2",
     "@node-rs/argon2": "^2.0.2",
     "@radix-ui/react-accordion": "^1.2.12",
@@ -49,18 +43,17 @@
     "@tanstack/query-async-storage-persister": "^5.100.5",
     "@tanstack/react-query": "^5.100.5",
     "@tanstack/react-query-persist-client": "^5.100.5",
-    "@trpc/client": "^11.16.0",
-    "@trpc/react-query": "^11.16.0",
-    "@trpc/server": "^11.16.0",
+    "@trpc/client": "^11.17.0",
+    "@trpc/react-query": "^11.17.0",
+    "@trpc/server": "^11.17.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "drizzle-orm": "^0.45.2",
     "flag-icons": "^7.5.0",
     "gsap": "^3.15.0",
     "ioredis": "^5.10.1",
-    "lucide-react": "^1.11.0",
+    "lucide-react": "^1.14.0",
     "maxmind": "^5.0.6",
-    "next": "^16.2.3",
     "ogl": "^1.0.11",
     "postgres": "^3.4.9",
     "react": "^19.2.4",
@@ -70,13 +63,15 @@
     "socket.io-client": "^4.8.3",
     "tailwind-merge": "^3.5.0",
     "thumbhash": "^0.1.1",
-    "zod": "^4.3.6"
+    "vinext": "^0.0.45",
+    "zod": "^4.4.0"
   },
   "devDependencies": {
     "@types/node": "^25.6.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "^6.0.1",
+    "@vitejs/plugin-rsc": "^0.5.25",
     "autoprefixer": "^10.5.0",
     "drizzle-kit": "^0.31.10",
     "jsdom": "^29.1.0",
@@ -84,14 +79,23 @@
     "postcss": "^8.5.12",
     "prettier": "^3.8.2",
     "prettier-plugin-tailwindcss": "^0.7.4",
+    "react-server-dom-webpack": "^19.2.5",
     "tailwindcss": "^3.4.17",
     "typescript": "^6.0.3",
+    "vite": "^8.0.10",
+    "vite-plugin-wasm": "^3.6.0",
     "vitest": "^4.1.5"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
       "esbuild",
       "sharp"
+    ],
+    "overrides": {
+      "typescript": "^6.0.3"
+    },
+    "ignoredBuiltDependencies": [
+      "@swc/core"
     ]
   }
 }

@@ -15,7 +15,7 @@ RUN mkdir -p wasm/src && echo "fn main() {}" > wasm/src/main.rs \
     && cd wasm && cargo build --release --target wasm32-unknown-unknown || true
 
 COPY wasm/src ./wasm/src
-RUN cd wasm && wasm-pack build --release --target nodejs --out-dir /app/lib/wasm/pkg
+RUN cd wasm && wasm-pack build --release --target web --out-dir /app/lib/wasm/pkg
 
 # ---- Stage 2: Dependencies ----
 FROM node:22-slim AS deps
@@ -40,7 +40,6 @@ COPY --from=deps /app/pnpm-lock.yaml ./pnpm-lock.yaml
 COPY . .
 COPY --from=wasm /app/lib/wasm/pkg ./lib/wasm/pkg
 
-ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 ENV NODE_OPTIONS="--max-old-space-size=1536"
 
@@ -65,19 +64,16 @@ FROM node:22-slim AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
-ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3001
 
 RUN groupadd --system --gid 1001 nodejs \
-    && useradd --system --uid 1001 --gid nodejs nextjs
+    && useradd --system --uid 1001 --gid nodejs nodejs
 
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-COPY --from=builder --chown=nextjs:nodejs /app/public ./public
-COPY --from=wasm --chown=nextjs:nodejs /app/lib/wasm/pkg ./lib/wasm/pkg
-COPY --from=builder --chown=nextjs:nodejs /app/database ./database
+COPY --from=builder --chown=nodejs:nodejs /app/dist/standalone ./
+COPY --from=wasm --chown=nodejs:nodejs /app/lib/wasm/pkg ./lib/wasm/pkg
+COPY --from=builder --chown=nodejs:nodejs /app/database ./database
 
-USER nextjs
+USER nodejs
 EXPOSE 3001
 
 CMD ["node", "server.js"]

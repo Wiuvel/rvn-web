@@ -1,9 +1,10 @@
 import Image from 'next/image';
-import iconVk from '@/public/static/icons/oauth/vk.svg';
-import iconYandex from '@/public/static/icons/oauth/yandex.svg';
-import iconTelegram from '@/public/static/icons/oauth/telegram.svg';
-import iconGoogle from '@/public/static/icons/oauth/google.svg';
-import iconTwitch from '@/public/static/icons/oauth/twitch.svg';
+
+const iconVk = '/static/icons/oauth/vk.svg';
+const iconYandex = '/static/icons/oauth/yandex.svg';
+const iconTelegram = '/static/icons/oauth/telegram.svg';
+const iconGoogle = '/static/icons/oauth/google.svg';
+const iconTwitch = '/static/icons/oauth/twitch.svg';
 
 interface OAuthButtonsProps {
   isLoading: boolean;

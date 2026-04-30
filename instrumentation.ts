@@ -3,8 +3,28 @@
  * Runs once when the Node.js runtime initializes.
  */
 
+const GLOBAL_FLAG = Symbol.for('rvn.instrumentation.registered');
+
+type GlobalWithFlag = typeof globalThis & { [GLOBAL_FLAG]?: boolean };
+
+/** Logs unhandled request errors (instrumentation hook) */
+export function onRequestError(error: unknown, request: { path: string; method: string }): void {
+  const msg = error instanceof Error ? (error.stack ?? error.message) : String(error);
+  console.error(`[request-error] ${request.method} ${request.path}\n${msg}`);
+}
+
 export async function register() {
-  if (process.env.NEXT_RUNTIME === 'nodejs') {
+  /* Skip on HMR re-execution: globals survive module reloads, the flag does not */
+  const g = globalThis as GlobalWithFlag;
+  if (g[GLOBAL_FLAG]) return;
+  g[GLOBAL_FLAG] = true;
+
+  console.log('[startup] instrumentation register called');
+  if (
+    process.env.NEXT_RUNTIME === 'nodejs' ||
+    process.env.VINEXT_RUNTIME === 'nodejs' ||
+    typeof process !== 'undefined'
+  ) {
     /* WASM image processor */
     try {
       const { checkWasmReady } = await import('./lib/wasm/image-processor');

@@ -9,9 +9,6 @@
   --gradient-to: #8c66ff;
 }
 
-/* Font loading теперь обрабатывается через next/font в app/fonts.ts */
-/* @font-face декларации удалены, так как next/font автоматически генерирует оптимизированные @font-face */
-
 * {
   box-sizing: border-box;
   margin: 0;
@@ -19,7 +16,7 @@
 }
 
 .protection-page {
-  background: #000000;
+  background: #121212;
   color: var(--text-primary);
   min-height: 100vh;
   display: flex;

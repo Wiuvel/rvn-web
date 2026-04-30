@@ -3,67 +3,32 @@
  * Provides resizing capabilities with graceful fallback to the original buffer.
  */
 
-import path from 'path';
-import { createRequire } from 'module';
+import { readFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
+import initWasm, {
+  resize_image,
+  generate_thumbhash as wasm_generate_thumbhash,
+} from './pkg/image_processor_wasm.js';
+
+const wasmPath = fileURLToPath(new URL('./pkg/image_processor_wasm_bg.wasm', import.meta.url));
 
 export interface ProcessImageOptions {
   width?: number;
   height?: number;
 }
 
-// Type definition for the WASM module exports
-interface WasmModule {
-  resize_image: (input: Uint8Array, width: number, height: number) => Uint8Array;
-  generate_thumbhash: (input: Uint8Array) => {
-    width?: number;
-    height?: number;
-    thumbhash?: string;
-  };
-}
-
-let wasmModule: WasmModule | null = null;
-
-/**
- * Loads the WASM package.
- * Tries dynamic import first (standard), falls back to filesystem load (Next.js server/dev context).
- */
-async function loadWasmPkg(): Promise<WasmModule> {
-  if (wasmModule) return wasmModule;
-
-  try {
-    const cwd = process.cwd();
-    const pkgPath = path.join(cwd, 'lib', 'wasm', 'pkg', 'image_processor_wasm.js');
-    const require = createRequire(path.join(cwd, 'package.json'));
-    const pkg = require(pkgPath);
-    if (pkg && typeof pkg.resize_image === 'function') {
-      wasmModule = pkg;
-      return pkg;
-    }
-    throw new Error('Invalid WASM module structure via require');
-  } catch (fsError) {
-    try {
-      // @ts-ignore - The pkg directory is generated at build time
-      const pkg = await import('./pkg/image_processor_wasm.js');
-      if (pkg && typeof pkg.resize_image === 'function') {
-        wasmModule = pkg;
-        return pkg;
-      }
-      throw new Error('Invalid WASM module structure via import');
-    } catch (importError) {
-      throw new Error(
-        `Failed to load WASM module. FS error: ${fsError}. Import error: ${importError}`,
-      );
-    }
-  }
-}
+let wasmReady = false;
 
 /**
  * Checks if the WASM module is ready/loadable.
  * Used for health checks or startup validation.
  */
 export async function checkWasmReady(): Promise<boolean> {
+  if (wasmReady) return true;
   try {
-    await loadWasmPkg();
+    const bytes = await readFile(wasmPath);
+    await initWasm({ module_or_path: bytes });
+    wasmReady = true;
     return true;
   } catch (error) {
     console.error('[WASM] Health check failed:', error);
@@ -85,7 +50,7 @@ export async function processImage(
   }
 
   try {
-    const mod = await loadWasmPkg();
+    await checkWasmReady();
     const input = new Uint8Array(buffer);
 
     // Default to 0 if not provided (Rust side handles 0 as "keep original" or logic there)
@@ -99,7 +64,7 @@ export async function processImage(
     const h = options.height ?? 0;
 
     if (w > 0 && h > 0) {
-      const out = mod.resize_image(input, w, h);
+      const out = resize_image(input, w, h);
       return Buffer.from(out);
     }
 
@@ -117,8 +82,8 @@ export async function generateThumbhash(buffer: Buffer): Promise<{
   height: number | null;
 }> {
   try {
-    const mod = await loadWasmPkg();
-    const result = mod.generate_thumbhash(new Uint8Array(buffer));
+    await checkWasmReady();
+    const result = wasm_generate_thumbhash(new Uint8Array(buffer));
     return {
       thumbhash: result?.thumbhash ?? null,
       width: result?.width ?? null,

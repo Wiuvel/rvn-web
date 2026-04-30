@@ -46,11 +46,6 @@ export default function AdvantagesSection() {
 
   return (
     <section id="advantages" className="fade-in relative overflow-hidden">
-      <div
-        className="pointer-events-none absolute left-0 top-1/2 hidden h-[300px] w-[300px] -translate-y-1/2 rounded-full bg-primary-500/[0.03] blur-[100px] md:block"
-        aria-hidden="true"
-      />
-
       <div className="relative mx-auto max-w-7xl px-4 py-16 sm:px-6 md:py-24 lg:px-8">
         <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-2 lg:gap-16">
           <div ref={leftRef} className="order-2 grid grid-cols-2 gap-4 lg:order-1">

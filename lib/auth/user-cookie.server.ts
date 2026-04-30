@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from 'crypto';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import { cookies } from 'next/headers';
 import { getEnv } from '@/lib/validation/env-validation';
 import { appConfig } from '@/lib/utils/config';

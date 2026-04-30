@@ -13,7 +13,7 @@ import {
 } from '@/lib/auth/index';
 import { hasUserRole } from '@/lib/auth/user-roles';
 import { generateCSRFToken, verifyCSRFToken, revokeCSRFToken } from '@/lib/security/csrf';
-import { generateSessionId } from '@/lib/utils/index';
+import { generateSessionId } from '@/lib/utils/server';
 import { db } from '@/lib/database/db';
 import { users, userDevices } from '@/lib/database/schema';
 import { eq, desc } from 'drizzle-orm';
@@ -21,7 +21,7 @@ import { SessionManager } from '@/lib/auth/session-manager';
 import { sanitizeInput } from '@/lib/security/sanitize';
 import { logger } from '@/lib/utils/secure-logger';
 import { SESSION_TIMEOUT } from '@/lib/utils/constants';
-import { createHash, randomBytes } from 'crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { hash as argon2Hash, verify as argon2Verify } from '@node-rs/argon2';
 import { passwordChangeSchema } from '@/lib/validation/schemas';
 import { deviceIdParamSchema } from '@/lib/validation/api-schemas';

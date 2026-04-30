@@ -8,10 +8,6 @@ const nextConfig: NextConfig = {
   assetPrefix: '',
   trailingSlash: false,
   outputFileTracingRoot: process.cwd(),
-  outputFileTracingIncludes: {
-    '/lib/wasm/pkg': ['./lib/wasm/pkg/**/*'],
-  },
-  serverExternalPackages: ['ioredis'],
   devIndicators: {
     position: 'top-right',
   },

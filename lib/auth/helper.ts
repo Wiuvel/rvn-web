@@ -1,7 +1,8 @@
 // Auth helper functions for API handlers
 
 import { cookies } from 'next/headers';
-import { getUserByToken, type User } from './index';
+import type { User } from './index';
+import { getUserByToken } from './index';
 import { hasUserRole } from './user-roles';
 import { ERROR_NOT_AUTHENTICATED } from '../utils/constants';
 import { SessionManager } from './session-manager';

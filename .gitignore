@@ -7,7 +7,7 @@
 !.yarn/plugins
 !.yarn/releases
 !.yarn/versions
-/.next/
+/dist/
 /out/
 /build
 /temp
@@ -25,5 +25,5 @@ yarn-error.log*
 !.env.example
 .vercel
 *.tsbuildinfo
-next-env.d.ts
+vinext-env.d.ts
 database/*.mmdb

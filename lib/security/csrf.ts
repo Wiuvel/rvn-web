@@ -3,7 +3,7 @@
  * Enables horizontal scaling and CSRF persistence across restarts.
  */
 
-import { createHmac, timingSafeEqual, randomBytes } from 'crypto';
+import { createHmac, timingSafeEqual, randomBytes } from 'node:crypto';
 import { getEnv } from '../validation/env-validation';
 import { getCsrfStore, CSRF_TOKEN_LIFETIME } from './csrf-store';
 

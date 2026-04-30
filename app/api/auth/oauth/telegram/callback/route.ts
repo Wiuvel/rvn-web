@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createHmac, createHash } from 'crypto';
+import { createHmac, createHash } from 'node:crypto';
 import { getEnv } from '@/lib/validation/env-validation';
 import { createUserFromOAuth, getUserByEmail } from '@/lib/auth/index';
 import { SessionManager } from '@/lib/auth/session-manager';

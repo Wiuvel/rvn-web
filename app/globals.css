@@ -21,9 +21,6 @@ body {
   -ms-overflow-style: none;
 }
 
-/* Font loading is now handled via next/font in app/fonts.ts */
-/* Font-face declarations have been removed, as next/font automatically generates optimized @font-faces */
-
 html::-webkit-scrollbar,
 body::-webkit-scrollbar {
   display: none;
@@ -66,11 +63,11 @@ a {
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
+    --background: 0 0% 7.1%;
     --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
+    --card: 0 0% 7.1%;
     --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
+    --popover: 0 0% 7.1%;
     --popover-foreground: 210 40% 98%;
     --primary: 200 100% 55%;
     --primary-foreground: 222.2 47.4% 11.2%;
@@ -231,7 +228,7 @@ a {
   flex: 0 0 auto;
   min-width: 280px;
   border: 1px solid rgb(38, 38, 38);
-  background: rgb(10, 10, 10);
+  background: #121212;
   border-radius: 1.5rem;
   padding: 1.5rem;
   transition:

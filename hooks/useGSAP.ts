@@ -1,149 +1,183 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { gsap } from 'gsap';
-import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import type { gsap as GsapType } from 'gsap';
 
-if (typeof window !== 'undefined') {
-  gsap.registerPlugin(ScrollTrigger);
+type ScrollTriggerType = typeof import('gsap/ScrollTrigger').ScrollTrigger;
+
+interface GsapBundle {
+  gsap: typeof GsapType;
+  ScrollTrigger: ScrollTriggerType;
 }
 
+let gsapPromise: Promise<GsapBundle> | null = null;
+
+/**
+ * Lazy-loads GSAP + ScrollTrigger on first call.
+ * Cached as a singleton to avoid duplicate downloads.
+ */
+function loadGsap(): Promise<GsapBundle> {
+  if (!gsapPromise) {
+    gsapPromise = Promise.all([import('gsap'), import('gsap/ScrollTrigger')]).then(
+      ([gsapMod, stMod]) => {
+        const { gsap } = gsapMod;
+        const { ScrollTrigger } = stMod;
+        gsap.registerPlugin(ScrollTrigger);
+        return { gsap, ScrollTrigger };
+      },
+    );
+  }
+  return gsapPromise;
+}
+
+/** Initializes GSAP context for a container with reduced-motion + mobile guards. */
 export const useGSAP = () => {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!containerRef.current) return;
 
-    const ctx = gsap.context(() => {
-      gsap.config({
-        force3D: true,
-        nullTargetWarn: false,
-      });
+    let cleanup: (() => void) | null = null;
 
-      const isMobileDevice = window.innerWidth < 768;
+    loadGsap().then(({ gsap, ScrollTrigger }) => {
+      if (!containerRef.current) return;
 
-      ScrollTrigger.config({
-        ignoreMobileResize: true,
-        syncInterval: isMobileDevice ? 120 : 60,
-      });
+      const ctx = gsap.context(() => {
+        gsap.config({ force3D: true, nullTargetWarn: false });
 
-      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-        gsap.globalTimeline.timeScale(0);
-        ScrollTrigger.getAll().forEach((trigger) => trigger.disable());
-      }
+        const isMobile = window.innerWidth < 768;
+        ScrollTrigger.config({
+          ignoreMobileResize: true,
+          syncInterval: isMobile ? 120 : 60,
+        });
 
-      window.matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', (e) => {
-        if (e.matches) {
-          gsap.globalTimeline.timeScale(0);
-          ScrollTrigger.getAll().forEach((trigger) => trigger.disable());
-        } else {
-          gsap.globalTimeline.timeScale(1);
-          ScrollTrigger.getAll().forEach((trigger) => trigger.enable());
-        }
-      });
+        const mql = window.matchMedia('(prefers-reduced-motion: reduce)');
+        const applyReducedMotion = (reduced: boolean) => {
+          gsap.globalTimeline.timeScale(reduced ? 0 : 1);
+          ScrollTrigger.getAll().forEach((t) => (reduced ? t.disable() : t.enable()));
+        };
+        applyReducedMotion(mql.matches);
+        const onChange = (e: MediaQueryListEvent) => applyReducedMotion(e.matches);
+        mql.addEventListener('change', onChange);
 
-      const isMobile = window.innerWidth < 768;
-      if (isMobile) {
-        ScrollTrigger.getAll().forEach((trigger) => trigger.disable());
-      }
-    }, containerRef);
+        if (isMobile) ScrollTrigger.getAll().forEach((t) => t.disable());
 
-    return () => ctx.revert();
+        cleanup = () => mql.removeEventListener('change', onChange);
+      }, containerRef);
+
+      const prev = cleanup;
+      cleanup = () => {
+        prev?.();
+        ctx.revert();
+      };
+    });
+
+    return () => cleanup?.();
   }, []);
 
   return containerRef;
 };
 
+/** Fades an element in on scroll with an optional delay. */
 export const useFadeIn = (delay: number = 0) => {
   const elementRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!elementRef.current) return;
 
+    let killed = false;
+    let animation: gsap.core.Tween | null = null;
     const element = elementRef.current;
     const isMobile = window.innerWidth < 768;
 
-    if (isMobile) {
-      gsap.set(element, { opacity: 1, y: 0 });
-      return;
-    }
+    loadGsap().then(({ gsap }) => {
+      if (killed || !element) return;
 
-    const animation = gsap.fromTo(
-      element,
-      {
-        opacity: 0,
-        y: 15,
-      },
-      {
-        opacity: 1,
-        y: 0,
-        duration: 0.4,
-        ease: 'power2.out',
-        delay,
-        scrollTrigger: {
-          trigger: element,
-          start: 'top 92%',
-          end: 'bottom 8%',
-          toggleActions: 'play none none none',
+      if (isMobile) {
+        gsap.set(element, { opacity: 1, y: 0 });
+        return;
+      }
+
+      animation = gsap.fromTo(
+        element,
+        { opacity: 0, y: 15 },
+        {
+          opacity: 1,
+          y: 0,
+          duration: 0.4,
+          ease: 'power2.out',
+          delay,
+          scrollTrigger: {
+            trigger: element,
+            start: 'top 92%',
+            end: 'bottom 8%',
+            toggleActions: 'play none none none',
+          },
         },
-      },
-    );
+      );
+    });
 
     return () => {
-      animation.kill();
+      killed = true;
+      animation?.kill();
     };
   }, [delay]);
 
   return elementRef;
 };
 
+/** Fades container children in sequence on scroll. */
 export const useStaggeredFadeIn = (delay: number = 0, stagger: number = 0.05) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!containerRef.current || typeof window === 'undefined') return;
 
-    const isMobile = window.innerWidth < 768;
-    const elements = containerRef.current.children;
-
-    if (isMobile) {
-      gsap.set(elements, { opacity: 1, y: 0, scale: 1 });
-      return;
-    }
-
+    let killed = false;
     let animation: gsap.core.Tween | null = null;
+    let raf = 0;
+    const container = containerRef.current;
+    const isMobile = window.innerWidth < 768;
 
-    const raf = requestAnimationFrame(() => {
-      if (!containerRef.current) return;
+    loadGsap().then(({ gsap }) => {
+      if (killed) return;
+      const elements = container.children;
 
-      const rect = containerRef.current.getBoundingClientRect();
-      const isAlreadyVisible = rect.top < window.innerHeight * 0.92;
-
-      if (isAlreadyVisible) {
+      if (isMobile) {
         gsap.set(elements, { opacity: 1, y: 0, scale: 1 });
         return;
       }
 
-      gsap.set(elements, { opacity: 0, y: 10, scale: 0.98 });
+      raf = requestAnimationFrame(() => {
+        const rect = container.getBoundingClientRect();
+        const visible = rect.top < window.innerHeight * 0.92;
 
-      animation = gsap.to(elements, {
-        opacity: 1,
-        y: 0,
-        scale: 1,
-        duration: 0.35,
-        ease: 'power2.out',
-        delay,
-        stagger,
-        scrollTrigger: {
-          trigger: containerRef.current,
-          start: 'top 92%',
-          end: 'bottom 8%',
-          toggleActions: 'play none none none',
-        },
+        if (visible) {
+          gsap.set(elements, { opacity: 1, y: 0, scale: 1 });
+          return;
+        }
+
+        gsap.set(elements, { opacity: 0, y: 10, scale: 0.98 });
+        animation = gsap.to(elements, {
+          opacity: 1,
+          y: 0,
+          scale: 1,
+          duration: 0.35,
+          ease: 'power2.out',
+          delay,
+          stagger,
+          scrollTrigger: {
+            trigger: container,
+            start: 'top 92%',
+            end: 'bottom 8%',
+            toggleActions: 'play none none none',
+          },
+        });
       });
     });
 
     return () => {
+      killed = true;
       cancelAnimationFrame(raf);
       animation?.kill();
     };

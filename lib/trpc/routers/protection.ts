@@ -1,5 +1,5 @@
 import { cookies } from 'next/headers';
-import crypto from 'crypto';
+import crypto from 'node:crypto';
 import { TRPCError } from '@trpc/server';
 import { router, publicProcedure, authRateLimitedProcedure } from '../init';
 import { logger } from '@/lib/utils/secure-logger';

@@ -4,7 +4,7 @@
  * Used for grouping devices in user_devices table
  */
 
-import { createHash } from 'crypto';
+import { createHash } from 'node:crypto';
 
 function normalizeUserAgent(ua: string): string {
   const browserMatch = ua.match(

@@ -3,10 +3,10 @@
  * Session + Token binding: session_id и token взаимно связаны через tokenFingerprint.
  */
 
-import { createHmac, createHash } from 'crypto';
+import { createHmac, createHash } from 'node:crypto';
 import { cookies } from 'next/headers';
 import { SESSION_TIMEOUT } from '../utils/constants';
-import { generateSessionId as generateSessionIdUtil } from '../utils/index';
+import { generateSessionId as generateSessionIdUtil } from '../utils/server';
 import { logger } from '../utils/secure-logger';
 import { getSessionStore, type SessionData } from './session-store';
 import { getEnv } from '../validation/env-validation';

@@ -29,6 +29,9 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        neutral: {
+          950: '#121212',
+        },
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
         ring: 'hsl(var(--ring))',

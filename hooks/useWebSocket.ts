@@ -1,12 +1,23 @@
 /**
  * Hook for working with WebSocket in support system.
+ * socket.io-client is lazy-loaded on first connect to keep it out of the initial bundle.
  */
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import io from 'socket.io-client';
+import type { Socket } from 'socket.io-client';
 
-// Use ReturnType to get the type of Socket from io function.
-type SocketType = ReturnType<typeof io>;
+type SocketType = Socket;
+type IoFn = typeof import('socket.io-client').default;
+
+let ioPromise: Promise<IoFn> | null = null;
+
+/** Lazy-loads socket.io-client; cached as a singleton across all hook callers. */
+function loadIo(): Promise<IoFn> {
+  if (!ioPromise) {
+    ioPromise = import('socket.io-client').then((m) => m.default);
+  }
+  return ioPromise;
+}
 
 interface UseWebSocketOptions {
   enabled?: boolean;
@@ -96,7 +107,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
 
     // Debounce reconnection to prevent rapid reconnection attempts when the token changes quickly (e.g., during async token fetch on initial load).
     // A 100ms delay stops cyclic reconnects and avoids multiple sockets when the token updates in quick succession.
-    reconnectTimeoutRef.current = setTimeout(() => {
+    reconnectTimeoutRef.current = setTimeout(async () => {
       isConnectingRef.current = false;
 
       // Disconnect previous socket only when the token changes; prevents duplicate connections during token refresh.
@@ -112,6 +123,11 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
       if (socketRef.current?.connected && currentTokenRef.current === token) {
         return;
       }
+
+      const io = await loadIo();
+
+      // Token may have changed while socket.io-client was loading; bail out if so.
+      if (currentTokenRef.current !== token) return;
 
       // Connect to the external WebSocket server via NEXT_PUBLIC_WS_URL env var.
       // Falls back to current origin for backwards compatibility during migration.
