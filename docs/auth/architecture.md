@@ -9,7 +9,7 @@
 ```
 ┌──────────────┐                         ┌──────────────────┐
 │   Browser    │   token (httpOnly)      │    rvn-web       │
-│              │   session_id (httpOnly) │    (Next.js)     │
+│              │   session_id (httpOnly) │    (Vinext)      │
 │  IndexedDB:  │─────────────────────────►   tRPC router    │
 │  rvn_fpid    │   user_data (signed)    │                  │
 │              │◄────────────────────────│                  │

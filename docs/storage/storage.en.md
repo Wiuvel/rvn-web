@@ -85,9 +85,9 @@ Cache warm-up: avatar/banner upload routes call `setMediaCache` immediately afte
 | `resize_image(input, w, h)` | Triangle-filter `resize_exact`, format auto-detected by `image::guess_format`. Returns input unchanged if `w==0 || h==0`. |
 | `generate_thumbhash(input)` | Resizes to ≤100×100, generates [ThumbHash](https://evanw.github.io/thumbhash/) blur preview. Returns `{ width, height, thumbhash }`. |
 
-Loader (`lib/wasm/image-processor.ts`) tries CommonJS `require()` first (works in Next.js standalone bundles), falls back to dynamic `import('./pkg/...')`. On failure, both `processImage` and `generateThumbhash` log the error and **return the original buffer / nulls** — image flows are never blocked by a missing WASM build.
+Loader (`lib/wasm/image-processor.ts`) reads the `.wasm` binary via `fs.readFile` (Node's `fetch` cannot resolve `file://`) and passes raw bytes to `initWasm({ module_or_path })`. Path resolution tries `cwd/lib/wasm/pkg` first, then falls back to `import.meta.url`. On failure, both `processImage` and `generateThumbhash` log the error and **return the original buffer / nulls** — image flows are never blocked by a missing WASM build.
 
-`next.config.ts` ships `lib/wasm/pkg/**/*` via `outputFileTracingIncludes` so the standalone build contains the compiled module.
+The Vinext build (`vinext build`) does not bundle the `.wasm` binary into the standalone output; the Dockerfile copies `lib/wasm/pkg/` into `dist/server/assets/pkg/` explicitly.
 
 ## Request flow
 
@@ -149,4 +149,4 @@ If `S3_*` is unset the upload endpoints return 503; if `REDIS_URL` is unset the 
 - `app/support/files/[key]/route.ts` — authenticated support attachment read endpoint.
 - `app/api/auth/avatar/route.ts`, `app/api/auth/banner/route.ts` — avatar/banner upload + cache warm-up.
 - `app/api/support/upload/route.ts` — support multi-file upload + ThumbHash extraction.
-- `next.config.ts` — `outputFileTracingIncludes` for the WASM bundle.
+- `Dockerfile` — copies `lib/wasm/pkg/` into the standalone build (Vinext does not bundle WASM binaries automatically).

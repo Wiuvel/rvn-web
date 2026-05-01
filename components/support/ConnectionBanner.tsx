@@ -1,17 +1,34 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { WifiOff } from 'lucide-react';
 
 interface ConnectionBannerProps {
   isConnected: boolean;
 }
 
+const OFFLINE_GRACE_MS = 2500;
+
 /**
  * Compact, non-blocking banner shown when the WebSocket is offline.
  * Tickets and messages still work via tRPC polling — this is informational.
+ *
+ * Hidden during initial connect: only renders after the socket has stayed
+ * offline for OFFLINE_GRACE_MS, so it doesn't flash on page load.
  */
 export default function ConnectionBanner({ isConnected }: ConnectionBannerProps) {
-  if (isConnected) return null;
+  const [showOffline, setShowOffline] = useState(false);
+
+  useEffect(() => {
+    if (isConnected) {
+      setShowOffline(false);
+      return;
+    }
+    const timer = setTimeout(() => setShowOffline(true), OFFLINE_GRACE_MS);
+    return () => clearTimeout(timer);
+  }, [isConnected]);
+
+  if (isConnected || !showOffline) return null;
 
   return (
     <div

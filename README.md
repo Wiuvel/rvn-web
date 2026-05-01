@@ -21,9 +21,15 @@
   <img src="https://img.shields.io/badge/Rust-000000?style=flat-square&logo=rust&logoColor=white" alt="Rust">
 </p>
 
+## 📖 About
+
+**RVN** is a VPN service that gives users fast, private internet access without the usual setup hassle. Pick a plan, top up your balance or redeem a promo, and your connection is ready in seconds — no manual configuration, no waiting around.
+
+The site is the home base for everything around the subscription: account and device management, payments and balance history, in-app support with live replies, and notifications that keep you in the loop. Sign in with the provider you already use, manage your plan from any device, and reach support whenever something needs attention.
+
 ## 🚀 Tech Stack
 
-**Core**: `Vinext` - Next.js API on Vite 8, React 19, TypeScript, Tailwind CSS, Radix UI
+**Core**: Vinext - Next.js API on Vite 8, React 19, TypeScript, Tailwind CSS, Radix UI
 
 **API**: tRPC 11, Socket.io
 

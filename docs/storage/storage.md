@@ -85,9 +85,9 @@
 | `resize_image(input, w, h)` | `resize_exact` с фильтром Triangle, формат определяется через `image::guess_format`. Возвращает вход без изменений, если `w==0 \|\| h==0`. |
 | `generate_thumbhash(input)` | Ресайз до ≤100×100, генерация [ThumbHash](https://evanw.github.io/thumbhash/) blur-превью. Возвращает `{ width, height, thumbhash }`. |
 
-Загрузчик (`lib/wasm/image-processor.ts`) сначала пробует CommonJS `require()` (работает в Next.js standalone-сборках), затем — динамический `import('./pkg/...')`. При ошибке `processImage` и `generateThumbhash` логируют ошибку и **возвращают исходный буфер / nulls** — флоу с изображениями никогда не блокируется отсутствием WASM-сборки.
+Загрузчик (`lib/wasm/image-processor.ts`) читает `.wasm` через `fs.readFile` (Node `fetch` не умеет `file://`) и передаёт сырые байты в `initWasm({ module_or_path })`. Поиск пути: сначала `cwd/lib/wasm/pkg`, затем fallback на `import.meta.url`. При ошибке `processImage` и `generateThumbhash` логируют ошибку и **возвращают исходный буфер / nulls** — флоу с изображениями никогда не блокируется отсутствием WASM-сборки.
 
-`next.config.ts` тащит `lib/wasm/pkg/**/*` через `outputFileTracingIncludes`, чтобы standalone-сборка содержала скомпилированный модуль.
+Сборка Vinext (`vinext build`) не упаковывает `.wasm`-бинарник в standalone-вывод; Dockerfile явно копирует `lib/wasm/pkg/` в `dist/server/assets/pkg/`.
 
 ## Поток запросов
 
@@ -149,4 +149,4 @@
 - `app/support/files/[key]/route.ts` — авторизованный read-эндпойнт вложений.
 - `app/api/auth/avatar/route.ts`, `app/api/auth/banner/route.ts` — загрузка + прогрев кэша.
 - `app/api/support/upload/route.ts` — мульти-файл загрузка + извлечение ThumbHash.
-- `next.config.ts` — `outputFileTracingIncludes` для WASM-бандла.
+- `Dockerfile` — копирует `lib/wasm/pkg/` в standalone-сборку (Vinext не упаковывает WASM-бинарники автоматически).

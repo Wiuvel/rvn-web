@@ -15,7 +15,7 @@ interface SEOProps {
   author?: string;
   section?: string;
   tags?: string[];
-  noindex?: boolean; // Для запрета индексации
+  noindex?: boolean;
 }
 
 export function generateMetadata({
@@ -98,7 +98,7 @@ export function generateMetadata({
 
 export const pageMetadata = {
   home: generateMetadata({
-    title: 'RVN',
+    title: 'RVN — Маркет прокси/ВПН',
     description:
       'RVN.MARKET - современный сервис приватного доступа в сеть. Высокая скорость и полная анонимность. Стабильные сервера с минимальным пингом.',
     keywords: ['Main Page', 'Home Page', 'Main'],

@@ -4,7 +4,7 @@
 
 ## Overview
 
-Real-time communication is handled by a **standalone WebSocket server** (`rvn-socket-server`), separate from the Next.js application. The web app connects to it as a client and sends broadcast commands via internal REST API.
+Real-time communication is handled by a **standalone WebSocket server** (`rvn-socket-server`), separate from the web application (Vinext, Next.js API-compatible). The web app connects to it as a client and sends broadcast commands via internal REST API.
 
 ```
 ┌──────────────┐     Socket.IO      ┌─────────────────────┐
@@ -17,7 +17,7 @@ Real-time communication is handled by a **standalone WebSocket server** (`rvn-so
        ▼                                     ▼
 ┌──────────────┐   POST /broadcast/* ┌────────────────────┐
 │   rvn-web    │────────────────────►│  rvn-socket-server │
-│  (Next.js)   │    x-internal-      │  REST broadcast    │
+│  (Vinext)    │    x-internal-      │  REST broadcast    │
 │  port 3001   │    api-key          │  endpoints         │
 └──────┬───────┘                     └────────────────────┘
        │

@@ -38,7 +38,7 @@
 
 ### 1. Точка входа proxy
 
-`proxy.ts` — единственный middleware в проекте. Запускается в Edge Runtime Next.js и обрабатывает запросы строго в этом порядке:
+`proxy.ts` — единственный middleware в проекте. Использует API мидлварей Next.js (совместимо с Vinext, который поддерживает ту же конвенцию `proxy.ts`) и обрабатывает запросы строго в этом порядке:
 
 1. **`shouldBypassProxy`** — пропустить статику, API-эндпоинты, RSC-prefetch и т.п. (matcher в `proxy.ts` и `lib/proxy/utils.ts`).
 2. **`handleProtection`** (`lib/proxy/protection.ts`) — слой защиты от ботов/DDoS (этот документ).
@@ -199,9 +199,9 @@ interface ICsrfStore {
 | `Content-Security-Policy` | Генерируется `generateCSPHeader(isDev)` — см. ниже. На статике не ставится. |
 | `Strict-Transport-Security` | `max-age=31536000; includeSubDomains; preload` (только в production). |
 | `X-XSS-Protection` | `1; mode=block`. |
-| `X-Content-Type-Options` | `nosniff` (ставится в `next.config.ts:headers()`). |
-| `X-Frame-Options` | `DENY` (ставится в `next.config.ts:headers()`). |
-| `Referrer-Policy` | `strict-origin-when-cross-origin` (ставится в `next.config.ts:headers()`). |
+| `X-Content-Type-Options` | `nosniff` (ставится в `next.config.ts:headers()`, читается Vinext). |
+| `X-Frame-Options` | `DENY` (ставится в `next.config.ts:headers()`, читается Vinext). |
+| `Referrer-Policy` | `strict-origin-when-cross-origin` (ставится в `next.config.ts:headers()`, читается Vinext). |
 
 На ответы со статикой дополнительно добавляются `Access-Control-Allow-*` заголовки, если запрос пришёл с основного домена или с одного из его поддоменов (`isSubdomain` / `isValidOrigin`).
 

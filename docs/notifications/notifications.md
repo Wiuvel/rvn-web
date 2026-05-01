@@ -143,6 +143,6 @@ POST /broadcast/notification
 | `components/providers/WebSocketProvider.tsx` | Глобальный WS провайдер |
 | `components/navigation/Notifications.tsx` | Виджет (dropdown) |
 | `components/notifications/NotificationsPageClient.tsx` | Страница /notifications |
-| `app/notifications/page.tsx` | Next.js route |
+| `app/notifications/page.tsx` | App Router route |
 | `database/schema.sql` | Полная схема (секция 7) |
 | `database/schema_migration.sql` | Миграция для существующей БД |

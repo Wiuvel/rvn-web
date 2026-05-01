@@ -143,6 +143,6 @@ If the user is viewing a ticket (`activeTicketId` passed to `useNotifications`),
 | `components/providers/WebSocketProvider.tsx` | Global WS provider |
 | `components/navigation/Notifications.tsx` | Widget (dropdown) |
 | `components/notifications/NotificationsPageClient.tsx` | /notifications page |
-| `app/notifications/page.tsx` | Next.js route |
+| `app/notifications/page.tsx` | App Router route |
 | `database/schema.sql` | Full schema (section 7) |
 | `database/schema_migration.sql` | Migration for existing DB |
