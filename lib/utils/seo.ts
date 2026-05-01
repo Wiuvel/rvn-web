@@ -32,7 +32,9 @@ export function generateMetadata({
   noindex = false,
 }: SEOProps): Metadata {
   const fullTitle = title
-    ? title === siteName || title.includes('RVN - безопасный доступ в сеть')
+    ? title === siteName ||
+      title.startsWith(`${siteName} `) ||
+      title.includes('RVN - безопасный доступ в сеть')
       ? title
       : `${title} | ${siteName}`
     : `${siteName} - безопасный доступ в сеть`;
@@ -98,7 +100,7 @@ export function generateMetadata({
 
 export const pageMetadata = {
   home: generateMetadata({
-    title: 'RVN — Маркет прокси/ВПН',
+    title: 'RVN — Маркет современных Proxy',
     description:
       'RVN.MARKET - современный сервис приватного доступа в сеть. Высокая скорость и полная анонимность. Стабильные сервера с минимальным пингом.',
     keywords: ['Main Page', 'Home Page', 'Main'],
