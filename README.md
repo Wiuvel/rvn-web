@@ -153,4 +153,8 @@ wasm/                  # Rust image processing
 - `CSRF_SECRET` / `TURNSTILE_*` — security
 - OAuth keys per provider
 
+## License
+
+The project is distributed under the License Terms: [Apache License 2.0 + Commons Clause](./LICENSE.md)
+
 ---
