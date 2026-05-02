@@ -11,10 +11,47 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  wasm:
+    name: Build WASM
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache cargo & wasm/target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            wasm/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('wasm/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+      - name: Build WASM
+        run: cd wasm && wasm-pack build --target web --out-dir ../lib/wasm/pkg
+
+      - name: Upload WASM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wasm-pkg
+          path: lib/wasm/pkg/
+          retention-days: 1
+
   quality:
     name: Lint, types & format
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    needs: [wasm]
     steps:
       - uses: actions/checkout@v4
 
@@ -24,6 +61,12 @@ jobs:
         with:
           node-version: '22'
           cache: 'pnpm'
+
+      - name: Download WASM artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: wasm-pkg
+          path: lib/wasm/pkg/
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -41,6 +84,7 @@ jobs:
     name: Tests
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    needs: [wasm]
     steps:
       - uses: actions/checkout@v4
 
@@ -50,6 +94,12 @@ jobs:
         with:
           node-version: '22'
           cache: 'pnpm'
+
+      - name: Download WASM artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: wasm-pkg
+          path: lib/wasm/pkg/
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -71,6 +121,12 @@ jobs:
         with:
           node-version: '22'
           cache: 'pnpm'
+
+      - name: Download WASM artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: wasm-pkg
+          path: lib/wasm/pkg/
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
