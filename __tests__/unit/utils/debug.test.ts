@@ -42,9 +42,7 @@ describe('debug utilities', () => {
     it('debugStart / debugEnd / debugError / debugWarn are no-ops in production', async () => {
       process.env.NODE_ENV = 'production';
       const spies = spyConsole();
-      const { debugStart, debugEnd, debugError, debugWarn } = await import(
-        '@/lib/utils/debug'
-      );
+      const { debugStart, debugEnd, debugError, debugWarn } = await import('@/lib/utils/debug');
       debugStart('foo');
       debugEnd('foo');
       debugError('foo', new Error('x'));

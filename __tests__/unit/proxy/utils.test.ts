@@ -39,10 +39,7 @@ describe('isStaticFile', () => {
 });
 
 describe('shouldBypassProxy', () => {
-  function makeRequest(
-    url: string,
-    headers: Record<string, string> = {},
-  ): NextRequest {
+  function makeRequest(url: string, headers: Record<string, string> = {}): NextRequest {
     return new NextRequest(new URL(url, 'https://rvn.market'), {
       headers,
     });
@@ -67,8 +64,7 @@ describe('shouldBypassProxy', () => {
     expect(
       shouldBypassProxy(
         makeRequest('/', {
-          'user-agent':
-            'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
+          'user-agent': 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
         }),
       ),
     ).toBe(true);
@@ -78,8 +74,7 @@ describe('shouldBypassProxy', () => {
     expect(
       shouldBypassProxy(
         makeRequest('/', {
-          'user-agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         }),
       ),
     ).toBe(false);

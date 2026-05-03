@@ -29,7 +29,9 @@ describe('getOAuthErrorMessage', () => {
   });
 
   it('falls back to unknown_error for unrecognized codes', () => {
-    expect(getOAuthErrorMessage('totally_unknown_code')).toBe(OAUTH_ERROR_MESSAGES['unknown_error']);
+    expect(getOAuthErrorMessage('totally_unknown_code')).toBe(
+      OAUTH_ERROR_MESSAGES['unknown_error'],
+    );
   });
 
   it('every value in GOOGLE_ERROR_MAP points to a real OAUTH_ERROR_MESSAGES key', () => {
