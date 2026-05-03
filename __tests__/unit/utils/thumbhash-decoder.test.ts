@@ -50,28 +50,25 @@ describe('decodeThumbHash', () => {
   });
 
   describe('on decoder failure', () => {
-    let originalEnv: string | undefined;
     let warnSpy: ReturnType<typeof vi.spyOn>;
 
     beforeEach(() => {
-      originalEnv = process.env.NODE_ENV;
       warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     });
 
     afterEach(() => {
-      if (originalEnv === undefined) delete process.env.NODE_ENV;
-      else process.env.NODE_ENV = originalEnv;
+      vi.unstubAllEnvs();
       vi.restoreAllMocks();
     });
 
     it('returns null and silently swallows errors in production', () => {
-      process.env.NODE_ENV = 'production';
+      vi.stubEnv('NODE_ENV', 'production');
       expect(decodeThumbHash('!!! not base64 !!!')).toBeNull();
       expect(warnSpy).not.toHaveBeenCalled();
     });
 
     it('returns null and warns in development', () => {
-      process.env.NODE_ENV = 'development';
+      vi.stubEnv('NODE_ENV', 'development');
       expect(decodeThumbHash('!!! not base64 !!!')).toBeNull();
       expect(warnSpy).toHaveBeenCalled();
     });

@@ -1,23 +1,8 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { NextResponse } from 'next/server';
 import { setCorsHeaders, handleCorsPreflight } from '@/lib/security/cors';
 
 describe('setCorsHeaders', () => {
-  let originalEnv: string | undefined;
-  let originalAllowed: string | undefined;
-
-  beforeEach(() => {
-    originalEnv = process.env.NODE_ENV;
-    originalAllowed = process.env.ALLOWED_ORIGINS;
-  });
-
-  afterEach(() => {
-    if (originalEnv === undefined) delete process.env.NODE_ENV;
-    else process.env.NODE_ENV = originalEnv;
-    if (originalAllowed === undefined) delete process.env.ALLOWED_ORIGINS;
-    else process.env.ALLOWED_ORIGINS = originalAllowed;
-  });
-
   it('echoes "*" when origin is explicitly true', () => {
     const res = setCorsHeaders(NextResponse.next(), { origin: true });
     expect(res.headers.get('Access-Control-Allow-Origin')).toBe('*');

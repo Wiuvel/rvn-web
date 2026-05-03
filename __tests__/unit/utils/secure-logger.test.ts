@@ -19,17 +19,14 @@ function spyAllConsole(): SpyHandles {
 
 describe('SecureLogger - production output', () => {
   let spies: SpyHandles;
-  let originalEnv: string | undefined;
 
   beforeEach(() => {
-    originalEnv = process.env.NODE_ENV;
-    process.env.NODE_ENV = 'production';
+    vi.stubEnv('NODE_ENV', 'production');
     spies = spyAllConsole();
   });
 
   afterEach(() => {
-    if (originalEnv === undefined) delete process.env.NODE_ENV;
-    else process.env.NODE_ENV = originalEnv;
+    vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
 
@@ -116,21 +113,18 @@ describe('SecureLogger - production output', () => {
 
 describe('SecureLogger - debug gate', () => {
   let spies: SpyHandles;
-  let originalEnv: string | undefined;
 
   beforeEach(() => {
-    originalEnv = process.env.NODE_ENV;
     spies = spyAllConsole();
   });
 
   afterEach(() => {
-    if (originalEnv === undefined) delete process.env.NODE_ENV;
-    else process.env.NODE_ENV = originalEnv;
+    vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
 
   it('debug() is a no-op outside development', () => {
-    process.env.NODE_ENV = 'production';
+    vi.stubEnv('NODE_ENV', 'production');
     logger.debug('debug-msg', { foo: 'bar' });
     expect(spies.log).not.toHaveBeenCalled();
     expect(spies.error).not.toHaveBeenCalled();
@@ -139,7 +133,7 @@ describe('SecureLogger - debug gate', () => {
   });
 
   it('debug() emits in development', () => {
-    process.env.NODE_ENV = 'development';
+    vi.stubEnv('NODE_ENV', 'development');
     logger.debug('debug-msg', { foo: 'bar' });
     // In development the formatted output goes through console.log (debug level)
     expect(spies.log).toHaveBeenCalled();
@@ -148,17 +142,14 @@ describe('SecureLogger - debug gate', () => {
 
 describe('SecureLogger - dev formatting', () => {
   let spies: SpyHandles;
-  let originalEnv: string | undefined;
 
   beforeEach(() => {
-    originalEnv = process.env.NODE_ENV;
-    process.env.NODE_ENV = 'development';
+    vi.stubEnv('NODE_ENV', 'development');
     spies = spyAllConsole();
   });
 
   afterEach(() => {
-    if (originalEnv === undefined) delete process.env.NODE_ENV;
-    else process.env.NODE_ENV = originalEnv;
+    vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
 

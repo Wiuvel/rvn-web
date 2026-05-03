@@ -98,7 +98,8 @@ describe('generateMetadata', () => {
   describe('openGraph', () => {
     it('defaults type to "website"', () => {
       const meta = generateMetadata({});
-      expect(meta.openGraph?.type).toBe('website');
+      const og = meta.openGraph as Record<string, unknown>;
+      expect(og.type).toBe('website');
     });
 
     it('includes article-specific fields when provided', () => {
@@ -163,7 +164,8 @@ describe('createArticleMetadata', () => {
       publishedTime: '2026-05-01T00:00:00Z',
       url: '/blog/launch',
     });
-    expect(meta.openGraph?.type).toBe('article');
+    const og = meta.openGraph as Record<string, unknown>;
+    expect(og.type).toBe('article');
   });
 
   it('defaults author to "RVN"', () => {
