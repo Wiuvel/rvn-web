@@ -64,10 +64,10 @@ export default function SubscriptionPage() {
   };
 
   return (
-    <div className="relative bg-neutral-950 text-neutral-100">
+    <div className="relative overflow-x-hidden bg-neutral-950 text-neutral-100">
       {/* Background gradient */}
-      <div className="pointer-events-none absolute inset-0">
-        <div className="absolute left-1/2 top-0 h-[600px] w-[800px] -translate-x-1/2 rounded-full bg-primary-500/5 blur-[120px]" />
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute left-1/2 top-0 h-[600px] w-[800px] max-w-full -translate-x-1/2 rounded-full bg-primary-500/5 blur-[120px]" />
       </div>
 
       <div className="relative z-10 mx-auto max-w-6xl px-4 pb-8 pt-8 sm:px-6 lg:px-8 lg:pb-32 lg:pt-32">

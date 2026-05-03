@@ -58,12 +58,12 @@
     "postgres": "^3.4.9",
     "react": "^19.2.4",
     "react-dom": "^19.2.5",
-    "react-hook-form": "^7.74.0",
+    "react-hook-form": "^7.75.0",
     "recharts": "^3.8.1",
     "socket.io-client": "^4.8.3",
     "tailwind-merge": "^3.5.0",
     "thumbhash": "^0.1.1",
-    "vinext": "^0.0.45",
+    "vinext": "^0.0.46",
     "zod": "^4.4.0"
   },
   "devDependencies": {

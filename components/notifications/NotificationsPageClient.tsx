@@ -88,40 +88,45 @@ export default function NotificationsPageClient() {
   return (
     <div className="min-h-screen bg-neutral-950 text-white selection:bg-primary-500/30">
       <Header />
-      <main className="mx-auto max-w-2xl px-4 pb-24 pt-24 lg:pb-8 lg:pt-32">
-        <button
-          onClick={() => router.back()}
-          className="mb-8 inline-flex items-center gap-2 text-base text-neutral-400 transition-colors hover:text-white"
-        >
-          <ArrowLeft className="h-5 w-5" />
-          Назад
-        </button>
+      <main className="relative pb-24 pt-8 lg:pb-8 lg:pt-32">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <button
+            onClick={() => router.back()}
+            className="mb-8 inline-flex items-center gap-2 text-base text-neutral-400 transition-colors hover:text-white"
+          >
+            <ArrowLeft className="h-5 w-5" />
+            Назад
+          </button>
 
-        <div className="mb-8 flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="bg-gradient-to-br from-white via-neutral-200 to-neutral-500 bg-clip-text text-3xl font-bold tracking-tight text-transparent sm:text-4xl">
-                Уведомления
-              </h1>
-              {unreadCount > 0 && (
-                <span className="flex h-6 min-w-[24px] items-center justify-center rounded-full bg-primary-500 px-2 text-xs font-bold text-white">
-                  {unreadCount > 99 ? '99+' : unreadCount}
-                </span>
-              )}
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 lg:gap-8">
+            <div className="lg:col-span-4">
+              <div className="lg:sticky lg:top-32">
+                <div className="flex items-center gap-3">
+                  <h1 className="bg-gradient-to-br from-white via-neutral-200 to-neutral-500 bg-clip-text text-3xl font-bold tracking-tight text-transparent sm:text-4xl">
+                    Уведомления
+                  </h1>
+                  {unreadCount > 0 && (
+                    <span className="flex h-6 min-w-[24px] items-center justify-center rounded-full bg-primary-500 px-2 text-xs font-bold text-white">
+                      {unreadCount > 99 ? '99+' : unreadCount}
+                    </span>
+                  )}
+                </div>
+                <p className="mt-3 text-sm text-neutral-400">
+                  Ответы поддержки и системные события
+                </p>
+                {unreadCount > 0 && (
+                  <button
+                    onClick={() => markAllRead()}
+                    className="mt-4 inline-flex items-center gap-1.5 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2 text-xs font-medium text-neutral-400 transition-colors hover:bg-white/5 hover:text-white"
+                  >
+                    <CheckCheck className="h-4 w-4" />
+                    Прочитать все
+                  </button>
+                )}
+              </div>
             </div>
-            <p className="mt-3 text-sm text-neutral-400">Ответы поддержки и системные события</p>
-          </div>
-          {unreadCount > 0 && (
-            <button
-              onClick={() => markAllRead()}
-              className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-medium text-neutral-400 transition-colors hover:bg-white/5 hover:text-white"
-            >
-              <CheckCheck className="h-4 w-4" />
-              Прочитать все
-            </button>
-          )}
-        </div>
 
+            <div className="lg:col-span-8">
         {isLoading ? (
           <div className="flex items-center justify-center py-20">
             <div className="h-8 w-8 animate-spin rounded-full border-2 border-neutral-600 border-t-primary-500" />
@@ -257,6 +262,9 @@ export default function NotificationsPageClient() {
             )}
           </div>
         )}
+            </div>
+          </div>
+        </div>
       </main>
     </div>
   );
