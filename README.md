@@ -10,13 +10,13 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Vinext-0.45-F38020?style=flat-square&logo=cloudflare&logoColor=white" alt="Vinext">
   <img src="https://img.shields.io/badge/Next.js_API-000000?style=flat-square&logo=next.js&logoColor=white" alt="Next.js API Compatible">
-  <img src="https://img.shields.io/badge/React-19-61dafb?style=flat-square&logo=react&logoColor=black" alt="React">
+  <img src="https://img.shields.io/badge/React-19-3178c6?style=flat-square&logo=react&logoColor=black" alt="React">
   <img src="https://img.shields.io/badge/TypeScript-6.0-3178c6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript">
-  <img src="https://img.shields.io/badge/Tailwind-4-38bdf8?style=flat-square&logo=tailwindcss&logoColor=white" alt="Tailwind">
-  <img src="https://img.shields.io/badge/tRPC-11-2596be?style=flat-square&logo=trpc&logoColor=white" alt="tRPC">
-  <img src="https://img.shields.io/badge/Drizzle-PostgreSQL-c5f74f?style=flat-square&logo=drizzle&logoColor=black" alt="Drizzle ORM">
-  <img src="https://img.shields.io/badge/Redis-DC382D?style=flat-square&logo=redis&logoColor=white" alt="Redis">
+  <img src="https://img.shields.io/badge/Tailwind-4-3178c6?style=flat-square&logo=tailwindcss&logoColor=white" alt="Tailwind">
+  <img src="https://img.shields.io/badge/tRPC-11-3178c6?style=flat-square&logo=trpc&logoColor=white" alt="tRPC">
   <img src="https://img.shields.io/badge/Vite-8-646CFF?style=flat-square&logo=vite&logoColor=white" alt="Vite">
+  <img src="https://img.shields.io/badge/Drizzle-PostgreSQL-c5f74f?style=flat-square&logo=drizzle&logoColor=green" alt="Drizzle ORM">
+  <img src="https://img.shields.io/badge/Redis-DC382D?style=flat-square&logo=redis&logoColor=white" alt="Redis">
   <img src="https://img.shields.io/badge/Docker-2496ED?style=flat-square&logo=docker&logoColor=white" alt="Docker">
   <img src="https://img.shields.io/badge/Rust-000000?style=flat-square&logo=rust&logoColor=white" alt="Rust">
 </p>
@@ -40,6 +40,8 @@ The site is the home base for everything around the subscription: account and de
 **Infra** Docker, Rust → WASM (Image processing), Rolldown
 
 ## 📚 Documentation
+
+[**Vinext notes**](docs/vinext/vinext.en.md) — workarounds for the regressions introduced in vinext 0.0.52 (TS path mappings, vitest aliases, cookie `sameSite` casing, `next/image` prop gaps).
 
 ### Authentication
 

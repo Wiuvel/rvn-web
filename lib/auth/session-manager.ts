@@ -308,7 +308,7 @@ export class SessionManager {
       maxAge: SESSION_TIMEOUT / 1000,
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production' && !isLocalhost,
-      sameSite: 'strict',
+      sameSite: 'Strict',
       path: '/',
     });
   }

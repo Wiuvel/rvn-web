@@ -59,7 +59,7 @@ export const protectionRouter = router({
       maxAge: 12 * 60 * 60, // 12 часов
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict' as const,
+      sameSite: 'Strict' as const,
       path: '/',
     };
 

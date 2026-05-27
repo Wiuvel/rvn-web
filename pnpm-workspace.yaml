@@ -1,0 +1,6 @@
+allowBuilds:
+  esbuild: true
+overrides:
+  'typescript': '^6.0.3'
+nodeLinker: hoisted
+autoInstallPeers: true

@@ -58,7 +58,7 @@ export const authRouter = router({
         maxAge: 0,
         path: '/',
         secure: process.env.NODE_ENV === 'production' && !isLocalhost,
-        sameSite: 'strict',
+        sameSite: 'Strict',
       });
       // Не сбрасываем session_id для неавторизованных — сессия нужна для CSRF и повторного входа
       return { authenticated: false as const };
@@ -88,7 +88,7 @@ export const authRouter = router({
         maxAge: SESSION_TIMEOUT / 1000,
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production' && !isLocalhost,
-        sameSite: 'strict',
+        sameSite: 'Strict',
         path: '/',
       });
     }
@@ -124,7 +124,7 @@ export const authRouter = router({
           maxAge: 60 * 60 * 24,
           httpOnly: true,
           secure: process.env.NODE_ENV === 'production' && !isLocalhost,
-          sameSite: 'lax',
+          sameSite: 'Lax',
           path: '/',
         });
       }
@@ -212,7 +212,7 @@ export const authRouter = router({
           maxAge: appConfig.token.maxAge,
           httpOnly: true,
           secure: process.env.NODE_ENV === 'production' && !isLocalhost,
-          sameSite: 'strict',
+          sameSite: 'Strict',
           path: '/',
         });
 
@@ -278,7 +278,7 @@ export const authRouter = router({
         maxAge: 60 * 60 * 6,
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production' && !isLocalhost,
-        sameSite: 'strict' as const,
+        sameSite: 'Strict' as const,
         path: '/',
       };
 
@@ -380,7 +380,7 @@ export const authRouter = router({
         maxAge: appConfig.token.maxAge,
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production' && !isLocalhost,
-        sameSite: 'strict',
+        sameSite: 'Strict',
         path: '/',
       });
 

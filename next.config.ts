@@ -1,4 +1,4 @@
-import type { NextConfig } from 'next';
+import type { NextConfig } from 'vinext';
 
 const nextConfig: NextConfig = {
   cacheComponents: true,

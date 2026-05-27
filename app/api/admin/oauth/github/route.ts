@@ -79,7 +79,7 @@ export async function GET(request: NextRequest) {
       maxAge: 10 * 60,
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production' && !isLocalhost,
-      sameSite: 'lax',
+      sameSite: 'Lax',
       path: '/',
     });
 

@@ -162,6 +162,7 @@ export default function ImageViewer({ isOpen, onClose, imageUrl, alt }: ImageVie
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseUp}
+            onDragStart={(e) => e.preventDefault()}
             role="presentation"
           >
             <Image
@@ -176,7 +177,6 @@ export default function ImageViewer({ isOpen, onClose, imageUrl, alt }: ImageVie
                 transform: `scale(${scale}) translate(${position.x / scale}px, ${position.y / scale}px)`,
                 transition: isDragging ? 'none' : 'transform 0.2s ease-out',
               }}
-              draggable={false}
               unoptimized
               onError={() => {
                 // Обработка ошибки загрузки изображения

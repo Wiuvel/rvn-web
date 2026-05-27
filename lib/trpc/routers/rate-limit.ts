@@ -72,7 +72,7 @@ export const rateLimitRouter = router({
     cookieStore.set('rate_limit_immunity', immunityExpiry.toString(), {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      sameSite: 'Lax',
       maxAge: 15 * 60,
       path: '/',
     });

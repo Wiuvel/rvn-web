@@ -7,4 +7,11 @@ export default defineConfig({
   ssr: {
     external: ['maxmind', 'ioredis', '@node-rs/argon2'],
   },
+  build: {
+    rolldownOptions: {
+      checks: {
+        pluginTimings: false,
+      },
+    },
+  },
 });

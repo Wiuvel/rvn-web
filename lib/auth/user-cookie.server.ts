@@ -86,7 +86,7 @@ export function getUserDataCookieOptions(isLocalhost: boolean) {
     maxAge,
     httpOnly: false, // Клиент читает для UI
     secure: process.env.NODE_ENV === 'production' && !isLocalhost,
-    sameSite: 'lax' as const,
+    sameSite: 'Lax' as const,
     path: '/',
   };
 }

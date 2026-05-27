@@ -223,7 +223,7 @@ export async function GET(request: NextRequest) {
         maxAge: 60 * 60 * 2,
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production' && !isLocalhost,
-        sameSite: 'lax',
+        sameSite: 'Lax',
         path: '/',
         ...(cookieDomain && { domain: cookieDomain }),
       });
@@ -236,7 +236,7 @@ export async function GET(request: NextRequest) {
         maxAge: 60 * 60 * 2,
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production' && !isLocalhost,
-        sameSite: 'lax',
+        sameSite: 'Lax',
         path: '/',
         ...(cookieDomain && { domain: cookieDomain }),
       });
@@ -250,7 +250,7 @@ export async function GET(request: NextRequest) {
       maxAge: appConfig.token.maxAge,
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production' && !isLocalhost,
-      sameSite: 'lax',
+      sameSite: 'Lax',
       path: '/',
     });
 

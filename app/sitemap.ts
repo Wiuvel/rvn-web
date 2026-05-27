@@ -1,7 +1,6 @@
-import { MetadataRoute } from 'next';
 import { domains } from '@/lib/utils/config';
 
-export default function sitemap(): MetadataRoute.Sitemap {
+export default function sitemap() {
   const baseUrl = domains.mainUrl;
   const currentDate = new Date().toISOString();
   const staticPages = [
@@ -70,7 +69,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     },
   ];
 
-  const dynamicPages: MetadataRoute.Sitemap = [];
+  const dynamicPages: typeof staticPages = [];
 
   // - Page Apps, News..
 

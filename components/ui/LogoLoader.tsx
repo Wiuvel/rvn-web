@@ -15,7 +15,6 @@ export default function LogoLoader() {
           height={290}
           className="logo-pulse h-auto w-[200px]"
           priority
-          fetchPriority="high"
         />
       </div>
     </div>

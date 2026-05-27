@@ -187,7 +187,7 @@ export async function handleProtection(
       maxAge: 60 * 60 * 12 /** 12 hours */,
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production' && !isLocalhost,
-      sameSite: 'strict',
+      sameSite: 'Strict',
       path: '/',
     });
 
@@ -234,7 +234,7 @@ export async function handleProtection(
     maxAge: 60 * 60 * 12 /** 12 hours */,
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production' && !isLocalhost,
-    sameSite: 'strict',
+    sameSite: 'Strict',
     path: '/',
   });
 
