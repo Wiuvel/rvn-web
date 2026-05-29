@@ -6,13 +6,13 @@
 
 Проект работает на [**vinext**](https://github.com/cloudflare/vinext) — реимплементации API Next.js поверх Vite. CLI (`vinext dev`, `vinext build`, `vinext start`) и весь набор `next/*` модулей работают как раньше, App Router и `proxy.ts` тоже.
 
-Документ нужен только из-за **специфики версии 0.0.52**: в ней появились regressions, которых не было в 0.0.46, и для них в проекте стоят локальные workaround'ы. Если бамп vinext'а уберёт пункт ниже — workaround можно снимать.
+Документ нужен из-за **regressions, появившихся в 0.0.52** (которых не было в 0.0.46) и **сохраняющихся в 0.0.53** — для них в проекте стоят локальные workaround'ы. Если бамп vinext'а уберёт пункт ниже — workaround можно снимать.
 
-## Текущие workaround'ы (vinext 0.0.52)
+## Текущие workaround'ы (проверено на vinext 0.0.53)
 
 ### 1. Ambient module declarations для `next/*`
 
-В 0.0.52 пакет `next` не подтягивается, и `tsc` валит ~140 ошибок `TS2307: Cannot find module 'next/...'`. Vinext-плагин для Vite сам резолвит `next/*` на runtime, но TS об этом не знает.
+Пакет `next` не подтягивается, и `tsc` валит ~140 ошибок `TS2307: Cannot find module 'next/...'`. Vinext-плагин для Vite сам резолвит `next/*` на runtime, но TS об этом не знает.
 
 **Где решено**: `types/global.d.ts` — там лежат ambient module declarations, которые ре-экспортят содержимое из `vinext/shims/*` (это **официально exposed** npm subpath из `package.json` vinext'а: `"./shims/*": { "types": "./dist/shims/*.d.ts", "import": "./dist/shims/*.js" }`):
 
@@ -47,7 +47,7 @@ resolve: {
 
 ### 3. Cookie `sameSite` — capitalized values
 
-Vinext-шим `cookies()` требует `'Strict' | 'Lax' | 'None'`. В Next.js (и в vinext 0.0.46) принимался lowercase. Браузеры RFC-6265 case-insensitive, рантайм идентичен, но **в коде используй capitalized**:
+Vinext-шим `cookies()` требует `'Strict' | 'Lax' | 'None'`. В Next.js (и в vinext 0.0.46) принимался lowercase; в 0.0.53 всё ещё capitalized. Браузеры RFC-6265 case-insensitive, рантайм идентичен, но **в коде используй capitalized**:
 
 ```ts
 cookieStore.set('session_id', value, { sameSite: 'Strict' }); // ✅
