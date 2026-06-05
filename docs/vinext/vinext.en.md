@@ -6,9 +6,9 @@
 
 The project runs on [**vinext**](https://github.com/cloudflare/vinext) — a reimplementation of the Next.js API surface on top of Vite. The CLI (`vinext dev`, `vinext build`, `vinext start`) and the whole `next/*` module set work as they did under Next.js; the App Router and `proxy.ts` likewise.
 
-This document exists because of **regressions introduced in 0.0.52** (absent in 0.0.46) that **persist in 0.0.53** — the workarounds for them live in this repo. If a future vinext bump removes one of the items below, the corresponding workaround can be dropped.
+This document exists because of **regressions introduced in 0.0.52** (absent in 0.0.46) that **persist in 0.0.55** — the workarounds for them live in this repo. If a future vinext bump removes one of the items below, the corresponding workaround can be dropped.
 
-## Current workarounds (verified on vinext 0.0.53)
+## Current workarounds (verified on vinext 0.0.55)
 
 ### 1. Ambient module declarations for `next/*`
 
@@ -47,7 +47,7 @@ Adding a new `next/*` import in a test? Add the matching alias.
 
 ### 3. Cookie `sameSite` — capitalized values
 
-The vinext shim for `cookies()` requires `'Strict' | 'Lax' | 'None'`. Next.js (and vinext 0.0.46) accepted lowercase; 0.0.53 is still capitalized. Browsers (RFC 6265) are case-insensitive at runtime, so behaviour is identical — but **always use capitalized values in code**:
+The vinext shim for `cookies()` requires `'Strict' | 'Lax' | 'None'`. Next.js (and vinext 0.0.46) accepted lowercase; 0.0.55 is still capitalized. Browsers (RFC 6265) are case-insensitive at runtime, so behaviour is identical — but **always use capitalized values in code**:
 
 ```ts
 cookieStore.set('session_id', value, { sameSite: 'Strict' }); // ✅

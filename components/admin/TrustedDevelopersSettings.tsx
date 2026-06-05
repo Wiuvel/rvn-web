@@ -185,6 +185,7 @@ export default function TrustedDevelopersSettings() {
                     value={formData.github_username}
                     onChange={(e) => setFormData({ ...formData, github_username: e.target.value })}
                     placeholder="Wiuvel"
+                    aria-label="Логин GitHub"
                     required
                     className="w-full rounded-lg border border-neutral-800 bg-neutral-900/50 py-3 pl-10 pr-4 text-white placeholder-neutral-500 transition-all focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                   />
@@ -231,6 +232,7 @@ export default function TrustedDevelopersSettings() {
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     placeholder="developer@example.com"
+                    aria-label="Email разработчика"
                     className="w-full rounded-lg border border-neutral-800 bg-neutral-900/50 py-3 pl-10 pr-4 text-white placeholder-neutral-500 transition-all focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                   />
                 </div>

@@ -131,6 +131,7 @@ export default function RemnawaveSettings() {
               value={endpoint}
               onChange={(e) => setEndpoint(e.target.value)}
               placeholder="https://panel.example.com"
+              aria-label="Endpoint панели"
               className="w-full rounded-lg border border-neutral-700 bg-neutral-800 px-4 py-2.5 text-sm text-white placeholder-neutral-500 transition-colors focus:border-primary-500 focus:outline-none"
             />
           </div>
@@ -150,6 +151,7 @@ export default function RemnawaveSettings() {
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
                 placeholder="eyJhbGciOiJIUzI1NiIs..."
+                aria-label="API-ключ"
                 className="w-full rounded-lg border border-neutral-700 bg-neutral-800 px-4 py-2.5 pr-20 text-sm text-white placeholder-neutral-500 transition-colors focus:border-primary-500 focus:outline-none"
               />
               <button
@@ -171,6 +173,8 @@ export default function RemnawaveSettings() {
               </div>
               <button
                 type="button"
+                aria-label="Включить/выключить тестовый промокод"
+                aria-pressed={testPromoEnabled}
                 onClick={() => setTestPromoEnabled(!testPromoEnabled)}
                 className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${
                   testPromoEnabled ? 'bg-primary-600' : 'bg-neutral-700'
@@ -191,6 +195,7 @@ export default function RemnawaveSettings() {
                   value={testPromoCode}
                   onChange={(e) => setTestPromoCode(e.target.value)}
                   placeholder="Введите промокод"
+                  aria-label="Тестовый промокод"
                   className="w-full rounded-lg border border-neutral-700 bg-neutral-800 px-4 py-2.5 text-sm text-white placeholder-neutral-500 transition-colors focus:border-primary-500 focus:outline-none"
                 />
               </div>

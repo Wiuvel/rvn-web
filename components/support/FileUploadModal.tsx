@@ -580,6 +580,7 @@ export default function FileUploadModal({
               accept="image/*,.pdf,.txt"
               onChange={handleFileSelect}
               className="hidden"
+              aria-label="Выбрать файл"
             />
 
             {selectedFiles.length > 0 && (

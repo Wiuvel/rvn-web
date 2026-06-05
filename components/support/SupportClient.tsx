@@ -2440,6 +2440,7 @@ export default function SupportClient() {
           tabIndex={0}
           aria-label="Закрыть модальное окно"
         >
+          {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- модальная обёртка: обработчики закрытия по клику/Escape */}
           <div
             className="max-h-[90vh] w-full max-w-md cursor-default overflow-y-auto rounded-2xl border border-white/10 bg-neutral-900 p-4 sm:p-6"
             onClick={(e) => e.stopPropagation()}
@@ -2469,6 +2470,7 @@ export default function SupportClient() {
                     }
                   }}
                   placeholder="Тема обращения.."
+                  aria-label="Тема обращения"
                   className="w-full rounded-lg border border-white/10 bg-neutral-800 px-3 py-2 text-sm text-white focus:border-primary-500 focus:outline-none"
                 />
                 <div className="mt-1 text-right text-xs text-neutral-500">
@@ -2490,6 +2492,7 @@ export default function SupportClient() {
                     }
                   }}
                   placeholder="Опишите свою проблему.."
+                  aria-label="Описание проблемы"
                   rows={4}
                   className="w-full resize-none rounded-lg border border-white/10 bg-neutral-800 px-3 py-2 text-sm text-white placeholder-neutral-500 focus:border-primary-500 focus:outline-none"
                   onKeyDown={(e) => {

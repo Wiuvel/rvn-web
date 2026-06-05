@@ -11,3 +11,4 @@ __tests__
 docs
 *.md
 data/*.mmdb
+dev

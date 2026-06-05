@@ -133,6 +133,7 @@ export default function SubscriptionPurchaseModal({
   const isPending = purchaseMutation.isPending;
 
   return (
+    /* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- модальная обёртка: обработчики закрытия по клику/Escape */
     <div
       role="dialog"
       aria-modal="true"
@@ -143,6 +144,7 @@ export default function SubscriptionPurchaseModal({
         if (e.key === 'Escape') handleClose();
       }}
     >
+      {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- модальная обёртка: обработчики закрытия по клику/Escape */}
       <div
         role="document"
         className="w-full max-w-md overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-900 shadow-2xl"
@@ -202,6 +204,7 @@ export default function SubscriptionPurchaseModal({
                     <button
                       key={plan.id}
                       type="button"
+                      aria-label={`Выбрать тариф ${plan.name}`}
                       onClick={() => setSelectedPlanId(plan.id)}
                       className={`w-full rounded-xl border p-4 text-left transition-colors ${
                         isSelected
@@ -334,6 +337,7 @@ export default function SubscriptionPurchaseModal({
                     value={promoCode}
                     onChange={(e) => setPromoCode(e.target.value)}
                     placeholder="Введите промокод"
+                    aria-label="Промокод"
                     className={`w-full rounded-lg border bg-neutral-800 px-3 py-2 pr-9 text-sm text-white placeholder-neutral-500 focus:outline-none ${
                       isPromoValid
                         ? 'border-green-500/50 focus:border-green-500'

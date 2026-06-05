@@ -406,6 +406,7 @@ export default function AdminPanelContent({ teamCount }: AdminPanelContentProps)
                     <button
                       onClick={() => fetchUsers(debouncedSearch, sortDirection)}
                       className="user-refresh-btn"
+                      aria-label="Обновить список пользователей"
                       disabled={usersLoading}
                     >
                       <svg
@@ -865,6 +866,7 @@ export default function AdminPanelContent({ teamCount }: AdminPanelContentProps)
 
       {/* Ban User Modal */}
       {banUser && (
+        /* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- модальная обёртка: обработчики закрытия по клику/Escape */
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
           onClick={(e) => {
@@ -942,6 +944,7 @@ export default function AdminPanelContent({ teamCount }: AdminPanelContentProps)
                   value={banReason}
                   onChange={(e) => setBanReason(e.target.value)}
                   placeholder="BRUH.."
+                  aria-label="Причина блокировки"
                   className="h-24 w-full resize-none rounded-lg border border-neutral-800 bg-neutral-950 p-3 text-sm text-white focus:border-neutral-600 focus:outline-none"
                 />
               </div>

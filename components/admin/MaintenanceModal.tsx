@@ -146,6 +146,7 @@ export default function MaintenanceModal({
       }}
       aria-label="Close modal"
     >
+      {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- модальная обёртка: обработчики закрытия по клику/Escape */}
       <div
         className="animate-scaleIn flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-xl border border-neutral-800 bg-neutral-900 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
@@ -196,6 +197,8 @@ export default function MaintenanceModal({
                 </div>
                 <button
                   onClick={handleToggle}
+                  aria-label="Включить/выключить режим обслуживания"
+                  aria-pressed={config.isActive}
                   className={`relative h-6 w-12 rounded-full transition-colors duration-200 focus:outline-none ${
                     config.isActive ? 'bg-blue-600' : 'bg-neutral-700'
                   }`}
@@ -223,6 +226,7 @@ export default function MaintenanceModal({
                     type="datetime-local"
                     value={toInputFormat(config.scheduledStart)}
                     onChange={handleStartDateChange}
+                    aria-label="Начало работ"
                     className="w-full rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-2.5 text-white transition-colors focus:border-blue-500 focus:outline-none"
                   />
                 </div>
@@ -237,6 +241,7 @@ export default function MaintenanceModal({
                   <input
                     id="end-date"
                     type="datetime-local"
+                    aria-label="Окончание работ"
                     value={toInputFormat(config.scheduledEnd)}
                     onChange={(e) =>
                       setConfig({ ...config, scheduledEnd: fromInputFormat(e.target.value) })
@@ -256,6 +261,7 @@ export default function MaintenanceModal({
                   value={config.message}
                   onChange={(e) => setConfig({ ...config, message: e.target.value })}
                   placeholder="Мы проводим плановое обновление..."
+                  aria-label="Сообщение для пользователей"
                   rows={3}
                   className="w-full resize-none rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-2 text-white focus:border-blue-500 focus:outline-none"
                 />

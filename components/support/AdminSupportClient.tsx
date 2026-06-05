@@ -1961,6 +1961,7 @@ export default function AdminSupportClient() {
                 value={archiveSearchQuery}
                 onChange={(e) => setArchiveSearchQuery(e.target.value)}
                 placeholder="Поиск по логину или теме"
+                aria-label="Поиск по логину или теме"
                 className="w-full rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-2 pl-10 text-sm text-white placeholder-neutral-500 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               <svg
@@ -1979,6 +1980,7 @@ export default function AdminSupportClient() {
               {archiveSearchQuery && (
                 <button
                   onClick={() => setArchiveSearchQuery('')}
+                  aria-label="Очистить поиск"
                   className="absolute right-3 top-1/2 -translate-y-1/2 transform text-neutral-500 transition-colors hover:text-white"
                 >
                   <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2002,6 +2004,7 @@ export default function AdminSupportClient() {
                 value={activeSearchQuery}
                 onChange={(e) => setActiveSearchQuery(e.target.value)}
                 placeholder="Поиск по логину или ID"
+                aria-label="Поиск по логину или ID"
                 className="w-full rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-2 pl-10 text-sm text-white placeholder-neutral-500 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               <svg
@@ -2020,6 +2023,7 @@ export default function AdminSupportClient() {
               {activeSearchQuery && (
                 <button
                   onClick={() => setActiveSearchQuery('')}
+                  aria-label="Очистить поиск"
                   className="absolute right-3 top-1/2 -translate-y-1/2 transform text-neutral-500 transition-colors hover:text-white"
                 >
                   <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2523,6 +2527,7 @@ export default function AdminSupportClient() {
                               }
                             }}
                             placeholder="Введите сообщение..."
+                            aria-label="Текст сообщения"
                             className="flex-1 rounded-lg border border-neutral-700 bg-neutral-800 px-4 py-2.5 text-sm text-white placeholder-neutral-500 focus:border-blue-500 focus:outline-none sm:text-base"
                           />
                           <button
@@ -2557,6 +2562,7 @@ export default function AdminSupportClient() {
                   onClick={() => setRightPanelCollapsed(false)}
                   className="p-3 text-neutral-400 transition-colors hover:bg-neutral-800 hover:text-white"
                   title="Развернуть панель"
+                  aria-label="Развернуть панель"
                 >
                   <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path
@@ -2575,6 +2581,7 @@ export default function AdminSupportClient() {
                         onClick={() => setRightPanelCollapsed(true)}
                         className="rounded p-1 text-neutral-400 transition-colors hover:bg-neutral-800 hover:text-white"
                         title="Свернуть панель"
+                        aria-label="Свернуть панель"
                       >
                         <svg
                           className="h-4 w-4"
@@ -2599,6 +2606,7 @@ export default function AdminSupportClient() {
                         onClick={() => setRightPanelCollapsed(true)}
                         className="rounded p-1 text-neutral-400 transition-colors hover:bg-neutral-800 hover:text-white"
                         title="Свернуть панель"
+                        aria-label="Свернуть панель"
                       >
                         <svg
                           className="h-4 w-4"

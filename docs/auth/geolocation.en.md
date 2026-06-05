@@ -29,7 +29,13 @@ registerDevice() / createSession()
 - Built-in localization: `result.city.names.ru`, `result.country.names.ru`
 - Falls back to `.names.en` when Russian translation is unavailable
 
-**Production (Docker)**: downloaded at build time from [P3TERX/GeoLite.mmdb](https://github.com/P3TERX/GeoLite.mmdb) — a mirror updated daily via CI.
+**Production (Docker)**: downloaded at build time. With a MaxMind license key (passed as a BuildKit secret) the official, up-to-date database is fetched directly from MaxMind. Without a key the build falls back to the [P3TERX/GeoLite.mmdb](https://github.com/P3TERX/GeoLite.mmdb) community mirror, so the build never breaks:
+
+```bash
+docker build --secret id=maxmind_key,env=MAXMIND_LICENSE_KEY -t rvn-web .
+```
+
+The key is never written to an image layer or `docker history`.
 
 **Dev**: .mmdb is absent, module automatically switches to the fallback.
 
@@ -69,7 +75,8 @@ In-memory `Map<ip, {value, expiresAt}>`:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `MAXMIND_DB_PATH` | `./data/GeoLite2-City.mmdb` | Path to .mmdb file |
+| `MAXMIND_DB_PATH` | `./data/GeoLite2-City.mmdb` | Path to .mmdb file (runtime) |
+| `MAXMIND_LICENSE_KEY` | — | License key for the official GeoLite2 download (Docker build only, BuildKit secret) |
 
 ## Startup Check
 

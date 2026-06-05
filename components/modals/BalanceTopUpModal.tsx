@@ -95,6 +95,7 @@ export default function BalanceTopUpModal({ isOpen, onClose, onSuccess }: Balanc
   const canSubmit = isAmountValid && isPromoValid && !isPending;
 
   return (
+    /* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- модальная обёртка: обработчики закрытия по клику/Escape */
     <div
       role="dialog"
       aria-modal="true"
@@ -105,6 +106,7 @@ export default function BalanceTopUpModal({ isOpen, onClose, onSuccess }: Balanc
         if (e.key === 'Escape') handleClose();
       }}
     >
+      {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- модальная обёртка: обработчики закрытия по клику/Escape */}
       <div
         role="document"
         className="w-full max-w-md overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-900 shadow-2xl"
@@ -157,6 +159,7 @@ export default function BalanceTopUpModal({ isOpen, onClose, onSuccess }: Balanc
                     value={amount}
                     onChange={(e) => handleAmountChange(e.target.value)}
                     placeholder={`от ${MIN_AMOUNT_RUB} ₽`}
+                    aria-label="Сумма пополнения"
                     className="w-full rounded-lg border border-neutral-700 bg-neutral-800 px-4 py-3 pr-10 text-lg font-medium text-white placeholder-neutral-500 focus:border-primary-500 focus:outline-none"
                   />
                   <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-neutral-500">
@@ -214,6 +217,7 @@ export default function BalanceTopUpModal({ isOpen, onClose, onSuccess }: Balanc
                     value={promoCode}
                     onChange={(e) => setPromoCode(e.target.value)}
                     placeholder="Введите промокод"
+                    aria-label="Промокод"
                     className={`w-full rounded-lg border bg-neutral-800 px-3 py-2 pr-9 text-sm text-white placeholder-neutral-500 focus:outline-none ${
                       isPromoValid
                         ? 'border-green-500/50 focus:border-green-500'

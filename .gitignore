@@ -27,4 +27,11 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 .next/
+.vinext/
 database/*.mmdb
+
+# Local dev stack (dev/up.mjs)
+.env.local.bak
+dev/.ws-server/
+dev/.data/
+dev/.ws.env

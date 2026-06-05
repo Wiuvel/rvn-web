@@ -219,6 +219,7 @@ export default function CommentsSection({
               }}
               disabled={!!replyingTo || submitting}
               placeholder="Напишите комментарий..."
+              aria-label="Текст комментария"
               className="h-28 w-full resize-none rounded-xl border border-white/10 bg-neutral-900 p-4 text-base text-white placeholder-neutral-500 transition-colors focus:border-primary-500 focus:outline-none"
             />
             {!replyingTo && (

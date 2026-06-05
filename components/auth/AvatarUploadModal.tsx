@@ -425,6 +425,7 @@ export default function AvatarUploadModal({
         className="fixed inset-0 z-[1000] bg-black/60 backdrop-blur-sm"
         onClick={onClose}
         role="button"
+        aria-label="Закрыть"
         tabIndex={0}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
@@ -497,6 +498,7 @@ export default function AvatarUploadModal({
                   accept="image/*"
                   onChange={handleFileSelect}
                   className="hidden"
+                  aria-label="Выбрать файл"
                   disabled={uploading}
                 />
                 <div
@@ -578,6 +580,7 @@ export default function AvatarUploadModal({
                   accept="image/*"
                   onChange={handleFileSelect}
                   className="hidden"
+                  aria-label="Выбрать файл"
                   disabled={uploading}
                 />
                 <div
@@ -626,6 +629,7 @@ export default function AvatarUploadModal({
                   {cropArea && overlayStyle && (
                     <>
                       <div className="pointer-events-none absolute inset-0" style={overlayStyle} />
+                      {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- интерактивный кроп-регион управляется мышью */}
                       <div
                         className="absolute cursor-move rounded-full border-2 border-white/90 shadow-[0_0_0_1px_rgba(0,0,0,0.8),0_0_20px_rgba(59,130,246,0.3)]"
                         style={{
@@ -639,6 +643,7 @@ export default function AvatarUploadModal({
                         aria-label="Область обрезки"
                       />
                       {['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'].map((handle) => (
+                        /* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- интерактивный кроп-регион управляется мышью */
                         <div
                           key={handle}
                           className="absolute z-20 h-4 w-4 cursor-nwse-resize rounded-sm border-2 border-blue-500 bg-white shadow-lg"
@@ -676,6 +681,7 @@ export default function AvatarUploadModal({
                   accept="image/*"
                   onChange={handleFileSelect}
                   className="hidden"
+                  aria-label="Выбрать файл"
                   disabled={uploading}
                 />
                 <button

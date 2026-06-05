@@ -27,6 +27,7 @@ export function CloseReasonModal({
           value={reason}
           onChange={(e) => onReasonChange(e.target.value)}
           placeholder="Введите причину закрытия..."
+          aria-label="Причина закрытия тикета"
           rows={4}
           className="w-full resize-none rounded-lg border border-neutral-700 bg-neutral-800 px-4 py-3 text-sm text-white placeholder-neutral-500 focus:border-blue-500 focus:outline-none"
         />

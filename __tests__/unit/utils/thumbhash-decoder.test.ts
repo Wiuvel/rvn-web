@@ -79,10 +79,6 @@ describe('decodeThumbHash', () => {
     // if the underlying library rejects it (unlikely for this canonical sample), the result
     // is null — either way we document the contract.
     const result = decodeThumbHash('1QcSHQRnh493V4dIh4eXh1h4kJUI');
-    if (result !== null) {
-      expect(result).toMatch(/^data:image\//);
-    } else {
-      expect(result).toBeNull();
-    }
+    expect(result).toSatisfy((r: string | null) => r === null || r.startsWith('data:image/'));
   });
 });

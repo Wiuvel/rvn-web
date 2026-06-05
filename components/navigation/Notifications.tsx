@@ -145,6 +145,7 @@ export function NotificationsWidget({
                   }) => (
                     <button
                       key={notification.id}
+                      aria-label="Открыть уведомление"
                       onClick={() =>
                         handleNotificationClick({
                           id: notification.id,

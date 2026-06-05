@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1
+
 # ---- Stage 1: WASM Builder ----
 FROM rust:1-slim-bookworm AS wasm
 WORKDIR /app
@@ -21,7 +23,7 @@ RUN cd wasm && wasm-pack build --release --target web --out-dir /app/lib/wasm/pk
 FROM node:22-slim AS deps
 WORKDIR /app
 
-RUN corepack enable && corepack prepare pnpm@10.33.0 --activate
+RUN corepack enable && corepack prepare pnpm@11.3.0 --activate
 
 COPY package.json pnpm-lock.yaml ./
 
@@ -31,7 +33,7 @@ RUN pnpm install --frozen-lockfile --node-linker=hoisted
 FROM node:22-slim AS builder
 WORKDIR /app
 
-RUN corepack enable && corepack prepare pnpm@10.33.0 --activate
+RUN corepack enable && corepack prepare pnpm@11.3.0 --activate
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/package.json ./package.json
@@ -53,9 +55,21 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-RUN mkdir -p database && \
-    wget -q -O database/GeoLite2-City.mmdb \
-      "https://github.com/P3TERX/GeoLite.mmdb/raw/download/GeoLite2-City.mmdb"
+# GeoLite2-City database: official MaxMind download when a license key is
+# provided (BuildKit secret, never baked into a layer), else a mirror.
+RUN --mount=type=secret,id=maxmind_key \
+    mkdir -p database && \
+    KEY="$(cat /run/secrets/maxmind_key 2>/dev/null || true)" && \
+    if [ -n "$KEY" ]; then \
+      wget -q -O /tmp/GeoLite2-City.tar.gz \
+        "https://download.maxmind.com/app/geoip_download?edition_id=GeoLite2-City&license_key=${KEY}&suffix=tar.gz" && \
+      tar -xzf /tmp/GeoLite2-City.tar.gz -C /tmp && \
+      mv /tmp/GeoLite2-City_*/GeoLite2-City.mmdb database/GeoLite2-City.mmdb && \
+      rm -rf /tmp/GeoLite2-City.tar.gz /tmp/GeoLite2-City_*; \
+    else \
+      wget -q -O database/GeoLite2-City.mmdb \
+        "https://github.com/P3TERX/GeoLite.mmdb/raw/download/GeoLite2-City.mmdb"; \
+    fi
 
 RUN pnpm build
 

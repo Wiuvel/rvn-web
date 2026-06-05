@@ -8,15 +8,19 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Vinext-0.0.53-F38020?style=flat-square&logo=cloudflare&logoColor=white" alt="Vinext">
+  <img src="https://img.shields.io/badge/Vinext-0.0.55-F38020?style=flat-square&logo=cloudflare&logoColor=white" alt="Vinext">
   <img src="https://img.shields.io/badge/Next.js_API-000000?style=flat-square&logo=next.js&logoColor=white" alt="Next.js API Compatible">
   <img src="https://img.shields.io/badge/React-19-3178c6?style=flat-square&logo=react&logoColor=black" alt="React">
   <img src="https://img.shields.io/badge/TypeScript-6.0-3178c6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript">
   <img src="https://img.shields.io/badge/Tailwind-4-3178c6?style=flat-square&logo=tailwindcss&logoColor=white" alt="Tailwind">
   <img src="https://img.shields.io/badge/tRPC-11-3178c6?style=flat-square&logo=trpc&logoColor=white" alt="tRPC">
+  <img src="https://img.shields.io/badge/Socket.IO-4-010101?style=flat-square&logo=socketdotio&logoColor=white" alt="Socket.IO">
   <img src="https://img.shields.io/badge/Vite-8-646CFF?style=flat-square&logo=vite&logoColor=white" alt="Vite">
-  <img src="https://img.shields.io/badge/Drizzle-PostgreSQL-c5f74f?style=flat-square&logo=drizzle&logoColor=green" alt="Drizzle ORM">
+  <img src="https://img.shields.io/badge/Drizzle-ORM-c5f74f?style=flat-square&logo=drizzle&logoColor=green" alt="Drizzle ORM">
+  <img src="https://img.shields.io/badge/PostgreSQL-4169E1?style=flat-square&logo=postgresql&logoColor=white" alt="PostgreSQL">
   <img src="https://img.shields.io/badge/Redis-DC382D?style=flat-square&logo=redis&logoColor=white" alt="Redis">
+  <img src="https://img.shields.io/badge/AWS_S3-569A31?style=flat-square&logo=amazons3&logoColor=white" alt="AWS S3">
+  <img src="https://img.shields.io/badge/WebAssembly-654FF0?style=flat-square&logo=webassembly&logoColor=white" alt="WebAssembly">
   <img src="https://img.shields.io/badge/Docker-2496ED?style=flat-square&logo=docker&logoColor=white" alt="Docker">
   <img src="https://img.shields.io/badge/Rust-000000?style=flat-square&logo=rust&logoColor=white" alt="Rust">
 </p>
@@ -41,7 +45,7 @@ The site is the home base for everything around the subscription: account and de
 
 ## 📚 Documentation
 
-[**Vinext notes**](docs/vinext/vinext.en.md) — workarounds for the regressions still present as of vinext 0.0.53 (ambient `next/*` declarations, vitest aliases, cookie `sameSite` casing, `next/image` prop gaps).
+[**Vinext notes**](docs/vinext/vinext.en.md) — workarounds for the regressions still present as of vinext 0.0.55 (ambient `next/*` declarations, vitest aliases, cookie `sameSite` casing, `next/image` prop gaps).
 
 ### Authentication
 
@@ -96,6 +100,12 @@ The site is the home base for everything around the subscription: account and de
 |----------|-------------|
 | [Migrations](docs/database/migrations.en.md) | Drizzle Kit workflow, custom migrations for triggers/CHECK constraints, `db:generate` / `db:migrate` scripts, bootstrap on existing DBs |
 
+### Development
+
+| Document | Description |
+|----------|-------------|
+| [Local dev stack](docs/dev/local-stack.en.md) | One-command local Postgres + Redis + MinIO + WS server, generated secrets, auto migrations, `dev/up.mjs` / `dev/down.mjs` |
+
 ---
 
 ## ⚙️ Setup
@@ -107,6 +117,18 @@ pnpm run build:wasm
 pnpm run build
 pnpm run dev
 ```
+
+### Local dev stack
+
+Don't have a Postgres / Redis / S3 / WS server to point at? Spin up a complete local environment (containers + generated secrets + auto migrations) with one command, then run the dev server:
+
+```bash
+node dev/up.mjs     # Postgres + Redis + MinIO + WS server
+pnpm dev            # rvn-web on http://localhost:3000
+node dev/down.mjs   # tear it down
+```
+
+See [Local dev stack](docs/dev/local-stack.en.md) for ports, OAuth/Turnstile notes, and the `.env.local` backup behaviour.
 
 ## 📜 Scripts
 
@@ -120,6 +142,34 @@ pnpm format            # prettier
 pnpm db:generate       # drizzle-kit: emit a new SQL migration from schema.ts
 pnpm db:migrate        # apply pending migrations to DATABASE_URL
 pnpm db:studio         # drizzle-kit studio (local DB inspector)
+```
+
+## 🐳 Docker
+
+The image is built in stages (WASM → deps → build → runner) and outputs a standalone server on port `3001`.
+
+**Build** — two public build args are baked into the client bundle, and the MaxMind license key is passed as a BuildKit secret (never written to an image layer):
+
+```bash
+export MAXMIND_LICENSE_KEY=your-license-key
+
+docker build \
+  --build-arg NEXT_PUBLIC_WS_URL=wss://ws.rvn.market \
+  --build-arg NEXT_PUBLIC_TURNSTILE_SITEKEY=your-sitekey \
+  --secret id=maxmind_key,env=MAXMIND_LICENSE_KEY \
+  -t rvn-web .
+```
+
+| Build variable | How | Required | Purpose |
+|----------------|-----|----------|---------|
+| `NEXT_PUBLIC_WS_URL` | `--build-arg` | yes | WebSocket URL, inlined into the client bundle |
+| `NEXT_PUBLIC_TURNSTILE_SITEKEY` | `--build-arg` | yes | Turnstile site key, inlined into the client bundle |
+| `MAXMIND_LICENSE_KEY` | `--secret id=maxmind_key` | no | Official GeoLite2 download; omit to fall back to a mirror |
+
+**Run** — runtime config comes from the environment (see [Environment](#-environment)):
+
+```bash
+docker run -p 3001:3001 --env-file .env rvn-web
 ```
 
 ## 📁 Project Structure

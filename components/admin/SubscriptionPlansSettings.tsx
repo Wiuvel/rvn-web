@@ -219,6 +219,8 @@ export default function SubscriptionPlansSettings() {
                     {!plan.isStub && (
                       <button
                         type="button"
+                        aria-label="Включить/выключить план"
+                        aria-pressed={plan.active}
                         onClick={() => updatePlan(index, { active: !plan.active })}
                         className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${
                           plan.active ? 'bg-primary-600' : 'bg-neutral-700'
@@ -251,6 +253,7 @@ export default function SubscriptionPlansSettings() {
                       value={plan.name}
                       onChange={(e) => updatePlan(index, { name: e.target.value })}
                       placeholder={isDefault ? 'Базовая' : 'Название плана'}
+                      aria-label="Название плана"
                       className="w-full rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-white placeholder-neutral-500 focus:border-primary-500 focus:outline-none"
                     />
                   </label>
@@ -262,6 +265,7 @@ export default function SubscriptionPlansSettings() {
                         <input
                           type="number"
                           min={0}
+                          aria-label="Цена в рублях"
                           value={plan.priceKopecks / 100}
                           onChange={(e) =>
                             updatePlan(index, {
@@ -280,6 +284,7 @@ export default function SubscriptionPlansSettings() {
                         <input
                           type="number"
                           min={1}
+                          aria-label="Длительность в днях"
                           value={plan.durationDays}
                           onChange={(e) =>
                             updatePlan(index, { durationDays: Number(e.target.value) })
@@ -320,6 +325,7 @@ export default function SubscriptionPlansSettings() {
                     value={plan.description}
                     onChange={(e) => updatePlan(index, { description: e.target.value })}
                     placeholder="Краткое описание тарифа"
+                    aria-label="Описание тарифа"
                     rows={2}
                     className="w-full resize-none rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-white placeholder-neutral-500 focus:border-primary-500 focus:outline-none"
                   />
@@ -354,6 +360,7 @@ export default function SubscriptionPlansSettings() {
                     <input
                       type="text"
                       placeholder="Новая фича"
+                      aria-label="Новая фича"
                       className="flex-1 rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-1.5 text-xs text-white placeholder-neutral-500 focus:border-primary-500 focus:outline-none"
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') {
