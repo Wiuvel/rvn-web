@@ -122,6 +122,8 @@
 - Для image-вложений запускается `generateThumbhash(buffer)` — см. ниже про WASM.
 - Роут требует `?ticketId=…` и проверяет, что тикет принадлежит вызывающему (или что сессия — это support/admin).
 
+> Используется [Системой поддержки](../support/support.md) — вложения в сообщениях.
+
 ## WASM image processor
 
 `lib/wasm/image-processor.ts` оборачивает Rust → WASM модуль (`wasm/src/lib.rs`) с экспортом:

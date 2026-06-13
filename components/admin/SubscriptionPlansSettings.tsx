@@ -12,7 +12,14 @@ import {
   AlertTriangle,
   Clock,
   X,
+  WifiOff,
 } from 'lucide-react';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Toggle } from '@/components/admin/ui/Toggle';
+import { Field, inputClass } from '@/components/admin/ui/Field';
+import { PlanPreviewCard } from '@/components/admin/PlanPreviewCard';
+import { cn } from '@/lib/utils/index';
 
 /** Plan shape matching the backend schema */
 interface PlanConfig {
@@ -35,6 +42,9 @@ function generatePlanId(): string {
 /** Max real (non-stub) plans allowed */
 const MAX_REAL_PLANS = 3;
 
+/** Quick-pick durations (days) */
+const DURATION_PRESETS = [30, 90, 180, 365];
+
 export default function SubscriptionPlansSettings() {
   const [plans, setPlans] = useState<PlanConfig[]>([]);
   const [error, setError] = useState('');
@@ -49,6 +59,13 @@ export default function SubscriptionPlansSettings() {
     { retry: false },
   );
   const squadsData = Array.isArray(squadsRaw) ? squadsRaw : [];
+
+  // The squads endpoint returns [] both when the panel is unreachable and when
+  // there genuinely are no squads. Disambiguate via the saved settings: if the
+  // panel isn't configured, an empty list means "no connection", not "empty".
+  const { data: settings } = trpc.admin.remnawave.get.useQuery();
+  const panelConfigured = Boolean(settings?.endpoint && settings?.apiKey);
+  const squadsUnavailable = !squadsLoading && squadsData.length === 0 && !panelConfigured;
 
   const saveMutation = trpc.admin.subscriptionPlans.save.useMutation({
     onSuccess: () => {
@@ -125,6 +142,11 @@ export default function SubscriptionPlansSettings() {
     setPlans((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const addFeature = (index: number, value: string) => {
+    const val = value.trim();
+    if (val) updatePlan(index, { features: [...plans[index].features, val] });
+  };
+
   const handleSave = () => {
     setError('');
     const hasEmpty = plans.some((p) => !p.name.trim());
@@ -163,7 +185,7 @@ export default function SubscriptionPlansSettings() {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-xl border border-neutral-800 bg-neutral-900/50 p-6">
+      <Card className="border-neutral-800 bg-neutral-900/50 p-6">
         <div className="mb-6 flex items-center justify-between">
           <div>
             <h3 className="text-lg font-semibold text-white">Тарифные планы</h3>
@@ -171,19 +193,17 @@ export default function SubscriptionPlansSettings() {
               Управление подписками и назначение доступа
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            {plans.length > 0 && plans[0]?.squadUuid ? (
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-green-500/20 bg-green-500/10 px-3 py-1 text-xs font-medium text-green-400">
-                <CheckCircle2 className="h-3 w-3" />
-                Настроено
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-orange-500/20 bg-orange-500/10 px-3 py-1 text-xs font-medium text-orange-400">
-                <XCircle className="h-3 w-3" />
-                Сквад не назначен
-              </span>
-            )}
-          </div>
+          {plans[0]?.squadUuid ? (
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-green-500/20 bg-green-500/10 px-3 py-1 text-xs font-medium text-green-400">
+              <CheckCircle2 className="h-3 w-3" />
+              Настроено
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-neutral-600/40 bg-neutral-700/20 px-3 py-1 text-xs font-medium text-neutral-400">
+              <XCircle className="h-3 w-3" />
+              Сквад не назначен
+            </span>
+          )}
         </div>
 
         <div className="space-y-4">
@@ -192,11 +212,12 @@ export default function SubscriptionPlansSettings() {
             return (
               <div
                 key={plan.id}
-                className={`rounded-lg border p-4 ${
+                className={cn(
+                  'rounded-lg border p-4',
                   plan.isStub
                     ? 'border-neutral-700/30 bg-neutral-800/20'
-                    : 'border-neutral-700/50 bg-neutral-800/30'
-                }`}
+                    : 'border-neutral-700/50 bg-neutral-800/30',
+                )}
               >
                 <div className="mb-3 flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -217,25 +238,17 @@ export default function SubscriptionPlansSettings() {
                   </div>
                   <div className="flex items-center gap-2">
                     {!plan.isStub && (
-                      <button
-                        type="button"
-                        aria-label="Включить/выключить план"
-                        aria-pressed={plan.active}
-                        onClick={() => updatePlan(index, { active: !plan.active })}
-                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${
-                          plan.active ? 'bg-primary-600' : 'bg-neutral-700'
-                        }`}
-                      >
-                        <span
-                          className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow transition-transform duration-200 ${
-                            plan.active ? 'translate-x-4' : 'translate-x-0'
-                          }`}
-                        />
-                      </button>
+                      <Toggle
+                        size="sm"
+                        checked={plan.active}
+                        onChange={(next) => updatePlan(index, { active: next })}
+                        label="Активировать план"
+                      />
                     )}
                     {!isDefault && (
                       <button
                         type="button"
+                        aria-label="Удалить план"
                         onClick={() => removePlan(index)}
                         className="rounded p-1 text-neutral-500 transition-colors hover:bg-red-500/10 hover:text-red-400"
                       >
@@ -245,93 +258,116 @@ export default function SubscriptionPlansSettings() {
                   </div>
                 </div>
 
-                <div className={`grid gap-3 ${plan.isStub ? 'grid-cols-1' : 'grid-cols-2'}`}>
-                  <label className="block">
-                    <span className="mb-1 block text-xs text-neutral-500">Название</span>
+                <div className={cn('grid gap-3', plan.isStub ? 'grid-cols-1' : 'grid-cols-2')}>
+                  <Field label="Название">
                     <input
                       type="text"
                       value={plan.name}
                       onChange={(e) => updatePlan(index, { name: e.target.value })}
                       placeholder={isDefault ? 'Базовая' : 'Название плана'}
                       aria-label="Название плана"
-                      className="w-full rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-white placeholder-neutral-500 focus:border-primary-500 focus:outline-none"
+                      className={inputClass}
                     />
-                  </label>
+                  </Field>
 
                   {!plan.isStub && (
                     <>
-                      <label className="block">
-                        <span className="mb-1 block text-xs text-neutral-500">Цена (₽)</span>
+                      <Field label="Цена (₽)">
                         <input
                           type="number"
                           min={0}
-                          aria-label="Цена в рублях"
                           value={plan.priceKopecks / 100}
                           onChange={(e) =>
                             updatePlan(index, {
                               priceKopecks: Math.round(Number(e.target.value) * 100),
                             })
                           }
-                          className="w-full rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-white placeholder-neutral-500 focus:border-primary-500 focus:outline-none"
+                          aria-label="Цена в рублях"
+                          className={inputClass}
                         />
-                      </label>
+                      </Field>
 
-                      <label className="block">
-                        <span className="mb-1 flex items-center gap-1 text-xs text-neutral-500">
-                          <Clock className="h-3 w-3" />
-                          Длительность (дней)
-                        </span>
-                        <input
-                          type="number"
-                          min={1}
-                          aria-label="Длительность в днях"
-                          value={plan.durationDays}
-                          onChange={(e) =>
-                            updatePlan(index, { durationDays: Number(e.target.value) })
-                          }
-                          className="w-full rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-white placeholder-neutral-500 focus:border-primary-500 focus:outline-none"
-                        />
-                      </label>
+                      <Field
+                        label="Длительность (дней)"
+                        icon={<Clock className="h-3.5 w-3.5 text-neutral-500" />}
+                        className="col-span-2"
+                      >
+                        <div className="flex flex-wrap items-center gap-2">
+                          <input
+                            type="number"
+                            min={1}
+                            value={plan.durationDays}
+                            onChange={(e) =>
+                              updatePlan(index, { durationDays: Number(e.target.value) })
+                            }
+                            aria-label="Длительность в днях"
+                            className={cn(inputClass, 'w-28')}
+                          />
+                          <div className="flex flex-wrap gap-1.5">
+                            {DURATION_PRESETS.map((days) => (
+                              <button
+                                key={days}
+                                type="button"
+                                onClick={() => updatePlan(index, { durationDays: days })}
+                                className={cn(
+                                  'rounded-md border px-2.5 py-1 text-xs font-medium transition-colors',
+                                  plan.durationDays === days
+                                    ? 'border-primary-500/40 bg-primary-500/10 text-primary-300'
+                                    : 'border-neutral-700 text-neutral-400 hover:border-neutral-500 hover:text-white',
+                                )}
+                              >
+                                {days} дн
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </Field>
 
-                      <label className="block">
-                        <span className="mb-1 block text-xs text-neutral-500">
-                          Внутренний сквад
-                        </span>
-                        <select
-                          value={plan.squadUuid ?? ''}
-                          onChange={(e) =>
-                            updatePlan(index, {
-                              squadUuid: e.target.value || null,
-                            })
-                          }
-                          className="w-full rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-white focus:border-primary-500 focus:outline-none"
-                        >
-                          <option value="">Не назначен</option>
-                          {squadsData?.map((squad) => (
-                            <option key={squad.uuid} value={squad.uuid}>
-                              {squad.squadName} ({squad.inboundsCount} инбаундов)
-                            </option>
-                          ))}
-                        </select>
-                      </label>
+                      <Field label="Внутренний сквад" className="col-span-2">
+                        {squadsUnavailable ? (
+                          <div className="flex items-center gap-2 rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-400">
+                            <WifiOff className="h-3.5 w-3.5 shrink-0" />
+                            Нет связи с панелью — настройте подключение во вкладке «Remnawave»
+                          </div>
+                        ) : squadsData.length === 0 ? (
+                          <div className="rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-2 text-xs text-neutral-500">
+                            В панели нет внутренних сквадов
+                          </div>
+                        ) : (
+                          <select
+                            value={plan.squadUuid ?? ''}
+                            onChange={(e) =>
+                              updatePlan(index, { squadUuid: e.target.value || null })
+                            }
+                            aria-label="Внутренний сквад"
+                            className={inputClass}
+                          >
+                            <option value="">Не назначен</option>
+                            {squadsData.map((squad) => (
+                              <option key={squad.uuid} value={squad.uuid}>
+                                {squad.squadName} · {squad.inboundsCount} инб. ·{' '}
+                                {squad.membersCount} польз.
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </Field>
                     </>
                   )}
                 </div>
 
-                {/* Описание */}
-                <label className="mt-3 block">
-                  <span className="mb-1 block text-xs text-neutral-500">Описание</span>
+                <Field label="Описание" className="mt-3">
                   <textarea
                     value={plan.description}
                     onChange={(e) => updatePlan(index, { description: e.target.value })}
                     placeholder="Краткое описание тарифа"
                     aria-label="Описание тарифа"
                     rows={2}
-                    className="w-full resize-none rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-white placeholder-neutral-500 focus:border-primary-500 focus:outline-none"
+                    className={cn(inputClass, 'resize-none')}
                   />
-                </label>
+                </Field>
 
-                {/* Что входит (features) */}
+                {/* Features */}
                 <div className="mt-3">
                   <span className="mb-1 block text-xs text-neutral-500">Что входит</span>
                   {plan.features.length > 0 && (
@@ -344,10 +380,12 @@ export default function SubscriptionPlansSettings() {
                           {feature}
                           <button
                             type="button"
-                            onClick={() => {
-                              const next = plan.features.filter((_, i) => i !== fi);
-                              updatePlan(index, { features: next });
-                            }}
+                            aria-label="Удалить фичу"
+                            onClick={() =>
+                              updatePlan(index, {
+                                features: plan.features.filter((_, i) => i !== fi),
+                              })
+                            }
                             className="ml-0.5 text-neutral-500 transition-colors hover:text-red-400"
                           >
                             <X className="h-3 w-3" />
@@ -361,27 +399,22 @@ export default function SubscriptionPlansSettings() {
                       type="text"
                       placeholder="Новая фича"
                       aria-label="Новая фича"
-                      className="flex-1 rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-1.5 text-xs text-white placeholder-neutral-500 focus:border-primary-500 focus:outline-none"
+                      className={cn(inputClass, 'flex-1 px-3 py-1.5 text-xs')}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') {
                           e.preventDefault();
-                          const val = (e.target as HTMLInputElement).value.trim();
-                          if (val) {
-                            updatePlan(index, { features: [...plan.features, val] });
-                            (e.target as HTMLInputElement).value = '';
-                          }
+                          addFeature(index, (e.target as HTMLInputElement).value);
+                          (e.target as HTMLInputElement).value = '';
                         }
                       }}
                     />
                     <button
                       type="button"
+                      aria-label="Добавить фичу"
                       onClick={(e) => {
                         const input = e.currentTarget.previousElementSibling as HTMLInputElement;
-                        const val = input.value.trim();
-                        if (val) {
-                          updatePlan(index, { features: [...plan.features, val] });
-                          input.value = '';
-                        }
+                        addFeature(index, input.value);
+                        input.value = '';
                       }}
                       className="rounded-lg border border-neutral-700 px-2.5 py-1.5 text-xs text-neutral-400 transition-colors hover:border-neutral-500 hover:text-white"
                     >
@@ -416,7 +449,6 @@ export default function SubscriptionPlansSettings() {
           </button>
         </div>
 
-        {/* Squad change warning */}
         {hasSquadChanges && (
           <div className="mt-4 flex items-center gap-2 rounded-lg border border-amber-500/20 bg-amber-500/10 px-4 py-2.5 text-sm text-amber-400">
             <AlertTriangle className="h-4 w-4 shrink-0" />
@@ -429,7 +461,6 @@ export default function SubscriptionPlansSettings() {
             {error}
           </div>
         )}
-
         {success && (
           <div className="mt-4 rounded-lg border border-green-500/20 bg-green-500/10 px-4 py-2.5 text-sm text-green-400">
             {success}
@@ -437,16 +468,30 @@ export default function SubscriptionPlansSettings() {
         )}
 
         <div className="mt-6">
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="flex items-center gap-2 rounded-lg bg-primary-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-500 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+          <Button onClick={handleSave} disabled={saving}>
+            {saving && <Loader2 className="animate-spin" />}
             Сохранить
-          </button>
+          </Button>
         </div>
-      </div>
+      </Card>
+
+      {/* Live preview — how the plans will look on /subscription */}
+      <Card className="border-neutral-800 bg-neutral-900/50 p-6">
+        <h3 className="mb-1 text-lg font-semibold text-white">Предпросмотр</h3>
+        <p className="mb-5 text-sm text-neutral-400">
+          Так тарифы увидят пользователи на странице подписок
+        </p>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {realPlans.map((plan, i) => (
+            <PlanPreviewCard key={plan.id} {...plan} highlighted={i === 0} />
+          ))}
+          {plans
+            .filter((p) => p.isStub)
+            .map((plan) => (
+              <PlanPreviewCard key={plan.id} {...plan} />
+            ))}
+        </div>
+      </Card>
     </div>
   );
 }

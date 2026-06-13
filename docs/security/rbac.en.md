@@ -125,3 +125,5 @@ There is no global "force log out on role change" — the next request that goes
 - `lib/auth/user-cookie.server.ts` — `createUserDataCookie` / `parseUserDataCookie`.
 - `lib/proxy/auth.ts` — proxy-level routing decisions (does NOT enforce role).
 - `components/navigation/UserMenu.tsx`, `components/navigation/MobileNavigation.tsx` — example consumers of `pex`.
+
+**See also:** [Admin panel](../admin/admin-panel.en.md) (separate admin auth track), [Support system](../support/support.en.md) (where the `support` role applies).

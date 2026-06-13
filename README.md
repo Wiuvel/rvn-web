@@ -64,6 +64,18 @@ The site is the home base for everything around the subscription: account and de
 | [Notification system](docs/notifications/notifications.en.md) | Real-time notifications, UPSERT grouping, WebSocket delivery, caching |
 | [Notification types](docs/notifications/types.en.md) | Type catalog, UPSERT semantics, cleanup policy, read paths, system broadcasts |
 
+### Admin
+
+| Document | Description |
+|----------|-------------|
+| [Admin panel](docs/admin/admin-panel.en.md) | Separate admin auth (GitHub OAuth + trusted developers), tabs, tRPC procedures, role grants, maintenance mode |
+
+### Support
+
+| Document | Description |
+|----------|-------------|
+| [Support system](docs/support/support.en.md) | Ticket lifecycle, messages, pagination, real-time WebSocket delivery, attachments, notifications |
+
 ### WebSocket
 
 | Document | Description |

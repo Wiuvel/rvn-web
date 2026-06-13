@@ -1,46 +1,64 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useEffect } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { trpc } from '@/lib/trpc/client';
-import { Globe, Key, CheckCircle2, XCircle, Loader2, RefreshCw, Tag } from 'lucide-react';
+import { Globe, Key, CheckCircle2, XCircle, Loader2, RefreshCw, Tag, Activity } from 'lucide-react';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import {
+  Accordion,
+  AccordionItem,
+  AccordionTrigger,
+  AccordionContent,
+} from '@/components/ui/accordion';
+import { Toggle } from '@/components/admin/ui/Toggle';
+import { TextField } from '@/components/admin/ui/Field';
+
+const formSchema = z.object({
+  endpoint: z.string().url('Укажите корректный URL панели'),
+  apiKey: z.string().min(1, 'Укажите API-ключ'),
+  testPromoEnabled: z.boolean(),
+  testPromoCode: z.string(),
+});
+type FormValues = z.infer<typeof formSchema>;
 
 export default function RemnawaveSettings() {
-  const [endpoint, setEndpoint] = useState('');
-  const [apiKey, setApiKey] = useState('');
-  const [testPromoEnabled, setTestPromoEnabled] = useState(false);
-  const [testPromoCode, setTestPromoCode] = useState('');
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-  const [showKey, setShowKey] = useState(false);
-  const successTimer = useRef<ReturnType<typeof setTimeout>>(null);
-
   const utils = trpc.useUtils();
 
   const { data, isLoading } = trpc.admin.remnawave.get.useQuery();
 
-  useEffect(() => {
-    return () => {
-      if (successTimer.current) clearTimeout(successTimer.current);
-    };
-  }, []);
-
-  const updateMutation = trpc.admin.remnawave.update.useMutation({
-    onSuccess: () => {
-      setSuccess('Настройки сохранены');
-      setError('');
-      utils.admin.remnawave.get.invalidate();
-      if (successTimer.current) clearTimeout(successTimer.current);
-      successTimer.current = setTimeout(() => setSuccess(''), 3000);
-    },
-    onError: (err) => {
-      setError(err.message || 'Ошибка при сохранении');
-      setSuccess('');
-    },
+  const {
+    register,
+    handleSubmit,
+    reset,
+    watch,
+    setValue,
+    formState: { errors, isDirty },
+  } = useForm<FormValues>({
+    resolver: zodResolver(formSchema),
+    defaultValues: { endpoint: '', apiKey: '', testPromoEnabled: false, testPromoCode: '' },
   });
+
+  const testPromoEnabled = watch('testPromoEnabled');
+
+  // Populate the form once settings load.
+  useEffect(() => {
+    if (data) {
+      reset({
+        endpoint: data.endpoint,
+        apiKey: data.apiKey,
+        testPromoEnabled: data.testPromoEnabled,
+        testPromoCode: data.testPromoCode,
+      });
+    }
+  }, [data, reset]);
 
   const {
     data: healthData,
-    isLoading: healthLoading,
+    isFetching: healthLoading,
     refetch: refetchHealth,
     error: healthError,
   } = trpc.admin.remnawave.healthCheck.useQuery(undefined, {
@@ -48,40 +66,33 @@ export default function RemnawaveSettings() {
     retry: false,
   });
 
-  useEffect(() => {
-    if (data) {
-      setEndpoint(data.endpoint);
-      setApiKey(data.apiKey);
-      setTestPromoEnabled(data.testPromoEnabled);
-      setTestPromoCode(data.testPromoCode);
-    }
-  }, [data]);
+  const updateMutation = trpc.admin.remnawave.update.useMutation({
+    onSuccess: () => {
+      // Saved endpoint/key change what the panel returns, so refetch everything
+      // derived from it — not just the settings form itself.
+      utils.admin.remnawave.get.invalidate();
+      utils.admin.remnawave.squads.invalidate();
+      utils.admin.subscriptionPlans.list.invalidate();
+      utils.subscription.servers.invalidate();
+      utils.subscription.publicServers.invalidate();
+      // Auto-verify connectivity right after saving.
+      refetchHealth();
+    },
+  });
 
-  const handleSave = () => {
-    setError('');
-    if (!endpoint.trim()) {
-      setError('Укажите Endpoint панели');
-      return;
-    }
-    if (!apiKey.trim()) {
-      setError('Укажите API Key');
-      return;
-    }
+  const onSubmit = (values: FormValues) => {
     updateMutation.mutate({
-      endpoint: endpoint.trim(),
-      apiKey: apiKey.trim(),
-      testPromoEnabled,
-      testPromoCode: testPromoCode.trim(),
+      endpoint: values.endpoint.trim(),
+      apiKey: values.apiKey.trim(),
+      testPromoEnabled: values.testPromoEnabled,
+      testPromoCode: values.testPromoCode.trim(),
     });
-  };
-
-  const handleTestConnection = () => {
-    setError('');
-    refetchHealth();
   };
 
   const isConfigured = Boolean(data?.endpoint && data?.apiKey);
   const saving = updateMutation.isPending;
+  const saveError = updateMutation.error?.message;
+  const saved = updateMutation.isSuccess && !isDirty;
 
   if (isLoading) {
     return (
@@ -91,202 +102,168 @@ export default function RemnawaveSettings() {
     );
   }
 
+  const metrics = healthData?.metrics?.[0];
+
   return (
     <div className="space-y-6">
-      <div className="rounded-xl border border-neutral-800 bg-neutral-900/50 p-6">
+      <Card className="border-neutral-800 bg-neutral-900/50 p-6">
         <div className="mb-6 flex items-center justify-between">
           <div>
             <h3 className="text-lg font-semibold text-white">Subscription API</h3>
             <p className="mt-1 text-sm text-neutral-400">
-              Подключение к панели для управления подписками
+              Подключение к панели Remnawave для управления подписками
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            {isConfigured ? (
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-green-500/20 bg-green-500/10 px-3 py-1 text-xs font-medium text-green-400">
-                <CheckCircle2 className="h-3 w-3" />
-                Настроено
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-orange-500/20 bg-orange-500/10 px-3 py-1 text-xs font-medium text-orange-400">
-                <XCircle className="h-3 w-3" />
-                Не настроено
-              </span>
-            )}
-          </div>
+          <StatusBadge isConfigured={isConfigured} />
         </div>
 
-        <div className="space-y-4">
-          <div>
-            <label
-              htmlFor="rw-endpoint"
-              className="mb-1.5 block text-sm font-medium text-neutral-300"
-            >
-              <Globe className="mr-1.5 inline h-4 w-4 text-neutral-500" />
-              Endpoint
-            </label>
-            <input
-              id="rw-endpoint"
-              type="url"
-              value={endpoint}
-              onChange={(e) => setEndpoint(e.target.value)}
-              placeholder="https://panel.example.com"
-              aria-label="Endpoint панели"
-              className="w-full rounded-lg border border-neutral-700 bg-neutral-800 px-4 py-2.5 text-sm text-white placeholder-neutral-500 transition-colors focus:border-primary-500 focus:outline-none"
-            />
+        {!isConfigured && (
+          <div className="mb-5 rounded-lg border border-neutral-700/50 bg-neutral-800/30 px-4 py-3 text-sm text-neutral-400">
+            Укажите адрес панели и API-ключ, чтобы активировать подписки. До настройки сервис
+            подписок неактивен — серверы и тарифы недоступны пользователям.
           </div>
+        )}
 
-          <div>
-            <label
-              htmlFor="rw-api-key"
-              className="mb-1.5 block text-sm font-medium text-neutral-300"
-            >
-              <Key className="mr-1.5 inline h-4 w-4 text-neutral-500" />
-              API Key (Bearer Token)
-            </label>
-            <div className="relative">
-              <input
-                id="rw-api-key"
-                type={showKey ? 'text' : 'password'}
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                placeholder="eyJhbGciOiJIUzI1NiIs..."
-                aria-label="API-ключ"
-                className="w-full rounded-lg border border-neutral-700 bg-neutral-800 px-4 py-2.5 pr-20 text-sm text-white placeholder-neutral-500 transition-colors focus:border-primary-500 focus:outline-none"
-              />
-              <button
-                type="button"
-                onClick={() => setShowKey(!showKey)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 rounded px-2 py-1 text-xs text-neutral-400 transition-colors hover:text-white"
-              >
-                {showKey ? 'Скрыть' : 'Показать'}
-              </button>
-            </div>
-          </div>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <TextField
+            label="Endpoint"
+            icon={<Globe className="h-4 w-4 text-neutral-500" />}
+            type="url"
+            placeholder="https://panel.example.com"
+            error={errors.endpoint?.message}
+            {...register('endpoint')}
+          />
 
-          {/* Test promo code settings */}
-          <div className="mt-6 rounded-lg border border-neutral-700/50 bg-neutral-800/30 p-4">
+          <TextField
+            label="API Key (Bearer Token)"
+            icon={<Key className="h-4 w-4 text-neutral-500" />}
+            type="password"
+            placeholder="eyJhbGciOiJIUzI1NiIs..."
+            error={errors.apiKey?.message}
+            {...register('apiKey')}
+          />
+
+          {/* Test promo code */}
+          <div className="rounded-lg border border-neutral-700/50 bg-neutral-800/30 p-4">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
+              <span className="flex items-center gap-2 text-sm font-medium text-neutral-300">
                 <Tag className="h-4 w-4 text-neutral-500" />
-                <span className="text-sm font-medium text-neutral-300">Тестовый промокод</span>
-              </div>
-              <button
-                type="button"
-                aria-label="Включить/выключить тестовый промокод"
-                aria-pressed={testPromoEnabled}
-                onClick={() => setTestPromoEnabled(!testPromoEnabled)}
-                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${
-                  testPromoEnabled ? 'bg-primary-600' : 'bg-neutral-700'
-                }`}
-              >
-                <span
-                  className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow ring-0 transition-transform duration-200 ${
-                    testPromoEnabled ? 'translate-x-5' : 'translate-x-0'
-                  }`}
-                />
-              </button>
+                Тестовый промокод
+              </span>
+              <Toggle
+                checked={testPromoEnabled}
+                onChange={(next) => setValue('testPromoEnabled', next, { shouldDirty: true })}
+                label="Включить тестовый промокод"
+              />
             </div>
             {testPromoEnabled && (
-              <div className="mt-3">
-                <input
-                  id="rw-test-promo"
-                  type="text"
-                  value={testPromoCode}
-                  onChange={(e) => setTestPromoCode(e.target.value)}
-                  placeholder="Введите промокод"
-                  aria-label="Тестовый промокод"
-                  className="w-full rounded-lg border border-neutral-700 bg-neutral-800 px-4 py-2.5 text-sm text-white placeholder-neutral-500 transition-colors focus:border-primary-500 focus:outline-none"
-                />
-              </div>
+              <input
+                type="text"
+                placeholder="Введите промокод"
+                aria-label="Тестовый промокод"
+                className="mt-3 w-full rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-white placeholder-neutral-500 transition-colors focus:border-primary-500 focus:outline-none"
+                {...register('testPromoCode')}
+              />
             )}
           </div>
-        </div>
 
-        {error && (
-          <div className="mt-4 rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-2.5 text-sm text-red-400">
-            {error}
+          {saveError && (
+            <div className="rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-2.5 text-sm text-red-400">
+              {saveError}
+            </div>
+          )}
+          {saved && (
+            <div className="rounded-lg border border-green-500/20 bg-green-500/10 px-4 py-2.5 text-sm text-green-400">
+              Настройки сохранены
+            </div>
+          )}
+
+          <div className="flex items-center gap-3 pt-1">
+            <Button type="submit" disabled={saving}>
+              {saving && <Loader2 className="animate-spin" />}
+              Сохранить
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => refetchHealth()}
+              disabled={healthLoading || !isConfigured}
+            >
+              {healthLoading ? <Loader2 className="animate-spin" /> : <RefreshCw />}
+              Проверить подключение
+            </Button>
           </div>
-        )}
-
-        {success && (
-          <div className="mt-4 rounded-lg border border-green-500/20 bg-green-500/10 px-4 py-2.5 text-sm text-green-400">
-            {success}
-          </div>
-        )}
-
-        <div className="mt-6 flex items-center gap-3">
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="flex items-center gap-2 rounded-lg bg-primary-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-500 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            Сохранить
-          </button>
-
-          <button
-            onClick={handleTestConnection}
-            disabled={healthLoading || !isConfigured}
-            className="flex items-center gap-2 rounded-lg border border-neutral-700 bg-neutral-800 px-5 py-2.5 text-sm font-medium text-neutral-300 transition-colors hover:border-neutral-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {healthLoading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <RefreshCw className="h-4 w-4" />
-            )}
-            Проверить подключение
-          </button>
-        </div>
-      </div>
+        </form>
+      </Card>
 
       {(healthData || healthError) && (
-        <div className="rounded-xl border border-neutral-800 bg-neutral-900/50 p-6">
-          <h4 className="mb-3 text-sm font-semibold text-white">Статус подключения</h4>
+        <Card className="border-neutral-800 bg-neutral-900/50 p-6">
           {healthError ? (
             <div className="flex items-center gap-2 text-sm text-red-400">
               <XCircle className="h-4 w-4" />
-              Ошибка: {healthError.message}
+              Панель недоступна: {healthError.message}
             </div>
           ) : healthData ? (
-            <div className="space-y-2">
+            <div>
               <div className="flex items-center gap-2 text-sm text-green-400">
                 <CheckCircle2 className="h-4 w-4" />
                 Панель доступна
               </div>
-              {healthData.metrics?.[0] && (
-                <div className="xs:grid-cols-2 mt-3 grid grid-cols-1 gap-3 sm:grid-cols-4">
-                  <div className="rounded-lg border border-neutral-800 bg-neutral-800/50 p-3">
-                    <div className="text-xs text-neutral-500">Uptime</div>
-                    <div className="mt-1 text-sm font-medium text-white">
-                      {Math.floor(healthData.metrics[0].uptime / 3600)}ч{' '}
-                      {Math.floor((healthData.metrics[0].uptime % 3600) / 60)}м
-                    </div>
-                  </div>
-                  <div className="rounded-lg border border-neutral-800 bg-neutral-800/50 p-3">
-                    <div className="text-xs text-neutral-500">Heap</div>
-                    <div className="mt-1 text-sm font-medium text-white">
-                      {(healthData.metrics[0].heapUsed / 1024 / 1024).toFixed(1)} MB
-                    </div>
-                  </div>
-                  <div className="rounded-lg border border-neutral-800 bg-neutral-800/50 p-3">
-                    <div className="text-xs text-neutral-500">RSS</div>
-                    <div className="mt-1 text-sm font-medium text-white">
-                      {(healthData.metrics[0].rss / 1024 / 1024).toFixed(1)} MB
-                    </div>
-                  </div>
-                  <div className="rounded-lg border border-neutral-800 bg-neutral-800/50 p-3">
-                    <div className="text-xs text-neutral-500">PID</div>
-                    <div className="mt-1 text-sm font-medium text-white">
-                      {healthData.metrics[0].pid}
-                    </div>
-                  </div>
-                </div>
+              {metrics && (
+                <Accordion type="single" collapsible className="mt-2">
+                  <AccordionItem value="metrics" className="border-neutral-800">
+                    <AccordionTrigger className="text-sm text-neutral-300 hover:no-underline">
+                      <span className="flex items-center gap-2">
+                        <Activity className="h-4 w-4 text-neutral-500" />
+                        Метрики панели
+                      </span>
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                        <Metric
+                          label="Uptime"
+                          value={`${Math.floor(metrics.uptime / 3600)}ч ${Math.floor((metrics.uptime % 3600) / 60)}м`}
+                        />
+                        <Metric
+                          label="Heap"
+                          value={`${(metrics.heapUsed / 1024 / 1024).toFixed(1)} MB`}
+                        />
+                        <Metric
+                          label="RSS"
+                          value={`${(metrics.rss / 1024 / 1024).toFixed(1)} MB`}
+                        />
+                        <Metric label="PID" value={String(metrics.pid)} />
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                </Accordion>
               )}
             </div>
           ) : null}
-        </div>
+        </Card>
       )}
+    </div>
+  );
+}
+
+function StatusBadge({ isConfigured }: { isConfigured: boolean }) {
+  return isConfigured ? (
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-green-500/20 bg-green-500/10 px-3 py-1 text-xs font-medium text-green-400">
+      <CheckCircle2 className="h-3 w-3" />
+      Настроено
+    </span>
+  ) : (
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-neutral-600/40 bg-neutral-700/20 px-3 py-1 text-xs font-medium text-neutral-400">
+      Не настроено
+    </span>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-neutral-800 bg-neutral-800/50 p-3">
+      <div className="text-xs text-neutral-500">{label}</div>
+      <div className="mt-1 text-sm font-medium text-white">{value}</div>
     </div>
   );
 }

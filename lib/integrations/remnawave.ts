@@ -108,6 +108,61 @@ async function getPanelSettings(): Promise<{ endpoint: string; apiKey: string } 
  */
 export function invalidateSettingsCache() {
   settingsCache = null;
+  nodesCache = null;
+  statusCache = null;
+  warnedInactive = false;
+}
+
+/* Subscription system status */
+
+/**
+ * Why the subscription system is inactive:
+ * - `not_configured` — Remnawave endpoint/API key not set in panel_settings.
+ * - `no_admin` — no administrator registered yet (pre-production state).
+ */
+export type SubscriptionInactiveReason = 'not_configured' | 'no_admin';
+export type SubscriptionSystemStatus =
+  | { active: true }
+  | { active: false; reason: SubscriptionInactiveReason };
+
+let statusCache: { status: SubscriptionSystemStatus; cachedAt: number } | null = null;
+const STATUS_CACHE_TTL = 60_000;
+/** Emit the "system inactive" warning only once per process (reset on config change). */
+let warnedInactive = false;
+
+/**
+ * Whether the subscription system is operational.
+ *
+ * Inactive (rather than erroring) when the Remnawave panel is unconfigured or
+ * no admin exists — both are expected pre-production states. The result is
+ * cached for 1 minute; the first inactive result logs a single warning, so the
+ * logs aren't spammed on every page load. `invalidateSettingsCache()` resets
+ * both the cache and the warning latch.
+ */
+export async function getSubscriptionSystemStatus(): Promise<SubscriptionSystemStatus> {
+  if (statusCache && Date.now() - statusCache.cachedAt < STATUS_CACHE_TTL) {
+    return statusCache.status;
+  }
+
+  let status: SubscriptionSystemStatus;
+  const { checkAdminExists } = await import('@/lib/auth/index');
+  if (!(await checkAdminExists())) {
+    status = { active: false, reason: 'no_admin' };
+  } else if (!(await getPanelSettings())) {
+    status = { active: false, reason: 'not_configured' };
+  } else {
+    status = { active: true };
+  }
+
+  if (!status.active && !warnedInactive) {
+    warnedInactive = true;
+    logger.warn('Subscription system inactive — Remnawave calls disabled', {
+      reason: status.reason,
+    });
+  }
+
+  statusCache = { status, cachedAt: Date.now() };
+  return status;
 }
 
 /* HTTP client */

@@ -17,6 +17,7 @@ import {
   disableUser as rwDisableUser,
   addUsersToSquad,
   getServerNodes,
+  getSubscriptionSystemStatus,
 } from '@/lib/integrations/remnawave';
 import { invalidateUserAuthCacheByUserId } from '@/lib/auth/index';
 import { cache } from '@/lib/database/cache';
@@ -139,6 +140,7 @@ export const subscriptionRouter = router({
 
   /** Public: VPN server nodes (no auth required, for /subscription page). */
   publicServers: publicProcedure.query(async () => {
+    if (!(await getSubscriptionSystemStatus()).active) return [];
     const result = await getServerNodes();
     if (!result.ok) return [];
     return result.data;
@@ -232,12 +234,15 @@ export const subscriptionRouter = router({
       return { valid, type: valid ? ('coupon' as const) : null };
     }),
 
-  /** Fetch VPN server nodes (cached 5 min on server side). */
+  /**
+   * Fetch VPN server nodes (cached 5 min on server side).
+   * Returns [] when the subscription system is inactive (unconfigured panel /
+   * no admin) instead of erroring, so the dashboard doesn't spam the logs.
+   */
   servers: protectedProcedure.query(async () => {
+    if (!(await getSubscriptionSystemStatus()).active) return [];
     const result = await getServerNodes();
-    if (!result.ok) {
-      throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: result.error });
-    }
+    if (!result.ok) return [];
     return result.data;
   }),
 
@@ -332,6 +337,14 @@ export const subscriptionRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB not configured' });
+
+      /** Refuse early if the subscription system isn't operational yet. */
+      if (!(await getSubscriptionSystemStatus()).active) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: 'Сервис подписок временно недоступен',
+        });
+      }
 
       const userId = ctx.user.id;
 

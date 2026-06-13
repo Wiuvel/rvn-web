@@ -4,7 +4,7 @@
 
 ## Overview
 
-The notification system informs users about events in support tickets: replies from support, status changes. Notifications are delivered in real-time via WebSocket and available through an API with cursor-based pagination.
+The notification system informs users about events in support tickets: replies from support, status changes. Notifications are delivered in real-time via WebSocket and available through an API with cursor-based pagination. The producing side is the [Support system](../support/support.en.md).
 
 ```
 ┌──────────────┐    notification:new   ┌─────────────────────┐

@@ -177,6 +177,24 @@ Public types:
 
 Returned values use the `Result<T> = { ok: true, data: T } | { ok: false, error: string }` pattern, so callers can react without `try/catch` boilerplate (see `purchase` rollback paths).
 
+## Graceful degradation
+
+Before a Remnawave panel is configured — or before any administrator is registered — the subscription system is **inactive** rather than erroring. `getSubscriptionSystemStatus()` (`lib/integrations/remnawave.ts`) reports:
+
+| Status | Condition |
+|--------|-----------|
+| `{ active: false, reason: 'no_admin' }` | No administrator registered yet (see [Admin panel](../admin/admin-panel.en.md)) |
+| `{ active: false, reason: 'not_configured' }` | Admin exists, but `remnawave_endpoint` / `remnawave_api_key` are unset |
+| `{ active: true }` | Admin exists and the panel is configured |
+
+While inactive:
+
+- `subscription.servers` and `subscription.publicServers` return `[]` instead of throwing — no `Internal server error on subscription.servers` spam in the logs on every dashboard load.
+- `subscription.purchase` fails fast with `PRECONDITION_FAILED` ("Сервис подписок временно недоступен") instead of failing deep inside Remnawave user creation.
+- The inactive state is logged **once per process** (not per request). The status is cached for 60 s.
+
+`invalidateSettingsCache()` (called by `admin.remnawave.update`) resets the status cache, the node cache, and the once-per-process warning latch, so configuring the panel re-activates the system within one cache window — and if it later breaks again, you get one fresh warning.
+
 ## Configuration
 
 | Variable / Setting | Where | Purpose |

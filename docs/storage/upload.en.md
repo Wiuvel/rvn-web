@@ -122,6 +122,8 @@ Same shape as avatars but storage path is `banners/<userId>/<timestamp>.<ext>` a
 - `generateThumbhash(buffer)` runs for image attachments — see "WASM image processor" below.
 - The route requires `?ticketId=…` and verifies the ticket belongs to the caller (or to a support agent for admin/support sessions).
 
+> Used by the [Support system](../support/support.en.md) — message attachments.
+
 ## WASM Image Processor
 
 `lib/wasm/image-processor.ts` wraps a Rust → WASM module (`wasm/src/lib.rs`) that exposes:

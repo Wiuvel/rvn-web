@@ -125,3 +125,5 @@ const pex = isAdmin ? 'a' : isSupport ? 's' : 'u';
 - `lib/auth/user-cookie.server.ts` — `createUserDataCookie` / `parseUserDataCookie`.
 - `lib/proxy/auth.ts` — решения уровня прокси (роль НЕ проверяет).
 - `components/navigation/UserMenu.tsx`, `components/navigation/MobileNavigation.tsx` — пример потребителей `pex`.
+
+**См. также:** [Админ-панель](../admin/admin-panel.md) (отдельный контур админ-аутентификации), [Система поддержки](../support/support.md) (где применяется роль `support`).
