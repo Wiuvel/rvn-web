@@ -4,8 +4,7 @@ import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
-import { Area, AreaChart as RechartsAreaChart, XAxis, YAxis } from 'recharts';
+import { AreaChart } from '@/components/admin/AreaChart';
 import { trpc } from '@/lib/trpc/client';
 const Skeleton = ({ className }: { className?: string }) => (
   <div className={`animate-pulse rounded bg-neutral-800 ${className || ''}`} />
@@ -117,25 +116,6 @@ export default function SupportAnalytics() {
     messages: hour.count,
   }));
 
-  const chartConfig = {
-    created: {
-      label: 'Создано',
-      color: '#3b82f6',
-    },
-    closed: {
-      label: 'Закрыто',
-      color: '#10b981',
-    },
-    messages: {
-      label: 'Сообщений',
-      color: '#8b5cf6',
-    },
-    tickets: {
-      label: 'Тикетов',
-      color: '#3b82f6',
-    },
-  };
-
   return (
     <div className="space-y-4">
       {/* Заголовок с выбором периода */}
@@ -231,49 +211,15 @@ export default function SupportAnalytics() {
             <CardDescription className="text-xs">Создано и закрыто тикетов</CardDescription>
           </CardHeader>
           <CardContent className="pt-0">
-            <ChartContainer config={chartConfig} className="h-[200px] w-full">
-              <RechartsAreaChart data={ticketsChartData}>
-                <defs>
-                  <linearGradient id="fillCreated" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="fillClosed" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <XAxis
-                  dataKey="date"
-                  tickLine={false}
-                  axisLine={false}
-                  tickMargin={8}
-                  tickFormatter={(value) => value}
-                  className="text-xs text-neutral-500"
-                />
-                <YAxis
-                  tickLine={false}
-                  axisLine={false}
-                  tickMargin={8}
-                  className="text-xs text-neutral-500"
-                />
-                <ChartTooltip content={<ChartTooltipContent />} />
-                <Area
-                  type="monotone"
-                  dataKey="created"
-                  stroke="#3b82f6"
-                  fill="url(#fillCreated)"
-                  strokeWidth={2}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="closed"
-                  stroke="#10b981"
-                  fill="url(#fillClosed)"
-                  strokeWidth={2}
-                />
-              </RechartsAreaChart>
-            </ChartContainer>
+            <AreaChart
+              data={ticketsChartData}
+              xKey="date"
+              height={200}
+              series={[
+                { key: 'created', label: 'Создано', color: '#3b82f6' },
+                { key: 'closed', label: 'Закрыто', color: '#10b981' },
+              ]}
+            />
           </CardContent>
         </Card>
       )}
@@ -285,38 +231,12 @@ export default function SupportAnalytics() {
             <CardTitle className="text-base">Сообщения по дням</CardTitle>
           </CardHeader>
           <CardContent className="pt-0">
-            <ChartContainer config={chartConfig} className="h-[200px] w-full">
-              <RechartsAreaChart data={messagesChartData}>
-                <defs>
-                  <linearGradient id="fillMessages" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <XAxis
-                  dataKey="date"
-                  tickLine={false}
-                  axisLine={false}
-                  tickMargin={8}
-                  tickFormatter={(value) => value}
-                  className="text-xs text-neutral-500"
-                />
-                <YAxis
-                  tickLine={false}
-                  axisLine={false}
-                  tickMargin={8}
-                  className="text-xs text-neutral-500"
-                />
-                <ChartTooltip content={<ChartTooltipContent />} />
-                <Area
-                  type="monotone"
-                  dataKey="messages"
-                  stroke="#8b5cf6"
-                  fill="url(#fillMessages)"
-                  strokeWidth={2}
-                />
-              </RechartsAreaChart>
-            </ChartContainer>
+            <AreaChart
+              data={messagesChartData}
+              xKey="date"
+              height={200}
+              series={[{ key: 'messages', label: 'Сообщений', color: '#8b5cf6' }]}
+            />
           </CardContent>
         </Card>
       )}
@@ -329,37 +249,12 @@ export default function SupportAnalytics() {
               <CardTitle className="text-base">Тикеты по часам</CardTitle>
             </CardHeader>
             <CardContent className="pt-0">
-              <ChartContainer config={chartConfig} className="h-[150px] w-full">
-                <RechartsAreaChart data={ticketsHourlyChartData}>
-                  <defs>
-                    <linearGradient id="fillTicketsHourly" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <XAxis
-                    dataKey="hour"
-                    tickLine={false}
-                    axisLine={false}
-                    tickMargin={8}
-                    className="text-xs text-neutral-500"
-                  />
-                  <YAxis
-                    tickLine={false}
-                    axisLine={false}
-                    tickMargin={8}
-                    className="text-xs text-neutral-500"
-                  />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <Area
-                    type="monotone"
-                    dataKey="tickets"
-                    stroke="#3b82f6"
-                    fill="url(#fillTicketsHourly)"
-                    strokeWidth={2}
-                  />
-                </RechartsAreaChart>
-              </ChartContainer>
+              <AreaChart
+                data={ticketsHourlyChartData}
+                xKey="hour"
+                height={150}
+                series={[{ key: 'tickets', label: 'Тикетов', color: '#3b82f6' }]}
+              />
             </CardContent>
           </Card>
 
@@ -368,37 +263,12 @@ export default function SupportAnalytics() {
               <CardTitle className="text-base">Сообщения по часам</CardTitle>
             </CardHeader>
             <CardContent className="pt-0">
-              <ChartContainer config={chartConfig} className="h-[150px] w-full">
-                <RechartsAreaChart data={messagesHourlyChartData}>
-                  <defs>
-                    <linearGradient id="fillMessagesHourly" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <XAxis
-                    dataKey="hour"
-                    tickLine={false}
-                    axisLine={false}
-                    tickMargin={8}
-                    className="text-xs text-neutral-500"
-                  />
-                  <YAxis
-                    tickLine={false}
-                    axisLine={false}
-                    tickMargin={8}
-                    className="text-xs text-neutral-500"
-                  />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <Area
-                    type="monotone"
-                    dataKey="messages"
-                    stroke="#8b5cf6"
-                    fill="url(#fillMessagesHourly)"
-                    strokeWidth={2}
-                  />
-                </RechartsAreaChart>
-              </ChartContainer>
+              <AreaChart
+                data={messagesHourlyChartData}
+                xKey="hour"
+                height={150}
+                series={[{ key: 'messages', label: 'Сообщений', color: '#8b5cf6' }]}
+              />
             </CardContent>
           </Card>
         </div>

@@ -59,11 +59,10 @@
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-hook-form": "^7.77.0",
-    "recharts": "^3.8.1",
     "socket.io-client": "^4.8.3",
     "tailwind-merge": "^3.6.0",
     "thumbhash": "^0.1.1",
-    "vinext": "^0.0.55",
+    "vinext": "^0.1.2",
     "zod": "^4.4.3"
   },
   "devDependencies": {

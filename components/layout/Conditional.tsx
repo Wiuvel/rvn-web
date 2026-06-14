@@ -11,7 +11,7 @@ interface ConditionalLayoutProps {
 }
 
 export default function ConditionalLayout({ children }: ConditionalLayoutProps) {
-  const pathname = usePathname();
+  const pathname = usePathname() ?? '';
 
   // Страницы с header и footer
   const pagesWithHeaderFooter = ['/'];

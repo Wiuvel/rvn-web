@@ -6,9 +6,9 @@
 
 Проект работает на [**vinext**](https://github.com/cloudflare/vinext) — реимплементации API Next.js поверх Vite. CLI (`vinext dev`, `vinext build`, `vinext start`) и весь набор `next/*` модулей работают как раньше, App Router и `proxy.ts` тоже.
 
-Документ нужен из-за **regressions, появившихся в 0.0.52** (которых не было в 0.0.46) и **сохраняющихся в 0.0.55** — для них в проекте стоят локальные workaround'ы. Если бамп vinext'а уберёт пункт ниже — workaround можно снимать.
+Документ нужен из-за **regressions, появившихся в 0.0.52** (которых не было в 0.0.46) и **сохраняющихся в 0.1.2** — для них в проекте стоят локальные workaround'ы. Если бамп vinext'а уберёт пункт ниже — workaround можно снимать.
 
-## Текущие workaround'ы (проверено на vinext 0.0.55)
+## Текущие workaround'ы (проверено на vinext 0.1.2)
 
 ### 1. Ambient module declarations для `next/*`
 
@@ -47,7 +47,7 @@ resolve: {
 
 ### 3. Cookie `sameSite` — capitalized values
 
-Vinext-шим `cookies()` требует `'Strict' | 'Lax' | 'None'`. В Next.js (и в vinext 0.0.46) принимался lowercase; в 0.0.55 всё ещё capitalized. Браузеры RFC-6265 case-insensitive, рантайм идентичен, но **в коде используй capitalized**:
+Vinext-шим `cookies()` требует `'Strict' | 'Lax' | 'None'`. В Next.js (и в vinext 0.0.46) принимался lowercase; в 0.1.2 всё ещё capitalized. Браузеры RFC-6265 case-insensitive, рантайм идентичен, но **в коде используй capitalized**:
 
 ```ts
 cookieStore.set('session_id', value, { sameSite: 'Strict' }); // ✅
@@ -100,5 +100,7 @@ vinext check        # сканер совместимости
 | `Failed to resolve import "next/..."` в `vitest` | `vitest.config.mts` → `resolve.alias` |
 | `UNLOADABLE_DEPENDENCY ... shims/*/server` в build | Не используй tsconfig `paths` для `next/*` — переноси в ambient declarations |
 | `Type '"strict"' is not assignable to '"Strict" \| ...'` | Замени на capitalized |
+| `Property '...' does not exist on type '{...} \| null'` (`useParams`) | С 0.1.2 шим `useParams()` nullable (как в Next.js) — читай через `?.` |
+| `'pathname' is possibly 'null'` (`usePathname`) | С 0.1.2 шим `usePathname()` nullable (как в Next.js) — `usePathname() ?? ''` |
 | `Cannot find module... '*.css'` | `types/global.d.ts` |
 | Пропали `PageProps` / `LayoutProps` | `vinext build` перегенерит `.next/types/routes.d.ts` |

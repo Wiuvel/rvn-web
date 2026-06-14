@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Vinext-0.0.55-F38020?style=flat-square&logo=cloudflare&logoColor=white" alt="Vinext">
+  <img src="https://img.shields.io/badge/Vinext-0.1.2-F38020?style=flat-square&logo=cloudflare&logoColor=white" alt="Vinext">
   <img src="https://img.shields.io/badge/Next.js_API-000000?style=flat-square&logo=next.js&logoColor=white" alt="Next.js API Compatible">
   <img src="https://img.shields.io/badge/React-19-3178c6?style=flat-square&logo=react&logoColor=black" alt="React">
   <img src="https://img.shields.io/badge/TypeScript-6.0-3178c6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript">
@@ -45,7 +45,7 @@ The site is the home base for everything around the subscription: account and de
 
 ## 📚 Documentation
 
-[**Vinext notes**](docs/vinext/vinext.en.md) — workarounds for the regressions still present as of vinext 0.0.55 (ambient `next/*` declarations, vitest aliases, cookie `sameSite` casing, `next/image` prop gaps).
+[**Vinext notes**](docs/vinext/vinext.en.md) — workarounds for the regressions still present as of vinext 0.1.2 (ambient `next/*` declarations, vitest aliases, cookie `sameSite` casing, `next/image` prop gaps).
 
 ### Authentication
 

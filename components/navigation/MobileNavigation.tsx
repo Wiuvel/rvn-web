@@ -34,7 +34,7 @@ export default function MobileNavigation() {
   const backdropRef = useRef<HTMLDivElement>(null);
   const hasOpened = useRef(false);
   const prevPathnameRef = useRef<string | null>(null);
-  const pathname = usePathname();
+  const pathname = usePathname() ?? '';
 
   const { userData, loading } = useAuth({ silent: true, lightweight: true });
   const { unreadCount } = useNotifications({ enabled: !!userData });

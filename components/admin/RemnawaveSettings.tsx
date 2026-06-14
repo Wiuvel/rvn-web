@@ -124,7 +124,7 @@ export default function RemnawaveSettings() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <form onSubmit={handleSubmit(onSubmit)} className="max-w-2xl space-y-4">
           <TextField
             label="Endpoint"
             icon={<Globe className="h-4 w-4 text-neutral-500" />}

@@ -185,7 +185,7 @@ export default function SubscriptionPlansSettings() {
 
   return (
     <div className="space-y-6">
-      <Card className="border-neutral-800 bg-neutral-900/50 p-6">
+      <Card className="max-w-3xl border-neutral-800 bg-neutral-900/50 p-6">
         <div className="mb-6 flex items-center justify-between">
           <div>
             <h3 className="text-lg font-semibold text-white">Тарифные планы</h3>

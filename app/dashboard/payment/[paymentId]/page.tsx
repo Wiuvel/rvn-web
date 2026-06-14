@@ -8,7 +8,7 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { CheckCircle2, XCircle, Clock, ArrowLeft } from 'lucide-react';
 
 export default function PaymentStatusPage() {
-  const { paymentId } = useParams<{ paymentId: string }>();
+  const paymentId = useParams<{ paymentId: string }>()?.paymentId;
   const { userData, loading: authLoading } = useAuth({
     requireAuth: true,
     redirectOnFail: '/auth',
