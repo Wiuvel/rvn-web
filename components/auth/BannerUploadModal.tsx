@@ -42,7 +42,9 @@ export default function BannerUploadModal({
   const [error, setError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-  const [containerSize, setContainerSize] = useState<{ width: number; height: number } | null>(null);
+  const [containerSize, setContainerSize] = useState<{ width: number; height: number } | null>(
+    null,
+  );
   const fileInputRef = useRef<HTMLInputElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
@@ -677,137 +679,135 @@ export default function BannerUploadModal({
                     className="h-auto max-h-[400px] w-full object-contain"
                     onLoad={initializeCropArea}
                   />
-                  {cropArea &&
-                    !isMobile &&
-                    containerSize && (
-                      <>
-                        {/* Затемнение вне области обрезки */}
-                        <div
-                          className="pointer-events-none absolute inset-0"
-                          style={{
-                            background: `linear-gradient(to right, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.6) ${(cropArea.x / containerSize.width) * 100}%, transparent ${(cropArea.x / containerSize.width) * 100}%, transparent ${((cropArea.x + cropArea.width) / containerSize.width) * 100}%, rgba(0,0,0,0.6) ${((cropArea.x + cropArea.width) / containerSize.width) * 100}%, rgba(0,0,0,0.6) 100%),
+                  {cropArea && !isMobile && containerSize && (
+                    <>
+                      {/* Затемнение вне области обрезки */}
+                      <div
+                        className="pointer-events-none absolute inset-0"
+                        style={{
+                          background: `linear-gradient(to right, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.6) ${(cropArea.x / containerSize.width) * 100}%, transparent ${(cropArea.x / containerSize.width) * 100}%, transparent ${((cropArea.x + cropArea.width) / containerSize.width) * 100}%, rgba(0,0,0,0.6) ${((cropArea.x + cropArea.width) / containerSize.width) * 100}%, rgba(0,0,0,0.6) 100%),
                                     linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.6) ${(cropArea.y / containerSize.height) * 100}%, transparent ${(cropArea.y / containerSize.height) * 100}%, transparent ${((cropArea.y + cropArea.height) / containerSize.height) * 100}%, rgba(0,0,0,0.6) ${((cropArea.y + cropArea.height) / containerSize.height) * 100}%, rgba(0,0,0,0.6) 100%)`,
-                          }}
-                        />
+                        }}
+                      />
 
-                          {/* Область обрезки */}
-                          <div
-                            className="absolute cursor-move border-2 border-white/90 shadow-[0_0_0_1px_rgba(0,0,0,0.8),0_0_20px_rgba(59,130,246,0.3)]"
-                            style={{
-                              left: `${cropArea.x}px`,
-                              top: `${cropArea.y}px`,
-                              width: `${cropArea.width}px`,
-                              height: `${cropArea.height}px`,
-                            }}
-                            onMouseDown={handleCropMouseDown}
-                            role="button"
-                            tabIndex={0}
-                            aria-label="Crop area"
-                            onKeyDown={() => {}}
-                          />
+                      {/* Область обрезки */}
+                      <div
+                        className="absolute cursor-move border-2 border-white/90 shadow-[0_0_0_1px_rgba(0,0,0,0.8),0_0_20px_rgba(59,130,246,0.3)]"
+                        style={{
+                          left: `${cropArea.x}px`,
+                          top: `${cropArea.y}px`,
+                          width: `${cropArea.width}px`,
+                          height: `${cropArea.height}px`,
+                        }}
+                        onMouseDown={handleCropMouseDown}
+                        role="button"
+                        tabIndex={0}
+                        aria-label="Crop area"
+                        onKeyDown={() => {}}
+                      />
 
-                          {/* Ручки для изменения размера - всегда привязаны к рамке */}
-                          {/* Углы */}
-                          <div
-                            className="absolute z-20 h-5 w-5 cursor-nwse-resize rounded-sm border-2 border-blue-500 bg-white shadow-lg transition-transform hover:bg-blue-50 active:scale-90"
-                            style={{
-                              left: `${cropArea.x - 10}px`,
-                              top: `${cropArea.y - 10}px`,
-                            }}
-                            onMouseDown={(e) => handleResizeMouseDown(e, 'nw')}
-                            role="button"
-                            tabIndex={0}
-                            aria-label="Resize NW"
-                            onKeyDown={() => {}}
-                          />
-                          <div
-                            className="absolute z-20 h-5 w-5 cursor-nesw-resize rounded-sm border-2 border-blue-500 bg-white shadow-lg transition-transform hover:bg-blue-50 active:scale-90"
-                            style={{
-                              left: `${cropArea.x + cropArea.width - 10}px`,
-                              top: `${cropArea.y - 10}px`,
-                            }}
-                            onMouseDown={(e) => handleResizeMouseDown(e, 'ne')}
-                            role="button"
-                            tabIndex={0}
-                            aria-label="Resize NE"
-                            onKeyDown={() => {}}
-                          />
-                          <div
-                            className="absolute z-20 h-5 w-5 cursor-nesw-resize rounded-sm border-2 border-blue-500 bg-white shadow-lg transition-transform hover:bg-blue-50 active:scale-90"
-                            style={{
-                              left: `${cropArea.x - 10}px`,
-                              top: `${cropArea.y + cropArea.height - 10}px`,
-                            }}
-                            onMouseDown={(e) => handleResizeMouseDown(e, 'sw')}
-                            role="button"
-                            tabIndex={0}
-                            aria-label="Resize SW"
-                            onKeyDown={() => {}}
-                          />
-                          <div
-                            className="absolute z-20 h-5 w-5 cursor-nwse-resize rounded-sm border-2 border-blue-500 bg-white shadow-lg transition-transform hover:bg-blue-50 active:scale-90"
-                            style={{
-                              left: `${cropArea.x + cropArea.width - 10}px`,
-                              top: `${cropArea.y + cropArea.height - 10}px`,
-                            }}
-                            onMouseDown={(e) => handleResizeMouseDown(e, 'se')}
-                            role="button"
-                            tabIndex={0}
-                            aria-label="Resize SE"
-                            onKeyDown={() => {}}
-                          />
+                      {/* Ручки для изменения размера - всегда привязаны к рамке */}
+                      {/* Углы */}
+                      <div
+                        className="absolute z-20 h-5 w-5 cursor-nwse-resize rounded-sm border-2 border-blue-500 bg-white shadow-lg transition-transform hover:bg-blue-50 active:scale-90"
+                        style={{
+                          left: `${cropArea.x - 10}px`,
+                          top: `${cropArea.y - 10}px`,
+                        }}
+                        onMouseDown={(e) => handleResizeMouseDown(e, 'nw')}
+                        role="button"
+                        tabIndex={0}
+                        aria-label="Resize NW"
+                        onKeyDown={() => {}}
+                      />
+                      <div
+                        className="absolute z-20 h-5 w-5 cursor-nesw-resize rounded-sm border-2 border-blue-500 bg-white shadow-lg transition-transform hover:bg-blue-50 active:scale-90"
+                        style={{
+                          left: `${cropArea.x + cropArea.width - 10}px`,
+                          top: `${cropArea.y - 10}px`,
+                        }}
+                        onMouseDown={(e) => handleResizeMouseDown(e, 'ne')}
+                        role="button"
+                        tabIndex={0}
+                        aria-label="Resize NE"
+                        onKeyDown={() => {}}
+                      />
+                      <div
+                        className="absolute z-20 h-5 w-5 cursor-nesw-resize rounded-sm border-2 border-blue-500 bg-white shadow-lg transition-transform hover:bg-blue-50 active:scale-90"
+                        style={{
+                          left: `${cropArea.x - 10}px`,
+                          top: `${cropArea.y + cropArea.height - 10}px`,
+                        }}
+                        onMouseDown={(e) => handleResizeMouseDown(e, 'sw')}
+                        role="button"
+                        tabIndex={0}
+                        aria-label="Resize SW"
+                        onKeyDown={() => {}}
+                      />
+                      <div
+                        className="absolute z-20 h-5 w-5 cursor-nwse-resize rounded-sm border-2 border-blue-500 bg-white shadow-lg transition-transform hover:bg-blue-50 active:scale-90"
+                        style={{
+                          left: `${cropArea.x + cropArea.width - 10}px`,
+                          top: `${cropArea.y + cropArea.height - 10}px`,
+                        }}
+                        onMouseDown={(e) => handleResizeMouseDown(e, 'se')}
+                        role="button"
+                        tabIndex={0}
+                        aria-label="Resize SE"
+                        onKeyDown={() => {}}
+                      />
 
-                          {/* Стороны */}
-                          <div
-                            className="absolute z-20 h-5 w-5 cursor-ns-resize rounded-sm border-2 border-blue-500 bg-white shadow-lg transition-transform hover:bg-blue-50 active:scale-90"
-                            style={{
-                              left: `${cropArea.x + cropArea.width / 2 - 10}px`,
-                              top: `${cropArea.y - 10}px`,
-                            }}
-                            onMouseDown={(e) => handleResizeMouseDown(e, 'n')}
-                            role="button"
-                            tabIndex={0}
-                            aria-label="Resize N"
-                            onKeyDown={() => {}}
-                          />
-                          <div
-                            className="absolute z-20 h-5 w-5 cursor-ns-resize rounded-sm border-2 border-blue-500 bg-white shadow-lg transition-transform hover:bg-blue-50 active:scale-90"
-                            style={{
-                              left: `${cropArea.x + cropArea.width / 2 - 10}px`,
-                              top: `${cropArea.y + cropArea.height - 10}px`,
-                            }}
-                            onMouseDown={(e) => handleResizeMouseDown(e, 's')}
-                            role="button"
-                            tabIndex={0}
-                            aria-label="Resize S"
-                            onKeyDown={() => {}}
-                          />
-                          <div
-                            className="absolute z-20 h-5 w-5 cursor-ew-resize rounded-sm border-2 border-blue-500 bg-white shadow-lg transition-transform hover:bg-blue-50 active:scale-90"
-                            style={{
-                              left: `${cropArea.x - 10}px`,
-                              top: `${cropArea.y + cropArea.height / 2 - 10}px`,
-                            }}
-                            onMouseDown={(e) => handleResizeMouseDown(e, 'w')}
-                            role="button"
-                            tabIndex={0}
-                            aria-label="Resize W"
-                            onKeyDown={() => {}}
-                          />
-                          <div
-                            className="absolute z-20 h-5 w-5 cursor-ew-resize rounded-sm border-2 border-blue-500 bg-white shadow-lg transition-transform hover:bg-blue-50 active:scale-90"
-                            style={{
-                              left: `${cropArea.x + cropArea.width - 10}px`,
-                              top: `${cropArea.y + cropArea.height / 2 - 10}px`,
-                            }}
-                            onMouseDown={(e) => handleResizeMouseDown(e, 'e')}
-                            role="button"
-                            tabIndex={0}
-                            aria-label="Resize E"
-                            onKeyDown={() => {}}
-                          />
-                        </>
-                      )}
+                      {/* Стороны */}
+                      <div
+                        className="absolute z-20 h-5 w-5 cursor-ns-resize rounded-sm border-2 border-blue-500 bg-white shadow-lg transition-transform hover:bg-blue-50 active:scale-90"
+                        style={{
+                          left: `${cropArea.x + cropArea.width / 2 - 10}px`,
+                          top: `${cropArea.y - 10}px`,
+                        }}
+                        onMouseDown={(e) => handleResizeMouseDown(e, 'n')}
+                        role="button"
+                        tabIndex={0}
+                        aria-label="Resize N"
+                        onKeyDown={() => {}}
+                      />
+                      <div
+                        className="absolute z-20 h-5 w-5 cursor-ns-resize rounded-sm border-2 border-blue-500 bg-white shadow-lg transition-transform hover:bg-blue-50 active:scale-90"
+                        style={{
+                          left: `${cropArea.x + cropArea.width / 2 - 10}px`,
+                          top: `${cropArea.y + cropArea.height - 10}px`,
+                        }}
+                        onMouseDown={(e) => handleResizeMouseDown(e, 's')}
+                        role="button"
+                        tabIndex={0}
+                        aria-label="Resize S"
+                        onKeyDown={() => {}}
+                      />
+                      <div
+                        className="absolute z-20 h-5 w-5 cursor-ew-resize rounded-sm border-2 border-blue-500 bg-white shadow-lg transition-transform hover:bg-blue-50 active:scale-90"
+                        style={{
+                          left: `${cropArea.x - 10}px`,
+                          top: `${cropArea.y + cropArea.height / 2 - 10}px`,
+                        }}
+                        onMouseDown={(e) => handleResizeMouseDown(e, 'w')}
+                        role="button"
+                        tabIndex={0}
+                        aria-label="Resize W"
+                        onKeyDown={() => {}}
+                      />
+                      <div
+                        className="absolute z-20 h-5 w-5 cursor-ew-resize rounded-sm border-2 border-blue-500 bg-white shadow-lg transition-transform hover:bg-blue-50 active:scale-90"
+                        style={{
+                          left: `${cropArea.x + cropArea.width - 10}px`,
+                          top: `${cropArea.y + cropArea.height / 2 - 10}px`,
+                        }}
+                        onMouseDown={(e) => handleResizeMouseDown(e, 'e')}
+                        role="button"
+                        tabIndex={0}
+                        aria-label="Resize E"
+                        onKeyDown={() => {}}
+                      />
+                    </>
+                  )}
                 </div>
                 <button
                   onClick={() => {

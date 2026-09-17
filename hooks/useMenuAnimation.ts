@@ -41,7 +41,6 @@ export function useMenuAnimation(
     }
 
     if (isOpen) {
-
       requestAnimationFrame(() => {
         if (menuRef.current) {
           gsap.killTweensOf(menuRef.current);

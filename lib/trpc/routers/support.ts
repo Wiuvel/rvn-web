@@ -823,7 +823,10 @@ export const supportRouter = router({
               sessionId: sessionId.slice(0, 8),
               reason: csrfValidation.reason,
             });
-            throw new TRPCError({ code: 'FORBIDDEN', message: 'Invalid CSRF token. Please refresh the page.' });
+            throw new TRPCError({
+              code: 'FORBIDDEN',
+              message: 'Invalid CSRF token. Please refresh the page.',
+            });
           }
         }
 

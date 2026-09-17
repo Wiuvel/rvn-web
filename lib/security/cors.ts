@@ -33,9 +33,7 @@ export function setCorsHeaders(
   const config = { ...defaultOptions, ...options };
   const reqOrigin =
     options.requestOrigin ??
-    (typeof request === 'string'
-      ? request
-      : request?.headers?.get('origin') ?? null);
+    (typeof request === 'string' ? request : (request?.headers?.get('origin') ?? null));
 
   // W3C CORS Specification: Access-Control-Allow-Origin must be either a single origin or "*".
   // Multiple origins cannot be joined by comma, and "*" cannot be used with Credentials: true.

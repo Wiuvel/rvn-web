@@ -126,7 +126,10 @@ export default function AuthForm({ return_to, initialError, mode }: AuthFormProp
   };
 
   const registerPassword = useWatch({ control: registerForm.control, name: 'password' });
-  const registerConfirmPassword = useWatch({ control: registerForm.control, name: 'confirmPassword' });
+  const registerConfirmPassword = useWatch({
+    control: registerForm.control,
+    name: 'confirmPassword',
+  });
 
   const handleRegister = async (data: RegisterFormData) => {
     if (!csrfToken) {
