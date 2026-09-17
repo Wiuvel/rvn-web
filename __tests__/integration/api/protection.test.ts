@@ -21,7 +21,7 @@ describe('API: protection router', () => {
       expect(result.ip).toBe('192.168.1.1');
     });
 
-    it('берёт первый адрес из x-forwarded-for при списке', async () => {
+    it('берет первый адрес из x-forwarded-for при списке', async () => {
       const ctx = createMockContext();
       ctx.headers.set('x-forwarded-for', '10.0.0.1, 192.168.1.1, 172.16.0.1');
       const caller = createCaller(ctx);

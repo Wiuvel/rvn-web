@@ -1993,7 +1993,7 @@ export default function SupportClient() {
           </div>
 
           <div className="flex min-h-0 flex-1 flex-col gap-3 sm:gap-6 lg:flex-row">
-            {/* Левая панель: на ПК при свёрнутом виде — узкая панель с номерами; иначе — полный список (на мобильном всегда список) */}
+            {/* Левая панель: на ПК при свернутом виде — узкая панель с номерами; иначе — полный список (на мобильном всегда список) */}
             <div
               className={`flex min-h-0 flex-col overflow-hidden transition-all duration-300 ease-in-out ${activeTicket ? 'hidden lg:flex' : 'flex'} ${sidebarCollapsed ? 'lg:w-16' : 'lg:w-1/3'}`}
             >
@@ -2214,7 +2214,7 @@ export default function SupportClient() {
               </div>
             </div>
 
-            {/* Чат — при свёрнутой панели занимает почти весь экран на ПК */}
+            {/* Чат — при свернутой панели занимает почти весь экран на ПК */}
             <div
               className={`flex min-h-0 flex-1 flex-col ${activeTicket ? 'flex' : 'hidden lg:flex'}`}
             >
@@ -2440,7 +2440,7 @@ export default function SupportClient() {
           tabIndex={0}
           aria-label="Закрыть модальное окно"
         >
-          {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- модальная обёртка: обработчики закрытия по клику/Escape */}
+          {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- модальная обертка: обработчики закрытия по клику/Escape */}
           <div
             className="max-h-[90vh] w-full max-w-md cursor-default overflow-y-auto rounded-2xl border border-white/10 bg-neutral-900 p-4 sm:p-6"
             onClick={(e) => e.stopPropagation()}

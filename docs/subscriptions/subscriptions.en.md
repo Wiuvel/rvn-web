@@ -142,7 +142,7 @@ Inputs: `{ planId, payFrom: 'balance' | 'promo' | 'external', promoCode? }`.
 - Inputs: `{ promoCode, amount }` (kopecks, ≥ 10 000 = 100 RUB).
 - Promo must be enabled and match the configured code.
 - One-shot guard: rejects if any prior `balance_transactions` row of type `topup` exists for the user.
-- Atomic balance increment via `sql\`${users.balance} + ${amount}\``, ledger row recorded, auth cache invalidated, `user_data` cookie refreshed.
+- Atomic balance increment via `sql\`${users.balance} + ${amount}\``, ledger row recorded, auth cache invalidated,`user_data` cookie refreshed.
 
 ## Sync flow (`subscription.sync`)
 
@@ -171,6 +171,7 @@ Updates `expire_at`, `subscription_url`, traffic fields and returns `userTraffic
 REST wrapper used by both the subscription router and admin panel. Endpoint and API key are read from `panel_settings` (cached for 60 s in `settingsCache`), so an admin can rotate the key without restarting.
 
 Public types:
+
 - `RemnawaveUser`, `RemnawaveUserTraffic`, `RemnawaveUserStatus`, `TrafficLimitStrategy`.
 - `CreateUserParams`.
 - `RemnawaveHealthMetrics`.

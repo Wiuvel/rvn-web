@@ -131,7 +131,7 @@ export default function DevicesClient() {
                 {deviceCount} из {DEVICE_LIMIT}
               </span>
             </div>
-            <p className="mt-3 text-sm text-neutral-400">Устройства, подключённые к сервису</p>
+            <p className="mt-3 text-sm text-neutral-400">Устройства, подключенные к сервису</p>
           </div>
 
           {/* Progress bar */}
@@ -159,7 +159,7 @@ export default function DevicesClient() {
                 <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-neutral-800/50">
                   <HardDrive className="h-7 w-7 text-neutral-500" />
                 </div>
-                <p className="text-base font-medium text-neutral-400">Нет подключённых устройств</p>
+                <p className="text-base font-medium text-neutral-400">Нет подключенных устройств</p>
                 <p className="mt-2 text-sm text-neutral-500">
                   Устройства появятся после подключения к VPN
                 </p>

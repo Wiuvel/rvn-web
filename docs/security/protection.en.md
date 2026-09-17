@@ -53,7 +53,7 @@ If `handleProtection` returns a `NextResponse`, the request is short-circuited a
 
 | Factor | Weight | Logic |
 |---|---|---|
-| `suspiciousUserAgent` | 30 | Empty / very short UA, no `mozilla|chrome|safari|firefox|edge|opera`, or matches a known scraper regex (`curl`, `python-requests`, `okhttp`, `headless`, `phantom`, …). |
+| `suspiciousUserAgent` | 30 | Empty / very short UA, no `mozilla|chrome|safari|firefox|edge|opera`, or matches a known scraper regex (`curl`,`python-requests`,`okhttp`,`headless`,`phantom`, …). |
 | `missingHeaders` | 20 | Missing two or more of `accept`, `accept-language`, `accept-encoding`, or invalid format (`Accept-Language` not matching `[a-z]{2}(-[a-z]{2})?`). |
 | `suspiciousIP` | 15 | IPv4/IPv6 regex fails, or IP is `unknown`. |
 | `botPattern` | 25 | UA matches `bot|crawler|spider|scraper|headless|selenium|puppeteer|playwright`. |

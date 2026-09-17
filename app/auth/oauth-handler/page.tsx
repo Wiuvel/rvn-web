@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, Suspense } from 'react';
+import { useEffect, useState, useRef, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { getOAuthErrorMessage, isPopupSpecificError } from '@/lib/auth/oauth-errors';
 
@@ -125,15 +125,32 @@ function sendMessageAndClose(
   return false;
 }
 
+const VALID_PROVIDERS = new Set(['google', 'telegram', 'yandex', 'vk', 'twitch']);
+
 function OAuthHandlerContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const [status, setStatus] = useState<'loading' | 'redirecting' | 'processing' | 'error'>(
-    'loading',
-  );
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [handled, setHandled] = useState(false);
   const provider = searchParams.get('provider');
+  const success = searchParams.get('success');
+  const userId = searchParams.get('user_id');
+  const urlError = searchParams.get('error');
+
+  const [status, setStatus] = useState<'loading' | 'redirecting' | 'processing' | 'error'>(() => {
+    if (success && userId) return 'processing';
+    if (urlError || (!provider && !success) || (provider && !VALID_PROVIDERS.has(provider))) {
+      return 'error';
+    }
+    if (provider && provider !== 'telegram') return 'redirecting';
+    return 'loading';
+  });
+  const [errorMessage, setErrorMessage] = useState<string | null>(() => {
+    if (urlError) return getOAuthErrorMessage(urlError);
+    if ((!provider && !success) || (provider && !VALID_PROVIDERS.has(provider))) {
+      return getOAuthErrorMessage('invalid_provider');
+    }
+    return null;
+  });
+  const handledRef = useRef(false);
 
   // Initialize: mark as popup if we detect it
   useEffect(() => {
@@ -150,14 +167,10 @@ function OAuthHandlerContent() {
 
   // Handle success callback from OAuth provider
   useEffect(() => {
-    if (handled) return;
-
-    const success = searchParams.get('success');
-    const userId = searchParams.get('user_id');
+    if (handledRef.current) return;
 
     if (success && userId) {
-      setHandled(true);
-      setStatus('processing');
+      handledRef.current = true;
 
       // CRITICAL: If in popup, send message and close - NEVER redirect
       const wasHandled = sendMessageAndClose(
@@ -179,21 +192,21 @@ function OAuthHandlerContent() {
         } catch {
           // sessionStorage may be unavailable
         }
-        window.location.href = `/dashboard/${userId}`;
+        window.location.assign(`/dashboard/${userId}`);
       }
 
       return;
     }
-  }, [searchParams, handled]);
+  }, [searchParams, success, userId]);
 
   // Handle error callback from URL parameters (including provider errors like Google's ?error=...)
   useEffect(() => {
-    if (handled) return;
+    if (handledRef.current) return;
 
     const error = searchParams.get('error');
     if (!error) return;
 
-    setHandled(true);
+    handledRef.current = true;
 
     // Check if this is a popup-specific error (should redirect to /auth/)
     if (isPopupSpecificError(error)) {
@@ -232,32 +245,19 @@ function OAuthHandlerContent() {
       }
       router.push(`/auth?error=${encodeURIComponent(error)}`);
     }
-  }, [searchParams, router, handled]);
+  }, [searchParams, router]);
 
   // Handle provider initialization
   useEffect(() => {
-    if (handled) return;
+    if (handledRef.current) return;
 
-    // If there's an error in URL, don't process provider initialization
-    // Error handling is done in separate useEffect
-    const error = searchParams.get('error');
-    if (error) {
+    if (urlError || success) {
       return;
     }
 
-    // If there's a success in URL, don't process provider initialization
-    // Success handling is done in separate useEffect
-    const success = searchParams.get('success');
-    if (success) {
-      return;
-    }
-
-    if (!provider) {
-      setHandled(true);
+    if (!provider || !VALID_PROVIDERS.has(provider)) {
+      handledRef.current = true;
       const errorMsg = getOAuthErrorMessage('invalid_provider');
-      // Always set error in state to display it
-      setErrorMessage(errorMsg);
-      setStatus('error');
 
       const wasHandled = sendMessageAndClose(
         'OAUTH_ERROR',
@@ -269,15 +269,20 @@ function OAuthHandlerContent() {
       );
 
       if (!wasHandled) {
-        sessionStorage.removeItem('oauth_popup');
+        try {
+          if (typeof sessionStorage !== 'undefined') {
+            sessionStorage.removeItem('oauth_popup');
+          }
+        } catch {
+          // sessionStorage may be unavailable
+        }
         router.push('/auth?error=invalid_provider');
       }
       return;
     }
 
     // Start OAuth flow based on provider
-    if (provider === 'google') {
-      setStatus('redirecting');
+    if (provider !== 'telegram') {
       // Ensure popup flag is saved before redirect
       try {
         if (typeof sessionStorage !== 'undefined' && isPopupWindow()) {
@@ -285,77 +290,14 @@ function OAuthHandlerContent() {
         }
       } catch {
         // sessionStorage may be unavailable
-      }
-      // Redirect to Google OAuth endpoint
-      if (typeof window !== 'undefined') {
-        window.location.href = '/api/auth/oauth/google';
-      }
-    } else if (provider === 'telegram') {
-      setStatus('loading');
-      // Redirect to Telegram OAuth endpoint (similar to Google)
-      if (typeof window !== 'undefined') {
-        window.location.href = '/api/auth/oauth/telegram';
-      }
-    } else if (provider === 'yandex') {
-      setStatus('redirecting');
-      // Ensure popup flag is saved before redirect
-      try {
-        if (typeof sessionStorage !== 'undefined' && isPopupWindow()) {
-          sessionStorage.setItem('oauth_popup', 'true');
-        }
-      } catch {
-        // sessionStorage may be unavailable
-      }
-      // Redirect to Yandex OAuth endpoint
-      if (typeof window !== 'undefined') {
-        window.location.href = '/api/auth/oauth/yandex';
-      }
-    } else if (provider === 'vk') {
-      setStatus('redirecting');
-      // Ensure popup flag is saved before redirect
-      try {
-        if (typeof sessionStorage !== 'undefined' && isPopupWindow()) {
-          sessionStorage.setItem('oauth_popup', 'true');
-        }
-      } catch {
-        // sessionStorage may be unavailable
-      }
-      // Redirect to VK OAuth endpoint
-      if (typeof window !== 'undefined') {
-        window.location.href = '/api/auth/oauth/vk';
-      }
-    } else if (provider === 'twitch') {
-      setStatus('redirecting');
-      try {
-        if (typeof sessionStorage !== 'undefined' && isPopupWindow()) {
-          sessionStorage.setItem('oauth_popup', 'true');
-        }
-      } catch {}
-      if (typeof window !== 'undefined') {
-        window.location.href = '/api/auth/oauth/twitch';
-      }
-    } else {
-      setHandled(true);
-      const errorMsg = getOAuthErrorMessage('invalid_provider');
-      // Always set error in state to display it
-      setErrorMessage(errorMsg);
-      setStatus('error');
-
-      const wasHandled = sendMessageAndClose(
-        'OAUTH_ERROR',
-        {
-          error: errorMsg,
-        },
-        setErrorMessage,
-        setStatus,
-      );
-
-      if (!wasHandled) {
-        sessionStorage.removeItem('oauth_popup');
-        router.push('/auth?error=invalid_provider');
       }
     }
-  }, [searchParams, router, provider, handled]);
+
+    // Redirect to OAuth endpoint
+    if (typeof window !== 'undefined') {
+      window.location.assign(`/api/auth/oauth/${provider}`);
+    }
+  }, [provider, router, success, urlError]);
 
   // Error state
   if (status === 'error' && errorMessage) {

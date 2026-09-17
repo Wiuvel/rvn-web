@@ -59,7 +59,6 @@ function AuthIsolatedClientContent() {
 
   useEffect(() => {
     if (!showReason || !reasonMessage) return;
-    setReasonFadeOut(false);
     const fadeTimer = setTimeout(() => {
       setReasonFadeOut(true);
     }, 4500);
@@ -73,6 +72,7 @@ function AuthIsolatedClientContent() {
     return () => {
       clearTimeout(fadeTimer);
       clearTimeout(hideTimer);
+      setReasonFadeOut(false);
     };
   }, [showReason, reasonMessage]);
 

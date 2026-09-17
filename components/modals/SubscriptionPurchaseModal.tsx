@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { trpc } from '@/lib/trpc/client';
 import {
@@ -60,19 +60,16 @@ export default function SubscriptionPurchaseModal({
     );
 
   /** Auto-select plan: prefer initialPlanId, fallback to first real plan */
-  useEffect(() => {
-    if (plansData) {
-      if (initialPlanId) {
-        const target = plansData.find((p) => p.id === initialPlanId && !p.isStub);
-        if (target) {
-          setSelectedPlanId(target.id);
-          return;
-        }
-      }
-      const firstReal = plansData.find((p) => !p.isStub);
-      if (firstReal) setSelectedPlanId((prev) => prev ?? firstReal.id);
+  const defaultPlanId = useMemo(() => {
+    if (!plansData) return null;
+    if (initialPlanId) {
+      const target = plansData.find((p) => p.id === initialPlanId && !p.isStub);
+      if (target) return target.id;
     }
+    return plansData.find((p) => !p.isStub)?.id ?? null;
   }, [plansData, initialPlanId]);
+
+  const effectivePlanId = selectedPlanId ?? defaultPlanId;
 
   const purchaseMutation = trpc.subscription.purchase.useMutation({
     onSuccess: (data) => {
@@ -95,7 +92,7 @@ export default function SubscriptionPurchaseModal({
     },
   });
 
-  const selectedPlan = plansData?.find((p) => p.id === selectedPlanId && !p.isStub);
+  const selectedPlan = plansData?.find((p) => p.id === effectivePlanId && !p.isStub);
   const realPlans = plansData?.filter((p) => !p.isStub) ?? [];
   const stubPlans = plansData?.filter((p) => p.isStub) ?? [];
   const isPromoValid = debouncedPromo.length > 0 && promoValidation?.valid === true;
@@ -103,16 +100,16 @@ export default function SubscriptionPurchaseModal({
     debouncedPromo.length > 0 && !promoChecking && promoValidation?.valid === false;
 
   const handleBalancePurchase = () => {
-    if (!selectedPlanId) return;
+    if (!effectivePlanId) return;
     setError('');
-    purchaseMutation.mutate({ planId: selectedPlanId, payFrom: 'balance' });
+    purchaseMutation.mutate({ planId: effectivePlanId, payFrom: 'balance' });
   };
 
   const handlePromoPurchase = () => {
-    if (!selectedPlanId || !promoCode.trim()) return;
+    if (!effectivePlanId || !promoCode.trim()) return;
     setError('');
     purchaseMutation.mutate({
-      planId: selectedPlanId,
+      planId: effectivePlanId,
       payFrom: 'promo',
       promoCode: promoCode.trim(),
     });
@@ -133,7 +130,7 @@ export default function SubscriptionPurchaseModal({
   const isPending = purchaseMutation.isPending;
 
   return (
-    /* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- модальная обёртка: обработчики закрытия по клику/Escape */
+    /* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- модальная обертка: обработчики закрытия по клику/Escape */
     <div
       role="dialog"
       aria-modal="true"
@@ -144,7 +141,7 @@ export default function SubscriptionPurchaseModal({
         if (e.key === 'Escape') handleClose();
       }}
     >
-      {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- модальная обёртка: обработчики закрытия по клику/Escape */}
+      {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- модальная обертка: обработчики закрытия по клику/Escape */}
       <div
         role="document"
         className="w-full max-w-md overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-900 shadow-2xl"
@@ -198,7 +195,7 @@ export default function SubscriptionPurchaseModal({
               {/* Plan cards */}
               <div className="mb-5 space-y-2">
                 {realPlans.map((plan) => {
-                  const isSelected = selectedPlanId === plan.id;
+                  const isSelected = effectivePlanId === plan.id;
                   const showSelector = realPlans.length > 1;
                   return (
                     <button
@@ -301,7 +298,7 @@ export default function SubscriptionPurchaseModal({
                         <div>
                           <p className="text-sm font-medium text-white">Оплатить с баланса</p>
                           <p className="text-xs text-neutral-500">
-                            {(balance / 100).toFixed(0)} ₽ на счёте
+                            {(balance / 100).toFixed(0)} ₽ на счете
                             {!canPayFromBalance && ' (недостаточно)'}
                           </p>
                         </div>
@@ -316,7 +313,7 @@ export default function SubscriptionPurchaseModal({
                       <div className="flex items-center gap-3">
                         <CreditCard className="h-5 w-5 text-neutral-500" />
                         <div>
-                          <p className="text-sm font-medium text-neutral-400">Платёжные системы</p>
+                          <p className="text-sm font-medium text-neutral-400">Платежные системы</p>
                           <p className="text-xs text-neutral-600">Скоро</p>
                         </div>
                       </div>

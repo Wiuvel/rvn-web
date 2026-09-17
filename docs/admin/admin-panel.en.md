@@ -2,7 +2,7 @@
 
 > **[Русская версия](admin-panel.md)**
 
-Platform control panel at `app/ui/panel/admin`: users and roles, servers and plans (Remnawave), support analytics, maintenance mode. It has its **own authentication**, separate from user auth.
+Platform control panel at `app/ui/panel/admin`: users and roles, servers and plans, support analytics, maintenance mode. It has its **own authentication**, separate from user auth.
 
 ## Related documents
 

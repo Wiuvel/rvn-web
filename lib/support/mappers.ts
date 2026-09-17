@@ -7,6 +7,7 @@ import type {
   RawMessageApi,
   RawAttachmentApi,
   RawLastMessageApi,
+  AdminTicketUi,
 } from '@/lib/support/types';
 import type {
   Ticket,
@@ -163,4 +164,37 @@ export function mapRawTicketWithMessagesToUi(
 ): Ticket {
   const messages = rawMessages.map(mapRawMessageToUi);
   return mapRawTicketToUi(rawTicket, messages);
+}
+
+/**
+ * Map raw ticket from API to Admin Support UI ticket.
+ */
+export function mapRawTicketToAdminUi(t: RawTicketApi): AdminTicketUi {
+  const lm = t.last_message;
+  const lastMessage: AdminTicketUi['last_message'] =
+    lm == null
+      ? null
+      : {
+          id: lm.id,
+          message_text: lm.message_text,
+          sender_type: lm.sender_type ?? 'user',
+          created_at: lm.created_at,
+          is_read: lm.is_read ?? false,
+        };
+  return {
+    id: t.id,
+    subject: t.subject,
+    status: t.status,
+    priority: t.priority || 'normal',
+    created_at: t.created_at,
+    updated_at: t.updated_at ?? t.created_at,
+    last_message_at: t.last_message_at ?? t.updated_at ?? t.created_at,
+    closed_at: t.closed_at ?? null,
+    user_id: t.user_id,
+    user: t.user,
+    assigned_to: t.assigned_to ?? null,
+    assigned_user: t.assigned_user,
+    last_message: lastMessage,
+    unread_count: t.unread_count,
+  };
 }

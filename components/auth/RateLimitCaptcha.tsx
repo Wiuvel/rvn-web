@@ -59,7 +59,9 @@ function normalizeError(message: string): string {
 
 export default function RateLimitCaptcha({ isOpen, onSuccess, onClose }: RateLimitCaptchaProps) {
   const clearMutation = trpc.rateLimit.clear.useMutation();
-  const [isScriptLoaded, setIsScriptLoaded] = useState(false);
+  const [isScriptLoaded, setIsScriptLoaded] = useState(
+    () => typeof window !== 'undefined' && !!window.turnstile,
+  );
   const [isVerifying, setIsVerifying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isFinalError, setIsFinalError] = useState(false);
@@ -87,7 +89,6 @@ export default function RateLimitCaptcha({ isOpen, onSuccess, onClose }: RateLim
     if (typeof window === 'undefined') return;
 
     if (window.turnstile) {
-      setIsScriptLoaded(true);
       return;
     }
 

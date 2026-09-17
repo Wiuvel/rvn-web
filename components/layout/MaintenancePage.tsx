@@ -15,7 +15,7 @@ export default function MaintenancePage({ message }: MaintenancePageProps) {
       description={
         message || (
           <>
-            Мы проводим плановое обновление системы, чтобы сделать её лучше для вас.{' '}
+            Мы проводим плановое обновление системы, чтобы сделать ее лучше для вас.{' '}
             <span className="hidden md:inline">Пожалуйста, зайдите позже.</span>
           </>
         )

@@ -3,33 +3,16 @@
  * Поддерживает различные заголовки для определения реального IP клиента
  */
 
+import { isIP } from 'node:net';
+
 /**
- * Валидирует формат IP-адреса (IPv4 или IPv6)
+ * Валидирует формат IP-адреса (IPv4 или IPv6) используя стандарты node:net
  */
 export function isValidIP(ip: string): boolean {
   if (!ip || typeof ip !== 'string') {
     return false;
   }
-
-  // IPv4 regex
-  const ipv4Regex = /^(\d{1,3}\.){3}\d{1,3}$/;
-  // IPv6 regex (упрощенный, но достаточный)
-  const ipv6Regex = /^([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}$/;
-
-  if (ipv4Regex.test(ip)) {
-    // Проверяем, что каждый октет в диапазоне 0-255
-    const parts = ip.split('.');
-    return parts.every((part) => {
-      const num = parseInt(part, 10);
-      return num >= 0 && num <= 255;
-    });
-  }
-
-  if (ipv6Regex.test(ip)) {
-    return true;
-  }
-
-  return false;
+  return isIP(ip) !== 0;
 }
 
 /**

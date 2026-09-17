@@ -42,6 +42,7 @@ export default function AvatarUploadModal({
   const [cropStart, setCropStart] = useState<CropArea | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [containerSize, setContainerSize] = useState<{ width: number; height: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
@@ -155,6 +156,10 @@ export default function AvatarUploadModal({
 
   const initializeCropArea = () => {
     if (!imageRef.current || !imageContainerRef.current) return;
+    setContainerSize({
+      width: imageContainerRef.current.clientWidth,
+      height: imageContainerRef.current.clientHeight,
+    });
     const imgBounds = getImageBounds();
     if (!imgBounds) return;
     const size = Math.min(
@@ -403,11 +408,10 @@ export default function AvatarUploadModal({
   if (!isOpen) return null;
 
   const overlayStyle =
-    cropArea && imageContainerRef.current
+    cropArea && containerSize
       ? (() => {
-          const c = imageContainerRef.current!;
-          const w = c.clientWidth;
-          const h = c.clientHeight;
+          const w = containerSize.width;
+          const h = containerSize.height;
           const l = (cropArea.x / w) * 100;
           const r = ((cropArea.x + cropArea.width) / w) * 100;
           const t = (cropArea.y / h) * 100;

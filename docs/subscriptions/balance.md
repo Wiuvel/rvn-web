@@ -4,7 +4,7 @@
 
 ## Обзор
 
-Денежное состояние живёт в трёх таблицах: `users.balance` (текущий остаток), `payments` (одна строка на каждое пополнение или покупку, независимо от способа оплаты) и `balance_transactions` (append-only лог каждого зачисления/списания). Все суммы хранятся в **копейках** в виде PostgreSQL `integer` — никаких float'ов в pipeline нет. Чтобы показать 200,00 ₽, читаем `2000000` и делим на 100 в UI-слое.
+Денежное состояние живет в трех таблицах: `users.balance` (текущий остаток), `payments` (одна строка на каждое пополнение или покупку, независимо от способа оплаты) и `balance_transactions` (append-only лог каждого зачисления/списания). Все суммы хранятся в **копейках** в виде PostgreSQL `integer` — никаких float'ов в pipeline нет. Чтобы показать 200,00 ₽, читаем `2000000` и делим на 100 в UI-слое.
 
 Текущий баланс пользователя — единственный источник правды на строке `users`. Лог (`balance_transactions`) делает баланс восстановимым; таблица `payments` — аудитопригодными счета.
 
@@ -41,7 +41,7 @@ balance_transactions {
 }
 ```
 
-Тройка `(payments, balance_transactions, users.balance)` сознательно избыточна: любая из трёх восстанавливается по двум другим. Сверка делается периодически, не в рантайме.
+Тройка `(payments, balance_transactions, users.balance)` сознательно избыточна: любая из трех восстанавливается по двум другим. Сверка делается периодически, не в рантайме.
 
 ## Пополнение (test promo)
 
@@ -70,13 +70,13 @@ balance_transactions {
 Свойства:
 
 - **Атомарно**: апдейт балансa — `SET balance = balance + $amount`, без read-modify-write race.
-- **Идемпотентно на пользователя**: каждый пользователь может применить test-promo не больше одного раза. Повторный вызов вернёт `Промокод уже использован`.
+- **Идемпотентно на пользователя**: каждый пользователь может применить test-promo не больше одного раза. Повторный вызов вернет `Промокод уже использован`.
 - **Только тест**: промо включается через `panel_settings.test_promo_enabled`. Если выключить — новые пополнения недоступны; ранее зачисленные балансы не трогаются.
-- **Без строки в `payments`**: пополнение по промокоду — это чисто запись в ledger, не чек. Нет «счёта», который надо выставить.
+- **Без строки в `payments`**: пополнение по промокоду — это чисто запись в ledger, не чек. Нет «счета», который надо выставить.
 
 ## Покупка
 
-`subscription.purchase` — путь списания. На входе один из трёх режимов `payFrom`:
+`subscription.purchase` — путь списания. На входе один из трех режимов `payFrom`:
 
 ```
 payFrom = 'balance' | 'promo' | 'external'
@@ -96,7 +96,7 @@ payFrom = 'balance' | 'promo' | 'external'
 
 Test-promo путь. Если test-promo включено и `promoCode` совпадает, покупка помечается `isTest`. Эффекты:
 
-- `amount = 0` (строка `payments` создаётся с нулевой суммой для целостности учёта).
+- `amount = 0` (строка `payments` создается с нулевой суммой для целостности учета).
 - `provider = 'test'`, `status = 'completed'`.
 - Баланс **не** списывается — пользователь получает подписку «бесплатно».
 - Запись `balance_transactions` для самой покупки не пишется; test-promo трактуется как out-of-band кредит.
@@ -106,9 +106,9 @@ Test-promo путь. Если test-promo включено и `promoCode` сов�
 1. Отказ, если уже есть активная подписка; затем резолвим план.
 2. INSERT в `payments` с `provider: 'pending'`, `status: 'pending'`.
 3. Возвращаем `{ paymentId, status: 'pending', redirectUrl: '/dashboard/payment/redirect?paymentId=…' }`.
-4. Внешний платёжный шлюз позже зовёт `/api/webhooks/payment`, чтобы пометить платёж `completed` и триггернуть Remnawave-provisioning. **Оговорка:** webhook-обработчик сейчас не финализирует подписку — открытый P0-пункт в `rvn-web-review.md`.
+4. Внешний платежный шлюз позже зовет `/api/webhooks/payment`, чтобы пометить платеж `completed` и триггернуть Remnawave-provisioning. **Оговорка:** webhook-обработчик сейчас не финализирует подписку — открытый P0-пункт в `rvn-web-review.md`.
 
-`revertPayment()` шарится между balance и external путями; ставит `payments.status = 'failed'`, и только когда платёж был списан с балансa, добавляет refund-запись в `balance_transactions`.
+`revertPayment()` шарится между balance и external путями; ставит `payments.status = 'failed'`, и только когда платеж был списан с балансa, добавляет refund-запись в `balance_transactions`.
 
 ## Промокоды
 
@@ -127,7 +127,7 @@ panel_settings:
 | Где используется | Эффект |
 |------------------|--------|
 | `topUp({ promoCode, amount })` | Зачисляет `amount` копеек один раз на пользователя, type `'topup'`. |
-| `purchase({ payFrom: 'promo', promoCode })` | Выдаёт подписку по цене 0 (`isTest` flow). |
+| `purchase({ payFrom: 'promo', promoCode })` | Выдает подписку по цене 0 (`isTest` flow). |
 
 Универсальной системы скидок, персональных кодов, истечения срока и usage-cap (кроме per-user one-shot для `topUp`) нет. Что-то амбициознее (многоуровневые купоны, реферальные коды, gift cards) потребует новой схемы — таких таблиц пока нет.
 
@@ -150,7 +150,7 @@ panel_settings:
 
 ## Инвалидация кэша и cookie
 
-Cookie `user_data` (см. `docs/auth/sessions.md`, `docs/security/rbac.md`) несёт в себе `balance` для мгновенной отрисовки UI. Любой эндпоинт, который меняет баланс, обязан:
+Cookie `user_data` (см. `docs/auth/sessions.md`, `docs/security/rbac.md`) несет в себе `balance` для мгновенной отрисовки UI. Любой эндпоинт, который меняет баланс, обязан:
 
 1. Делать SQL-апдейт одной командой (без read-modify-write).
 2. Звать `invalidateUserAuthCacheByUserId(userId)`, чтобы сбросить per-user auth-кэш `getUserByToken`.
@@ -161,7 +161,7 @@ Cookie `user_data` (см. `docs/auth/sessions.md`, `docs/security/rbac.md`) не
 
 ## Открытые вопросы
 
-- **Финализация webhook'а** для `payFrom='external'` не реализована — шлюз может пометить платёж `completed`, но провижн Remnawave + активация подписки ещё не подключены. Отслеживается как P0 в security/quality-ревью.
+- **Финализация webhook'а** для `payFrom='external'` не реализована — шлюз может пометить платеж `completed`, но провижн Remnawave + активация подписки еще не подключены. Отслеживается как P0 в security/quality-ревью.
 - **Сверка возвратов** работает best-effort: если Remnawave-provisioning упал, баланс возвращается, payment ставится в `failed`, но если процесс крашнулся между INSERT в `payments` и вызовом Remnawave, строка останется `completed` без подписки. Фонового реконсайлера сейчас нет.
 - **Multi-currency** сделан только на уровне схемы — `payments.currency` есть, но все пути захардкожены на `'RUB'` и копейки.
 
@@ -169,7 +169,7 @@ Cookie `user_data` (см. `docs/auth/sessions.md`, `docs/security/rbac.md`) не
 
 - `lib/trpc/routers/subscription.ts` — `payments`, `balance`, `promoStatus`, `validatePromo`, `topUp`, `purchase`.
 - `lib/database/schema.ts` — `payments`, `balanceTransactions`, `subscriptions`, `panelSettings`, `users.balance`.
-- `lib/api/remnawave.ts` — клиент Remnawave-provisioning, который зовёт `purchase`.
+- `lib/api/remnawave.ts` — клиент Remnawave-provisioning, который зовет `purchase`.
 - `lib/auth/helper.ts` — `setUserDataCookie` (перевыставляет cookie с новым балансом).
 - `lib/auth/index.ts` — `invalidateUserAuthCacheByUserId`.
-- `app/api/webhooks/payment/route.ts` — webhook внешнего шлюза (незавершённый).
+- `app/api/webhooks/payment/route.ts` — webhook внешнего шлюза (незавершенный).

@@ -4,7 +4,7 @@
 
 ## Обзор
 
-Подсистема подписок продаёт VPN-доступ, провизионируя пользователей в панели [Remnawave](https://remna.st/). Web-приложение хранит каталог тарифов, журнал платежей и баланс в PostgreSQL; собственно VPN-пользователь (squad, traffic limit, subscription URL) живёт в Remnawave. Поддерживаются три способа оплаты: с баланса, по тестовому промокоду и через внешнего провайдера (с webhook'ом).
+Подсистема подписок продает VPN-доступ, провизионируя пользователей в панели [Remnawave](https://remna.st/). Web-приложение хранит каталог тарифов, журнал платежей и баланс в PostgreSQL; собственно VPN-пользователь (squad, traffic limit, subscription URL) живет в Remnawave. Поддерживаются три способа оплаты: с баланса, по тестовому промокоду и через внешнего провайдера (с webhook'ом).
 
 ```
 ┌──────────────┐  trpc.subscription.purchase  ┌─────────────────┐
@@ -63,7 +63,7 @@
 | `status` | TEXT | `pending` \| `completed` \| `failed` |
 | `provider` | TEXT | `test` \| `balance` \| `pending` (внешний) |
 | `provider_payment_id` | TEXT | id платежа во внешнем провайдере |
-| `promo_code` | TEXT | Применённый промокод |
+| `promo_code` | TEXT | Примененный промокод |
 
 ### `balance_transactions`
 
@@ -93,11 +93,11 @@ interface PlanConfig {
   durationDays: number;  // 30
   squadUuid: string | null; // Internal Squad в Remnawave
   active: boolean;
-  isStub: boolean;       // план «затемнённый» в UI
+  isStub: boolean;       // план «затемненный» в UI
 }
 ```
 
-Грузится из `panel_settings.subscription_plans` JSON, кэшируется в процессе `PLANS_CONFIG_CACHE_TTL = 60 c`. Если строки нет, отдаётся единственный fallback `base-monthly`, чтобы страница не падала. **`squadUuid` никогда не уходит на клиент** — публичные `plans` / `publicPlans` его срезают.
+Грузится из `panel_settings.subscription_plans` JSON, кэшируется в процессе `PLANS_CONFIG_CACHE_TTL = 60 c`. Если строки нет, отдается единственный fallback `base-monthly`, чтобы страница не падала. **`squadUuid` никогда не уходит на клиент** — публичные `plans` / `publicPlans` его срезают.
 
 ## tRPC роутер (`lib/trpc/routers/subscription.ts`)
 
@@ -127,7 +127,7 @@ interface PlanConfig {
 5. Вставка `payments` с вычисленными `(status, provider)`:
    - `'completed' / 'test'` для промо,
    - `'completed' / 'balance'` для баланса,
-   - `'pending' / 'pending'` для внешнего (отдаётся `redirectUrl`, к Remnawave ещё не идём).
+   - `'pending' / 'pending'` для внешнего (отдается `redirectUrl`, к Remnawave еще не идем).
 6. **Внешний путь возвращает сразу** `{ paymentId, status: 'pending', redirectUrl }`. Активация — позже, в webhook'е.
 7. **Списание с баланса** — атомарно `users.balance -= priceKopecks` плюс запись в `balance_transactions` типа `purchase`, привязанная к платежу.
 8. **Создание пользователя в Remnawave** — `rwCreateUser({ username: 'rvn_<userId>', expireAt = now + durationDays, status: 'ACTIVE' })`.
@@ -135,14 +135,14 @@ interface PlanConfig {
 10. Вставка `subscriptions`, затем `payments.subscription_id = subscription.id`.
 11. Инвалидация auth-кэшей: `invalidateUserAuthCacheByUserId`, `cache.delete('profile:...')`, обновление `user_data`-cookie.
 
-**Compensation:** любая ошибка на шагах 8/9 вызывает `revertPayment()` — платёж становится `failed`, баланс возвращается с записью `refund` в журнал, пользователь Remnawave отключается (`rwDisableUser`).
+**Compensation:** любая ошибка на шагах 8/9 вызывает `revertPayment()` — платеж становится `failed`, баланс возвращается с записью `refund` в журнал, пользователь Remnawave отключается (`rwDisableUser`).
 
 ## Сценарий пополнения (`subscription.topUp`)
 
 - Вход: `{ promoCode, amount }` (копейки, ≥ 10 000 = 100 RUB).
 - Промо должно быть включено и совпадать с настроенным кодом.
 - One-shot guard: отказ, если у пользователя уже есть `balance_transactions.type = 'topup'`.
-- Атомарный инкремент через `sql\`${users.balance} + ${amount}\``, запись в журнал, инвалидация auth-кэша, обновление `user_data`-cookie.
+- Атомарный инкремент через `sql\`${users.balance} + ${amount}\``, запись в журнал, инвалидация auth-кэша, обновление`user_data`-cookie.
 
 ## Сценарий синхронизации (`subscription.sync`)
 
@@ -164,13 +164,14 @@ interface PlanConfig {
 - Проверяется `payment.status === 'pending'` (идемпотентно — повторы дают 409).
 - Обновляются `payments.status` и `provider_payment_id`.
 
-> ⚠️ **Известный pending (P0 в `rvn-web-review.md`):** webhook сейчас только обновляет строку. Он **ещё не запускает** провизию Remnawave для `completed` внешних платежей — есть `TODO` со списком шагов (rwCreateUser → addUsersToSquad → обновление подписки → инвалидация кэша). До дореализации внешние оплаты остаются в `pending`.
+> ⚠️ **Известный pending (P0 в `rvn-web-review.md`):** webhook сейчас только обновляет строку. Он **еще не запускает** провизию Remnawave для `completed` внешних платежей — есть `TODO` со списком шагов (rwCreateUser → addUsersToSquad → обновление подписки → инвалидация кэша). До дореализации внешние оплаты остаются в `pending`.
 
 ## Remnawave-клиент (`lib/api/remnawave.ts`)
 
-REST-обёртка, используемая и тRPC-роутером, и админ-панелью. Endpoint и API-ключ берутся из `panel_settings` (кэш 60 с в `settingsCache`), поэтому админ может ротировать ключ без рестарта.
+REST-обертка, используемая и тRPC-роутером, и админ-панелью. Endpoint и API-ключ берутся из `panel_settings` (кэш 60 с в `settingsCache`), поэтому админ может ротировать ключ без рестарта.
 
 Публичные типы:
+
 - `RemnawaveUser`, `RemnawaveUserTraffic`, `RemnawaveUserStatus`, `TrafficLimitStrategy`.
 - `CreateUserParams`.
 - `RemnawaveHealthMetrics`.
@@ -183,7 +184,7 @@ REST-обёртка, используемая и тRPC-роутером, и ад
 
 | Статус | Условие |
 |--------|---------|
-| `{ active: false, reason: 'no_admin' }` | Администратор ещё не зарегистрирован (см. [Админ-панель](../admin/admin-panel.md)) |
+| `{ active: false, reason: 'no_admin' }` | Администратор еще не зарегистрирован (см. [Админ-панель](../admin/admin-panel.md)) |
 | `{ active: false, reason: 'not_configured' }` | Админ есть, но `remnawave_endpoint` / `remnawave_api_key` не заданы |
 | `{ active: true }` | Админ есть и панель настроена |
 
@@ -193,7 +194,7 @@ REST-обёртка, используемая и тRPC-роутером, и ад
 - `subscription.purchase` отказывает сразу с `PRECONDITION_FAILED` («Сервис подписок временно недоступен»), не доходя до создания пользователя в Remnawave.
 - Неактивность логируется **один раз на процесс** (не на каждый запрос). Статус кэшируется на 60 с.
 
-`invalidateSettingsCache()` (вызывается из `admin.remnawave.update`) сбрасывает кэш статуса, кэш нод и флаг-«предупредили-один-раз» — поэтому после настройки панели система снова активируется в пределах одного окна кэша, а если позже снова сломается — придёт одно свежее предупреждение.
+`invalidateSettingsCache()` (вызывается из `admin.remnawave.update`) сбрасывает кэш статуса, кэш нод и флаг-«предупредили-один-раз» — поэтому после настройки панели система снова активируется в пределах одного окна кэша, а если позже снова сломается — придет одно свежее предупреждение.
 
 ## Конфигурация
 
@@ -206,7 +207,7 @@ REST-обёртка, используемая и тRPC-роутером, и ад
 | `test_promo_enabled` | `panel_settings` | Feature flag |
 | `test_promo_code` | `panel_settings` | Строка промокода |
 
-Связанные с Remnawave переменные в `.env.example` (`REMNAWAVE_ENDPOINT`, `REMNAWAVE_API_KEY`) намеренно закомментированы — на проде всё едет через `panel_settings`, чтобы админ мог менять значения без редеплоя.
+Связанные с Remnawave переменные в `.env.example` (`REMNAWAVE_ENDPOINT`, `REMNAWAVE_API_KEY`) намеренно закомментированы — на проде все едет через `panel_settings`, чтобы админ мог менять значения без редеплоя.
 
 ## Файлы
 

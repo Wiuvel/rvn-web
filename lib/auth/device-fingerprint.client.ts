@@ -20,7 +20,11 @@ export interface FpidRecord {
   lastSentAt?: number;
 }
 
-function md5LikeHash(str: string): string {
+/**
+ * Lightweight non-cryptographic 32-bit hash (djb2 variant) used purely for
+ * client-side IndexedDB record integrity check, NOT for cryptographic security or auth.
+ */
+function djb2Hash32(str: string): string {
   let h = 0;
   for (let i = 0; i < str.length; i++) {
     const c = str.charCodeAt(i);
@@ -34,6 +38,8 @@ function md5LikeHash(str: string): string {
     .concat(hex)
     .slice(0, 32);
 }
+
+const md5LikeHash = djb2Hash32;
 
 function createHash(fpid: string, time: string): string {
   return md5LikeHash(`${fpid}:${time}`);

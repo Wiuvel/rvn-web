@@ -54,7 +54,7 @@ describe('validateFileContent', () => {
     expect(result.valid).toBe(false);
     expect(result.error).toContain('не соответствует');
   });
-  it('отклоняет неразрешённый тип (SVG)', () => {
+  it('отклоняет неразрешенный тип (SVG)', () => {
     const buf = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><circle/></svg>');
     const result = validateFileContent(buf, 'image/svg+xml', 'test.svg');
     expect(result.valid).toBe(false);

@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers';
 import { TRPCError } from '@trpc/server';
 import { router, publicProcedure } from '../init';
-import { generalRateLimit } from '@/lib/security/rate-limit';
+import { generalRateLimit, createImmunityCookie } from '@/lib/security/rate-limit';
 import { logger } from '@/lib/utils/secure-logger';
 import { captchaBodySchema } from '@/lib/validation/api-schemas';
 
@@ -69,10 +69,10 @@ export const rateLimitRouter = router({
 
     const immunityExpiry = await generalRateLimit.grantImmunity(ctx.req);
 
-    cookieStore.set('rate_limit_immunity', immunityExpiry.toString(), {
+    cookieStore.set('rate_limit_immunity', createImmunityCookie(immunityExpiry), {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'Lax',
+      sameSite: 'lax',
       maxAge: 15 * 60,
       path: '/',
     });

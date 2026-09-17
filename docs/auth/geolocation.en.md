@@ -67,6 +67,7 @@ Stored in `user_devices.location` (TEXT) as a ready-to-display Russian string:
 ## Caching
 
 In-memory `Map<ip, {value, expiresAt}>`:
+
 - Max 10,000 entries (FIFO eviction)
 - TTL: 24 hours
 - Both positive and negative results (`null`) are cached
@@ -81,6 +82,7 @@ In-memory `Map<ip, {value, expiresAt}>`:
 ## Startup Check
 
 In `instrumentation.ts` on server start:
+
 ```
 [startup] GeoIP: MaxMind ready (./data/GeoLite2-City.mmdb)
 [startup] GeoIP: ip-api.com fallback (no .mmdb found)

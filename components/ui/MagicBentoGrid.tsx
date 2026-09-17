@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { trpc } from '@/lib/trpc/client';
 import { AdvancedBentoCard } from './AdvancedBentoCard';
 import MaintenanceModal from '@/components/admin/MaintenanceModal';
@@ -12,12 +12,14 @@ interface MaintenanceConfig {
   message: string;
 }
 
+import { useMounted } from '@/hooks/useMounted';
+
 interface MagicBentoGridProps {
   teamCount: number;
 }
 
 export default function AdvancedBentoGrid({ teamCount }: MagicBentoGridProps) {
-  const [mounted, setMounted] = useState(false);
+  const mounted = useMounted();
   const [isMaintenanceModalOpen, setIsMaintenanceModalOpen] = useState(false);
 
   const { data: maintenanceData } = trpc.admin.maintenance.get.useQuery(undefined, {
@@ -29,12 +31,6 @@ export default function AdvancedBentoGrid({ teamCount }: MagicBentoGridProps) {
     scheduledEnd: null,
     message: '',
   };
-
-  useEffect(() => {
-    setMounted(true);
-
-    return () => {};
-  }, []);
 
   if (!mounted) return null;
 

@@ -21,6 +21,15 @@ export default function ImageViewer({ isOpen, onClose, imageUrl, alt }: ImageVie
   const backdropRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement | null>(null);
 
+  const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
+  if (isOpen !== prevIsOpen) {
+    setPrevIsOpen(isOpen);
+    if (isOpen) {
+      setScale(1);
+      setPosition({ x: 0, y: 0 });
+    }
+  }
+
   useEffect(() => {
     if (typeof window === 'undefined' || !modalRef.current || !backdropRef.current) return;
 
@@ -37,8 +46,6 @@ export default function ImageViewer({ isOpen, onClose, imageUrl, alt }: ImageVie
         duration: 0.3,
         ease: 'power2.out',
       });
-      setScale(1);
-      setPosition({ x: 0, y: 0 });
     } else {
       gsap.to([backdropRef.current, modalRef.current], {
         opacity: 0,

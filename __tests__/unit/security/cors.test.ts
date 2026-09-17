@@ -8,13 +8,13 @@ describe('setCorsHeaders', () => {
     expect(res.headers.get('Access-Control-Allow-Origin')).toBe('*');
   });
 
-  it('joins an array of allowed origins with ", "', () => {
+  it('selects matching origin from array and sets Vary: Origin', () => {
     const res = setCorsHeaders(NextResponse.next(), {
       origin: ['https://a.example', 'https://b.example'],
+      requestOrigin: 'https://b.example',
     });
-    expect(res.headers.get('Access-Control-Allow-Origin')).toBe(
-      'https://a.example, https://b.example',
-    );
+    expect(res.headers.get('Access-Control-Allow-Origin')).toBe('https://b.example');
+    expect(res.headers.get('Vary')).toContain('Origin');
   });
 
   it('passes through a single string origin verbatim', () => {

@@ -42,7 +42,7 @@ export async function setUserDataCookie(user: User, isLocalhost: boolean): Promi
 /**
  * checkAuth: Session + Token binding с refresh flow.
  * Cookies: session_id (httpOnly), token (httpOnly).
- * При истекшей сессии и валидном token — создаём новую сессию (refresh).
+ * При истекшей сессии и валидном token — создаем новую сессию (refresh).
  *
  * @param request Optional request object (usually from headers()) to get IP/UA
  * @param options Configuration options
@@ -61,7 +61,7 @@ export async function checkAuth(
   }
 
   if (!sessionId) {
-    // Refresh flow: token есть, сессии нет — создаём сессию
+    // Refresh flow: token есть, сессии нет — создаем сессию
     const user = await getUserByToken(token);
     if (!user) {
       return { isAuthenticated: false, user: null, error: ERROR_NOT_AUTHENTICATED };

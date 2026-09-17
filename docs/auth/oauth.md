@@ -4,7 +4,7 @@
 
 ## Обзор
 
-Пять пользовательских OAuth-провайдеров (Google, Yandex, Twitch, VK, Telegram) и один админский (GitHub) встраиваются в общий поток логина и регистрации. Каждый провайдер живёт по пути `app/api/auth/oauth/<provider>/{route,callback/route}.ts` и в конце концов уходит в общие функции `createUserFromOAuth` / `getUserByEmail` из `lib/auth/index.ts`.
+Пять пользовательских OAuth-провайдеров (Google, Yandex, Twitch, VK, Telegram) и один админский (GitHub) встраиваются в общий поток логина и регистрации. Каждый провайдер живет по пути `app/api/auth/oauth/<provider>/{route,callback/route}.ts` и в конце концов уходит в общие функции `createUserFromOAuth` / `getUserByEmail` из `lib/auth/index.ts`.
 
 UI авторизации запускает OAuth во всплывающем окне через `app/auth/oauth-handler/page.tsx`, а родительский компонент `components/auth/Form.tsx` слушает `postMessage` от popup-окна. На случай, когда popup нельзя открыть (например, мобильный браузер), каждый callback поддерживает запасной путь — редирект напрямую на `/auth?error=…` или `/dashboard`.
 
@@ -17,7 +17,7 @@ window.open('/api/auth/oauth/<provider>?popup=true', '_blank')
        ▼
 [GET /api/auth/oauth/<provider>]
   • генерируем CSRF state (32 случайных байта в hex)
-  • кладём cookie oauth_state (10 минут, httpOnly)
+  • кладем cookie oauth_state (10 минут, httpOnly)
   • редирект на authorization URL провайдера
        │
        ▼
@@ -50,7 +50,7 @@ window.open('/api/auth/oauth/<provider>?popup=true', '_blank')
 
 ## CSRF: cookie `oauth_state`
 
-Каждый initiation-роут генерирует `state = randomBytes(32).toString('hex')` и кладёт его в httpOnly-cookie:
+Каждый initiation-роут генерирует `state = randomBytes(32).toString('hex')` и кладет его в httpOnly-cookie:
 
 ```ts
 response.cookies.set('oauth_state', stateWithPopup, {
@@ -64,7 +64,7 @@ response.cookies.set('oauth_state', stateWithPopup, {
 
 Этот же `state` уезжает к провайдеру в query. На callback оба значения должны совпасть — иначе `getErrorRedirectUrl('invalid_state', …)`.
 
-Если запрос пришёл из popup-страницы `/auth/oauth-handler`, к значению добавляется суффикс `:popup`, чтобы callback понял, куда редиректить пользователя. Перед сверкой суффикс отрезается.
+Если запрос пришел из popup-страницы `/auth/oauth-handler`, к значению добавляется суффикс `:popup`, чтобы callback понял, куда редиректить пользователя. Перед сверкой суффикс отрезается.
 
 ## Popup vs. Full page
 
@@ -92,7 +92,7 @@ if (expected_hash !== hash) → invalid_hash
 if (now - auth_date > 24h)  → auth_expired
 ```
 
-`bot_id` из `TELEGRAM_BOT_TOKEN` используется ещё и при initiation для построения URL виджета — см. `lib/utils/telegram-bot.ts`.
+`bot_id` из `TELEGRAM_BOT_TOKEN` используется еще и при initiation для построения URL виджета — см. `lib/utils/telegram-bot.ts`.
 
 ## Связывание аккаунтов
 
@@ -100,7 +100,7 @@ if (now - auth_date > 24h)  → auth_expired
 
 1. **По OAuth `provider_id`** (`google_<sub>`, `yandex_<id>`, `twitch_<id>`, `vk_<uid>`, `telegram_<id>`) — точное совпадение значит «возвратный пользователь».
 2. **По email** для провайдеров, которые его отдают, — на первом входе привязываем новую OAuth-идентичность к существующему локальному аккаунту.
-3. **Создать нового пользователя** — username берётся от провайдера (display name или sanitized local-part email), avatar URL копируется если есть, balance стартует с 0, дефолтная роль `user`.
+3. **Создать нового пользователя** — username берется от провайдера (display name или sanitized local-part email), avatar URL копируется если есть, balance стартует с 0, дефолтная роль `user`.
 
 У Telegram email отсутствует, поэтому шаг 2 пропускается — связать существующий аккаунт можно только если этот же Telegram ID уже привязан.
 

@@ -55,7 +55,7 @@ describe('validateFile', () => {
     expect(empty.valid).toBe(false);
     expect(empty.error).toContain('пустым');
   });
-  it('отклоняет запрещённые типы', () => {
+  it('отклоняет запрещенные типы', () => {
     const zip = validateFile({
       size: 1024,
       type: 'application/zip',

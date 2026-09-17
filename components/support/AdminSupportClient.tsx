@@ -27,8 +27,8 @@ import { AdminAccessDeniedState } from '@/components/support/AdminAccessDeniedSt
 import { CloseReasonModal } from '@/components/support/CloseReasonModal';
 import { AdminMessageItem } from '@/components/support/AdminMessageItem';
 import { debugPerformanceAsync, debugStart, debugEnd, debugError } from '@/lib/utils/debug';
-import type { RawTicketApi } from '@/lib/support/types';
-import { mapWsAttachments } from '@/lib/support/mappers';
+import type { AdminTicketUi as Ticket } from '@/lib/support/types';
+import { mapWsAttachments, mapRawTicketToAdminUi as mapRawTicketToUi } from '@/lib/support/mappers';
 
 interface AuthState {
   isAuthenticated: boolean;
@@ -36,39 +36,6 @@ interface AuthState {
   username: string | null;
   userId: string | null;
   user_id: string | null;
-}
-
-interface Ticket {
-  id: string;
-  subject: string;
-  status: 'open' | 'closed' | 'pending';
-  priority: 'low' | 'normal' | 'high' | 'urgent';
-  created_at: string;
-  updated_at: string;
-  last_message_at: string;
-  closed_at?: string | null;
-  user_id?: string; // ID пользователя, которому принадлежит тикет
-  user?: {
-    id: string;
-    username: string;
-    user_id: string;
-    avatar?: string | null;
-  } | null;
-  assigned_to?: string | null;
-  assigned_user?: {
-    id: string;
-    username: string;
-    user_id: string;
-    avatar?: string | null;
-  } | null;
-  last_message?: {
-    id: string;
-    message_text: string;
-    sender_type: 'user' | 'support' | 'system';
-    created_at: string;
-    is_read: boolean;
-  } | null;
-  unread_count?: number;
 }
 
 interface MessageAttachment {
@@ -111,35 +78,6 @@ interface Notification {
 
 const CACHE_PREFIX = 'support_panel_messages_';
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 минут
-
-function mapRawTicketToUi(t: RawTicketApi): Ticket {
-  const lm = t.last_message;
-  const lastMessage: Ticket['last_message'] =
-    lm == null
-      ? null
-      : {
-          id: lm.id,
-          message_text: lm.message_text,
-          sender_type: lm.sender_type ?? 'user',
-          created_at: lm.created_at,
-          is_read: lm.is_read ?? false,
-        };
-  return {
-    id: t.id,
-    subject: t.subject,
-    status: t.status,
-    priority: t.priority || 'normal',
-    created_at: t.created_at,
-    updated_at: t.updated_at ?? t.created_at,
-    last_message_at: t.last_message_at ?? t.updated_at ?? t.created_at,
-    closed_at: t.closed_at,
-    user_id: t.user_id,
-    user: t.user,
-    assigned_to: t.assigned_to,
-    assigned_user: t.assigned_user,
-    last_message: lastMessage,
-  };
-}
 
 export default function AdminSupportClient() {
   const utils = trpc.useUtils();

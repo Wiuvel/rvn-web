@@ -57,13 +57,13 @@ support_message_attachments
    │   агент: assignedTo, priority
    │             │
    │             ▼
-   │          pending  (ждём ответа пользователя / агента)
+   │          pending  (ждем ответа пользователя / агента)
    │             │
    │             ▼
    └────────▶ closed  (closed_at + причина закрытия)
 ```
 
-- **create** (`tickets.create`) — пользователь задаёт `subject` + первое сообщение; статус `open`.
+- **create** (`tickets.create`) — пользователь задает `subject` + первое сообщение; статус `open`.
 - **update** (`tickets.update`, `supportProcedure`) — агент меняет `status`, `assignedTo`, `priority`; при закрытии указывается причина (модалка `CloseReasonModal`), проставляется `closed_at`.
 - Фильтр списка для агента: `open` / `pending` / `closed` / `all`.
 - Архив — закрытые тикеты с отдельным поиском в `AdminSupportClient`.
@@ -82,7 +82,7 @@ support_message_attachments
 
 ## Пагинация
 
-Список и история сообщений подгружаются через `IntersectionObserver`: 50 элементов начальной загрузки + по 25 за батч при прокрутке к концу. Это уже отлажено для админ-поддержки (см. память проекта); `MessageItem` обёрнут в `React.memo`.
+Список и история сообщений подгружаются через `IntersectionObserver`: 50 элементов начальной загрузки + по 25 за батч при прокрутке к концу. Это уже отлажено для админ-поддержки (см. память проекта); `MessageItem` обернут в `React.memo`.
 
 ## Реал-тайм (WebSocket)
 
@@ -98,7 +98,7 @@ support_message_attachments
 
 ## Вложения
 
-Загрузка идёт не через tRPC, а через REST-роут `app/api/support/upload` (проверка magic-byte, лимиты, запись в S3 под префикс `support/`, генерация thumbhash для изображений). Метаданные сохраняются в `support_message_attachments`. Полный пайплайн — [Загрузка файлов](../storage/upload.md). Чтение файлов — `app/support/files/[key]`; рендер с размытым плейсхолдером — `ImageWithBlur` / `ImageViewer`.
+Загрузка идет не через tRPC, а через REST-роут `app/api/support/upload` (проверка magic-byte, лимиты, запись в S3 под префикс `support/`, генерация thumbhash для изображений). Метаданные сохраняются в `support_message_attachments`. Полный пайплайн — [Загрузка файлов](../storage/upload.md). Чтение файлов — `app/support/files/[key]`; рендер с размытым плейсхолдером — `ImageWithBlur` / `ImageViewer`.
 
 ## Уведомления
 
@@ -114,5 +114,5 @@ support_message_attachments
 | `components/support/MessageItem.tsx` / `AdminMessageItem.tsx` | Рендер сообщений (memo) |
 | `components/support/FileUploadModal.tsx` / `ImageViewer.tsx` | Вложения |
 | `components/support/CloseReasonModal.tsx` | Закрытие тикета с причиной |
-| `app/api/support/upload/route.ts` | Приём вложений |
+| `app/api/support/upload/route.ts` | Прием вложений |
 | `lib/websocket/client.ts` | Broadcast-хелперы |

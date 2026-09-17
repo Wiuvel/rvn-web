@@ -119,11 +119,7 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
   } = options;
 
   const router = useRouter();
-  const [cookieFallback, setCookieFallback] = useState<AuthMeResponse | null>(null);
-
-  useLayoutEffect(() => {
-    setCookieFallback(cookieToFallbackData());
-  }, []);
+  const [cookieFallback] = useState<AuthMeResponse | null>(() => cookieToFallbackData());
 
   const fallbackFromCookie = cookieFallback;
   const shouldFetch = !!fallbackFromCookie && !lightweight;
@@ -168,30 +164,13 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
     [data, fallbackFromCookie],
   );
 
-  const [sessionExpired, setSessionExpired] = useState(false);
-
-  useLayoutEffect(() => {
-    const apiData = data as AuthMeResponse | undefined;
-    const isAuthenticated = apiData?.authenticated === true && !!apiData?.user_id;
-    const apiSaysUnauthenticated =
-      apiData?.authenticated === false || (trpcError && httpStatusOf(trpcError) === 401);
-
-    if (isAuthenticated) {
-      setSessionExpired(false);
-      return;
-    }
-
-    /**
-     * Mark the session as expired strictly when:
-     * 1. A valid cookie previously existed.
-     * 2. The API explicitly returns an unauthenticated status.
-     * 3. A fetch was actively requested and completed.
-     */
-    const hadCookie = !!fallbackFromCookie;
-    if (hadCookie && apiSaysUnauthenticated && !isLoading && shouldFetch) {
-      setSessionExpired(true);
-    }
-  }, [fallbackFromCookie, data, trpcError, isLoading, shouldFetch]);
+  const apiData = data as AuthMeResponse | undefined;
+  const isAuthenticated = apiData?.authenticated === true && !!apiData?.user_id;
+  const apiSaysUnauthenticated =
+    apiData?.authenticated === false || (trpcError && httpStatusOf(trpcError) === 401);
+  const hadCookie = !!fallbackFromCookie;
+  const sessionExpired =
+    !isAuthenticated && hadCookie && !!apiSaysUnauthenticated && !isLoading && shouldFetch;
 
   useLayoutEffect(() => {
     if (!userData || !validateUserId || !redirectOnFail) return;

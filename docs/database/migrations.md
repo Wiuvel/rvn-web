@@ -4,7 +4,7 @@
 
 ## Обзор
 
-Схема БД живёт в **одном месте**: `lib/database/schema.ts` (Drizzle ORM). Поддерживается только Postgres. Через `drizzle-kit` мы считаем diff между TS-схемой и предыдущим snapshot и получаем сырые SQL-файлы в `database/drizzle/`. Миграции коммитятся в git и накатываются на БД небольшим Node-скриптом.
+Схема БД живет в **одном месте**: `lib/database/schema.ts` (Drizzle ORM). Поддерживается только Postgres. Через `drizzle-kit` мы считаем diff между TS-схемой и предыдущим snapshot и получаем сырые SQL-файлы в `database/drizzle/`. Миграции коммитятся в git и накатываются на БД небольшим Node-скриптом.
 
 Параллельного `database/schema.sql` больше **нет** — любое изменение проходит через `drizzle-kit generate`, чтобы SQL, который мы деплоим, совпадал с TS, который мы тайпчекаем.
 
@@ -21,7 +21,7 @@ database/drizzle/
     └── 0001_snapshot.json
 ```
 
-**Вся папка `database/drizzle/` коммитится в git** — включая `meta/`. Snapshots — это **не** артефакт сборки: именно по ним `drizzle-kit generate` считает diff для следующей миграции. Если их удалить или загнать в `.gitignore`, то на другой машине drizzle сгенерирует миграцию «создать всё с нуля», которая разломает уже мигрированную БД.
+**Вся папка `database/drizzle/` коммитится в git** — включая `meta/`. Snapshots — это **не** артефакт сборки: именно по ним `drizzle-kit generate` считает diff для следующей миграции. Если их удалить или загнать в `.gitignore`, то на другой машине drizzle сгенерирует миграцию «создать все с нуля», которая разломает уже мигрированную БД.
 
 ## Ежедневный flow
 
@@ -51,7 +51,7 @@ pnpm exec drizzle-kit generate --custom --name=enable_pg_trgm
 
 `0001_legacy_postgres_objects.sql` — это ровно такая миграция: в ней лежит триггер-функция `update_updated_at_column`, per-table `BEFORE UPDATE`-триггеры, триггер на `support_tickets.last_message_at`, триггер `check_comment_limit`, RPC-функции `get_last_messages_for_tickets` / `create_ticket_with_message` и CHECK-констрейнты (`status`, `priority`, `role`, `sender_type` и т.д.).
 
-## Что остаётся в schema.ts
+## Что остается в schema.ts
 
 | Конструкция              | Источник правды |
 |--------------------------|-----------------|
@@ -70,11 +70,11 @@ pnpm exec drizzle-kit generate --custom --name=enable_pg_trgm
 
 | Скрипт                 | Что делает |
 |------------------------|------------|
-| `pnpm run db:generate` | `drizzle-kit generate` — diff `schema.ts` vs последний snapshot, выдаёт `<NNNN>_*.sql` + новый snapshot. БД **не** трогает. |
-| `pnpm run db:migrate`  | `node scripts/db-migrate.mjs` — коннектится к `DATABASE_URL`, прогоняет все миграции из `_journal.json`, которых ещё нет в `__drizzle_migrations`. Идемпотентен. |
+| `pnpm run db:generate` | `drizzle-kit generate` — diff `schema.ts` vs последний snapshot, выдает `<NNNN>_*.sql` + новый snapshot. БД **не** трогает. |
+| `pnpm run db:migrate`  | `node scripts/db-migrate.mjs` — коннектится к `DATABASE_URL`, прогоняет все миграции из `_journal.json`, которых еще нет в `__drizzle_migrations`. Идемпотентен. |
 | `pnpm run db:studio`   | `drizzle-kit studio` — локальный веб-интерфейс для просмотра таблиц. |
 
-`drizzle-kit push` **сознательно не подключён** — он обходит историю миграций и snapshot, и безопасен только для прототипа.
+`drizzle-kit push` **сознательно не подключен** — он обходит историю миграций и snapshot, и безопасен только для прототипа.
 
 ## Применение миграций
 
@@ -90,11 +90,11 @@ await migrate(drizzle(client), { migrationsFolder: './database/drizzle' });
 await client.end();
 ```
 
-При первом запуске drizzle создаёт служебную таблицу `__drizzle_migrations` и записывает туда хеш каждой применённой миграции. Повторный запуск — no-op, если ничего нового нет.
+При первом запуске drizzle создает служебную таблицу `__drizzle_migrations` и записывает туда хеш каждой примененной миграции. Повторный запуск — no-op, если ничего нового нет.
 
 ### Bootstrap существующей БД
 
-Если в БД уже накатана схема (раньше применяли `database/schema.sql` руками), и нужно начать вести миграции с `0000_initial`, помечаешь её применённой **без** прогона DDL:
+Если в БД уже накатана схема (раньше применяли `database/schema.sql` руками), и нужно начать вести миграции с `0000_initial`, помечаешь ее примененной **без** прогона DDL:
 
 ```sql
 CREATE TABLE IF NOT EXISTS "drizzle"."__drizzle_migrations" (
@@ -103,7 +103,7 @@ CREATE TABLE IF NOT EXISTS "drizzle"."__drizzle_migrations" (
   created_at bigint
 );
 
--- Берёшь hash + tag из meta/_journal.json для 0000_initial
+-- Берешь hash + tag из meta/_journal.json для 0000_initial
 -- и вставляешь руками:
 INSERT INTO "drizzle"."__drizzle_migrations" (hash, created_at) VALUES (
   '<hash из _journal.json>',
@@ -126,9 +126,9 @@ INSERT INTO "drizzle"."__drizzle_migrations" (hash, created_at) VALUES (
 
 ## Когда schema.ts и БД разошлись
 
-Если колонка есть в БД, но нет в `schema.ts`, drizzle-kit её **дропнет** при следующем generate. Чтобы это починить:
+Если колонка есть в БД, но нет в `schema.ts`, drizzle-kit ее **дропнет** при следующем generate. Чтобы это починить:
 
 - Верни колонку в `schema.ts`, чтобы diff стал пустым.
 - Или выкини сгенерированную миграцию и запусти `drizzle-kit introspect` — он перегенерит `schema.ts` из живой БД.
 
-Всегда читай diff, который выдаёт `pnpm run db:generate`, перед коммитом.
+Всегда читай diff, который выдает `pnpm run db:generate`, перед коммитом.

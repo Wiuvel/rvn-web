@@ -28,7 +28,7 @@ export default function PaymentRedirectPage() {
       <div className="flex min-h-screen items-center justify-center bg-neutral-950 px-4">
         <div className="text-center">
           <XCircle className="mx-auto mb-4 h-12 w-12 text-red-400" />
-          <h1 className="mb-2 text-xl font-semibold text-white">Платёж не найден</h1>
+          <h1 className="mb-2 text-xl font-semibold text-white">Платеж не найден</h1>
           <p className="mb-4 text-sm text-neutral-400">Не удалось найти информацию о платеже.</p>
           <Link
             href={`/dashboard/${userData?.user_id}`}
@@ -49,10 +49,10 @@ export default function PaymentRedirectPage() {
             <AlertCircle className="h-8 w-8 text-yellow-400" />
           </div>
           <h1 className="mb-2 text-xl font-semibold text-white">
-            Платёжная система временно недоступна
+            Платежная система временно недоступна
           </h1>
           <p className="mb-6 text-sm text-neutral-400">
-            Интеграция с платёжными системами находится в разработке. Пожалуйста, воспользуйтесь
+            Интеграция с платежными системами находится в разработке. Пожалуйста, воспользуйтесь
             оплатой с баланса или промокодом.
           </p>
 

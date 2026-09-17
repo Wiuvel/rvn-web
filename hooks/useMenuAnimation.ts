@@ -8,6 +8,7 @@ export interface UseMenuAnimationOptions {
   blockScroll?: boolean;
   onClose?: () => void;
   persist?: boolean;
+  externalRef?: React.RefObject<HTMLDivElement | null>;
 }
 
 export function useMenuAnimation(
@@ -17,10 +18,19 @@ export function useMenuAnimation(
   shouldRender: boolean;
   menuRef: React.RefObject<HTMLDivElement | null>;
 } {
-  const { blockScroll = false, onClose, persist = false } = options;
+  const { blockScroll = false, onClose, persist = false, externalRef } = options;
   const [shouldRender, setShouldRender] = useState(persist);
-  const menuRef = useRef<HTMLDivElement>(null);
+  const internalMenuRef = useRef<HTMLDivElement>(null);
+  const menuRef = (externalRef ?? internalMenuRef) as React.RefObject<HTMLDivElement | null>;
   const animationRef = useRef<gsap.core.Tween | null>(null);
+
+  const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
+  if (isOpen !== prevIsOpen) {
+    setPrevIsOpen(isOpen);
+    if (isOpen && !shouldRender) {
+      setShouldRender(true);
+    }
+  }
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -31,9 +41,6 @@ export function useMenuAnimation(
     }
 
     if (isOpen) {
-      if (!shouldRender) {
-        setShouldRender(true);
-      }
 
       requestAnimationFrame(() => {
         if (menuRef.current) {
@@ -80,12 +87,14 @@ export function useMenuAnimation(
             },
           });
         } else if (!persist) {
-          setShouldRender(false);
-          if (onClose) onClose();
+          requestAnimationFrame(() => {
+            setShouldRender(false);
+            if (onClose) onClose();
+          });
         }
       }
     }
-  }, [isOpen, shouldRender, onClose, persist]);
+  }, [isOpen, shouldRender, onClose, persist, menuRef]);
 
   useEffect(() => {
     const menu = menuRef.current;
@@ -99,7 +108,7 @@ export function useMenuAnimation(
         gsap.killTweensOf(menu);
       }
     };
-  }, []);
+  }, [menuRef]);
 
   useEffect(() => {
     if (typeof window === 'undefined' || !blockScroll) return;

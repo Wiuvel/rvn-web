@@ -79,7 +79,7 @@ export default function HeroSection() {
           <div className="order-2 text-center lg:order-1 lg:text-left">
             <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-primary-500/20 bg-primary-500/[0.06] px-4 py-1.5 text-xs text-primary-300 backdrop-blur-sm md:mb-6">
               <Shield className="h-3.5 w-3.5" />
-              <span>Надёжная защита данных</span>
+              <span>Надежная защита данных</span>
               <ChevronRight className="h-3 w-3 opacity-50" />
             </div>
 
@@ -137,7 +137,7 @@ export default function HeroSection() {
                   <CardHeader className="p-4 md:p-6">
                     <div className="flex items-center justify-between text-xs">
                       <span className="font-medium text-white">
-                        {connected ? 'Сеанс защищён' : 'Подключение…'}
+                        {connected ? 'Сеанс защищен' : 'Подключение…'}
                       </span>
                       <Badge
                         variant={connected ? 'default' : 'secondary'}

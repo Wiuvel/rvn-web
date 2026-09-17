@@ -77,12 +77,12 @@ export default function AdminAuthForm({ initialAuthState, onAuthSuccess }: Admin
     enabled: !initialAuthState,
   });
 
-  useEffect(() => {
-    if (adminCheck.data) {
-      setAuthState(adminCheck.data);
-      setIsCheckingAuth(false);
-    }
-  }, [adminCheck.data]);
+  const [prevAdminData, setPrevAdminData] = useState(adminCheck.data);
+  if (adminCheck.data && adminCheck.data !== prevAdminData) {
+    setPrevAdminData(adminCheck.data);
+    setAuthState(adminCheck.data);
+    setIsCheckingAuth(false);
+  }
 
   const checkAuthStatus = async () => {
     setIsCheckingAuth(true);
@@ -129,7 +129,7 @@ export default function AdminAuthForm({ initialAuthState, onAuthSuccess }: Admin
         if (onAuthSuccess) {
           onAuthSuccess();
         } else {
-          window.location.href = '/ui/panel/admin';
+          window.location.assign('/ui/panel/admin');
         }
       } else {
         await registerMutation.mutateAsync({

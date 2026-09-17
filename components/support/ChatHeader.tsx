@@ -54,7 +54,7 @@ export default function ChatHeader({
   return (
     <div className="flex-shrink-0 border-b border-white/10 p-3 sm:p-4">
       <div className="flex items-center justify-between gap-2">
-        {/* Кнопка возврата к списку на мобильных; на ПК при свёрнутой панели — развернуть список */}
+        {/* Кнопка возврата к списку на мобильных; на ПК при свернутой панели — развернуть список */}
         <button
           onClick={handleBackClick}
           className={`${sidebarCollapsed ? 'lg:flex' : 'lg:hidden'} mr-2 rounded-lg p-1.5 text-neutral-400 transition-colors hover:bg-white/5 hover:text-white`}

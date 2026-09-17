@@ -342,7 +342,7 @@ export async function GET(request: NextRequest) {
       maxAge: 60 * 60 * 6,
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production' && !isLocalhost,
-      sameSite: 'Strict' as const,
+      sameSite: 'strict' as const,
       path: '/',
     };
 

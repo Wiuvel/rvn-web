@@ -88,7 +88,7 @@ export interface ContentValidationResult {
 
 /**
  * Валидирует содержимое файла по magic bytes.
- * Сравнивает реальный тип с заявленным и проверяет что формат разрешён.
+ * Сравнивает реальный тип с заявленным и проверяет что формат разрешен.
  */
 export function validateFileContent(
   buffer: Buffer,
@@ -101,11 +101,11 @@ export function validateFileContent(
     return {
       valid: false,
       detectedType: null,
-      error: 'Не удалось определить тип файла. Файл повреждён или имеет неподдерживаемый формат',
+      error: 'Не удалось определить тип файла. Файл поврежден или имеет неподдерживаемый формат',
     };
   }
 
-  // Проверяем что detected тип входит в список разрешённых
+  // Проверяем что detected тип входит в список разрешенных
   const allowedTypes = [
     'image/png',
     'image/jpeg',
@@ -119,7 +119,7 @@ export function validateFileContent(
     return {
       valid: false,
       detectedType,
-      error: `Тип файла "${detectedType}" не разрешён`,
+      error: `Тип файла "${detectedType}" не разрешен`,
     };
   }
 

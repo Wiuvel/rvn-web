@@ -40,6 +40,7 @@
 | `created_at` | TIMESTAMPTZ | Время создания/обновления |
 
 **Индексы:**
+
 - `idx_notifications_user_id` — по user_id
 - `idx_notifications_user_unread` — частичный (user_id, is_read) WHERE is_read = false
 - `idx_notifications_created_at` — по времени
@@ -52,16 +53,18 @@
 2. **Да** — UPDATE: обновить `message`, `created_at`, `count = count + 1`
 3. **Нет** — INSERT новое уведомление
 
-Результат: один тикет = одна строка (пока непрочитано). После `markRead` следующий ответ создаёт новое уведомление.
+Результат: один тикет = одна строка (пока непрочитано). После `markRead` следующий ответ создает новое уведомление.
 
 ## Точки создания
 
 ### Ответ поддержки (`support_reply`)
+
 - Триггер: `sendMessage` в `support.ts`, если `senderType === 'support'`
 - Title: "Новый ответ в тикете"
 - Message: "Поддержка ответила на обращение: {subject}" (до 80 символов)
 
 ### Изменение статуса (`ticket_status`)
+
 - Триггер: `changeStatus` / `closeTicket` в `support.ts`
 - `pending` → "Ваше обращение приняли в обработку"
 - `closed` → "Ваше обращение было закрыто"
@@ -89,36 +92,43 @@ POST /broadcast/notification
 ## API (tRPC)
 
 ### `notification.list`
+
 - Cursor-based пагинация (ORDER BY createdAt DESC)
 - Input: `{ cursor?: UUID, limit: 1..50 }`
 - Output: `{ items: Notification[], nextCursor: string | null }`
 
 ### `notification.unreadCount`
+
 - Кэшируется 10 секунд (in-memory)
 - Polling каждые 60 секунд как baseline
 - Output: `{ count: number }`
 
 ### `notification.markRead`
+
 - Input: `{ id: UUID }`
 - Помечает одно уведомление как прочитанное
 
 ### `notification.markAllRead`
+
 - Помечает все непрочитанные как прочитанные
 
 ## UI компоненты
 
 ### NotificationsWidget (`components/navigation/Notifications.tsx`)
+
 - Колокольчик с синим badge (число непрочитанных, 99+)
 - Dropdown: последние 5 уведомлений, кнопка "Прочитать все"
 - Клик → навигация к тикету (`/support?ticket={id}`)
 - Ссылка "Все уведомления" → `/notifications`
 
 ### Страница `/notifications`
+
 - Бесконечный скролл (IntersectionObserver)
 - Относительное время ("2 мин назад", "вчера")
 - Кнопки markRead для отдельных и markAllRead для всех
 
 ### Мобильная навигация
+
 - Bottom nav: Bell icon с badge заменяет "О проекте" для авторизованных
 - Overlay menu: пункт "Уведомления" с badge
 

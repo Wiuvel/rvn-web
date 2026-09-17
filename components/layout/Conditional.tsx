@@ -1,7 +1,7 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
-import { useState, useEffect } from 'react';
+import { useMounted } from '@/hooks/useMounted';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 import MobileNavigation from '@/components/navigation/MobileNavigation';
@@ -37,11 +37,7 @@ export default function ConditionalLayout({ children }: ConditionalLayoutProps) 
     pagesWithHeaderFooter.includes(pathname) || isLegalPage || isHeaderOnlyPage;
   const shouldShowFooter = shouldShowHeader && !isLegalPage && !isHeaderOnlyPage;
   const shouldShowMobileNav = !noMobileNavPages.some((page) => pathname.startsWith(page));
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const mounted = useMounted();
 
   if (!mounted) return null;
 

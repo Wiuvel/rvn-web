@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { AlertTriangle } from 'lucide-react';
@@ -12,25 +12,18 @@ export default function SessionExpiredModal() {
     silent: true,
     lightweight: isAdminPanel,
   });
-  const [isOpen, setIsOpen] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
 
-  useEffect(() => {
-    /** Don't show expired-session modal on the login page itself */
-    if (pathname === '/auth') {
-      setIsOpen(false);
-    } else {
-      setIsOpen(sessionExpired);
-    }
-  }, [sessionExpired, pathname]);
+  const isOpen = sessionExpired && pathname !== '/auth' && !dismissed;
 
   const handleLogin = () => {
-    setIsOpen(false);
+    setDismissed(true);
     window.location.href =
       '/auth?reason=session_expired&return_to=' + encodeURIComponent(window.location.pathname);
   };
 
   const handleHome = () => {
-    setIsOpen(false);
+    setDismissed(true);
     window.location.href = '/';
   };
 

@@ -41,12 +41,12 @@ node dev/down.mjs --restore    # stop + bring back your real .env.local without 
 
 | Service       | URL                                      | Notes                       |
 |---------------|------------------------------------------|-----------------------------|
-| rvn-web       | http://localhost:3000                    | `pnpm dev` (on host)        |
-| WS server     | http://localhost:3002                    | in Docker                   |
+| rvn-web       | <http://localhost:3000>                    | `pnpm dev` (on host)        |
+| WS server     | <http://localhost:3002>                    | in Docker                   |
 | Postgres      | postgresql://rvn:rvn@localhost:5432/rvn  | user/pass/db = `rvn`        |
 | Redis         | redis://localhost:6379                   | plaintext (no TLS)          |
-| MinIO API     | http://localhost:9000                    | S3 endpoint                 |
-| MinIO console | http://localhost:9001                    | `minioadmin` / `minioadmin` |
+| MinIO API     | <http://localhost:9000>                    | S3 endpoint                 |
+| MinIO console | <http://localhost:9001>                    | `minioadmin` / `minioadmin` |
 
 ## Notes
 

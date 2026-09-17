@@ -57,8 +57,7 @@ const SUSPICIOUS_BOT_PATTERNS = [
   /http|curl|wget|python|java|go-http/i,
 ];
 
-const IPV4_REGEX = /^(\d{1,3}\.){3}\d{1,3}$/;
-const IPV6_REGEX = /^([0-9a-fA-F]{0,4}:){7}[0-9a-fA-F]{0,4}$/;
+import { isValidIP } from '@/lib/validation/ip-validator';
 
 const BROWSER_ACCEPT_TYPES =
   /text\/html|application\/xhtml|image|text\/css|application\/javascript|application\/json|text\/plain/i;
@@ -100,7 +99,7 @@ function hasMissingHeaders(headers: Record<string, string | null>): boolean {
 /** Flags IPs that don't match valid IPv4 or IPv6 format. */
 function isSuspiciousIP(ip: string): boolean {
   if (!ip) return true;
-  return !IPV4_REGEX.test(ip) && !IPV6_REGEX.test(ip);
+  return !isValidIP(ip);
 }
 
 /** Returns true for allowed crawlers (Google, Yandex, Bing, social previews). */

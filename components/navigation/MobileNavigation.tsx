@@ -133,12 +133,19 @@ export default function MobileNavigation() {
     }
   }, [isOpen, shouldRender]);
 
+  const [prevNavPathname, setPrevNavPathname] = useState(pathname);
+  if (pathname !== prevNavPathname) {
+    setPrevNavPathname(pathname);
+    if (isOpen) {
+      setIsOpen(false);
+    }
+  }
+
   useEffect(() => {
     if (!shouldRender) return;
 
     const prev = prevPathnameRef.current;
     if (prev !== null && prev !== pathname) {
-      if (isOpen) setIsOpen(false);
       prevPathnameRef.current = pathname;
       hasOpened.current = false;
       if (overlayRef.current) {
@@ -153,7 +160,7 @@ export default function MobileNavigation() {
     } else {
       prevPathnameRef.current = pathname;
     }
-  }, [pathname, isOpen, shouldRender]);
+  }, [pathname, shouldRender]);
 
   useEffect(() => {
     if (typeof window === 'undefined' || !shouldRender) return;

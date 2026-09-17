@@ -13,8 +13,8 @@ function getCSRFSecret(): string {
     return getEnv().CSRF_SECRET;
   } catch {
     // Fallback only for development/testing
-    if (process.env.NODE_ENV === 'development') {
-      return 'default-csrf-secret-change-in-production-dev-only';
+    if (process.env.NODE_ENV !== 'production') {
+      return process.env.CSRF_SECRET || 'default-csrf-secret-change-in-production-dev-only';
     }
     throw new Error('CSRF_SECRET must be configured in production');
   }
@@ -51,21 +51,24 @@ export async function getCSRFTokenInfo(
   };
 }
 
-// Async verify - используется для Redis-backed store
+// Async verify - validates HMAC and enforces single-use token consumption against store
 export async function verifyCSRFToken(
   token: string,
   sessionId: string,
   detailed?: false,
+  consume?: boolean,
 ): Promise<boolean>;
 export async function verifyCSRFToken(
   token: string,
   sessionId: string,
   detailed: true,
+  consume?: boolean,
 ): Promise<{ valid: boolean; reason?: string }>;
 export async function verifyCSRFToken(
   token: string,
   sessionId: string,
-  detailed?: boolean,
+  detailed: boolean = false,
+  consume: boolean = true,
 ): Promise<boolean | { valid: boolean; reason?: string }> {
   try {
     if (!token || !sessionId) {
@@ -89,7 +92,7 @@ export async function verifyCSRFToken(
       return false;
     }
 
-    const tokenTime = parseInt(timestamp || '0');
+    const tokenTime = parseInt(timestamp || '0', 10);
     if (isNaN(tokenTime)) {
       if (detailed) return { valid: false, reason: 'Invalid timestamp' };
       return false;
@@ -113,23 +116,35 @@ export async function verifyCSRFToken(
     }
 
     const isValid = timingSafeEqual(signatureBuffer, expectedBuffer);
+    if (!isValid) {
+      if (detailed) return { valid: false, reason: 'Invalid signature' };
+      return false;
+    }
 
-    if (isValid) {
-      const store = getCsrfStore();
-      const storedToken = await store.get(sessionId);
-      if (storedToken && storedToken.token !== token) {
-        if (detailed) return { valid: false, reason: 'Token already used' };
-        return false;
-      }
-      // Сохраняем токен в хранилище для предотвращения повторного использования
-      await store.set(sessionId, { token, createdAt: Date.now() }, CSRF_TOKEN_LIFETIME);
+    // Verify token exists in store and matches
+    const store = getCsrfStore();
+    const storedToken = await store.get(sessionId);
+
+    if (!storedToken) {
+      if (detailed) return { valid: false, reason: 'Token not found or already consumed' };
+      return false;
+    }
+
+    if (storedToken.token !== token) {
+      if (detailed) return { valid: false, reason: 'Token already used or superseded' };
+      return false;
+    }
+
+    if (consume) {
+      // Consume token to prevent replay attacks
+      await store.delete(sessionId);
     }
 
     if (detailed) {
-      return { valid: isValid, reason: isValid ? undefined : 'Invalid signature' };
+      return { valid: true };
     }
 
-    return isValid;
+    return true;
   } catch (error) {
     if (detailed) {
       return {
@@ -146,8 +161,8 @@ export async function revokeCSRFToken(sessionId: string): Promise<void> {
   await store.delete(sessionId);
 }
 
-// Экспортируем функцию для получения размера хранилища (для отладки)
-export function getCSRFStoreSize(): number {
-  // In-memory fallback не отслеживает размер; Redis - нужно бы SCAN
-  return 0;
+// Экспортируем функцию для получения размера хранилища (для мониторинга)
+export async function getCSRFStoreSize(): Promise<number> {
+  const store = getCsrfStore();
+  return store.size();
 }

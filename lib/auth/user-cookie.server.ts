@@ -23,7 +23,7 @@ function getUserDataSecret(): string {
 }
 
 /**
- * Создаёт HMAC-подписанную строку: base64url(json) + "." + base64url(signature)
+ * Создает HMAC-подписанную строку: base64url(json) + "." + base64url(signature)
  */
 export function createUserDataCookie(payload: UserDataPayload): string {
   const json = JSON.stringify(payload);
@@ -86,7 +86,7 @@ export function getUserDataCookieOptions(isLocalhost: boolean) {
     maxAge,
     httpOnly: false, // Клиент читает для UI
     secure: process.env.NODE_ENV === 'production' && !isLocalhost,
-    sameSite: 'Lax' as const,
+    sameSite: 'lax' as const,
     path: '/',
   };
 }

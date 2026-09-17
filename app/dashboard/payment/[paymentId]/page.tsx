@@ -27,7 +27,7 @@ export default function PaymentStatusPage() {
       <div className="flex min-h-screen items-center justify-center bg-neutral-950 px-4">
         <div className="text-center">
           <XCircle className="mx-auto mb-4 h-12 w-12 text-red-400" />
-          <h1 className="mb-2 text-xl font-semibold text-white">Платёж не найден</h1>
+          <h1 className="mb-2 text-xl font-semibold text-white">Платеж не найден</h1>
           <Link
             href={`/dashboard/${userData?.user_id}`}
             className="text-sm text-primary-400 hover:underline"
@@ -52,14 +52,14 @@ export default function PaymentStatusPage() {
       color: 'text-yellow-400',
       bg: 'bg-yellow-500/10 border-yellow-500/20',
       title: 'Ожидание оплаты',
-      description: 'Платёж обрабатывается. Пожалуйста, подождите.',
+      description: 'Платеж обрабатывается. Пожалуйста, подождите.',
     },
     failed: {
       icon: XCircle,
       color: 'text-red-400',
       bg: 'bg-red-500/10 border-red-500/20',
       title: 'Ошибка оплаты',
-      description: 'Не удалось обработать платёж. Попробуйте снова.',
+      description: 'Не удалось обработать платеж. Попробуйте снова.',
     },
   };
 

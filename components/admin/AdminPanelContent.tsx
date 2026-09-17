@@ -174,12 +174,12 @@ export default function AdminPanelContent({ teamCount }: AdminPanelContentProps)
   }, [showAddRoleMenu, setShowAddRoleMenu]);
 
   useEffect(() => {
-    if (authState.isAuthenticated) {
-      const timer = setTimeout(() => setShowPanel(true), 100);
-      return () => clearTimeout(timer);
-    } else {
+    if (!authState.isAuthenticated) return;
+    const timer = setTimeout(() => setShowPanel(true), 100);
+    return () => {
+      clearTimeout(timer);
       setShowPanel(false);
-    }
+    };
   }, [authState.isAuthenticated]);
 
   useEffect(() => {
@@ -866,7 +866,7 @@ export default function AdminPanelContent({ teamCount }: AdminPanelContentProps)
 
       {/* Ban User Modal */}
       {banUser && (
-        /* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- модальная обёртка: обработчики закрытия по клику/Escape */
+        /* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- модальная обертка: обработчики закрытия по клику/Escape */
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
           onClick={(e) => {

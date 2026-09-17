@@ -95,7 +95,8 @@
 **Провайдеры**: Google, Telegram, Twitch, VK, Yandex
 
 **Особенности**:
-- CSRF-токен передаётся в `state` параметре OAuth
+
+- CSRF-токен передается в `state` параметре OAuth
 - Поддержка popup-окна (флаг `:popup` в state cookie)
 - Username из OAuth санитизируется: только `[a-zA-Z0-9_-]`, 3–30 символов
 - При коллизии username: добавляется суффикс `_1`, `_2`, ..., `_100`, fallback `_{timestamp}`
@@ -117,7 +118,7 @@
 
 **GitHub OAuth для админов**: проверяется наличие username/email в таблице `trusted_github_developers`. Если есть — автоматическое создание/вход в админ-аккаунт. Иначе — отказ.
 
-**Root-админ**: первый созданный админ получает `isRoot = true`. Не может быть удалён, имеет доступ к привилегированным операциям.
+**Root-админ**: первый созданный админ получает `isRoot = true`. Не может быть удален, имеет доступ к привилегированным операциям.
 
 ## Архитектура сессий
 
@@ -180,7 +181,7 @@ IndexedDB: rvn_device
 
 - Генерируется один раз при первом посещении
 - Формат: `MP_` + 12 случайных символов
-- Передаётся серверу через cookie `rvn_fpid` (5 мин TTL, только при OAuth)
+- Передается серверу через cookie `rvn_fpid` (5 мин TTL, только при OAuth)
 - Удаляется из cookie после использования
 
 ### Layer 2: Server-Side Grouping
@@ -190,6 +191,7 @@ deviceFpHash = SHA256(normalizeUA(userAgent) + normalizeIP(ip) + fpid)
 ```
 
 При регистрации устройства:
+
 1. Если есть FPID → вычислить `deviceFpHash`
 2. Найти существующее устройство с тем же `userId` + `deviceFpHash`
 3. Если найдено → обновить (не создавать дубликат)
@@ -247,6 +249,7 @@ Cookie `user_data` — единственная, читаемая клиенто
 ### Хранение
 
 Таблица `user_roles`:
+
 ```
 id, userId, role, grantedBy, grantedAt, revokedAt, isActive
 ```
@@ -275,7 +278,7 @@ id, userId, role, grantedBy, grantedAt, revokedAt, isActive
 | Лимитер | Окно | Макс. запросов | Ключ | Применение |
 |---------|------|----------------|------|------------|
 | `authRateLimit` | 5 мин | 10 | IP + UA (50 символов) | Вход, регистрация, OAuth |
-| `generalRateLimit` | 5 мин | 100 | IP | Все защищённые эндпоинты |
+| `generalRateLimit` | 5 мин | 100 | IP | Все защищенные эндпоинты |
 | `messageRateLimit` | 5 мин | 50 | IP или userId | Отправка сообщений |
 
 **Иммунитет**: после прохождения CAPTCHA rate limit пропускается на `RATE_LIMIT_IMMUNITY_DURATION`.

@@ -20,6 +20,7 @@ export interface ICsrfStore {
   get(sessionId: string): Promise<CsrfStoreEntry | null>;
   set(sessionId: string, data: CsrfStoreEntry, ttlMs: number): Promise<void>;
   delete(sessionId: string): Promise<boolean>;
+  size(): Promise<number>;
 }
 
 class RedisCsrfStore implements ICsrfStore {
@@ -54,6 +55,14 @@ class RedisCsrfStore implements ICsrfStore {
     const deleted = await redis.del(key);
     return deleted > 0;
   }
+
+  async size(): Promise<number> {
+    const redis = getRedisClient();
+    if (!redis) throw new Error('Redis unavailable');
+
+    const keys = await redis.keys(`${CSRF_KEY_PREFIX}*`);
+    return keys.length;
+  }
 }
 
 class MemoryCsrfStore implements ICsrfStore {
@@ -83,6 +92,17 @@ class MemoryCsrfStore implements ICsrfStore {
     this.store.delete(sessionId);
     this.expiration.delete(sessionId);
     return had;
+  }
+
+  async size(): Promise<number> {
+    const now = Date.now();
+    for (const [key, exp] of this.expiration.entries()) {
+      if (exp <= now) {
+        this.store.delete(key);
+        this.expiration.delete(key);
+      }
+    }
+    return this.store.size;
   }
 }
 
@@ -124,6 +144,14 @@ class ResilientCsrfStore implements ICsrfStore {
     }
     const memDeleted = await this.memory.delete(sessionId);
     return deleted || memDeleted;
+  }
+
+  async size(): Promise<number> {
+    try {
+      return await this.redis.size();
+    } catch {
+      return this.memory.size();
+    }
   }
 }
 

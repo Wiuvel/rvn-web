@@ -40,6 +40,7 @@ Table `notifications`:
 | `created_at` | TIMESTAMPTZ | Creation/update time |
 
 **Indexes:**
+
 - `idx_notifications_user_id` — by user_id
 - `idx_notifications_user_unread` — partial (user_id, is_read) WHERE is_read = false
 - `idx_notifications_created_at` — by time
@@ -57,11 +58,13 @@ Result: one ticket = one row (while unread). After `markRead`, the next reply cr
 ## Creation Points
 
 ### Support reply (`support_reply`)
+
 - Trigger: `sendMessage` in `support.ts` when `senderType === 'support'`
 - Title: "Новый ответ в тикете"
 - Message: "Поддержка ответила на обращение: {subject}" (up to 80 chars)
 
 ### Status change (`ticket_status`)
+
 - Trigger: `changeStatus` / `closeTicket` in `support.ts`
 - `pending` → "Ваше обращение приняли в обработку"
 - `closed` → "Ваше обращение было закрыто"
@@ -89,36 +92,43 @@ If the user is viewing a ticket (`activeTicketId` passed to `useNotifications`),
 ## API (tRPC)
 
 ### `notification.list`
+
 - Cursor-based pagination (ORDER BY createdAt DESC)
 - Input: `{ cursor?: UUID, limit: 1..50 }`
 - Output: `{ items: Notification[], nextCursor: string | null }`
 
 ### `notification.unreadCount`
+
 - Cached for 10 seconds (in-memory)
 - Polling every 60 seconds as baseline
 - Output: `{ count: number }`
 
 ### `notification.markRead`
+
 - Input: `{ id: UUID }`
 - Marks a single notification as read
 
 ### `notification.markAllRead`
+
 - Marks all unread notifications as read
 
 ## UI Components
 
 ### NotificationsWidget (`components/navigation/Notifications.tsx`)
+
 - Bell icon with blue badge (unread count, 99+)
 - Dropdown: last 5 notifications, "Mark all read" button
 - Click → navigate to ticket (`/support?ticket={id}`)
 - Link "All notifications" → `/notifications`
 
 ### Page `/notifications`
+
 - Infinite scroll (IntersectionObserver)
 - Relative time ("2 мин назад", "вчера")
 - Individual markRead and bulk markAllRead buttons
 
 ### Mobile navigation
+
 - Bottom nav: Bell icon with badge replaces "About" for authenticated users
 - Overlay menu: "Notifications" item with badge
 

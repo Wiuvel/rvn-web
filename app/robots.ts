@@ -1,6 +1,7 @@
+import type { MetadataRoute } from 'next';
 import { domains } from '@/lib/utils/config';
 
-export default function robots() {
+export default function robots(): MetadataRoute.Robots {
   const baseUrl = domains.mainUrl;
 
   return {

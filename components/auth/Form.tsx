@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { translateError } from '@/lib/utils/error-translations';
 import { getOAuthErrorMessage } from '@/lib/auth/oauth-errors';
@@ -125,7 +125,8 @@ export default function AuthForm({ return_to, initialError, mode }: AuthFormProp
     }
   };
 
-  const registerPassword = registerForm.watch('password');
+  const registerPassword = useWatch({ control: registerForm.control, name: 'password' });
+  const registerConfirmPassword = useWatch({ control: registerForm.control, name: 'confirmPassword' });
 
   const handleRegister = async (data: RegisterFormData) => {
     if (!csrfToken) {
@@ -159,7 +160,7 @@ export default function AuthForm({ return_to, initialError, mode }: AuthFormProp
         !return_to.startsWith('//')
           ? return_to
           : `/dashboard/${userId}`;
-      window.location.href = safeReturnTo;
+      window.location.assign(safeReturnTo);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Ошибка регистрации';
       dispatch({ type: 'SET_GLOBAL_ERROR', payload: escapeHtml(translateError(message)) });
@@ -200,7 +201,7 @@ export default function AuthForm({ return_to, initialError, mode }: AuthFormProp
         !return_to.startsWith('//')
           ? return_to
           : `/dashboard/${userId}`;
-      window.location.href = safeReturnTo;
+      window.location.assign(safeReturnTo);
     } catch (error) {
       dispatch({ type: 'SET_LOGIN_ATTEMPT_STATE', payload: 'error' });
       const message = error instanceof Error ? error.message : 'Ошибка входа';
@@ -428,7 +429,7 @@ export default function AuthForm({ return_to, initialError, mode }: AuthFormProp
                 </button>
               </div>
 
-              {state.showPasswordStrength.register && !registerForm.watch('confirmPassword') && (
+              {state.showPasswordStrength.register && !registerConfirmPassword && (
                 <PasswordStrengthIndicator password={registerPassword} />
               )}
 

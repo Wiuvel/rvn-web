@@ -41,32 +41,23 @@ export function UserMenu({
 }: UserMenuProps) {
   const router = useRouter();
   const logoutMutation = trpc.auth.logout.useMutation();
-  const { shouldRender, menuRef: animatedMenuRef } = useMenuAnimation(isOpen, {
+  const { shouldRender, menuRef } = useMenuAnimation(isOpen, {
     onClose,
     persist,
+    externalRef: externalMenuRef,
   });
-  const [avatarLoading, setAvatarLoading] = useState(true);
+
+  const avatarUrl = userData?.avatar ? getAvatarUrl(userData.avatar) : null;
+  const [loadedAvatarUrl, setLoadedAvatarUrl] = useState<string | null>(null);
+  const avatarLoading = !!avatarUrl && loadedAvatarUrl !== avatarUrl;
 
   useEffect(() => {
-    if (animatedMenuRef.current && externalMenuRef && 'current' in externalMenuRef) {
-      (externalMenuRef as React.MutableRefObject<HTMLDivElement | null>).current =
-        animatedMenuRef.current;
-    }
-  }, [shouldRender, animatedMenuRef, externalMenuRef]);
-
-  useEffect(() => {
-    if (userData?.avatar) {
-      const avatarUrl = getAvatarUrl(userData.avatar);
-      if (avatarUrl) {
-        setAvatarLoading(true);
-        // Preload image
-        const img = new window.Image();
-        img.src = avatarUrl;
-        img.onload = () => setAvatarLoading(false);
-        img.onerror = () => setAvatarLoading(false);
-      }
-    }
-  }, [userData?.avatar]);
+    if (!avatarUrl) return;
+    const img = new window.Image();
+    img.src = avatarUrl;
+    img.onload = () => setLoadedAvatarUrl(avatarUrl);
+    img.onerror = () => setLoadedAvatarUrl(avatarUrl);
+  }, [avatarUrl]);
 
   const getInitial = (username: string) => username.charAt(0).toUpperCase();
 
@@ -74,7 +65,7 @@ export function UserMenu({
     try {
       await logoutMutation.mutateAsync({ scope: 'user' });
       clearQueryCache();
-      window.location.href = '/auth';
+      window.location.assign('/auth');
     } catch (error) {
       console.error('Logout error:', error);
     }
@@ -84,7 +75,7 @@ export function UserMenu({
 
   return (
     <div
-      ref={animatedMenuRef}
+      ref={menuRef}
       className="absolute -right-[25px] top-full z-50 mt-5 w-[340px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-white/10 bg-[#0A0A0A]/95 shadow-2xl ring-1 ring-black/5 backdrop-blur-2xl"
     >
       {/* User Header Card */}
@@ -118,8 +109,8 @@ export function UserMenu({
                           height={56}
                           className={`h-full w-full object-cover transition-opacity duration-300 ${avatarLoading ? 'opacity-0' : 'opacity-100'}`}
                           unoptimized
-                          onLoad={() => setAvatarLoading(false)}
-                          onError={() => setAvatarLoading(false)}
+                          onLoad={() => setLoadedAvatarUrl(avatarUrl)}
+                          onError={() => setLoadedAvatarUrl(avatarUrl)}
                         />
                       </>
                     ) : (

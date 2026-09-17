@@ -58,11 +58,13 @@ IndexedDB `rvn_device` (v1), two stores:
 ### Delivery to Server
 
 **Login/register form** (`components/auth/Form.tsx`):
+
 ```
 fpid = getOrCreateFpid() → loginMutation({ fpid }) → markFpidSent()
 ```
 
 **OAuth** (popup → redirect → callback):
+
 ```
 getOrCreateFpid() → setFpidCookieForOAuth(fpid)
   ↓
@@ -82,6 +84,7 @@ Short-lived cookie (5 min) because OAuth redirects lose IndexedDB context.
 Computes SHA256 from normalized components:
 
 **1. User-Agent → `browser:os`**
+
 ```
 "Mozilla/5.0 (Windows NT 10.0; ...) Chrome/120.0..." → "chrome:windows"
 ```
@@ -90,6 +93,7 @@ Recognized browsers: Chrome, Firefox, Safari, Edge, Opera, Brave, Vivaldi, Yande
 OS: Windows, Mac, Linux, Android, iOS.
 
 **2. IP → prefix**
+
 ```
 IPv4: "185.22.174.56"  → "185.22.174"    (first 3 octets)
 IPv6: "2001:db8:1::1"  → "2001:db8:1::"  (first 4 segments)

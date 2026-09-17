@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Settings, Check as Save, AlertTriangle, X, Calendar } from 'lucide-react';
 import { trpc } from '@/lib/trpc/client';
@@ -19,6 +19,8 @@ interface MaintenanceModalProps {
   initialConfig?: MaintenanceConfig;
 }
 
+import { useMounted } from '@/hooks/useMounted';
+
 export default function MaintenanceModal({
   isOpen,
   onClose,
@@ -33,7 +35,7 @@ export default function MaintenanceModal({
     },
   );
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
-  const [mounted, setMounted] = useState(false);
+  const mounted = useMounted();
 
   const { data: fetchedConfig, isLoading: loading } = trpc.admin.maintenance.get.useQuery(
     undefined,
@@ -42,11 +44,13 @@ export default function MaintenanceModal({
     },
   );
 
-  useEffect(() => {
-    if (fetchedConfig) {
-      setConfig(fetchedConfig as MaintenanceConfig);
-    }
-  }, [fetchedConfig]);
+  const sourceConfig = initialConfig || (fetchedConfig as MaintenanceConfig | undefined);
+  const [prevSourceConfig, setPrevSourceConfig] = useState(sourceConfig);
+
+  if (sourceConfig && sourceConfig !== prevSourceConfig) {
+    setPrevSourceConfig(sourceConfig);
+    setConfig(sourceConfig);
+  }
 
   const updateMutation = trpc.admin.maintenance.update.useMutation({
     onSuccess: () => {
@@ -62,16 +66,6 @@ export default function MaintenanceModal({
   });
 
   const saving = updateMutation.isPending;
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
-    if (initialConfig) {
-      setConfig(initialConfig);
-    }
-  }, [initialConfig]);
 
   const handleSave = () => {
     setMessage(null);
@@ -146,7 +140,7 @@ export default function MaintenanceModal({
       }}
       aria-label="Close modal"
     >
-      {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- модальная обёртка: обработчики закрытия по клику/Escape */}
+      {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- модальная обертка: обработчики закрытия по клику/Escape */}
       <div
         className="animate-scaleIn flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-xl border border-neutral-800 bg-neutral-900 shadow-2xl"
         onClick={(e) => e.stopPropagation()}

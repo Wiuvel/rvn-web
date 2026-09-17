@@ -3,6 +3,7 @@ import { detectSuspiciousVisitor } from '@/lib/security/suspicious-detector';
 import { getRedisClient } from '@/lib/database/redis';
 import { logger } from '@/lib/utils/secure-logger';
 import { applySecurityHeaders } from '@/lib/security/headers';
+import { getClientIP } from '@/lib/validation/ip-validator';
 
 let cachedHmacKey: CryptoKey | null = null;
 
@@ -145,10 +146,7 @@ export async function handleProtection(
   }
 
   const userAgent = request.headers.get('user-agent') || '';
-  const ip =
-    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-    request.headers.get('x-real-ip') ||
-    'unknown';
+  const ip = getClientIP(request);
   const referer = request.headers.get('referer');
   const acceptLanguage = request.headers.get('accept-language');
 
@@ -187,7 +185,7 @@ export async function handleProtection(
       maxAge: 60 * 60 * 12 /** 12 hours */,
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production' && !isLocalhost,
-      sameSite: 'Strict',
+      sameSite: 'strict',
       path: '/',
     });
 
@@ -234,7 +232,7 @@ export async function handleProtection(
     maxAge: 60 * 60 * 12 /** 12 hours */,
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production' && !isLocalhost,
-    sameSite: 'Strict',
+    sameSite: 'strict',
     path: '/',
   });
 

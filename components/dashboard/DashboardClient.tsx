@@ -177,12 +177,13 @@ export default function DashboardClient({ userId }: DashboardClientProps) {
     enabled: !!userData,
     staleTime: 5 * 60_000,
   });
+  const [now] = useState(() => Date.now());
   const activeSub = useMemo(() => subsData?.find((s) => s.status === 'active') ?? null, [subsData]);
   const daysLeft = useMemo(() => {
     if (!activeSub?.expireAt) return null;
-    const diff = new Date(activeSub.expireAt).getTime() - Date.now();
+    const diff = new Date(activeSub.expireAt).getTime() - now;
     return Math.max(0, Math.ceil(diff / 86_400_000));
-  }, [activeSub]);
+  }, [activeSub, now]);
   /** Resolve plan ID to human-readable name */
   const planNameMap = useMemo(() => {
     const map = new Map<string, string>();

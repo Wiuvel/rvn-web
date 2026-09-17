@@ -20,24 +20,23 @@ export default function HeaderAvatar({
   isDesktop,
   buttonRef,
 }: HeaderAvatarProps) {
-  const [loading, setLoading] = useState(true);
-  const avatarLoadFallbackRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
   const avatarUrl = getAvatarUrl(userData.avatar);
   const gradientClasses = getGradientClasses(userData.avatar);
+
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [timedOut, setTimedOut] = useState(false);
+  const loading = !!avatarUrl && !isLoaded && !timedOut;
+  const avatarLoadFallbackRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Handle fallback for image loading
   const AVATAR_LOAD_FALLBACK_MS = 800;
 
   useEffect(() => {
-    if (!avatarUrl) {
-      setLoading(false);
-      return;
-    }
+    if (!avatarUrl) return;
 
     avatarLoadFallbackRef.current = setTimeout(() => {
       avatarLoadFallbackRef.current = null;
-      setLoading(false);
+      setTimedOut(true);
     }, AVATAR_LOAD_FALLBACK_MS);
 
     return () => {
@@ -53,7 +52,7 @@ export default function HeaderAvatar({
       clearTimeout(avatarLoadFallbackRef.current);
       avatarLoadFallbackRef.current = null;
     }
-    setLoading(false);
+    setIsLoaded(true);
   };
 
   const handleError = () => {
@@ -61,7 +60,7 @@ export default function HeaderAvatar({
       clearTimeout(avatarLoadFallbackRef.current);
       avatarLoadFallbackRef.current = null;
     }
-    setLoading(false);
+    setIsLoaded(true);
   };
 
   const getInitial = (username: string) => {

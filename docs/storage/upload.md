@@ -4,9 +4,9 @@
 
 ## Обзор
 
-Приложение принимает загрузки в трёх местах: аватары, баннеры и вложения в support-чате. Все три проходят через общие хелперы `lib/storage/s3-client.ts` и в итоге попадают в S3-совместимое Object Storage (endpoint конфигурируется — работает с AWS S3, MinIO, Backblaze B2 и т.п.). Контракт намеренно строгий:
+Приложение принимает загрузки в трех местах: аватары, баннеры и вложения в support-чате. Все три проходят через общие хелперы `lib/storage/s3-client.ts` и в итоге попадают в S3-совместимое Object Storage (endpoint конфигурируется — работает с AWS S3, MinIO, Backblaze B2 и т.п.). Контракт намеренно строгий:
 
-1. **Multipart POST**, не presigned PUT. Сервер читает файл в `Buffer` и валидирует всё ещё до того, как уйдёт хоть один S3-вызов.
+1. **Multipart POST**, не presigned PUT. Сервер читает файл в `Buffer` и валидирует все еще до того, как уйдет хоть один S3-вызов.
 2. **Magic-bytes валидация** работает поверх Content-Type. Заявленный клиентом MIME — это лишь подсказка, а не факт; реальную сигнатуру в файле перебивает.
 3. **Auth + rate limit** проверяются до того, как сервер прочитает хоть один байт тела.
 
@@ -91,7 +91,7 @@
 
 `validateFileContent(buffer, declaredType, fileName)` отклоняет запрос, если:
 
-- `detectMimeType` вернул null (повреждён / неизвестный формат).
+- `detectMimeType` вернул null (поврежден / неизвестный формат).
 - Detected MIME не входит в allowlist (закрывает вариант «заявил `application/pdf`, прислал `.exe`»).
 - Detected MIME = `image/gif` для avatar/banner-роутов (анимированные аватары запрещены явно).
 
@@ -102,7 +102,7 @@
 ### Аватары — `app/api/auth/avatar/route.ts`
 
 - Лимит: `AVATAR_MAX_BYTES` (2 MB).
-- Разрешённые типы: только изображения, **без GIF** (анимированные аватары запрещены).
+- Разрешенные типы: только изображения, **без GIF** (анимированные аватары запрещены).
 - Storage path: `avatars/<userId>/<timestamp>.<ext>` — timestamp ломает browser cache при перезаписи.
 - `users.avatar` ставится в `s3:<storagePath>` (префикс `s3:` сообщает read-path'у, что нужно идти через `media-cache`, а не по внешнему URL).
 - Старый аватар удаляется после успешного коммита в БД, **с проверкой пути** — путь обязан начинаться с `avatars/<userId>/`, чтобы исключить path-traversal между пользователями.
@@ -133,7 +133,7 @@
 | `resize_image(buf, width, height)` | Билинейный resize в указанные габариты. Формат сохраняется (PNG → PNG, JPEG → JPEG). |
 | `generate_thumbhash(buf)` | Возвращает `{ width, height, thumbhash }` — base64 blur-placeholder. |
 
-У обёртки есть graceful fallback: если WASM не загрузился (запуск сервера без `wasm-pack build`, runtime-ошибка), `resize_image()` возвращает оригинальный буфер, а `generate_thumbhash()` — null. Загрузка в любом случае проходит, единственный эффект — UI не получит blur-плейсхолдер.
+У обертки есть graceful fallback: если WASM не загрузился (запуск сервера без `wasm-pack build`, runtime-ошибка), `resize_image()` возвращает оригинальный буфер, а `generate_thumbhash()` — null. Загрузка в любом случае проходит, единственный эффект — UI не получит blur-плейсхолдер.
 
 Thumbhash хранится рядом с метаданными вложения, чтобы чат мог отрисовать blur-плейсхолдер до загрузки полного изображения.
 
@@ -158,7 +158,7 @@ Thumbhash хранится рядом с метаданными вложения
 - Префиксы ключей: `media:body:<s3Key>`, `media:meta:<s3Key>`.
 - Тела больше `MIN_BODY_SIZE_TO_COMPRESS` (512 байт) хранятся gzip-сжатыми, когда `MEDIA_CACHE_COMPRESS=true`.
 - TTL по умолчанию: аватары/баннеры — 24 ч, support-вложения — 1 ч. Все значения настраиваются через `MEDIA_CACHE_TTL_SEC_*`.
-- Кэшируются только allow-listed префиксы: `support/`, `avatars/`, `banners/`. Всё остальное идёт мимо кэша.
+- Кэшируются только allow-listed префиксы: `support/`, `avatars/`, `banners/`. Все остальное идет мимо кэша.
 - Кэш автоматически выключается, если `REDIS_URL` не задан — поведение не меняется, просто на каждый запрос cold-fetch из S3.
 
 ## Файлы
@@ -167,6 +167,6 @@ Thumbhash хранится рядом с метаданными вложения
 - `lib/storage/s3-client.ts` — `getS3Client`, `uploadFileToS3`, `uploadAvatarToS3`, `deleteFileFromS3`, `validateFile`, `validateFileWithContent`.
 - `lib/storage/media-cache.ts` — Redis-кэш тел.
 - `lib/validation/magic-bytes.ts` — детект magic bytes, `detectMimeType`, `validateFileContent`.
-- `lib/wasm/image-processor.ts` — WASM-обёртка.
+- `lib/wasm/image-processor.ts` — WASM-обертка.
 - `wasm/src/lib.rs` — Rust → WASM источник `resize_image` и `generate_thumbhash`.
 - `lib/utils/constants.ts` — лимиты по размеру.

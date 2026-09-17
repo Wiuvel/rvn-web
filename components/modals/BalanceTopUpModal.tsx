@@ -95,7 +95,7 @@ export default function BalanceTopUpModal({ isOpen, onClose, onSuccess }: Balanc
   const canSubmit = isAmountValid && isPromoValid && !isPending;
 
   return (
-    /* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- модальная обёртка: обработчики закрытия по клику/Escape */
+    /* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- модальная обертка: обработчики закрытия по клику/Escape */
     <div
       role="dialog"
       aria-modal="true"
@@ -106,7 +106,7 @@ export default function BalanceTopUpModal({ isOpen, onClose, onSuccess }: Balanc
         if (e.key === 'Escape') handleClose();
       }}
     >
-      {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- модальная обёртка: обработчики закрытия по клику/Escape */}
+      {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- модальная обертка: обработчики закрытия по клику/Escape */}
       <div
         role="document"
         className="w-full max-w-md overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-900 shadow-2xl"
@@ -199,7 +199,7 @@ export default function BalanceTopUpModal({ isOpen, onClose, onSuccess }: Balanc
                 <div className="flex items-center gap-3">
                   <CreditCard className="h-5 w-5 text-neutral-500" />
                   <div>
-                    <p className="text-sm font-medium text-neutral-400">Платёжные системы</p>
+                    <p className="text-sm font-medium text-neutral-400">Платежные системы</p>
                     <p className="text-xs text-neutral-600">Скоро</p>
                   </div>
                 </div>

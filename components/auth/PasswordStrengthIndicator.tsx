@@ -13,7 +13,7 @@ export const PasswordStrengthIndicator = ({ password }: PasswordStrengthIndicato
   return (
     <div className="mt-2 animate-fadeIn space-y-2">
       <div className="mb-1 flex items-center justify-between">
-        <span className="text-xs text-neutral-400">Надёжность пароля:</span>
+        <span className="text-xs text-neutral-400">Надежность пароля:</span>
         {strength.label && (
           <span
             className={`text-xs font-medium ${

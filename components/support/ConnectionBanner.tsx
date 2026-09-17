@@ -20,12 +20,12 @@ export default function ConnectionBanner({ isConnected }: ConnectionBannerProps)
   const [showOffline, setShowOffline] = useState(false);
 
   useEffect(() => {
-    if (isConnected) {
-      setShowOffline(false);
-      return;
-    }
+    if (isConnected) return;
     const timer = setTimeout(() => setShowOffline(true), OFFLINE_GRACE_MS);
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      setShowOffline(false);
+    };
   }, [isConnected]);
 
   if (isConnected || !showOffline) return null;

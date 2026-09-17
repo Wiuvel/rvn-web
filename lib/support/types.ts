@@ -63,3 +63,26 @@ export interface RawMessageApi {
   sender?: RawSupportUser | RawSupportUser[];
   attachments?: RawAttachmentApi[];
 }
+
+export interface AdminTicketUi {
+  id: string;
+  subject: string;
+  status: 'open' | 'closed' | 'pending';
+  priority: 'low' | 'normal' | 'high' | 'urgent';
+  created_at: string;
+  updated_at: string;
+  last_message_at: string;
+  closed_at?: string | null;
+  user_id?: string;
+  user?: RawSupportUser | null;
+  assigned_to?: string | null;
+  assigned_user?: RawSupportUser | null;
+  last_message?: {
+    id: string;
+    message_text: string;
+    sender_type: 'user' | 'support' | 'system';
+    created_at: string;
+    is_read: boolean;
+  } | null;
+  unread_count?: number;
+}

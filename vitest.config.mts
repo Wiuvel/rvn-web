@@ -6,7 +6,7 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './'),
+      '@': path.resolve(import.meta.dirname, './'),
       // Tests import from `next/*` but the `next` package is no longer installed —
       // vinext ships shims for the public surface under `vinext/shims/*` (an
       // officially exported subpath). The vinext Vite plugin handles this in the

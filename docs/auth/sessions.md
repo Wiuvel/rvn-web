@@ -4,7 +4,7 @@
 
 ## Обзор
 
-Состояние авторизации разнесено по трём cookie и одной серверной записи в session store. Каждая cookie выполняет свою задачу и живёт своё время:
+Состояние авторизации разнесено по трем cookie и одной серверной записи в session store. Каждая cookie выполняет свою задачу и живет свое время:
 
 | Cookie | httpOnly | Max-age | Назначение |
 |--------|---------:|--------:|------------|
@@ -20,7 +20,7 @@
 
 - **Основной backend**: Redis. Ключи: `session:<id>` (сам `SessionData`-блоб) и `user_sessions:<userId>` (Set с ID сессий для быстрого массового revoke).
 - **Fallback**: in-memory `Map<string, SessionData>` с периодической очисткой. Используется только пока Redis недоступен; такие сессии видны только текущему Node-процессу и пропадают при рестарте.
-- **Самовосстановление**: каждый вызов сначала пробует Redis. Когда Redis вернётся — новые сессии снова идут туда, старые in-memory просто истекут по TTL.
+- **Самовосстановление**: каждый вызов сначала пробует Redis. Когда Redis вернется — новые сессии снова идут туда, старые in-memory просто истекут по TTL.
 
 Структура `SessionData`:
 
@@ -68,25 +68,25 @@ tokenHash        = SHA256(token)              // лежит в user_devices
 `lib/auth/helper.ts → checkAuth(request, options)` определяет пользователя по cookie:
 
 1. **Нет `token`** → не авторизован.
-2. **Есть только `token`, нет `session_id`** → cold-start. Ищем пользователя по `tokenHash`, затем автоматически создаём новую сессию (`refresh flow`) и переустанавливаем `session_id`. Пропускается, если `options.readOnly = true` (Server Components могут прочитать пользователя, но не могут выставлять cookie).
+2. **Есть только `token`, нет `session_id`** → cold-start. Ищем пользователя по `tokenHash`, затем автоматически создаем новую сессию (`refresh flow`) и переустанавливаем `session_id`. Пропускается, если `options.readOnly = true` (Server Components могут прочитать пользователя, но не могут выставлять cookie).
 3. **Есть `token` + `session_id`** → вызов `SessionManager.validateSession(sessionId, token, ip, ua)`. Проверки:
    - Token binding (`tokenFingerprint` должен совпасть с HMAC текущего `token`).
-   - User-Agent, нормализованный до `<browser>:<os>`. При несовпадении пишется WARN-лог, сохранённый UA обновляется, но запрос **не** отклоняется.
+   - User-Agent, нормализованный до `<browser>:<os>`. При несовпадении пишется WARN-лог, сохраненный UA обновляется, но запрос **не** отклоняется.
    - IP. По умолчанию мягко: тот же `/24` (IPv4) или первые 4 сегмента (IPv6). Строгий IP включается через `validateSession(..., { strictIP: true })` — используется для чувствительных админских операций.
 
 Если валидация провалилась, сервер чистит `session_id` (и при необходимости `token`), клиент считается неавторизованным.
 
 ### Refresh
 
-Cookie `session_id` естественным образом истекает после 1 часа неактивности. Следующий запрос всё ещё содержит `token`, поэтому `checkAuth` уходит в refresh-ветку и создаёт новую сессию. Пользователь не видит логаута.
+Cookie `session_id` естественным образом истекает после 1 часа неактивности. Следующий запрос все еще содержит `token`, поэтому `checkAuth` уходит в refresh-ветку и создает новую сессию. Пользователь не видит логаута.
 
-`SessionManager.refreshSessionCookie()` дополнительно вызывается из путей с rate-limit, чтобы продлевать cookie, пока сессия ещё жива в Redis.
+`SessionManager.refreshSessionCookie()` дополнительно вызывается из путей с rate-limit, чтобы продлевать cookie, пока сессия еще жива в Redis.
 
 ### Logout
 
 - **Одно устройство**: `SessionManager.destroySession(sessionId)` + `clearSessionCookie('session_id')` + удаление строки `user_devices` по `tokenHash` (`SessionManager.revokeDevice(token)`) + чистка cookie `token` и `user_data`.
 - **Все остальные устройства**: `SessionManager.revokeOtherDevices(userId, currentToken)` (удаляет все строки `user_devices`, у которых `tokenHash !== currentTokenHash`) и `destroyAllUserSessions(userId)` за вычетом текущего `sessionId`. Используется в `/user/settings/security` («Выйти везде»).
-- **Принудительная инвалидация админом**: `destroyAllUserSessions(userId)` также вызывается, когда админ блокирует аккаунт или забирает роль — следующий запрос пользователя приведёт к разлогину.
+- **Принудительная инвалидация админом**: `destroyAllUserSessions(userId)` также вызывается, когда админ блокирует аккаунт или забирает роль — следующий запрос пользователя приведет к разлогину.
 
 ## Cookie `user_data`
 
@@ -96,7 +96,7 @@ Cookie `session_id` естественным образом истекает п�
 value = base64url(JSON) + "." + base64url(HMAC-SHA256(USER_DATA_SECRET, base64url(JSON)))
 ```
 
-Проверяется на сервере через `parseUserDataCookie()` с `timingSafeEqual`. Подделка вернёт `null` и UI остаётся в logged-out до ответа auth-запроса. Ключ подписи — `USER_DATA_SECRET` (валидируется как `min(32)` и обязателен в production по zod-схеме `lib/validation/env-validation.ts`); если он отсутствует, в не-production fallback используется `CSRF_SECRET`.
+Проверяется на сервере через `parseUserDataCookie()` с `timingSafeEqual`. Подделка вернет `null` и UI остается в logged-out до ответа auth-запроса. Ключ подписи — `USER_DATA_SECRET` (валидируется как `min(32)` и обязателен в production по zod-схеме `lib/validation/env-validation.ts`); если он отсутствует, в не-production fallback используется `CSRF_SECRET`.
 
 Payload намеренно маленький — `{ user_id, username, avatar, banner, pex, balance }` — и обновляется каждым эндпоинтом, который меняет одно из этих полей (загрузка аватарки, пополнение баланса, выдача роли и т.д.) через `setUserDataCookie(user, isLocalhost)`.
 
@@ -133,7 +133,7 @@ Payload намеренно маленький — `{ user_id, username, avatar, 
 }
 ```
 
-`getCookieDomain()` (`lib/utils/index.ts`) возвращает регистрируемый домен (например, `.rvn.market`), когда запрос идёт с production-хоста, и `undefined` для `localhost`, чтобы Chrome принял cookie.
+`getCookieDomain()` (`lib/utils/index.ts`) возвращает регистрируемый домен (например, `.rvn.market`), когда запрос идет с production-хоста, и `undefined` для `localhost`, чтобы Chrome принял cookie.
 
 ## Файлы
 

@@ -87,11 +87,11 @@ export default function SubscriptionPlansSettings() {
     };
   }, []);
 
-  useEffect(() => {
-    if (plansData) {
-      setPlans(plansData);
-    }
-  }, [plansData]);
+  const [prevPlansData, setPrevPlansData] = useState(plansData);
+  if (plansData && plansData !== prevPlansData) {
+    setPrevPlansData(plansData);
+    setPlans(plansData);
+  }
 
   const realPlans = plans.filter((p) => !p.isStub);
   const canAddRealPlan = realPlans.length < MAX_REAL_PLANS;
@@ -452,7 +452,7 @@ export default function SubscriptionPlansSettings() {
         {hasSquadChanges && (
           <div className="mt-4 flex items-center gap-2 rounded-lg border border-amber-500/20 bg-amber-500/10 px-4 py-2.5 text-sm text-amber-400">
             <AlertTriangle className="h-4 w-4 shrink-0" />
-            Сквад будет обновлён для всех пользователей с этой подпиской
+            Сквад будет обновлен для всех пользователей с этой подпиской
           </div>
         )}
 

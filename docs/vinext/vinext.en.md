@@ -4,37 +4,25 @@
 
 ## Overview
 
-The project runs on [**vinext**](https://github.com/cloudflare/vinext) — a reimplementation of the Next.js API surface on top of Vite. The CLI (`vinext dev`, `vinext build`, `vinext start`) and the whole `next/*` module set work as they did under Next.js; the App Router and `proxy.ts` likewise.
+The project runs on [**vinext**](https://github.com/cloudflare/vinext) (version `1.0.0-beta.10`) — a reimplementation of the Next.js API surface on top of Vite. The CLI (`vinext dev`, `vinext build`, `vinext start`) and the whole `next/*` module set work as they do under Next.js; the App Router and `proxy.ts` are fully supported.
 
-This document exists because of **regressions introduced in 0.0.52** (absent in 0.0.46) that **persist in 0.1.2** — the workarounds for them live in this repo. If a future vinext bump removes one of the items below, the corresponding workaround can be dropped.
+In versions 0.0.52 — 0.1.2, vinext had a few typing and runtime regressions that required local workarounds in this repository. In **vinext 1.0.0-beta**, most of these issues were officially addressed by Cloudflare via the introduction of `@vinext/types`.
 
-## Current workarounds (verified on vinext 0.1.2)
+## Status of Workarounds (verified on vinext 1.0.0-beta.10)
 
-### 1. Ambient module declarations for `next/*`
+### 1. Ambient module declarations for `next/*` — [CLOSED]
 
-The `next` package is not pulled in, and `tsc` throws ~140 `TS2307: Cannot find module 'next/...'` errors. The vinext Vite plugin resolves `next/*` at runtime on its own, but TS doesn't know that.
+- **Previous state**: The `next` package was not installed, causing `tsc` to throw ~140 `TS2307: Cannot find module 'next/...'` errors without ambient declarations in `types/global.d.ts`.
+- **Resolution**: Vinext 1.0.0-beta ships the official `@vinext/types` package and exposes the `vinext/types` subpath. The `next-env.d.ts` generator now automatically injects `import "vinext/types";`, providing complete `next/*` typing out of the box. The workaround in `types/global.d.ts` has been removed.
 
-**Where it's handled**: `types/global.d.ts` carries ambient module declarations that re-export from `vinext/shims/*` (the **officially exposed** npm subpath in vinext's `package.json`: `"./shims/*": { "types": "./dist/shims/*.d.ts", "import": "./dist/shims/*.js" }`):
+### 2. `vitest.config.mts` — aliases for tests — [ACTIVE]
 
-```ts
-declare module 'next/server' {
-  export * from 'vinext/shims/server';
-}
-declare module 'next/headers' {
-  export * from 'vinext/shims/headers';
-}
-// ...and so on for navigation, cache, link, image, script, dynamic, font/local, bare 'next'
-```
-
-**Why not tsconfig `paths`**: we tried — it breaks the build. Rolldown (via `vite-tsconfig-paths` in vinext) applies path mappings at runtime too, and `"next": [...]` (without `/*`) is treated as a **prefix match**: `next/server` then resolves to `<mapped>/server` and fails with `UNLOADABLE_DEPENDENCY`. Ambient declarations through `vinext/shims/*` solve the problem cleanly at the TS layer without touching the bundler.
-
-### 2. `vitest.config.mts` — aliases for tests
-
-Vitest uses Vite but without the vinext plugin. Tests importing `next/*` fail with `Failed to resolve import`. `vitest.config.mts` therefore carries:
+Vitest runs on Vite directly without the `vinext()` Vite plugin (which is tuned for dev/build server workflows and the RSC pipeline). Tests importing `next/*` still require explicit aliases to vinext's shims:
 
 ```ts
 resolve: {
   alias: {
+    '@': path.resolve(import.meta.dirname, './'),
     'next/server': 'vinext/shims/server',
     'next/headers': 'vinext/shims/headers',
     'next/cache': 'vinext/shims/cache',
@@ -43,64 +31,59 @@ resolve: {
 }
 ```
 
-Adding a new `next/*` import in a test? Add the matching alias.
+When introducing new `next/*` imports into unit test suites, add the corresponding alias to `vitest.config.mts`.
 
-### 3. Cookie `sameSite` — capitalized values
+### 3. Cookie `sameSite` casing — [CLOSED]
 
-The vinext shim for `cookies()` requires `'Strict' | 'Lax' | 'None'`. Next.js (and vinext 0.0.46) accepted lowercase; 0.1.2 is still capitalized. Browsers (RFC 6265) are case-insensitive at runtime, so behaviour is identical — but **always use capitalized values in code**:
-
-```ts
-cookieStore.set('session_id', value, { sameSite: 'Strict' }); // ✅
-```
-
-### 4. `MetadataRoute` namespace is not exported
-
-`MetadataRoute.Robots` / `MetadataRoute.Sitemap` are missing from the `next` shim. `app/robots.ts` and `app/sitemap.ts` carry no return-type annotation — TS infers it from the literal.
-
-### 5. `next/image` shim: missing props
-
-`draggable` and `fetchPriority` are absent from `ImageProps`. Fixed locally:
-
-- `LogoLoader`: `fetchPriority` dropped (redundant — `priority` covers it).
-- `ImageViewer`: `draggable={false}` moved to the parent via `onDragStart={e => e.preventDefault()}`.
-
-Module augmentation for `next/image` via ambient declarations works (that's what item 1 uses), but **point-wise widening** of `ImageProps` doesn't: vinext's export is a default const, not a type, and `interface ImageProps {}` inside `declare module 'next/image'` doesn't merge with the shim's type.
-
-### 6. CSS side-effect imports
-
-Vinext doesn't declare `*.css` as a module. `types/global.d.ts` carries:
+- **Previous state**: In 0.1.2, the `cookies()` shim strictly required capitalized values (`'Strict' | 'Lax' | 'None'`), conflicting with Next.js standard lowercase values.
+- **Resolution**: In 1.0.0-beta, types and runtime parsing match Next.js conventions (`'strict' | 'lax' | 'none'`). All cookie calls across the codebase now use standard lowercase:
 
 ```ts
-declare module '*.css';
+cookieStore.set('session_id', value, { sameSite: 'strict' });
 ```
+
+### 4. `MetadataRoute` namespace — [CLOSED]
+
+- **Previous state**: The `MetadataRoute` namespace was not exported from the `next` shim.
+- **Resolution**: `@vinext/types` exports full Next.js types. `app/robots.ts` and `app/sitemap.ts` are now strictly typed with `MetadataRoute.Robots` and `MetadataRoute.Sitemap`.
+
+### 5. `next/image` shim: props — [CLOSED]
+
+- **Previous state**: `ImageProps` was missing properties such as `fetchPriority` and `draggable`.
+- **Resolution**: Upstream `ImageProps` declarations in `@vinext/types` contain all standard Next.js and HTMLImageElement properties.
+
+### 6. CSS side-effect imports — [CLOSED]
+
+- **Previous state**: Vinext didn't declare `*.css` as a module, requiring `declare module '*.css'` in `types/global.d.ts`.
+- **Resolution**: Module declarations for `*.css`, `*.svg`, `*.png`, etc. are now included in the upstream Next.js declarations bundled into `@vinext/types`.
+
+---
 
 ## What vinext generates
 
-- **`next-env.d.ts`** — rewritten on every `vinext dev` / `vinext build`. Gitignored.
-- **`.next/types/routes.d.ts`** — globals `PageProps` / `LayoutProps` / `RouteContext`. The `.next/` directory is gitignored.
+- **`next-env.d.ts`** — rewritten on every `vinext dev` / `vinext build`. Includes `import "vinext/types";` and `./.next/types/routes.d.ts`. Gitignored.
+- **`.next/types/routes.d.ts`** — global `PageProps`, `LayoutProps`, and `RouteContext`. The `.next/` directory is gitignored.
 
-If either disappears, one `vinext build` restores it.
+If either file is missing, running `pnpm run build` restores them.
 
 ## Commands
 
 ```bash
-vinext dev          # dev with HMR
-vinext build        # production (RSC + SSR + client + standalone)
-vinext start        # local production server
-vinext check        # compatibility scanner
+pnpm run dev          # dev server with HMR (127.0.0.1)
+pnpm run build        # production build (RSC + SSR + client + standalone)
+pnpm run start        # local standalone production server
+pnpm run test run     # run Vitest unit tests once
+pnpm run type:check   # check types via tsc --noEmit
+pnpm run lint         # lint codebase via oxlint
 ```
-
-`vinext check` reports what vinext supports at **runtime**. It is **not** about TypeScript — that side is covered by item 1.
 
 ## Where to look when things break
 
 | Symptom | Look here |
 |---|---|
-| `Cannot find module 'next/...'` from `tsc` | `types/global.d.ts` → `declare module 'next/...'` |
+| `Cannot find module 'next/...'` from `tsc` | Verify `import "vinext/types";` in `next-env.d.ts` (regenerate via `pnpm run build`) |
 | `Failed to resolve import "next/..."` from `vitest` | `vitest.config.mts` → `resolve.alias` |
-| `UNLOADABLE_DEPENDENCY ... shims/*/server` during build | Don't use tsconfig `paths` for `next/*` — move them into ambient declarations |
-| `Type '"strict"' is not assignable to '"Strict" \| ...'` | Switch to capitalized |
-| `Property '...' does not exist on type '{...} \| null'` (`useParams`) | Since 0.1.2 the `useParams()` shim is nullable (like Next.js) — read via `?.` |
-| `'pathname' is possibly 'null'` (`usePathname`) | Since 0.1.2 the `usePathname()` shim is nullable (like Next.js) — `usePathname() ?? ''` |
-| `Cannot find module... '*.css'` | `types/global.d.ts` |
-| `PageProps` / `LayoutProps` are missing | `vinext build` regenerates `.next/types/routes.d.ts` |
+| `Type '"Strict"' is not assignable to '"strict" \| ...'` | Switch to lowercase (`strict`, `lax`, `none`) |
+| `Property '...' does not exist on type '{...} \| null'` (`useParams`) | `useParams()` is nullable (like Next.js) — read via `?.` |
+| `'pathname' is possibly 'null'` (`usePathname`) | `usePathname()` is nullable (like Next.js) — `usePathname() ?? ''` |
+| `PageProps` / `LayoutProps` are missing | `pnpm run build` regenerates `.next/types/routes.d.ts` |

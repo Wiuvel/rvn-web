@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { trpc } from '@/lib/trpc/client';
@@ -23,6 +23,7 @@ const formSchema = z.object({
   testPromoEnabled: z.boolean(),
   testPromoCode: z.string(),
 });
+
 type FormValues = z.infer<typeof formSchema>;
 
 export default function RemnawaveSettings() {
@@ -34,7 +35,7 @@ export default function RemnawaveSettings() {
     register,
     handleSubmit,
     reset,
-    watch,
+    control,
     setValue,
     formState: { errors, isDirty },
   } = useForm<FormValues>({
@@ -42,7 +43,7 @@ export default function RemnawaveSettings() {
     defaultValues: { endpoint: '', apiKey: '', testPromoEnabled: false, testPromoCode: '' },
   });
 
-  const testPromoEnabled = watch('testPromoEnabled');
+  const testPromoEnabled = useWatch({ control, name: 'testPromoEnabled' });
 
   // Populate the form once settings load.
   useEffect(() => {

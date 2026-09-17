@@ -6,42 +6,107 @@ interface RateLimitStore {
   };
 }
 
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import { RATE_LIMIT_CLEANUP_INTERVAL, RATE_LIMIT_IMMUNITY_DURATION } from '../utils/constants';
 import { getClientIP } from '../validation/ip-validator';
+import { getEnv } from '../validation/env-validation';
+
+function getImmunitySecret(): string {
+  try {
+    return getEnv().CSRF_SECRET;
+  } catch {
+    if (process.env.NODE_ENV !== 'production') {
+      return process.env.CSRF_SECRET || 'dev-rate-limit-immunity-secret-32-chars';
+    }
+    throw new Error('CSRF_SECRET must be configured in production for rate limit immunity');
+  }
+}
+
+/**
+ * Creates HMAC-signed immunity cookie: timestamp.signature
+ */
+export function createImmunityCookie(expiryTimestamp: number): string {
+  const data = expiryTimestamp.toString();
+  const signature = createHmac('sha256', getImmunitySecret()).update(data).digest('base64url');
+  return `${data}.${signature}`;
+}
+
+/**
+ * Verifies and parses HMAC-signed immunity cookie.
+ * Returns valid expiry timestamp or null if invalid/tampered/expired.
+ */
+export function parseImmunityCookie(cookieValue: string | undefined): number | null {
+  if (!cookieValue || typeof cookieValue !== 'string') return null;
+
+  const dotIdx = cookieValue.lastIndexOf('.');
+  if (dotIdx === -1) return null;
+
+  const data = cookieValue.slice(0, dotIdx);
+  const signature = cookieValue.slice(dotIdx + 1);
+
+  const expiry = parseInt(data, 10);
+  if (isNaN(expiry) || expiry <= Date.now()) return null;
+
+  try {
+    const expectedSignature = createHmac('sha256', getImmunitySecret())
+      .update(data)
+      .digest('base64url');
+
+    const sigBuf = Buffer.from(signature, 'base64url');
+    const expBuf = Buffer.from(expectedSignature, 'base64url');
+
+    if (sigBuf.length !== expBuf.length || !timingSafeEqual(sigBuf, expBuf)) {
+      return null;
+    }
+
+    return expiry;
+  } catch {
+    return null;
+  }
+}
 
 const store: RateLimitStore = {};
 
 // Оптимизированная структура для отслеживания времени истечения
-// Используем Map для более эффективной очистки
 const expirationTimes = new Map<string, number>();
 
-// Периодическая очистка устаревших записей (оптимизированная версия)
 let cleanupInterval: NodeJS.Timeout | null = null;
 
-function startCleanupInterval() {
+export function startRateLimiterCleanup(): void {
   if (cleanupInterval) return;
 
   cleanupInterval = setInterval(() => {
     const now = Date.now();
     const keysToDelete: string[] = [];
 
-    // Проходим только по ключам, которые точно истекли
     expirationTimes.forEach((expirationTime, key) => {
       if (expirationTime < now) {
         keysToDelete.push(key);
       }
     });
 
-    // Удаляем истекшие записи
     keysToDelete.forEach((key) => {
       delete store[key];
       expirationTimes.delete(key);
     });
   }, RATE_LIMIT_CLEANUP_INTERVAL);
+
+  if (typeof cleanupInterval.unref === 'function') {
+    cleanupInterval.unref();
+  }
 }
 
-// Запускаем очистку при первом импорте
-startCleanupInterval();
+export function stopRateLimiterCleanup(): void {
+  if (cleanupInterval) {
+    clearInterval(cleanupInterval);
+    cleanupInterval = null;
+  }
+}
+
+// Auto-start cleanup outside tests
+if (process.env.NODE_ENV !== 'test') {
+  startRateLimiterCleanup();
+}
 
 export interface RateLimitOptions {
   windowMs: number;
@@ -84,9 +149,10 @@ export class RateLimiter {
       .split(';')
       .find((c) => c.trim().startsWith('rate_limit_immunity='));
     if (immunityCookie) {
-      const immunityTimestamp = parseInt(immunityCookie.split('=')[1], 10);
-      if (!isNaN(immunityTimestamp) && immunityTimestamp > now) {
-        // Иммунитет активен через cookie - пропускаем все проверки
+      const rawVal = immunityCookie.split('=')[1]?.trim();
+      const immunityTimestamp = parseImmunityCookie(rawVal);
+      if (immunityTimestamp && immunityTimestamp > now) {
+        // Иммунитет активен через криптографически подписанную cookie - пропускаем проверки
         return {
           allowed: true,
           remaining: this.options.maxRequests,

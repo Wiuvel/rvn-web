@@ -122,8 +122,7 @@ export function invalidateSettingsCache() {
  */
 export type SubscriptionInactiveReason = 'not_configured' | 'no_admin';
 export type SubscriptionSystemStatus =
-  | { active: true }
-  | { active: false; reason: SubscriptionInactiveReason };
+  { active: true } | { active: false; reason: SubscriptionInactiveReason };
 
 let statusCache: { status: SubscriptionSystemStatus; cachedAt: number } | null = null;
 const STATUS_CACHE_TTL = 60_000;

@@ -4,7 +4,7 @@
 
 ## Обзор
 
-Слой защиты — это многоступенчатый фильтр, который выполняется **до** каждого нестатического запроса и решает: пропустить посетителя в приложение, отправить его на страницу Cloudflare Turnstile, или жёстко ограничить по rate limit. Реализован в proxy-middleware и сочетает четыре независимых сигнала: подписанная access-кука, sliding-window rate limit в Redis, многофакторный «suspicion score» и страница challenge'а.
+Слой защиты — это многоступенчатый фильтр, который выполняется **до** каждого нестатического запроса и решает: пропустить посетителя в приложение, отправить его на страницу Cloudflare Turnstile, или жестко ограничить по rate limit. Реализован в proxy-middleware и сочетает четыре независимых сигнала: подписанная access-кука, sliding-window rate limit в Redis, многофакторный «suspicion score» и страница challenge'а.
 
 ```
                      ┌──────────────────────────────────────┐
@@ -53,19 +53,19 @@
 
 | Фактор | Вес | Логика |
 |---|---|---|
-| `suspiciousUserAgent` | 30 | Пустой/слишком короткий UA, нет `mozilla|chrome|safari|firefox|edge|opera`, или совпадение с известным regex-скрапером (`curl`, `python-requests`, `okhttp`, `headless`, `phantom`, …). |
+| `suspiciousUserAgent` | 30 | Пустой/слишком короткий UA, нет `mozilla|chrome|safari|firefox|edge|opera`, или совпадение с известным regex-скрапером (`curl`,`python-requests`,`okhttp`,`headless`,`phantom`, …). |
 | `missingHeaders` | 20 | Отсутствуют 2+ заголовка из `accept`, `accept-language`, `accept-encoding`, или невалидный формат (`Accept-Language` не подходит под `[a-z]{2}(-[a-z]{2})?`). |
 | `suspiciousIP` | 15 | IPv4/IPv6 regex не проходит, либо IP `unknown`. |
 | `botPattern` | 25 | UA совпадает с `bot|crawler|spider|scraper|headless|selenium|puppeteer|playwright`. |
 | `suspiciousBehavior` | 10 | Нет `Accept-Language`, экзотический encoding и т.п. |
 
-Вайтлист поисковых и соцсетевых ботов (`googlebot`, `yandex`, `bingbot`, `twitterbot`, `facebookexternalhit`, `telegrambot`, `discordbot`, `whatsapp`, `slurp`) обходит подсчёт полностью.
+Вайтлист поисковых и соцсетевых ботов (`googlebot`, `yandex`, `bingbot`, `twitterbot`, `facebookexternalhit`, `telegrambot`, `discordbot`, `whatsapp`, `slurp`) обходит подсчет полностью.
 
 `shouldShowProtection(requestInfo, hasValidCookie)` возвращает `true`, когда **нет** валидной `access_token`-куки **и** score **≥ 30**.
 
 ### 3. Edge rate limiter (sliding window в Redis)
 
-`handleProtection` дёргает приватный `checkRateLimit(ip)`, который через Redis sorted set реализует лимит **30 запросов в минуту на IP**:
+`handleProtection` дергает приватный `checkRateLimit(ip)`, который через Redis sorted set реализует лимит **30 запросов в минуту на IP**:
 
 ```ts
 await redis.zremrangebyscore(`rate_limit:${ip}`, 0, now - 60_000);
@@ -75,11 +75,11 @@ await redis.zadd(`rate_limit:${ip}`, now, `${now}-${Math.random()}`);
 await redis.expire(`rate_limit:${ip}`, 70);
 ```
 
-Если Redis недоступен, проверка **деградирует «open»** (возвращает `false`) — приложение остаётся доступным, а не блокирует всех. Edge-уровень rate-лимита независим от per-procedure tRPC-лимитера и срабатывает до сопоставления маршрута.
+Если Redis недоступен, проверка **деградирует «open»** (возвращает `false`) — приложение остается доступным, а не блокирует всех. Edge-уровень rate-лимита независим от per-procedure tRPC-лимитера и срабатывает до сопоставления маршрута.
 
 ### 4. Access-кука (`access_token`)
 
-После того как пользователь решает Turnstile-challenge на `/protection`, tRPC-процедура `protection.verify` (`lib/trpc/routers/protection.ts`) выдаёт подписанную куку:
+После того как пользователь решает Turnstile-challenge на `/protection`, tRPC-процедура `protection.verify` (`lib/trpc/routers/protection.ts`) выдает подписанную куку:
 
 ```
 access_token = base64url({ "t": <ms since epoch> }) + "." + HMAC_SHA256(payload, TURNSTILE_SECRET_KEY)
@@ -103,7 +103,7 @@ access_token = base64url({ "t": <ms since epoch> }) + "." + HMAC_SHA256(payload,
 
 Страница challenge'а — серверный route в `app/protection/`. Клиентский скрипт лежит в `lib/scripts/protection.ts` и через `cf-turnstile` рендерит виджет с mobile-aware таймаутами (`observeDelay`, `iframeCheck`, `mainTimeout`). При успехе вызывает `protection.verify`, получает `access_token`-куку и редиректит по query-параметру `redirect=<path>` (валидируется `safeRedirect`: должен начинаться на `/`, без `//`, без `:`, без `<>`, без `javascript:`).
 
-Если у пользователя уже есть валидная `access_token` и он зашёл на `/protection` напрямую — proxy редиректит его на `/`.
+Если у пользователя уже есть валидная `access_token` и он зашел на `/protection` напрямую — proxy редиректит его на `/`.
 
 ## tRPC rate limiting (per-procedure)
 
@@ -136,7 +136,7 @@ const rateLimited = t.middleware(async ({ ctx, next }) => {
 
 `RateLimiter.check()` учитывает иммунитет двумя способами: (1) читает куку прямо из запроса — переживает рестарт процесса; (2) читает in-memory `immuneUntil` — fast path для горячих запросов на той же ноде.
 
-> **Ограничение.** Хранилище `RateLimiter` — **per-process in-memory**. Несколько инстансов `rvn-web` не делят счётчики — кука позволяет иммунитету работать кросс-инстансно, но базовые счётчики остаются per-pod. Единственный горизонтально консистентный лимитер сегодня — Redis sliding window в `handleProtection`.
+> **Ограничение.** Хранилище `RateLimiter` — **per-process in-memory**. Несколько инстансов `rvn-web` не делят счетчики — кука позволяет иммунитету работать кросс-инстансно, но базовые счетчики остаются per-pod. Единственный горизонтально консистентный лимитер сегодня — Redis sliding window в `handleProtection`.
 
 ## CSRF-защита
 
@@ -174,7 +174,7 @@ interface ICsrfStore {
 1. Разбивает токен, проверяет структуру и совпадение `sessionId`.
 2. Проверяет `now - timestamp < 1 час`.
 3. Пересчитывает HMAC и сравнивает через `crypto.timingSafeEqual`.
-4. **Защита от replay.** Если в хранилище токен отличается от полученного — верификация падает (`reason: 'Token already used'`). При успехе только что проверенный токен пересохраняется с новым `createdAt`, поэтому повторная попытка с **тем же** токеном пройдёт только до его замены.
+4. **Защита от replay.** Если в хранилище токен отличается от полученного — верификация падает (`reason: 'Token already used'`). При успехе только что проверенный токен пересохраняется с новым `createdAt`, поэтому повторная попытка с **тем же** токеном пройдет только до его замены.
 
 `revokeCSRFToken(sessionId)` удаляет токен из хранилища; вызывается явно после успешного логина (`auth.login`, `auth.register`).
 
@@ -182,17 +182,17 @@ interface ICsrfStore {
 
 | Процедура | Файл | Поведение при отсутствии/невалидности CSRF |
 |---|---|---|
-| `auth.csrf` | `lib/trpc/routers/auth.ts` | Выдаёт свежий токен, привязанный к текущему session id. |
+| `auth.csrf` | `lib/trpc/routers/auth.ts` | Выдает свежий токен, привязанный к текущему session id. |
 | `auth.login` | `lib/trpc/routers/auth.ts` | `BAD_REQUEST`, если `verifyCSRFToken` вернул false. |
 | `auth.register` | `lib/trpc/routers/auth.ts` | То же, что и `login`. |
 | `auth.adminLogin` | `lib/trpc/routers/auth.ts` | То же. |
 | `support.sendMessage` | `lib/trpc/routers/support.ts` | То же. |
 
-Авторизованные tRPC-процедуры **без** явного CSRF в нём не нуждаются: они уже требуют куку `token` с `httpOnly`+`sameSite=strict`, которая сама по себе является эффективной CSRF-защитой.
+Авторизованные tRPC-процедуры **без** явного CSRF в нем не нуждаются: они уже требуют куку `token` с `httpOnly`+`sameSite=strict`, которая сама по себе является эффективной CSRF-защитой.
 
 ## Security headers (CSP / HSTS / прочее)
 
-`applySecurityHeaders(response, isStaticFile, request?)` вызывается на каждом не-обойдённом запросе и на статических файлах (с урезанным набором заголовков, чтобы не ломать HTTP/2).
+`applySecurityHeaders(response, isStaticFile, request?)` вызывается на каждом не-обойденном запросе и на статических файлах (с урезанным набором заголовков, чтобы не ломать HTTP/2).
 
 | Заголовок | Значение |
 |---|---|
@@ -203,7 +203,7 @@ interface ICsrfStore {
 | `X-Frame-Options` | `DENY` (ставится в `next.config.ts:headers()`, читается Vinext). |
 | `Referrer-Policy` | `strict-origin-when-cross-origin` (ставится в `next.config.ts:headers()`, читается Vinext). |
 
-На ответы со статикой дополнительно добавляются `Access-Control-Allow-*` заголовки, если запрос пришёл с основного домена или с одного из его поддоменов (`isSubdomain` / `isValidOrigin`).
+На ответы со статикой дополнительно добавляются `Access-Control-Allow-*` заголовки, если запрос пришел с основного домена или с одного из его поддоменов (`isSubdomain` / `isValidOrigin`).
 
 ### CSP-директивы
 

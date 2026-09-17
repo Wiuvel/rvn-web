@@ -4,7 +4,7 @@
 
 ## Обзор
 
-Подсистема хранилища обрабатывает загружаемые пользователями файлы (аватары, баннеры, вложения тикетов поддержки), отдаёт их обратно через HTTP API, кэширует бинарники в Redis и применяет преобразования изображений (ресайз, ThumbHash blur preview) через Rust → WASM модуль.
+Подсистема хранилища обрабатывает загружаемые пользователями файлы (аватары, баннеры, вложения тикетов поддержки), отдает их обратно через HTTP API, кэширует бинарники в Redis и применяет преобразования изображений (ресайз, ThumbHash blur preview) через Rust → WASM модуль.
 
 ```
 ┌───────────────┐   upload   ┌──────────────────┐
@@ -66,12 +66,12 @@
 - `media:body:{s3Key}` — payload в base64 (gzip, если `MEDIA_CACHE_COMPRESS=true` и тело ≥ 512 байт).
 - `media:meta:{s3Key}` — JSON `{ content_type, size, compressed? }`.
 
-Разрешённые префиксы (всё остальное не кэшируется): `support/`, `avatars/`, `banners/`.
+Разрешенные префиксы (все остальное не кэшируется): `support/`, `avatars/`, `banners/`.
 
 | Функция | Поведение |
 |---------|-----------|
 | `getMediaFromCache(s3Key)` | Возвращает `{ body, contentType }` либо `null`. Прозрачно распаковывает gzip. Любая ошибка Redis → `null`. |
-| `setMediaCache(s3Key, body, contentType, { ttlSec?, isAvatarOrBanner? })` | Пишет оба ключа с TTL. Пропускается, если размер > `MEDIA_CACHE_MAX_OBJECT_MB`, префикс не разрешён или Redis недоступен. |
+| `setMediaCache(s3Key, body, contentType, { ttlSec?, isAvatarOrBanner? })` | Пишет оба ключа с TTL. Пропускается, если размер > `MEDIA_CACHE_MAX_OBJECT_MB`, префикс не разрешен или Redis недоступен. |
 | `invalidateMediaCache(s3Key)` | Удаляет оба ключа. Вызывается при замене аватара/баннера и удалении сообщения. |
 
 Прогрев кэша: маршруты загрузки аватара/баннера сразу после `S3 PUT` вызывают `setMediaCache`, поэтому первый GET — HIT.
@@ -85,7 +85,7 @@
 | `resize_image(input, w, h)` | `resize_exact` с фильтром Triangle, формат определяется через `image::guess_format`. Возвращает вход без изменений, если `w==0 \|\| h==0`. |
 | `generate_thumbhash(input)` | Ресайз до ≤100×100, генерация [ThumbHash](https://evanw.github.io/thumbhash/) blur-превью. Возвращает `{ width, height, thumbhash }`. |
 
-Загрузчик (`lib/wasm/image-processor.ts`) читает `.wasm` через `fs.readFile` (Node `fetch` не умеет `file://`) и передаёт сырые байты в `initWasm({ module_or_path })`. Поиск пути: сначала `cwd/lib/wasm/pkg`, затем fallback на `import.meta.url`. При ошибке `processImage` и `generateThumbhash` логируют ошибку и **возвращают исходный буфер / nulls** — флоу с изображениями никогда не блокируется отсутствием WASM-сборки.
+Загрузчик (`lib/wasm/image-processor.ts`) читает `.wasm` через `fs.readFile` (Node `fetch` не умеет `file://`) и передает сырые байты в `initWasm({ module_or_path })`. Поиск пути: сначала `cwd/lib/wasm/pkg`, затем fallback на `import.meta.url`. При ошибке `processImage` и `generateThumbhash` логируют ошибку и **возвращают исходный буфер / nulls** — флоу с изображениями никогда не блокируется отсутствием WASM-сборки.
 
 Сборка Vinext (`vinext build`) не упаковывает `.wasm`-бинарник в standalone-вывод; Dockerfile явно копирует `lib/wasm/pkg/` в `dist/server/assets/pkg/`.
 
@@ -94,8 +94,8 @@
 ### GET аватар/баннер — `app/images/users/[...path]/route.ts`
 
 1. Парсим `path[]` в `s3Key` (`avatars/{userId}/{file}` или `banners/{userId}/{file}`).
-2. Валидируем: `userId` — UUID, имя файла оканчивается на разрешённое расширение (`.jpg`, `.jpeg`, `.png`, `.gif`, `.webp`).
-3. `getMediaFromCache(s3Key)` → при HIT отдаём тело с `X-Cache: HIT` и `Cache-Control: public, max-age=…`.
+2. Валидируем: `userId` — UUID, имя файла оканчивается на разрешенное расширение (`.jpg`, `.jpeg`, `.png`, `.gif`, `.webp`).
+3. `getMediaFromCache(s3Key)` → при HIT отдаем тело с `X-Cache: HIT` и `Cache-Control: public, max-age=…`.
 4. При MISS: `getObjectAsBuffer(s3Key)` → `processImage(body, {})` (no-op без размеров) → `setMediaCache(...)` → ответ с `X-Cache: MISS`.
 5. `NoSuchKey` / 404 от S3 → JSON 404.
 
@@ -136,11 +136,11 @@
 | `MEDIA_CACHE_TTL_SEC_AVATARS` | `86400` | TTL для `avatars/` и `banners/` |
 | `MEDIA_CACHE_COMPRESS` | `true` | gzip тел ≥ 512 байт |
 
-Если `S3_*` не задано, эндпойнты загрузки отвечают 503; если не задан `REDIS_URL`, кэш отключён и каждый GET идёт в S3.
+Если `S3_*` не задано, эндпойнты загрузки отвечают 503; если не задан `REDIS_URL`, кэш отключен и каждый GET идет в S3.
 
 ## Файлы
 
-- `lib/storage/s3-client.ts` — обёртка AWS SDK, помощники загрузки, генерация ключей, валидация MIME.
+- `lib/storage/s3-client.ts` — обертка AWS SDK, помощники загрузки, генерация ключей, валидация MIME.
 - `lib/storage/media-cache.ts` — Redis-кэш с gzip и политикой TTL.
 - `lib/wasm/image-processor.ts` — загрузчик WASM, `processImage`, `generateThumbhash` с graceful fallback.
 - `wasm/src/lib.rs` — Rust-исходники (resize, ThumbHash).

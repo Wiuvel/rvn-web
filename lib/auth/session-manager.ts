@@ -22,7 +22,10 @@ function getTokenBindingSecret(): string {
   try {
     return getEnv().CSRF_SECRET;
   } catch {
-    return process.env.CSRF_SECRET || 'default-token-binding-secret';
+    if (process.env.NODE_ENV !== 'production') {
+      return process.env.CSRF_SECRET || 'dev-token-binding-secret-only';
+    }
+    throw new Error('CSRF_SECRET must be configured in production for token binding');
   }
 }
 
@@ -308,7 +311,7 @@ export class SessionManager {
       maxAge: SESSION_TIMEOUT / 1000,
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production' && !isLocalhost,
-      sameSite: 'Strict',
+      sameSite: 'strict',
       path: '/',
     });
   }

@@ -6,7 +6,7 @@ import { logger } from '@/lib/utils/secure-logger';
 import { captchaBodySchema } from '@/lib/validation/api-schemas';
 
 export const protectionRouter = router({
-  /** Верификация Turnstile и установка защищённых кук (аналог POST /api/protection/verify) */
+  /** Верификация Turnstile и установка защищенных кук (аналог POST /api/protection/verify) */
   verify: authRateLimitedProcedure.input(captchaBodySchema).mutation(async ({ ctx, input }) => {
     const { captchaToken } = input;
 
@@ -59,7 +59,7 @@ export const protectionRouter = router({
       maxAge: 12 * 60 * 60, // 12 часов
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'Strict' as const,
+      sameSite: 'strict' as const,
       path: '/',
     };
 

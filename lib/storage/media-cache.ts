@@ -13,7 +13,7 @@ const META_KEY_PREFIX = 'media:meta:';
 /** Минимальный размер тела (байт), при котором имеет смысл сжатие */
 const MIN_BODY_SIZE_TO_COMPRESS = 512;
 
-/** Разрешённые префиксы s3Key для кэширования */
+/** Разрешенные префиксы s3Key для кэширования */
 const ALLOWED_PREFIXES = ['support/', 'avatars/', 'banners/'] as const;
 
 export interface MediaCacheConfig {
@@ -109,7 +109,7 @@ export async function getMediaFromCache(
 /**
  * Записать медиа в кэш Redis.
  * Не пишет, если размер превышает лимит или Redis недоступен.
- * При включённом сжатии тела >= MIN_BODY_SIZE_TO_COMPRESS сжимаются gzip.
+ * При включенном сжатии тела >= MIN_BODY_SIZE_TO_COMPRESS сжимаются gzip.
  */
 export async function setMediaCache(
   s3Key: string,

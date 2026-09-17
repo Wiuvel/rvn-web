@@ -95,6 +95,7 @@ Client                  OAuth Provider           Server
 **Providers**: Google, Telegram, Twitch, VK, Yandex
 
 **Details**:
+
 - CSRF token is passed in the OAuth `state` parameter
 - Popup window support (`:popup` flag in state cookie)
 - OAuth username is sanitized: only `[a-zA-Z0-9_-]`, 3–30 chars
@@ -190,6 +191,7 @@ deviceFpHash = SHA256(normalizeUA(userAgent) + normalizeIP(ip) + fpid)
 ```
 
 On device registration:
+
 1. If FPID exists → compute `deviceFpHash`
 2. Find existing device with same `userId` + `deviceFpHash`
 3. If found → update (don't create duplicate)
@@ -247,6 +249,7 @@ Cookie `user_data` is the only client-readable cookie. Contains an HMAC-SHA256 s
 ### Storage
 
 Table `user_roles`:
+
 ```
 id, userId, role, grantedBy, grantedAt, revokedAt, isActive
 ```

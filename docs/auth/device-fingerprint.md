@@ -37,7 +37,7 @@
 
 - Формат: `MP_` + 12 случайных base64-символов (напр. `MP_x7kL9mN2pQ4r`)
 - Источник: `crypto.getRandomValues(new Uint8Array(12))`
-- Создаётся один раз, живёт в IndexedDB до ручного удаления
+- Создается один раз, живет в IndexedDB до ручного удаления
 
 ### Хранение
 
@@ -52,17 +52,19 @@ IndexedDB `rvn_device` (v1), два store:
 
 1. Читает FPID из IndexedDB
 2. Проверяет целостность через `rb_sync.hash`
-3. Если отсутствует или повреждён — генерирует новый
+3. Если отсутствует или поврежден — генерирует новый
 4. Возвращает `{ fpid, time, lastSentAt }`
 
 ### Передача на сервер
 
 **Форма входа/регистрации** (`components/auth/Form.tsx`):
+
 ```
 fpid = getOrCreateFpid() → loginMutation({ fpid }) → markFpidSent()
 ```
 
 **OAuth** (popup → redirect → callback):
+
 ```
 getOrCreateFpid() → setFpidCookieForOAuth(fpid)
   ↓
@@ -82,14 +84,16 @@ Cookie с коротким TTL (5 мин) — потому что OAuth redirect
 Вычисляет SHA256 из нормализованных компонентов:
 
 **1. User-Agent → `browser:os`**
+
 ```
 "Mozilla/5.0 (Windows NT 10.0; ...) Chrome/120.0..." → "chrome:windows"
 ```
 
-Распознаёт: Chrome, Firefox, Safari, Edge, Opera, Brave, Vivaldi, Yandex.
+Распознает: Chrome, Firefox, Safari, Edge, Opera, Brave, Vivaldi, Yandex.
 ОС: Windows, Mac, Linux, Android, iOS.
 
 **2. IP → префикс**
+
 ```
 IPv4: "185.22.174.56"  → "185.22.174"    (первые 3 октета)
 IPv6: "2001:db8:1::1"  → "2001:db8:1::"  (первые 4 сегмента)
@@ -137,7 +141,7 @@ IPv6: "2001:db8:1::1"  → "2001:db8:1::"  (первые 4 сегмента)
 | Приватный режим | Нет | `deviceName + IP` | UPDATE или INSERT |
 | Другой браузер | Другой | Другой `deviceFpHash` | INSERT (новое устройство) |
 
-> **Примечание:** При смене сети с persistent FPID создаётся новая запись, т.к. IP prefix входит в хеш. Это ожидаемое поведение — с точки зрения сервера это может быть другое устройство.
+> **Примечание:** При смене сети с persistent FPID создается новая запись, т.к. IP prefix входит в хеш. Это ожидаемое поведение — с точки зрения сервера это может быть другое устройство.
 
 ## Схема БД
 

@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useMemo } from 'react';
+import { useMounted } from '@/hooks/useMounted';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
@@ -112,16 +113,17 @@ export function TRPCProvider({ children }: { children: React.ReactNode }) {
     return client;
   });
   /**
-   * Defer persister creation to useEffect to avoid hydration mismatch:
-   ^ Server always renders null, client initializes after mount.
+   * Persister creation deferred until client mount via useMounted
+   * to avoid hydration mismatch (server renders null, client mounts).
    */
-  const [persister, setPersister] = useState<ReturnType<typeof createAsyncStoragePersister> | null>(
-    null,
+  const isMounted = useMounted();
+  const persister = useMemo(
+    () =>
+      isMounted && typeof window !== 'undefined'
+        ? createAsyncStoragePersister({ storage: window.localStorage })
+        : null,
+    [isMounted],
   );
-
-  useEffect(() => {
-    setPersister(createAsyncStoragePersister({ storage: window.localStorage }));
-  }, []);
 
   const [trpcClient] = useState(() =>
     trpc.createClient({

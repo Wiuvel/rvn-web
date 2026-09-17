@@ -6,6 +6,9 @@ export default async function MaintenanceGuard({ children }: { children: React.R
   const headersList = await headers();
   const pathname = headersList.get('x-pathname') || '';
 
+  let isMaintenance = false;
+  let maintenanceMessage: string | undefined;
+
   try {
     const isExempt =
       pathname.startsWith('/ui/panel') ||
@@ -21,11 +24,16 @@ export default async function MaintenanceGuard({ children }: { children: React.R
       const isActive = await isMaintenanceActive();
       if (isActive) {
         const config = await getMaintenanceConfig();
-        return <MaintenancePage message={config.message} />;
+        isMaintenance = true;
+        maintenanceMessage = config.message;
       }
     }
   } catch (error) {
     console.error('Failed to check maintenance mode:', error);
+  }
+
+  if (isMaintenance) {
+    return <MaintenancePage message={maintenanceMessage} />;
   }
 
   return <>{children}</>;

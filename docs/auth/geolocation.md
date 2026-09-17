@@ -29,7 +29,7 @@ registerDevice() / createSession()
 - Поддерживает локализацию из коробки: `result.city.names.ru`, `result.country.names.ru`
 - Fallback на `.names.en` если русского перевода нет
 
-**В production (Docker)**: скачивается при сборке образа. При наличии лицензионного ключа MaxMind (передаётся как BuildKit secret) официальная актуальная база качается напрямую с MaxMind. Без ключа сборка падает обратно на community-зеркало [P3TERX/GeoLite.mmdb](https://github.com/P3TERX/GeoLite.mmdb), поэтому билд никогда не ломается:
+**В production (Docker)**: скачивается при сборке образа. При наличии лицензионного ключа MaxMind (передается как BuildKit secret) официальная актуальная база качается напрямую с MaxMind. Без ключа сборка падает обратно на community-зеркало [P3TERX/GeoLite.mmdb](https://github.com/P3TERX/GeoLite.mmdb), поэтому билд никогда не ломается:
 
 ```bash
 docker build --secret id=maxmind_key,env=MAXMIND_LICENSE_KEY -t rvn-web .
@@ -74,6 +74,7 @@ docker build --secret id=maxmind_key,env=MAXMIND_LICENSE_KEY -t rvn-web .
 ## Кеширование
 
 In-memory `Map<ip, {value, expiresAt}>`:
+
 - Макс. 10,000 записей (FIFO eviction)
 - TTL: 24 часа
 - Кешируются и положительные, и отрицательные результаты (`null`)
@@ -88,6 +89,7 @@ In-memory `Map<ip, {value, expiresAt}>`:
 ## Startup check
 
 В `instrumentation.ts` при старте сервера:
+
 ```
 [startup] GeoIP: MaxMind ready (./data/GeoLite2-City.mmdb)
 [startup] GeoIP: ip-api.com fallback (no .mmdb found)

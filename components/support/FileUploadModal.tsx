@@ -91,17 +91,23 @@ export default function FileUploadModal({
   // Убрали предзагрузку WASM на клиенте, чтобы избежать проблем с Turbopack и node-модулем `fs` в браузерном бандле.
   // thumbhash/blur теперь не генерируется на клиенте (можно реализовать серверную генерацию при необходимости).
 
+  const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
+  if (isOpen !== prevIsOpen) {
+    setPrevIsOpen(isOpen);
+    if (isOpen) {
+      setUploading(false);
+      setError(null);
+      setIsDragging(false);
+      setShowRateLimitCaptcha(false);
+    }
+  }
+
   useEffect(() => {
     if (typeof window === 'undefined' || !modalRef.current || !backdropRef.current) return;
 
     if (isOpen) {
-      // Сбрасываем состояние при открытии модального окна
-      setUploading(false);
-      setError(null);
-      setIsDragging(false);
       isCaptchaOpenRef.current = false;
       isProcessingCaptchaRef.current = false;
-      setShowRateLimitCaptcha(false);
       pendingUploadRef.current = null;
 
       gsap.set([backdropRef.current, modalRef.current], { opacity: 0 });
@@ -151,7 +157,7 @@ export default function FileUploadModal({
 
     selectedFiles.forEach(({ file }) => {
       if (file.type.startsWith('image/')) {
-        // Создаём blob URL для превью
+        // Создаем blob URL для превью
         const blobUrl = URL.createObjectURL(file);
         newPreviews.set(file.name, blobUrl);
         setPreviews(new Map(newPreviews));

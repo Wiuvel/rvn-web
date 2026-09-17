@@ -1,7 +1,7 @@
 'use client';
 
 import { trpc } from '@/lib/trpc/client';
-import { useState, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import Header from '@/components/layout/Header';
 import {
   Monitor,
@@ -64,11 +64,14 @@ export default function SettingsClient() {
     enabled: !!userData,
   });
 
-  const [devices, setDevices] = useState<Device[]>([]);
+  const [revokedIds, setRevokedIds] = useState<Set<string>>(() => new Set());
+  const [revokedOthers, setRevokedOthers] = useState(false);
 
-  useEffect(() => {
-    if (devicesData?.devices) {
-      const mappedDevices = devicesData.devices.map((d) => ({
+  const devices: Device[] = useMemo(() => {
+    if (!devicesData?.devices) return [];
+    return devicesData.devices
+      .filter((d) => !revokedIds.has(d.id) && (!revokedOthers || d.is_current))
+      .map((d) => ({
         id: d.id,
         deviceName: d.device_name,
         ipAddress: d.ip_address,
@@ -77,9 +80,7 @@ export default function SettingsClient() {
         createdAt: d.created_at,
         isCurrent: d.is_current,
       }));
-      setDevices(mappedDevices);
-    }
-  }, [devicesData]);
+  }, [devicesData, revokedIds, revokedOthers]);
 
   const revokeDeviceMutation = trpc.auth.revokeDevice.useMutation();
   const changePasswordMutation = trpc.auth.changePassword.useMutation();
@@ -104,7 +105,7 @@ export default function SettingsClient() {
 
     try {
       await revokeDeviceMutation.mutateAsync({ deviceId });
-      setDevices(devices.filter((d) => d.id !== deviceId));
+      setRevokedIds((prev) => new Set(prev).add(deviceId));
       void utils.auth.devices.invalidate();
     } catch (error) {
       console.error('Error revoking device', error);
@@ -125,7 +126,7 @@ export default function SettingsClient() {
       });
       setPasswordSuccess('Пароль успешно изменен. Другие сессии завершены.');
       reset();
-      setDevices(devices.filter((d) => d.isCurrent));
+      setRevokedOthers(true);
       void utils.auth.devices.invalidate();
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Произошла ошибка при смене пароля';

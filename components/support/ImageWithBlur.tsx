@@ -132,15 +132,12 @@ export default function ImageWithBlur({
   }, [loading]);
 
   // Сбрасываем состояние при смене src
-  useEffect(() => {
+  const [prevSrc, setPrevSrc] = useState(src);
+  if (src !== prevSrc) {
+    setPrevSrc(src);
     setHasError(false);
-    if (isBlobUrl) {
-      // Blob URL загружается мгновенно
-      setIsLoaded(true);
-    } else {
-      setIsLoaded(false);
-    }
-  }, [src, isBlobUrl]);
+    setIsLoaded(isBlobUrl);
+  }
 
   // Определяем палитру skeleton-loader на основе статуса прочтения
   const skeletonGradient = isRead

@@ -42,6 +42,7 @@ export default function BannerUploadModal({
   const [error, setError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [containerSize, setContainerSize] = useState<{ width: number; height: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
@@ -170,6 +171,10 @@ export default function BannerUploadModal({
 
   const initializeCropArea = () => {
     if (!imageRef.current || !imageContainerRef.current) return;
+    setContainerSize({
+      width: imageContainerRef.current.clientWidth,
+      height: imageContainerRef.current.clientHeight,
+    });
 
     const imgBounds = getImageBounds();
     if (!imgBounds) return;
@@ -674,19 +679,16 @@ export default function BannerUploadModal({
                   />
                   {cropArea &&
                     !isMobile &&
-                    imageContainerRef.current &&
-                    (() => {
-                      const container = imageContainerRef.current;
-                      return (
-                        <>
-                          {/* Затемнение вне области обрезки */}
-                          <div
-                            className="pointer-events-none absolute inset-0"
-                            style={{
-                              background: `linear-gradient(to right, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.6) ${(cropArea.x / container.clientWidth) * 100}%, transparent ${(cropArea.x / container.clientWidth) * 100}%, transparent ${((cropArea.x + cropArea.width) / container.clientWidth) * 100}%, rgba(0,0,0,0.6) ${((cropArea.x + cropArea.width) / container.clientWidth) * 100}%, rgba(0,0,0,0.6) 100%),
-                                      linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.6) ${(cropArea.y / container.clientHeight) * 100}%, transparent ${(cropArea.y / container.clientHeight) * 100}%, transparent ${((cropArea.y + cropArea.height) / container.clientHeight) * 100}%, rgba(0,0,0,0.6) ${((cropArea.y + cropArea.height) / container.clientHeight) * 100}%, rgba(0,0,0,0.6) 100%)`,
-                            }}
-                          />
+                    containerSize && (
+                      <>
+                        {/* Затемнение вне области обрезки */}
+                        <div
+                          className="pointer-events-none absolute inset-0"
+                          style={{
+                            background: `linear-gradient(to right, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.6) ${(cropArea.x / containerSize.width) * 100}%, transparent ${(cropArea.x / containerSize.width) * 100}%, transparent ${((cropArea.x + cropArea.width) / containerSize.width) * 100}%, rgba(0,0,0,0.6) ${((cropArea.x + cropArea.width) / containerSize.width) * 100}%, rgba(0,0,0,0.6) 100%),
+                                    linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.6) ${(cropArea.y / containerSize.height) * 100}%, transparent ${(cropArea.y / containerSize.height) * 100}%, transparent ${((cropArea.y + cropArea.height) / containerSize.height) * 100}%, rgba(0,0,0,0.6) ${((cropArea.y + cropArea.height) / containerSize.height) * 100}%, rgba(0,0,0,0.6) 100%)`,
+                          }}
+                        />
 
                           {/* Область обрезки */}
                           <div
@@ -805,8 +807,7 @@ export default function BannerUploadModal({
                             onKeyDown={() => {}}
                           />
                         </>
-                      );
-                    })()}
+                      )}
                 </div>
                 <button
                   onClick={() => {

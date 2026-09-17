@@ -215,7 +215,7 @@ export async function getUserRoles(userId: string): Promise<UserRole[]> {
       );
 
     const roles = data?.map((r) => r.role as UserRole) || [];
-    // Всегда добавляем роль 'user', если её нет
+    // Всегда добавляем роль 'user', если ее нет
     if (!roles.includes('user')) {
       roles.push('user');
     }

@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server';
 
-interface CorsOptions {
+export interface CorsOptions {
   origin?: string | string[] | boolean;
   methods?: string[];
   allowedHeaders?: string[];
   credentials?: boolean;
   maxAge?: number;
+  requestOrigin?: string | null;
 }
 
 const defaultOptions: CorsOptions = {
@@ -24,16 +25,43 @@ const defaultOptions: CorsOptions = {
   maxAge: 86400,
 };
 
-export function setCorsHeaders(response: NextResponse, options: CorsOptions = {}): NextResponse {
+export function setCorsHeaders(
+  response: NextResponse,
+  options: CorsOptions = {},
+  request?: Request | string | null,
+): NextResponse {
   const config = { ...defaultOptions, ...options };
+  const reqOrigin =
+    options.requestOrigin ??
+    (typeof request === 'string'
+      ? request
+      : request?.headers?.get('origin') ?? null);
 
-  // Origin
+  // W3C CORS Specification: Access-Control-Allow-Origin must be either a single origin or "*".
+  // Multiple origins cannot be joined by comma, and "*" cannot be used with Credentials: true.
+  let allowOrigin: string | null = null;
+
   if (config.origin === true) {
-    response.headers.set('Access-Control-Allow-Origin', '*');
+    if (config.credentials && reqOrigin) {
+      allowOrigin = reqOrigin;
+    } else {
+      allowOrigin = '*';
+    }
   } else if (Array.isArray(config.origin)) {
-    response.headers.set('Access-Control-Allow-Origin', config.origin.join(', '));
+    if (reqOrigin && config.origin.includes(reqOrigin)) {
+      allowOrigin = reqOrigin;
+    } else if (config.origin.length > 0) {
+      allowOrigin = config.origin[0]!;
+    }
   } else if (typeof config.origin === 'string') {
-    response.headers.set('Access-Control-Allow-Origin', config.origin);
+    allowOrigin = config.origin;
+  }
+
+  if (allowOrigin) {
+    response.headers.set('Access-Control-Allow-Origin', allowOrigin);
+    if (allowOrigin !== '*') {
+      response.headers.append('Vary', 'Origin');
+    }
   }
 
   // Methods
