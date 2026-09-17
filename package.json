@@ -28,7 +28,7 @@
     "test": "vitest",
     "format:check": "prettier --check .",
     "format:fix": "prettier --write .",
-    "type:check": "tsc --noEmit",
+    "type:check": "vinext typegen && tsc --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "node scripts/db-migrate.mjs",
     "db:studio": "drizzle-kit studio"

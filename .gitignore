@@ -25,7 +25,6 @@ yarn-error.log*
 !.env.example
 .vercel
 *.tsbuildinfo
-next-env.d.ts
 .next/
 .vinext/
 database/*.mmdb
